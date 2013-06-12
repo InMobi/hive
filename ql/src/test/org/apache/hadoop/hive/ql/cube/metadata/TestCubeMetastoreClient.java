@@ -111,6 +111,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.isCube(cubeTbl));
     Cube cube2 = new Cube(cubeTbl);
     Assert.assertTrue(cube.equals(cube2));
+    Assert.assertNull(cube.getTimedDimensions());
 
     client.createCube(cubeNameWithProps, cubeMeasures, cubeDimensions,
         cubeProperties);
@@ -119,7 +120,9 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.isCube(cubeTbl));
     cube2 = new Cube(cubeTbl);
     Assert.assertTrue(cubeWithProps.equals(cube2));
-
+    Assert.assertNotNull(cubeWithProps.getTimedDimensions());
+    Assert.assertTrue(cubeWithProps.getTimedDimensions().contains("dt"));
+    Assert.assertTrue(cubeWithProps.getTimedDimensions().contains("mydate"));
   }
 
   @Test
