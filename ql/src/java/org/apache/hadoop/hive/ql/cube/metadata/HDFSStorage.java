@@ -17,6 +17,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.mortbay.log.Log;
 
 public class HDFSStorage extends Storage {
 
@@ -176,6 +177,7 @@ public class HDFSStorage extends Storage {
         location = new Path(storageTbl.getPath(), partLocation);
       }
     }
+    Log.info("Adding partition with partSpec:" + partSpec);
     client.createPartition(storageTbl, partSpec,
         location, getTableParameters(), inputFormat, outputFormat, -1,
         storageTbl.getCols(), serdeClassName, serdeParameters, null, null);

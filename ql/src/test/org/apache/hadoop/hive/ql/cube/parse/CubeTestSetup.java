@@ -140,10 +140,12 @@ public class CubeTestSetup {
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
     Storage hdfsStorage2 = new HDFSStorage("C2",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage2.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage2, updates);
 
     // create cube fact
@@ -169,6 +171,7 @@ public class CubeTestSetup {
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
 
     // create cube fact
@@ -196,6 +199,7 @@ public class CubeTestSetup {
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
 
     // create cube fact
@@ -207,8 +211,10 @@ public class CubeTestSetup {
     cal.setTime(twodaysBack);
     Date temp = cal.getTime();
     while (!(temp.after(now))) {
+      Map<String, Date> timeParts = new HashMap<String, Date>();
+      timeParts.put(Storage.getDatePartitionKey(), temp);
       client.addPartition(fact2, hdfsStorage,
-        UpdatePeriod.HOURLY, temp);
+        UpdatePeriod.HOURLY, timeParts);
       cal.add(Calendar.HOUR_OF_DAY, 1);
       temp = cal.getTime();
     }
@@ -233,6 +239,7 @@ public class CubeTestSetup {
     Storage hdfsStorage = new HDFSStorage("C2",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
 
     // create cube fact
@@ -386,6 +393,7 @@ public class CubeTestSetup {
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
 
@@ -405,6 +413,7 @@ public class CubeTestSetup {
     hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
     properties = new HashMap<String, String>();
@@ -421,6 +430,7 @@ public class CubeTestSetup {
     hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    hdfsStorage.addToPartCols(Storage.getDatePartition());
     storageAggregatePeriods.put(hdfsStorage, updates);
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
     properties = new HashMap<String, String>();
@@ -435,5 +445,4 @@ public class CubeTestSetup {
   public static boolean isFirstDayOfMonth() {
     return firstDayOfMonth;
   }
-
 }

@@ -145,7 +145,8 @@ public class CubeMetastoreClient {
     if (storageAggregatePeriods != null) {
       Map<String, List<UpdatePeriod>> updatePeriods =
           new HashMap<String, List<UpdatePeriod>>();
-      for (Map.Entry<Storage, List<UpdatePeriod>> entry : storageAggregatePeriods.entrySet()) {
+      for (Map.Entry<Storage, List<UpdatePeriod>> entry :
+          storageAggregatePeriods.entrySet()) {
         updatePeriods.put(entry.getKey().getName(), entry.getValue());
       }
       return updatePeriods;
@@ -289,8 +290,6 @@ public class CubeMetastoreClient {
     if (storageAggregatePeriods != null) {
       // create tables for each storage
       for (Storage storage : storageAggregatePeriods.keySet()) {
-        // Add date partition for all facts.
-        storage.addToPartCols(Storage.getDatePartition());
         createFactStorage(factTable.getName(), storage, sd,
             storageAggregatePeriods.get(storage));
       }
@@ -371,12 +370,12 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public void addPartition(CubeFactTable table, Storage storage,
-      UpdatePeriod updatePeriod, Date partitionTimestamp)
+      UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         table.getName(), updatePeriod, storage.getPrefix());
     addPartition(storageTableName, storage, getPartitionSpec(updatePeriod,
-        partitionTimestamp), false);
+        partitionTimestamps), false);
   }
 
   /**
@@ -391,13 +390,13 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public void addPartition(CubeFactTable table, Storage storage,
-      UpdatePeriod updatePeriod, Date partitionTimestamp,
+      UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps,
       Map<String, String> partSpec)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         table.getName(), updatePeriod, storage.getPrefix());
     partSpec.putAll(getPartitionSpec(updatePeriod,
-        partitionTimestamp));
+        partitionTimestamps));
     addPartition(storageTableName, storage, partSpec, false);
   }
 
@@ -427,6 +426,17 @@ public class CubeMetastoreClient {
     return partSpec;
   }
 
+  private Map<String, String> getPartitionSpec(
+      UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps) {
+    Map<String, String> partSpec = new HashMap<String, String>();
+    SimpleDateFormat dateFormat = new SimpleDateFormat(updatePeriod.format());
+    for (Map.Entry<String, Date> entry : partitionTimestamps.entrySet()) {
+      String pval = dateFormat.format(entry.getValue());
+      partSpec.put(entry.getKey(), pval);
+    }
+    return partSpec;
+  }
+
   private void addPartition(String storageTableName, Storage storage,
       Map<String, String> partSpec, boolean makeLatest) throws HiveException {
     storage.addPartition(storageTableName, partSpec, config, makeLatest);
@@ -451,12 +461,20 @@ public class CubeMetastoreClient {
 
   boolean factPartitionExists(CubeFactTable fact,
       Storage storage, UpdatePeriod updatePeriod,
-      Date partitionTimestamp, Map<String, String> partSpec)
+      Map<String, Date> partitionTimestamp, Map<String, String> partSpec)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         fact.getName(), updatePeriod, storage.getPrefix());
     return partitionExists(storageTableName, updatePeriod, partitionTimestamp,
         partSpec);
+  }
+
+  public boolean partitionExists(String storageTableName,
+      UpdatePeriod updatePeriod,
+      Map<String, Date> partitionTimestamps)
+          throws HiveException {
+    return partitionExists(storageTableName,
+        getPartitionSpec(updatePeriod, partitionTimestamps));
   }
 
   public boolean partitionExists(String storageTableName,
@@ -468,9 +486,9 @@ public class CubeMetastoreClient {
   }
 
   boolean partitionExists(String storageTableName, UpdatePeriod updatePeriod,
-      Date partitionTimestamp, Map<String, String> partSpec)
+      Map<String, Date> partitionTimestamps, Map<String, String> partSpec)
           throws HiveException {
-    partSpec.putAll(getPartitionSpec(updatePeriod, partitionTimestamp));
+    partSpec.putAll(getPartitionSpec(updatePeriod, partitionTimestamps));
     return partitionExists(storageTableName, partSpec);
   }
 
