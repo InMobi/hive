@@ -29,9 +29,13 @@ public class TestCubeMetastoreClient {
 
   //cube members
   private Cube cube;
+  private Cube cubeWithProps;
   private Set<CubeMeasure> cubeMeasures;
   private Set<CubeDimension> cubeDimensions;
   private final String cubeName = "testMetastoreCube";
+  private final String cubeNameWithProps = "testMetastoreCubeWithProps";
+  private final Map<String, String> cubeProperties =
+      new HashMap<String, String>();
   private Date now;
 
   @Before
@@ -92,6 +96,11 @@ public class TestCubeMetastoreClient {
     cubeDimensions.add(new InlineDimension(
             new FieldSchema("region", "string", "region dim"), regions));
     cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
+
+    cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
+        cubeNameWithProps), "dt,mydate");
+    cubeWithProps = new Cube(cubeNameWithProps, cubeMeasures, cubeDimensions,
+        cubeProperties);
   }
 
   @Test
@@ -102,6 +111,15 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.isCube(cubeTbl));
     Cube cube2 = new Cube(cubeTbl);
     Assert.assertTrue(cube.equals(cube2));
+
+    client.createCube(cubeNameWithProps, cubeMeasures, cubeDimensions,
+        cubeProperties);
+    Assert.assertTrue(client.tableExists(cubeNameWithProps));
+    cubeTbl = client.getHiveTable(cubeNameWithProps);
+    Assert.assertTrue(client.isCube(cubeTbl));
+    cube2 = new Cube(cubeTbl);
+    Assert.assertTrue(cubeWithProps.equals(cube2));
+
   }
 
   @Test
@@ -190,16 +208,16 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorage, updates);
     updatePeriods.put(hdfsStorage.getName(), updates);
 
-    CubeFactTable cubeFact = new CubeFactTable(cubeName, factName, factColumns,
-        updatePeriods);
+    CubeFactTable cubeFact = new CubeFactTable(cubeNameWithProps, factName,
+        factColumns, updatePeriods);
 
     // create cube fact
-    client.createCubeFactTable(cubeName, factName, factColumns,
+    client.createCubeFactTable(cubeNameWithProps, factName, factColumns,
         storageAggregatePeriods, 0L);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cube));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeWithProps));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
