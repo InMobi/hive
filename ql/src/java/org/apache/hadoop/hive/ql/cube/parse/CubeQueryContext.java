@@ -62,6 +62,7 @@ public class CubeQueryContext {
   private Cube cube;
   private List<String> cubeMeasureNames;
   private List<String> cubeDimNames;
+  private Set<String> timedDimensions;
   protected Set<CubeDimensionTable> dimensions =
       new HashSet<CubeDimensionTable>();
   private final Map<String, AbstractCubeTable> cubeTbls =
@@ -112,6 +113,7 @@ public class CubeQueryContext {
   private ASTNode orderByAST;
   private ASTNode groupByAST;
   private CubeMetastoreClient client;
+  private String timeDim;
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -182,9 +184,13 @@ public class CubeQueryContext {
           cube = client.getCube(tblName);
           cubeMeasureNames = MetastoreUtil.getCubeMeasureNames(cube);
           cubeDimNames = MetastoreUtil.getCubeDimensionNames(cube);
+          timedDimensions = cube.getTimedDimensions();
           List<String> cubeCols = new ArrayList<String>();
           cubeCols.addAll(cubeMeasureNames);
           cubeCols.addAll(cubeDimNames);
+          if (timedDimensions != null) {
+            cubeCols.addAll(timedDimensions);
+          }
           cubeTabToCols.put(cube, cubeCols);
           cubeTbls.put(tblName.toLowerCase(), cube);
         } else if (client.isDimensionTable(tblName)) {
@@ -247,11 +253,17 @@ public class CubeQueryContext {
       throw new SemanticException("Expected time range as " + TIME_RANGE_FUNC);
     }
 
-    fromDateRaw =
-        PlanUtils.stripQuotes(timenode.getChild(1).getText());
+    String timeDimName = PlanUtils.stripQuotes(timenode.getChild(1).getText());
+    if (cube.getTimedDimensions().contains(timeDimName)) {
+      timeDim = timeDimName;
+    } else {
+      throw new SemanticException(timeDimName + " is not a time dimension");
+    }
+
+
+    fromDateRaw = PlanUtils.stripQuotes(timenode.getChild(2).getText());
     if (timenode.getChildCount() > 2) {
-      toDateRaw = PlanUtils.stripQuotes(
-          timenode.getChild(2).getText());
+      toDateRaw = PlanUtils.stripQuotes(timenode.getChild(3).getText());
     }
     Date now = new Date();
 
@@ -262,7 +274,7 @@ public class CubeQueryContext {
       throw new SemanticException(e);
     }
 
-    assert timeFrom != null && timeTo != null;
+    assert timeDim != null && timeFrom != null && timeTo != null;
 
     if (timeFrom.after(timeTo)) {
       throw new SemanticException("From date: " + fromDateRaw
@@ -448,7 +460,7 @@ public class CubeQueryContext {
       // can answer the query
       String str = conf.get(CubeQueryConstants.VALID_FACT_TABLES);
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
-        Arrays.asList(StringUtils.split(str.toLowerCase()));
+        Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
       for (Iterator<CubeFactTable> i = candidateFactTables.iterator();
           i.hasNext();) {
         CubeFactTable fact = i.next();
@@ -749,7 +761,7 @@ public class CubeQueryContext {
       throws SemanticException {
     List<String> qstrs = new ArrayList<String>();
     qstrs.add(getSelectTree());
-    String whereString = getWhereTree(factStorageTable);
+    String whereString = genWhereClauseWithPartitions(factStorageTable);
     qstrs.add(getFromString());
     if (whereString != null) {
       qstrs.add(whereString);
@@ -896,21 +908,25 @@ public class CubeQueryContext {
     whereWithoutTimerange.append(")");
   }
 
-  private String getWhereTree(String factStorageTable) {
-    String originalWhereString = getWhereTree();
-    StringBuilder whereWithoutTimerange;
+  private String genWhereClauseWithPartitions(String factStorageTable) {
+    String originalWhere = getWhereTree();
+    StringBuilder whereBuf;
 
     if (factStorageTable != null) {
-      whereWithoutTimerange = new StringBuilder(originalWhereString.substring(0,
-          originalWhereString.indexOf(CubeQueryContext.TIME_RANGE_FUNC)));
-      // add where clause for fact;
-      appendWhereClause(whereWithoutTimerange, storageTableToWhereClause.get(
-          factStorageTable));
+      // Get Rid of the time range.
+      int timeRangeBegin = originalWhere.indexOf(TIME_RANGE_FUNC);
+      int timeRangeEnd = originalWhere.indexOf(')', timeRangeBegin);
+
+      whereBuf = new StringBuilder(originalWhere.substring(0, timeRangeBegin));
+      whereBuf.append("(")
+      .append(storageTableToWhereClause.get(factStorageTable))
+      .append(")")
+      .append(originalWhere.substring(timeRangeEnd));
     } else {
-      if (originalWhereString != null) {
-        whereWithoutTimerange = new StringBuilder(originalWhereString);
+      if (originalWhere != null) {
+        whereBuf = new StringBuilder(originalWhere);
       } else {
-        whereWithoutTimerange = new StringBuilder();
+        whereBuf = new StringBuilder();
       }
     }
 
@@ -918,16 +934,16 @@ public class CubeQueryContext {
     Iterator<CubeDimensionTable> it = dimensions.iterator();
     if (it.hasNext()) {
       CubeDimensionTable dim = it.next();
-      appendWhereClause(dim, whereWithoutTimerange, factStorageTable != null);
+      appendWhereClause(dim, whereBuf, factStorageTable != null);
       while (it.hasNext()) {
         dim = it.next();
-        appendWhereClause(dim, whereWithoutTimerange, true);
+        appendWhereClause(dim, whereBuf, true);
       }
     }
-    if (whereWithoutTimerange.length() == 0) {
+    if (whereBuf.length() == 0) {
       return null;
     }
-    return whereWithoutTimerange.toString();
+    return whereBuf.toString();
   }
 
   public String toHQL() throws SemanticException {
@@ -1128,5 +1144,9 @@ public class CubeQueryContext {
     if (exprToAlias != null) {
       exprToAlias.put(expr.trim().toLowerCase(), alias);
     }
+  }
+
+  public String getTimeDimension() {
+     return timeDim;
   }
 }

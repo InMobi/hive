@@ -27,6 +27,7 @@ public class CubeDriver extends Driver {
 
   public static String CUBE_QUERY_PFX = "CUBE ";
   private Context ctx;
+  CubeQueryContext rewrittenQuery;
 
   @Override
   public int compile(String command) {
@@ -64,6 +65,7 @@ public class CubeDriver extends Driver {
     // compile the cube query and rewrite it to HQL query
     CubeQueryRewriter rewriter = new CubeQueryRewriter(getConf());
     CubeQueryContext rewrittenQuery = rewriter.rewrite(tree);
+    this.rewrittenQuery = rewrittenQuery;
     String hql = rewrittenQuery.toHQL();
     if (explain) {
       hql = "EXPLAIN " + hql;

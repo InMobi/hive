@@ -57,10 +57,10 @@ public class StorageTableResolver implements ContextRewriter {
         CubeQueryConstants.FAIL_QUERY_ON_PARTIAL_DATA, false);
     String str = conf.get(CubeQueryConstants.VALID_STORAGE_FACT_TABLES);
     validFactStorageTables = StringUtils.isBlank(str) ? null :
-      Arrays.asList(StringUtils.split(str.toLowerCase()));
+      Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
     str = conf.get(CubeQueryConstants.VALID_STORAGE_DIM_TABLES);
     validDimTables = StringUtils.isBlank(str) ? null :
-      Arrays.asList(StringUtils.split(str.toLowerCase()));
+      Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
   }
 
   private List<String> getSupportedStorages(Configuration conf) {
@@ -82,10 +82,12 @@ public class StorageTableResolver implements ContextRewriter {
   Map<String, List<String>> storagePartMap =
       new HashMap<String, List<String>>();
 
+  private CubeQueryContext cubeql;
+
   @Override
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
-
+    this.cubeql = cubeql;
     client = cubeql.getMetastoreClient();
     if (!cubeql.getCandidateFactTables().isEmpty()) {
       // resolve storage table names
@@ -262,8 +264,11 @@ public class StorageTableResolver implements ContextRewriter {
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
       for (String storageTableName : storageTbls) {
+        String timePartitionColumn = cubeql.getTimeDimension();
+        Map<String, Date> timeSpec = new HashMap<String, Date>(1);
+        timeSpec.put(timePartitionColumn, dt);
         if (client.partitionExists(storageTableName,
-            interval, dt)) {
+            interval, timeSpec)) {
           partitions.add(part);
           foundPart = true;
           LOG.info("Adding existing partition" + part);

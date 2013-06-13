@@ -110,8 +110,12 @@ public class CubeTestSetup {
     cubeDimensions.add(new ReferencedDimension(
         new FieldSchema("dim2", "string", "ref dim"),
         new TableReference("testdim2", "id")));
-    cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
-    client.createCube(cubeName, cubeMeasures, cubeDimensions);
+    Map<String, String> cubeProperties =
+        new HashMap<String, String>();
+    cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
+        cubeName), Storage.getDatePartitionKey());
+    cube = new Cube(cubeName, cubeMeasures, cubeDimensions, cubeProperties);
+    client.createCube(cubeName, cubeMeasures, cubeDimensions, cubeProperties);
   }
 
   private void createCubeFact(CubeMetastoreClient client) throws HiveException {

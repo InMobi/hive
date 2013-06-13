@@ -3,12 +3,14 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
@@ -19,14 +21,18 @@ public final class Cube extends AbstractCubeTable {
   private final Map<String, CubeMeasure> measureMap;
   private final Map<String, CubeDimension> dimMap;
 
-
   static {
     columns.add(new FieldSchema("dummy", "string", "dummy column"));
   }
 
   public Cube(String name, Set<CubeMeasure> measures,
       Set<CubeDimension> dimensions) {
-    super(name, columns, new HashMap<String, String>());
+    this(name, measures, dimensions, new HashMap<String, String>());
+  }
+
+  public Cube(String name, Set<CubeMeasure> measures,
+      Set<CubeDimension> dimensions, Map<String, String> properties) {
+    super(name, columns, properties);
     this.measures = measures;
     this.dimensions = dimensions;
 
@@ -64,6 +70,17 @@ public final class Cube extends AbstractCubeTable {
 
   public Set<CubeDimension> getDimensions() {
     return dimensions;
+  }
+
+  public Set<String> getTimedDimensions() {
+    String str = getProperties().get(
+        MetastoreUtil.getCubeTimedDimensionListKey(getName()));
+    if (str != null) {
+      Set<String> timedDimensions = new HashSet<String>();
+      timedDimensions.addAll(Arrays.asList(StringUtils.split(str, ',')));
+      return timedDimensions;
+    }
+    return null;
   }
 
   @Override
