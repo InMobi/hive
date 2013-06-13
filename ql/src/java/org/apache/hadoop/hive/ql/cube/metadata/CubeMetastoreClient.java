@@ -182,7 +182,7 @@ public class CubeMetastoreClient {
 
   /**
    * Create cube defined by measures, dimensions and properties
-   * 
+   *
    * @param name Name of the cube
    * @param measures Measures of the cube
    * @param dimensions Dimensions of the cube
@@ -192,7 +192,7 @@ public class CubeMetastoreClient {
   public void createCube(String name, Set<CubeMeasure> measures,
       Set<CubeDimension> dimensions, Map<String, String> properties)
           throws HiveException {
-    Cube cube = new Cube(name, measures, dimensions);
+    Cube cube = new Cube(name, measures, dimensions, properties);
     createCube(cube);
   }
 

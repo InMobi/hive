@@ -31,11 +31,11 @@ public class TestCubeDriver {
   private Configuration conf;
   private CubeDriver driver;
   private final String cubeName = "testcube";
-  private final String twoDaysRange = "time_range_in('" + getDateUptoHours(
+  private final String twoDaysRange = "time_range_in('dt', '" + getDateUptoHours(
       twodaysBack) + "','" + getDateUptoHours(now) + "')";
-  private final String twoMonthsRangeUptoHours = "time_range_in('" +
+  private final String twoMonthsRangeUptoHours = "time_range_in('dt', '" +
       getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
-  private final String twoMonthsRangeUptoMonth = "time_range_in('" +
+  private final String twoMonthsRangeUptoMonth = "time_range_in('dt', '" +
       getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
 
   @BeforeClass
@@ -71,7 +71,7 @@ public class TestCubeDriver {
     Throwable th = null;
     try {
       driver.compileCubeQuery("select SUM(msr2) from testCube where" +
-        " time_range_in('NOW - 2DAYS', 'NOW')");
+        " time_range_in('dt', 'NOW - 2DAYS', 'NOW')");
     } catch (SemanticException e) {
       th = e;
       e.printStackTrace();
@@ -767,7 +767,8 @@ public class TestCubeDriver {
 
   @Test
   public void testTimeRangeValidation() throws Exception {
-    String timeRange2 = " time_range_in('" + getDateUptoHours(now)
+    System.out.println("##timerangein ");
+    String timeRange2 = " time_range_in('dt', '" + getDateUptoHours(now)
         + "','" + getDateUptoHours(twodaysBack) + "')";
     try {
       // this should throw exception because from date is after to date
@@ -778,6 +779,33 @@ public class TestCubeDriver {
       exc.printStackTrace();
       Assert.assertNotNull(exc);
     }
+
+    // check that time range can be any child of AND
+    String timeRange = " time_range_in('dt', '" + getDateUptoHours(twodaysBack)
+        + "','" + getDateUptoHours(now) + "')";
+    String q1 = "SELECT cityid, testCube.msr2 from testCube where " + timeRange + " AND cityid=1";
+
+    try {
+      String hql = driver.compileCubeQuery(q1);
+      System.out.println("##time1 " + hql);
+    } catch (SemanticException se) {
+      se.printStackTrace();
+    }
+
+    String q2 = "SELECT cityid, testCube.msr3 from testCube where cityid=1 AND " + timeRange;
+
+    try {
+      String hql = driver.compileCubeQuery(q2);
+      System.out.println("##time2 " + hql);
+    } catch (SemanticException se) {
+      se.printStackTrace();
+    }
+
+    // Check that column name in time range is extracted properly
+    driver.compileCubeQuery(q2);
+    Assert.assertEquals("Time dimension should be " + Storage.getDatePartitionKey(),
+        Storage.getDatePartitionKey(),
+        driver.rewrittenQuery.getTimeDimension());
   }
 
   @Test
