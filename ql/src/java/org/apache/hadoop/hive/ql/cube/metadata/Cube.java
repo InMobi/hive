@@ -77,7 +77,7 @@ public final class Cube extends AbstractCubeTable {
         MetastoreUtil.getCubeTimedDimensionListKey(getName()));
     if (str != null) {
       Set<String> timedDimensions = new HashSet<String>();
-      timedDimensions.addAll(Arrays.asList(StringUtils.split(str)));
+      timedDimensions.addAll(Arrays.asList(StringUtils.split(str, ',')));
       return timedDimensions;
     }
     return null;

@@ -57,10 +57,10 @@ public class StorageTableResolver implements ContextRewriter {
         CubeQueryConstants.FAIL_QUERY_ON_PARTIAL_DATA, false);
     String str = conf.get(CubeQueryConstants.VALID_STORAGE_FACT_TABLES);
     validFactStorageTables = StringUtils.isBlank(str) ? null :
-      Arrays.asList(StringUtils.split(str.toLowerCase()));
+      Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
     str = conf.get(CubeQueryConstants.VALID_STORAGE_DIM_TABLES);
     validDimTables = StringUtils.isBlank(str) ? null :
-      Arrays.asList(StringUtils.split(str.toLowerCase()));
+      Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
   }
 
   private List<String> getSupportedStorages(Configuration conf) {

@@ -62,6 +62,7 @@ public class CubeQueryContext {
   private Cube cube;
   private List<String> cubeMeasureNames;
   private List<String> cubeDimNames;
+  private Set<String> timedDimensions;
   protected Set<CubeDimensionTable> dimensions =
       new HashSet<CubeDimensionTable>();
   private final Map<String, AbstractCubeTable> cubeTbls =
@@ -182,9 +183,13 @@ public class CubeQueryContext {
           cube = client.getCube(tblName);
           cubeMeasureNames = MetastoreUtil.getCubeMeasureNames(cube);
           cubeDimNames = MetastoreUtil.getCubeDimensionNames(cube);
+          timedDimensions = cube.getTimedDimensions();
           List<String> cubeCols = new ArrayList<String>();
           cubeCols.addAll(cubeMeasureNames);
           cubeCols.addAll(cubeDimNames);
+          if (timedDimensions != null) {
+            cubeCols.addAll(timedDimensions);
+          }
           cubeTabToCols.put(cube, cubeCols);
           cubeTbls.put(tblName.toLowerCase(), cube);
         } else if (client.isDimensionTable(tblName)) {
@@ -448,7 +453,7 @@ public class CubeQueryContext {
       // can answer the query
       String str = conf.get(CubeQueryConstants.VALID_FACT_TABLES);
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
-        Arrays.asList(StringUtils.split(str.toLowerCase()));
+        Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
       for (Iterator<CubeFactTable> i = candidateFactTables.iterator();
           i.hasNext();) {
         CubeFactTable fact = i.next();
