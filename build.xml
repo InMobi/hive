@@ -1144,7 +1144,7 @@
     <artifact:pom
        file="${mvn.pom.dir}/hive-${hive.project}-${version}.pom"
        id="hive.project.pom" />
-    <artifact:install-provider artifactId="wagon-http" version="1.0-beta-2" />
+    <artifact:install-provider artifactId="wagon-http" version="2.4" />
     <if>
       <equals arg1="${mvn.publish.repo}" arg2="staging" />
       <then>
