@@ -24,7 +24,9 @@ public abstract class AbstractCubeTable implements Named {
     this.name = name.toLowerCase();
     this.columns = columns;
     this.weight = weight;
-    this.properties.putAll(props);
+    if (props != null) {
+      this.properties.putAll(props);
+    }
   }
 
   protected AbstractCubeTable(Table hiveTable) {
