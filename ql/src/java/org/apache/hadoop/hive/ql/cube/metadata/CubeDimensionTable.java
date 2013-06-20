@@ -1,39 +1,41 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeDimensionTable extends AbstractCubeTable {
-  private final Map<String, TableReference> dimensionReferences;
+  private final Map<String, List<TableReference>> dimensionReferences;
   private final Map<String, UpdatePeriod> snapshotDumpPeriods;
 
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight, Map<String, UpdatePeriod> snapshotDumpPeriods) {
     this(dimName, columns, weight, snapshotDumpPeriods,
-        new HashMap<String, TableReference>(), new HashMap<String, String>());
+        new HashMap<String, List<TableReference>>(), new HashMap<String, String>());
   }
 
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight, Set<String> storages) {
     this(dimName, columns, weight, getSnapshotDumpPeriods(storages),
-        new HashMap<String, TableReference>(), new HashMap<String, String>());
+        new HashMap<String, List<TableReference>>(), new HashMap<String, String>());
   }
 
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight, Map<String, UpdatePeriod> snapshotDumpPeriods,
-      Map<String, TableReference> dimensionReferences) {
+      Map<String, List<TableReference>> dimensionReferences) {
     this(dimName, columns, weight, snapshotDumpPeriods, dimensionReferences,
         new HashMap<String, String>());
   }
 
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight, Set<String> storages,
-      Map<String, TableReference> dimensionReferences) {
+      Map<String, List<TableReference>> dimensionReferences) {
     this(dimName, columns, weight, getSnapshotDumpPeriods(storages),
         dimensionReferences, new HashMap<String, String>());
   }
@@ -41,7 +43,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight,
       Map<String, UpdatePeriod> snapshotDumpPeriods,
-      Map<String, TableReference> dimensionReferences,
+      Map<String, List<TableReference>> dimensionReferences,
       Map<String, String> properties) {
     super(dimName, columns, properties, weight);
     this.dimensionReferences = dimensionReferences;
@@ -77,7 +79,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     addSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
 
-  public Map<String, TableReference> getDimensionReferences() {
+  public Map<String, List<TableReference>> getDimensionReferences() {
     return dimensionReferences;
   }
 
@@ -101,27 +103,33 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   }
 
   public static void addDimensionReferenceProperties(Map<String, String> props,
-      Map<String, TableReference> dimensionReferences) {
+      Map<String, List<TableReference>> dimensionReferences) {
     if (dimensionReferences != null) {
-      for (Map.Entry<String, TableReference> entry : dimensionReferences.entrySet()) {
+      for (Map.Entry<String, List<TableReference>> entry : dimensionReferences.entrySet()) {
         props.put(MetastoreUtil.getDimensionSrcReferenceKey(entry.getKey()),
             MetastoreUtil.getDimensionDestReference(entry.getValue()));
       }
     }
   }
 
-  public static Map<String, TableReference> getDimensionReferences(
+  public static Map<String, List<TableReference>> getDimensionReferences(
       Map<String, String> params) {
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
     for (String param : params.keySet()) {
       if (param.startsWith(MetastoreConstants.DIM_KEY_PFX)) {
         String key = param.replace(MetastoreConstants.DIM_KEY_PFX, "");
         String toks[] = key.split("\\.+");
         String dimName = toks[0];
         String value = params.get(MetastoreUtil.getDimensionSrcReferenceKey(dimName));
+
         if (value != null) {
-          dimensionReferences.put(dimName, new TableReference(value));
+          String refDims[] = StringUtils.split(value, ",");
+          List<TableReference> references = new ArrayList<TableReference>(refDims.length);
+          for (String refDim : refDims) {
+            references.add(new TableReference(refDim));
+          }
+          dimensionReferences.put(dimName, references);
         }
       }
     }

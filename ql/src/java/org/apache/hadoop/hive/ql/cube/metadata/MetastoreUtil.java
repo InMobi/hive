@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 public class MetastoreUtil implements MetastoreConstants {
@@ -65,10 +66,16 @@ public class MetastoreUtil implements MetastoreConstants {
         + columnName.toLowerCase();
   }
 
-  public static final String getDimensionDestReference(
-      TableReference reference) {
-    return reference.getDestTable() + TABLE_COLUMN_SEPERATOR
-        + reference.getDestColumn();
+  public static final String getDimensionDestReference(List<TableReference> references) {
+    String toks[] = new String[references.size()];
+
+    for (int i = 0; i < references.size(); i++) {
+      TableReference reference = references.get(i);
+      toks[i] = reference.getDestTable() + TABLE_COLUMN_SEPERATOR
+          + reference.getDestColumn();
+    }
+
+    return StringUtils.join(toks, ',');
   }
 
   public static String getInlineDimensionSizeKey(String name) {
