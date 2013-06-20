@@ -265,10 +265,10 @@ public class CubeTestSetup {
         " testColumnAmbiguity"));
     dimColumns.add(new FieldSchema("ambigdim2", "string", "used in " +
         "testColumnAmbiguity"));
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
-    dimensionReferences.put("stateid", new TableReference("statetable", "id"));
-    dimensionReferences.put("zipcode", new TableReference("ziptable", "code"));
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
+    dimensionReferences.put("zipcode", Arrays.asList(new TableReference("ziptable", "code")));
 
     Storage hdfsStorage1 = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
@@ -292,8 +292,8 @@ public class CubeTestSetup {
     dimColumns.add(new FieldSchema("f1", "string", "field1"));
     dimColumns.add(new FieldSchema("f2", "string", "field2"));
 
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
     Map<Storage, UpdatePeriod> snapshotDumpPeriods =
         new HashMap<Storage, UpdatePeriod>();
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
@@ -319,8 +319,8 @@ public class CubeTestSetup {
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
     Map<Storage, UpdatePeriod> snapshotDumpPeriods =
         new HashMap<Storage, UpdatePeriod>();
     snapshotDumpPeriods.put(hdfsStorage, null);
@@ -337,10 +337,10 @@ public class CubeTestSetup {
     dimColumns.add(new FieldSchema("capital", "string", "field2"));
     dimColumns.add(new FieldSchema("countryid", "string", "region name"));
 
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
-    dimensionReferences.put("countryid", new TableReference("countrytable",
-        "id"));
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("countryid", Arrays.asList(new TableReference("countrytable",
+        "id")));
 
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
