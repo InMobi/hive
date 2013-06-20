@@ -93,6 +93,16 @@ public class TestCubeMetastoreClient {
     cubeDimensions.add(new ReferencedDimension(
             new FieldSchema("dim2", "string", "ref dim"),
             new TableReference("testdim2", "id")));
+
+    List<TableReference> multiRefs = new ArrayList<TableReference>();
+    multiRefs.add(new TableReference("testdim2", "id"));
+    multiRefs.add(new TableReference("testdim3", "id"));
+    multiRefs.add(new TableReference("testdim4", "id"));
+
+    cubeDimensions.add(
+        new ReferencedDimension(new FieldSchema("dim3", "string", "multi ref dim"), multiRefs));
+
+
     cubeDimensions.add(new InlineDimension(
             new FieldSchema("region", "string", "region dim"), regions));
     cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
@@ -535,9 +545,9 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("capital", "string", "field2"));
     dimColumns.add(new FieldSchema("countryid", "int", "country id"));
 
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
-    dimensionReferences.put("countryid", new TableReference("countrytable", "id"));
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("countryid", Arrays.asList(new TableReference("countrytable", "id")));
 
     Map<Storage, UpdatePeriod> snapshotDumpPeriods =
         new HashMap<Storage, UpdatePeriod>();
@@ -579,10 +589,18 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("f1", "string", "field1"));
     dimColumns.add(new FieldSchema("f2", "string", "field2"));
     dimColumns.add(new FieldSchema("stateid", "int", "state id"));
+    dimColumns.add(new FieldSchema("statei2", "int", "state id"));
 
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
-    dimensionReferences.put("stateid", new TableReference("statetable", "id"));
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
+
+
+    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
+
+    final TableReference stateRef = new TableReference("statetable", "id");
+    final TableReference cityRef =  new TableReference("citytable", "id");
+    dimensionReferences.put("stateid2",
+        Arrays.asList(stateRef, cityRef));
 
     Map<Storage, UpdatePeriod> snapshotDumpPeriods =
         new HashMap<Storage, UpdatePeriod>();
@@ -591,16 +609,31 @@ public class TestCubeMetastoreClient {
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     snapshotDumpPeriods.put(hdfsStorage, UpdatePeriod.HOURLY);
+
     dumpPeriods.put(hdfsStorage.getName(), UpdatePeriod.HOURLY);
+
     CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
         dimColumns, 0L, dumpPeriods, dimensionReferences);
+
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
         dimensionReferences, snapshotDumpPeriods);
+
     Assert.assertTrue(client.tableExists(dimName));
+
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
+
     CubeDimensionTable cubeDim2 = new CubeDimensionTable(cubeTbl);
     Assert.assertTrue(cubeDim.equals(cubeDim2));
+
+    Map<String, List<TableReference>> actualRefs = cubeDim2.getDimensionReferences();
+    Assert.assertNotNull(actualRefs);
+    List<TableReference> multirefs = actualRefs.get("stateid2");
+    Assert.assertNotNull(multirefs);
+    Assert.assertEquals("Expecting two refs", 2, multirefs.size());
+    Assert.assertEquals(stateRef, multirefs.get(0));
+    Assert.assertEquals(cityRef, multirefs.get(1));
+
 
     // Assert for storage tables
     for (Storage storage : snapshotDumpPeriods.keySet()) {
@@ -626,9 +659,9 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("capital", "string", "field2"));
     dimColumns.add(new FieldSchema("region", "string", "region name"));
 
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
-    dimensionReferences.put("stateid", new TableReference("statetable", "id"));
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
 
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
@@ -665,9 +698,9 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("name", "string", "field1"));
     dimColumns.add(new FieldSchema("stateid", "int", "state id"));
 
-    Map<String, TableReference> dimensionReferences =
-        new HashMap<String, TableReference>();
-    dimensionReferences.put("stateid", new TableReference("statetable", "id"));
+    Map<String, List<TableReference>> dimensionReferences =
+        new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
 
     Storage hdfsStorage1 = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
