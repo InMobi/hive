@@ -23,6 +23,12 @@ public class ReferencedDimension extends BaseDimension {
         MetastoreUtil.getDimensionDestReference(reference));
   }
 
+  /**
+   * This is used only for serializing
+   *
+   * @param name
+   * @param props
+   */
   public ReferencedDimension(String name, Map<String, String> props) {
     super(name, props);
     this.reference = new TableReference(

@@ -23,6 +23,12 @@ public class BaseDimension extends CubeDimension {
     props.put(MetastoreUtil.getDimTypePropertyKey(getName()), type);
   }
 
+  /**
+   * This is used only for serializing
+   *
+   * @param name
+   * @param props
+   */
   public BaseDimension(String name, Map<String, String> props) {
     super(name);
     this.type = getDimType(name, props);
