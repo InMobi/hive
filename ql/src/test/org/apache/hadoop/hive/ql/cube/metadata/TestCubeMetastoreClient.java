@@ -13,47 +13,54 @@ import java.util.Set;
 
 import org.apache.avro.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.mapred.TextInputFormat;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestCubeMetastoreClient {
 
-  private CubeMetastoreClient client;
+  private static CubeMetastoreClient client;
 
   //cube members
-  private Cube cube;
-  private Cube cubeWithProps;
-  private Set<CubeMeasure> cubeMeasures;
-  private Set<CubeDimension> cubeDimensions;
-  private final String cubeName = "testMetastoreCube";
-  private final String cubeNameWithProps = "testMetastoreCubeWithProps";
-  private final Map<String, String> cubeProperties =
+  private static Cube cube;
+  private static Cube cubeWithProps;
+  private static Set<CubeMeasure> cubeMeasures;
+  private static Set<CubeDimension> cubeDimensions;
+  private static final String cubeName = "testMetastoreCube";
+  private static final String cubeNameWithProps = "testMetastoreCubeWithProps";
+  private static final Map<String, String> cubeProperties =
       new HashMap<String, String>();
-  private Date now;
+  private static Date now;
+  private static HiveConf conf = new HiveConf(TestCubeMetastoreClient.class);
 
-  @Before
-  public void setup() throws HiveException {
-    client =  CubeMetastoreClient.getInstance(new HiveConf(this.getClass()));
+  @BeforeClass
+  public static void setup() throws HiveException, AlreadyExistsException {
+    client =  CubeMetastoreClient.getInstance(conf);
     now = new Date();
-
+    Database database = new Database();
+    database.setName(TestCubeMetastoreClient.class.getSimpleName());
+    Hive.get(conf).createDatabase(database);
+    client.setCurrentDatabase(TestCubeMetastoreClient.class.getSimpleName());
     defineCube();
   }
 
-  @After
-  public void teardown() {
-    if (client != null) {
-      client.close();
-    }
+  @AfterClass
+  public static void teardown() throws Exception {
+    Hive.get().dropDatabase(TestCubeMetastoreClient.class.getSimpleName(),
+        true, true, true);
+    CubeMetastoreClient.close();
   }
 
-  private void defineCube() {
+  private static void defineCube() {
     cubeMeasures = new HashSet<CubeMeasure>();
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
         "first measure")));
@@ -115,6 +122,8 @@ public class TestCubeMetastoreClient {
 
   @Test
   public void testCube() throws Exception {
+    Assert.assertEquals(client.getCurrentDatabase(),
+        this.getClass().getSimpleName());
     client.createCube(cubeName, cubeMeasures, cubeDimensions);
     Assert.assertTrue(client.tableExists(cubeName));
     Table cubeTbl = client.getHiveTable(cubeName);
@@ -166,7 +175,7 @@ public class TestCubeMetastoreClient {
 
     // create cube fact
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
@@ -226,7 +235,7 @@ public class TestCubeMetastoreClient {
 
     // create cube fact
     client.createCubeFactTable(cubeNameWithProps, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
@@ -289,7 +298,7 @@ public class TestCubeMetastoreClient {
 
     // create cube fact
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 100L);
+        storageAggregatePeriods, 100L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
@@ -352,7 +361,7 @@ public class TestCubeMetastoreClient {
     CubeFactTable cubeFactWithParts = new CubeFactTable(cubeName,
         factNameWithPart, factColumns, updatePeriods);
     client.createCubeFactTable(cubeName, factNameWithPart, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factNameWithPart));
     Table cubeTbl = client.getHiveTable(factNameWithPart);
     Assert.assertTrue(client.isFactTable(cubeTbl));
@@ -420,7 +429,7 @@ public class TestCubeMetastoreClient {
     CubeFactTable cubeFactWithParts = new CubeFactTable(cubeName,
         factNameWithPart, factColumns, updatePeriods);
     client.createCubeFactTable(cubeName, factNameWithPart, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factNameWithPart));
     Table cubeTbl = client.getHiveTable(factNameWithPart);
     Assert.assertTrue(client.isFactTable(cubeTbl));
@@ -498,7 +507,7 @@ public class TestCubeMetastoreClient {
     CubeFactTable cubeFactWithTwoStorages = new CubeFactTable(cubeName,
         factName, factColumns, updatePeriods);
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
@@ -560,7 +569,7 @@ public class TestCubeMetastoreClient {
     CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
         dimColumns, 100L, dumpPeriods, dimensionReferences);
     client.createCubeDimensionTable(dimName, dimColumns, 100L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
@@ -616,7 +625,7 @@ public class TestCubeMetastoreClient {
         dimColumns, 0L, dumpPeriods, dimensionReferences);
 
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
 
     Assert.assertTrue(client.tableExists(dimName));
 
@@ -673,7 +682,7 @@ public class TestCubeMetastoreClient {
     CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
         dimColumns, 0L, storageNames, dimensionReferences);
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, storages);
+        dimensionReferences, storages, null);
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
@@ -718,7 +727,7 @@ public class TestCubeMetastoreClient {
     CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
         dimColumns, 0L, dumpPeriods, dimensionReferences);
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));

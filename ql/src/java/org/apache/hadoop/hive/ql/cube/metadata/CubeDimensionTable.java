@@ -41,6 +41,14 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   }
 
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
+      double weight, Set<String> storages,
+      Map<String, List<TableReference>> dimensionReferences,
+      Map<String, String> properties) {
+    this(dimName, columns, weight, getSnapshotDumpPeriods(storages),
+        dimensionReferences, properties);
+  }
+
+  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight,
       Map<String, UpdatePeriod> snapshotDumpPeriods,
       Map<String, List<TableReference>> dimensionReferences,

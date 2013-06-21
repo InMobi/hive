@@ -62,6 +62,14 @@ public class CubeMetastoreClient {
     Hive.closeCurrent();
   }
 
+  public void setCurrentDatabase(String currentDatabase) {
+    metastore.setCurrentDatabase(currentDatabase);
+  }
+
+  public String getCurrentDatabase() {
+    return metastore.getCurrentDatabase();
+  }
+
   private StorageDescriptor createStorageHiveTable(String tableName,
       StorageDescriptor sd,
       Map<String, String> parameters, TableType type,
@@ -204,15 +212,17 @@ public class CubeMetastoreClient {
    * @param columns The columns of fact table
    * @param storageAggregatePeriods Aggregate periods for the storages
    * @param weight Weight of the cube
+   * @param properties Properties of fact table
    *
    * @throws HiveException
    */
   public void createCubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
-      Map<Storage, List<UpdatePeriod>> storageAggregatePeriods, double weight)
+      Map<Storage, List<UpdatePeriod>> storageAggregatePeriods, double weight,
+      Map<String, String> properties)
           throws HiveException {
     CubeFactTable factTable = new CubeFactTable(cubeName, factName, columns,
-        getUpdatePeriods(storageAggregatePeriods), weight);
+        getUpdatePeriods(storageAggregatePeriods), weight, properties);
     createCubeTable(factTable, storageAggregatePeriods);
   }
 
@@ -224,14 +234,17 @@ public class CubeMetastoreClient {
    * @param weight Weight of the dimension table
    * @param dimensionReferences References to other dimensions
    * @param storages Storages on which dimension is available
+   * @param properties Properties of dimension table
+   *
    * @throws HiveException
    */
   public void createCubeDimensionTable(String dimName,
       List<FieldSchema> columns, double weight,
-      Map<String, List<TableReference>> dimensionReferences, Set<Storage> storages)
+      Map<String, List<TableReference>> dimensionReferences,
+      Set<Storage> storages, Map<String, String> properties)
           throws HiveException {
     CubeDimensionTable dimTable = new CubeDimensionTable(dimName, columns,
-        weight, getStorageNames(storages), dimensionReferences);
+        weight, getStorageNames(storages), dimensionReferences, properties);
     createCubeTable(dimTable, storages);
   }
 
@@ -267,17 +280,19 @@ public class CubeMetastoreClient {
    * @param dimensionReferences References to other dimensions
    * @param dumpPeriods Storages and their dump periods on which dimension
    *  is available
+   * @param properties properties of dimension table
    * @throws HiveException
    */
   public void createCubeDimensionTable(String dimName,
       List<FieldSchema> columns, double weight,
       Map<String, List<TableReference>> dimensionReferences,
-      Map<Storage, UpdatePeriod> dumpPeriods)
+      Map<Storage, UpdatePeriod> dumpPeriods,
+      Map<String, String> properties)
           throws HiveException {
     // add date partitions for storages with dumpPeriods
     addDatePartitions(dumpPeriods);
     CubeDimensionTable dimTable = new CubeDimensionTable(dimName, columns,
-        weight, getDumpPeriods(dumpPeriods), dimensionReferences);
+        weight, getDumpPeriods(dumpPeriods), dimensionReferences, properties);
     createCubeTable(dimTable, dumpPeriods.keySet());
   }
 

@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.BaseDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.ColumnMeasure;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.cube.metadata.TableReference;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.mapred.TextInputFormat;
 
@@ -154,7 +156,7 @@ public class CubeTestSetup {
 
     // create cube fact
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
   }
 
   private void createCubeFactWeekly(CubeMetastoreClient client) throws HiveException {
@@ -180,7 +182,7 @@ public class CubeTestSetup {
 
     // create cube fact
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
   }
 
   private void createCubeFactOnlyHourly(CubeMetastoreClient client)
@@ -208,7 +210,7 @@ public class CubeTestSetup {
 
     // create cube fact
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
     Calendar cal = Calendar.getInstance();
@@ -248,7 +250,7 @@ public class CubeTestSetup {
 
     // create cube fact
     client.createCubeFactTable(cubeName, factName, factColumns,
-        storageAggregatePeriods, 0L);
+        storageAggregatePeriods, 0L, null);
   }
 
   //DimWithTwoStorages
@@ -281,7 +283,7 @@ public class CubeTestSetup {
     snapshotDumpPeriods.put(hdfsStorage1, UpdatePeriod.HOURLY);
     snapshotDumpPeriods.put(hdfsStorage2, null);
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
   }
 
   private void createZiptable(CubeMetastoreClient client) throws Exception {
@@ -303,7 +305,7 @@ public class CubeTestSetup {
     snapshotDumpPeriods.put(hdfsStorage, UpdatePeriod.HOURLY);
     dumpPeriods.put(hdfsStorage.getName(), UpdatePeriod.HOURLY);
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
   }
 
   private void createCountryTable(CubeMetastoreClient client) throws Exception {
@@ -325,7 +327,7 @@ public class CubeTestSetup {
         new HashMap<Storage, UpdatePeriod>();
     snapshotDumpPeriods.put(hdfsStorage, null);
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
   }
 
   private void createStateTable(CubeMetastoreClient client) throws Exception {
@@ -349,12 +351,15 @@ public class CubeTestSetup {
         new HashMap<Storage, UpdatePeriod>();
     snapshotDumpPeriods.put(hdfsStorage, UpdatePeriod.HOURLY);
     client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, snapshotDumpPeriods);
+        dimensionReferences, snapshotDumpPeriods, null);
   }
 
-  public void createSources() throws Exception {
-    CubeMetastoreClient client =  CubeMetastoreClient.getInstance(
-        new HiveConf(this.getClass()));
+  public void createSources(HiveConf conf, String dbName) throws Exception {
+    CubeMetastoreClient client =  CubeMetastoreClient.getInstance(conf);
+    Database database = new Database();
+    database.setName(dbName);
+    Hive.get(conf).createDatabase(database);
+    client.setCurrentDatabase(dbName);
     createCube(client);
     createCubeFact(client);
     // commenting this as the week date format throws IllegalPatternException
@@ -366,6 +371,11 @@ public class CubeTestSetup {
     createCountryTable(client);
     createStateTable(client);
     createCubeFactsWithValidColumns(client);
+  }
+
+  public void dropSources(HiveConf conf) throws Exception {
+    Hive metastore = Hive.get(conf);
+    metastore.dropDatabase(metastore.getCurrentDatabase(), true, true, true);
   }
 
   private void createCubeFactsWithValidColumns(CubeMetastoreClient client)

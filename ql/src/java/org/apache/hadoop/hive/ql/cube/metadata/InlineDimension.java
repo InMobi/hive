@@ -28,6 +28,12 @@ public class InlineDimension extends BaseDimension {
         MetastoreUtil.getStr(values));
   }
 
+  /**
+   * This is used only for serializing
+   *
+   * @param name
+   * @param props
+   */
   public InlineDimension(String name, Map<String, String> props) {
     super(name, props);
     String valueStr = props.get(MetastoreUtil.getInlineDimensionValuesKey(
