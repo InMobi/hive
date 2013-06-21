@@ -21,6 +21,7 @@ import org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup;
 import org.apache.hadoop.hive.ql.cube.parse.DateUtil;
 import org.apache.hadoop.hive.ql.cube.parse.StorageTableResolver;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -38,10 +39,17 @@ public class TestCubeDriver {
   private final String twoMonthsRangeUptoMonth = "time_range_in('dt', '" +
       getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
 
+  static CubeTestSetup setup;
+  static HiveConf hconf = new HiveConf(TestCubeDriver.class);
   @BeforeClass
   public static void setup() throws Exception {
-    CubeTestSetup setup = new CubeTestSetup();
-    setup.createSources();
+    setup = new CubeTestSetup();
+    setup.createSources(hconf, TestCubeDriver.class.getSimpleName());
+  }
+
+  @AfterClass
+  public static void tearDown() throws Exception {
+    setup.dropSources(hconf);
   }
 
   @Before

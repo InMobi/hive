@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.BaseDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.ColumnMeasure;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.cube.metadata.TableReference;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.mapred.TextInputFormat;
 
@@ -63,6 +65,9 @@ public class CubeTestSetup {
     return zerothHour;
   }
 
+  public void setDB(String dbName) {
+
+  }
   private void createCube(CubeMetastoreClient client) throws HiveException {
     cubeMeasures = new HashSet<CubeMeasure>();
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
@@ -352,9 +357,12 @@ public class CubeTestSetup {
         dimensionReferences, snapshotDumpPeriods, null);
   }
 
-  public void createSources() throws Exception {
-    CubeMetastoreClient client =  CubeMetastoreClient.getInstance(
-        new HiveConf(this.getClass()));
+  public void createSources(HiveConf conf, String dbName) throws Exception {
+    CubeMetastoreClient client =  CubeMetastoreClient.getInstance(conf);
+    Database database = new Database();
+    database.setName(dbName);
+    Hive.get(conf).createDatabase(database);
+    client.setCurrentDatabase(dbName);
     createCube(client);
     createCubeFact(client);
     // commenting this as the week date format throws IllegalPatternException
@@ -366,6 +374,11 @@ public class CubeTestSetup {
     createCountryTable(client);
     createStateTable(client);
     createCubeFactsWithValidColumns(client);
+  }
+
+  public void dropSources(HiveConf conf) throws Exception {
+    Hive metastore = Hive.get(conf);
+    metastore.dropDatabase(metastore.getCurrentDatabase(), true, true, true);
   }
 
   private void createCubeFactsWithValidColumns(CubeMetastoreClient client)

@@ -62,6 +62,14 @@ public class CubeMetastoreClient {
     Hive.closeCurrent();
   }
 
+  public void setCurrentDatabase(String currentDatabase) {
+    metastore.setCurrentDatabase(currentDatabase);
+  }
+
+  public String getCurrentDatabase() {
+    return metastore.getCurrentDatabase();
+  }
+
   private StorageDescriptor createStorageHiveTable(String tableName,
       StorageDescriptor sd,
       Map<String, String> parameters, TableType type,
