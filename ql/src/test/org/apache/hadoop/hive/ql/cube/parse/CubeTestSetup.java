@@ -65,9 +65,6 @@ public class CubeTestSetup {
     return zerothHour;
   }
 
-  public void setDB(String dbName) {
-
-  }
   private void createCube(CubeMetastoreClient client) throws HiveException {
     cubeMeasures = new HashSet<CubeMeasure>();
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
