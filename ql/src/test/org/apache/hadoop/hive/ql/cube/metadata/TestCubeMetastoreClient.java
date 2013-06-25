@@ -179,7 +179,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cube));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeName));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
@@ -239,7 +239,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeWithProps));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeNameWithProps));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
@@ -302,7 +302,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cube));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeName));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
@@ -365,7 +365,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(factNameWithPart));
     Table cubeTbl = client.getHiveTable(factNameWithPart);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cube));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeName));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFactWithParts.equals(cubeFact2));
 
@@ -433,7 +433,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(factNameWithPart));
     Table cubeTbl = client.getHiveTable(factNameWithPart);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cube));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeName));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFactWithParts.equals(cubeFact2));
 
@@ -511,7 +511,7 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
-    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cube));
+    Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeName));
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFactWithTwoStorages.equals(cubeFact2));
 
