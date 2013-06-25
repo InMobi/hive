@@ -590,11 +590,11 @@ public class CubeMetastoreClient {
     return CubeTableType.FACT.name().equals(tableType);
   }
 
-  boolean isFactTableForCube(Table tbl, Cube cube) {
+  boolean isFactTableForCube(Table tbl, String cube) {
     if (isFactTable(tbl)) {
       String cubeName = tbl.getParameters().get(
           MetastoreUtil.getFactCubeNameKey(tbl.getTableName()));
-      return cubeName.equalsIgnoreCase(cube.getName());
+      return cubeName.equalsIgnoreCase(cube);
     }
     return false;
   }
@@ -674,10 +674,15 @@ public class CubeMetastoreClient {
   public CubeDimensionTable getDimensionTable(String tableName)
       throws HiveException {
     Table tbl = getTable(tableName);
-    if (isDimensionTable(tableName)) {
-      return new CubeDimensionTable(tbl);
+    if (isDimensionTable(tbl)) {
+      return getDimensionTable(tbl);
     }
     return null;
+  }
+
+  private CubeDimensionTable getDimensionTable(Table tbl)
+      throws HiveException {
+      return new CubeDimensionTable(tbl);
   }
 
   /**
@@ -689,10 +694,14 @@ public class CubeMetastoreClient {
    */
   public Cube getCube(String tableName) throws HiveException {
     Table tbl = getTable(tableName);
-    if (isCube(tableName)) {
-      return new Cube(tbl);
+    if (isCube(tbl)) {
+      return getCube(tbl);
     }
     return null;
+  }
+
+  private Cube getCube(Table tbl) {
+    return new Cube(tbl);
   }
 
   /**
@@ -707,14 +716,80 @@ public class CubeMetastoreClient {
     List<CubeDimensionTable> dimTables = new ArrayList<CubeDimensionTable>();
     try {
       for (String table : getClient().getAllTables()) {
-        if (isDimensionTable(table)) {
-          dimTables.add(getDimensionTable(table));
+        Table tbl = getHiveTable(table);
+        if (isDimensionTable(tbl)) {
+          dimTables.add(getDimensionTable(tbl));
         }
       }
     } catch (HiveException e) {
       throw new HiveException("Could not get all tables", e);
     }
     return dimTables;
+  }
+
+  /**
+   * Get all dimension tables names
+   *
+   * @return List of dimension table names
+   *
+   * @throws HiveException
+   */
+  public List<String> getAllDimensionTableNames()
+      throws HiveException {
+    List<String> dimTables = new ArrayList<String>();
+    try {
+      for (String table : getClient().getAllTables()) {
+        if (isDimensionTable(table)) {
+          dimTables.add(table);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return dimTables;
+  }
+
+  /**
+   * Get all cubes in metastore
+   *
+   * @return List of Cube objects
+   * @throws HiveException
+   */
+  public List<Cube> getAllCubes()
+      throws HiveException {
+    List<Cube> cubes = new ArrayList<Cube>();
+    try {
+      for (String table : getClient().getAllTables()) {
+        Table tbl = getHiveTable(table);
+        if (isCube(tbl)) {
+          cubes.add(getCube(tbl));
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return cubes;
+  }
+
+  /**
+   * Get all cube names in metastore
+   *
+   * @return List of String objects
+   * @throws HiveException
+   */
+  public List<String> getAllCubeNames()
+      throws HiveException {
+    List<String> cubes = new ArrayList<String>();
+    try {
+      for (String table : getClient().getAllTables()) {
+        if (isCube(table)) {
+          cubes.add(table);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return cubes;
   }
 
   /**
@@ -730,8 +805,31 @@ public class CubeMetastoreClient {
     try {
       for (String tableName : getClient().getAllTables()) {
         Table tbl = getTable(tableName);
-        if (isFactTableForCube(tbl, cube)) {
+        if (isFactTableForCube(tbl, cube.getName())) {
           factTables.add(new CubeFactTable(tbl));
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return factTables;
+  }
+
+  /**
+   * Get all fact table anmess in the cube.
+   *
+   * @param cube Cube object
+   *
+   * @return List of fact tables
+   * @throws HiveException
+   */
+  public List<String> getAllFactTableNames(String cube) throws HiveException {
+    List<String> factTables = new ArrayList<String>();
+    try {
+      for (String tableName : getClient().getAllTables()) {
+        Table tbl = getTable(tableName);
+        if (isFactTableForCube(tbl, cube)) {
+          factTables.add(tableName);
         }
       }
     } catch (HiveException e) {
