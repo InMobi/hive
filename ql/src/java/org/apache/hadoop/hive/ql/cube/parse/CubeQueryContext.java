@@ -915,7 +915,7 @@ public class CubeQueryContext {
     if (factStorageTable != null) {
       // Get Rid of the time range.
       int timeRangeBegin = originalWhere.indexOf(TIME_RANGE_FUNC);
-      int timeRangeEnd = originalWhere.indexOf(')', timeRangeBegin);
+      int timeRangeEnd = originalWhere.indexOf(')', timeRangeBegin) + 1;
 
       whereBuf = new StringBuilder(originalWhere.substring(0, timeRangeBegin));
       whereBuf.append("(")
