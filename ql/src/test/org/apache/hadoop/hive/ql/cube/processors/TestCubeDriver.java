@@ -691,6 +691,8 @@ public class TestCubeDriver {
     String q7 = "SELECT cityid, sum(testCube.msr2) from testCube where "
       + twoDaysRange + " having (testCube.msr2 > 100) OR (testcube.msr2 < 100" +
       " AND SUM(testcube.msr3) > 1000)";
+    String q8 = "SELECT cityid, sum(testCube.msr2) * sum(testCube.msr3) from" +
+      " testCube where " + twoDaysRange;
 
     String expectedq1 = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
       " sum(testCube.msr2) from ", null, "group by testcube.cityid",
@@ -718,10 +720,15 @@ public class TestCubeDriver {
       " SUM(testcube.msr3) > 1000)",
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact_HOURLY",
         "C1_testfact_DAILY"));
+    String expectedq8 = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
+        " sum(testCube.msr2) * sum(testCube.msr3) from ", null,
+        "group by testcube.cityid",
+        getWhereForDailyAndHourly2days(cubeName, "C1_testfact_HOURLY",
+          "C1_testfact_DAILY"));
 
-    String tests[] = {q1, q2, q3, q4, q5, q6, q7};
+    String tests[] = {q1, q2, q3, q4, q5, q6, q7, q8};
     String expected[] = {expectedq1, expectedq2, expectedq3, expectedq4,
-        expectedq5, expectedq6, expectedq7};
+        expectedq5, expectedq6, expectedq7,expectedq8};
 
     for (int i = 0; i < tests.length; i++) {
       try {
@@ -735,12 +742,12 @@ public class TestCubeDriver {
         e.printStackTrace();
       }
     }
-    String q8 = "SELECT cityid, testCube.noAggrMsr FROM testCube where "
+    String failq = "SELECT cityid, testCube.noAggrMsr FROM testCube where "
                 + twoDaysRange;
     try {
       // Should throw exception in aggregate resolver because noAggrMsr does
       //not have a default aggregate defined.
-      String hql = driver.compileCubeQuery(q8);
+      String hql = driver.compileCubeQuery(failq);
       Assert.assertTrue("Should not reach here: " + hql, false);
     } catch (SemanticException exc) {
       Assert.assertNotNull(exc);

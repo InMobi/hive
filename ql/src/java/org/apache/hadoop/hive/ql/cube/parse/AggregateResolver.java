@@ -79,6 +79,7 @@ public class AggregateResolver implements ContextRewriter {
       }
     } else if (HQLParser.isArithmeticOp(nodeType)) {
       // Allowed - sum ( msr1 * msr2 + msr3)
+      // Allowed - sum(msr1) * sum(msr2) + sum(msr3)
       // Not allowed - msr1 + msr2 * msr3 <- Not inside aggregate
       // Not allowed - sum(msr1) + msr2 <- Aggregate only on one measure
       // count of measures within aggregates must be equal to count of measures
