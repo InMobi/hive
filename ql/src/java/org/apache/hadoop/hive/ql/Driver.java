@@ -906,7 +906,9 @@ public class Driver implements CommandProcessor {
       ret = compile(command);
     }
     if (ret != 0) {
-      releaseLocks(ctx.getHiveLocks());
+      if (ctx != null) {
+        releaseLocks(ctx.getHiveLocks());
+      }
       return new CommandProcessorResponse(ret, errorMessage, SQLState);
     }
 
