@@ -383,6 +383,17 @@ public class TestJdbcDriver2 extends TestCase {
     doTestSelectAll(tableName, 100, 20);
   }
 
+  public void testNullType() throws Exception {
+    Statement stmt = con.createStatement();
+    try {
+      ResultSet res = stmt.executeQuery("select null from " + dataTypeTableName);
+      assertTrue(res.next());
+      assertNull(res.getObject(1));
+    } finally {
+      stmt.close();
+    }
+  }
+
   public void testDataTypes() throws Exception {
     Statement stmt = con.createStatement();
 
@@ -637,6 +648,14 @@ public class TestJdbcDriver2 extends TestCase {
 
     for (String checkPattern: tests.keySet()) {
       ResultSet rs = (ResultSet)con.getMetaData().getTables("default", null, checkPattern, null);
+      ResultSetMetaData resMeta = rs.getMetaData();
+      assertEquals(5, resMeta.getColumnCount());
+      assertEquals("TABLE_CAT", resMeta.getColumnName(1));
+      assertEquals("TABLE_SCHEM", resMeta.getColumnName(2));
+      assertEquals("TABLE_NAME", resMeta.getColumnName(3));
+      assertEquals("TABLE_TYPE", resMeta.getColumnName(4));
+      assertEquals("REMARKS", resMeta.getColumnName(5));
+
       int cnt = 0;
       while (rs.next()) {
         String resultTableName = rs.getString("TABLE_NAME");
@@ -678,7 +697,7 @@ public class TestJdbcDriver2 extends TestCase {
     ResultSet rs = (ResultSet)con.getMetaData().getSchemas();
     ResultSetMetaData resMeta = rs.getMetaData();
     assertEquals(2, resMeta.getColumnCount());
-    assertEquals("TABLE_SCHEMA", resMeta.getColumnName(1));
+    assertEquals("TABLE_SCHEM", resMeta.getColumnName(1));
     assertEquals("TABLE_CATALOG", resMeta.getColumnName(2));
 
     assertTrue(rs.next());
