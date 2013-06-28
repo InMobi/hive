@@ -91,16 +91,22 @@ public class AggregateResolver implements ContextRewriter {
       if (measuresInAggregates == measuresInTree) {
         if (measuresInAggregates == 0 && !insideAggregate) {
           // (msr1 + msr2)
-          throw new SemanticException("Invalid projection expression: "
+          throw new SemanticException("Invalid projection expression: arithmetic expression of measures "
               + HQLParser.getString(node));
         } else if (insideAggregate) {
           // sum(sum(msr1) + sum(msr2))
-          throw new SemanticException("Invalid projection expression: "
+          throw new SemanticException("Invalid projection expression: aggreate over aggregates "
               + HQLParser.getString(node));
+        } else {
+          // Valid complex aggregate expression: sum(msr1) + sum(msr2)
+          // We have to add it to aggregate set, as Hive analyzer will add parts of the expression,
+          // but not the whole expression itself
+          cubeql.addAggregateExpr(HQLParser.getString(node).toLowerCase());
         }
       } else {
-        throw new SemanticException("Invalid projection expression: "
-            + HQLParser.getString(node));
+        throw new SemanticException("Invalid projection expression: mismatched aggregates and measures"
+            + HQLParser.getString(node) + " measures in aggregates =" + measuresInAggregates
+            + " total measures =" + measuresInTree);
       }
     } else {
       boolean isArithmetic = HQLParser.isArithmeticOp(nodeType);
@@ -132,22 +138,34 @@ public class AggregateResolver implements ContextRewriter {
   }
 
   private int countMeasuresInAggregates(CubeQueryContext cubeql, ASTNode node,
-      boolean inAggregate) {
+      boolean hasAggregateParent) throws SemanticException {
     int nodeType = node.getToken().getType();
     if (nodeType == HiveParser.TOK_TABLE_OR_COL || nodeType == HiveParser.DOT) {
       String msrname = getColName(node);
-      if (cubeql.isCubeMeasure(msrname) && inAggregate) {
+      if (cubeql.isCubeMeasure(msrname) && hasAggregateParent) {
         return 1;
       } else {
         return 0;
       }
     } else {
       int count = 0;
+      // Tell children if they are inside an aggregate function:
+      // if this node is already in aggregate, then pass true, otherwise check if current node is
+      // an aggregate and pass that
+
+      boolean isCurrentNodeAggregate = isAggregateAST(node);
+
+      if (hasAggregateParent && isCurrentNodeAggregate) {
+        throw new SemanticException("Invalid projection - aggregate inside aggregate");
+      }
+
+      boolean isAggr = hasAggregateParent ? true : isCurrentNodeAggregate;
+
       for (int i = 0; i < node.getChildCount(); i++) {
-        boolean isAggr = isAggregateAST((ASTNode) node.getChild(i));
         count += countMeasuresInAggregates(cubeql, (ASTNode) node.getChild(i),
             isAggr);
       }
+
       return count;
     }
   }

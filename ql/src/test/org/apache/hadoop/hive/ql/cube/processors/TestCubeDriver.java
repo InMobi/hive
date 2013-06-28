@@ -309,7 +309,7 @@ public class TestCubeDriver {
     } else if (expected == null) {
       Assert.fail();
     } else if (actual == null) {
-      Assert.fail();
+      Assert.fail("Rewritten query is null");
     }
     expected = expected.replaceAll("\\W", "");
     actual = actual.replaceAll("\\W", "");
@@ -682,21 +682,36 @@ public class TestCubeDriver {
 
   @Test
   public void testAggregateResolver() throws Exception {
+    // pass
     String q1 = "SELECT cityid, testCube.msr2 from testCube where "
       + twoDaysRange;
+
+    // fail
     String q2 = "SELECT cityid, testCube.msr2 * testCube.msr2 from testCube where "
       + twoDaysRange;
+
+    // pass
     String q3 = "SELECT cityid, sum(testCube.msr2) from testCube where "
       + twoDaysRange;
+
+    // pass
     String q4 = "SELECT cityid, sum(testCube.msr2) from testCube where "
       + twoDaysRange + " having testCube.msr2 > 100";
+
+    // fail
     String q5 = "SELECT cityid, testCube.msr2 from testCube where "
       + twoDaysRange + " having testCube.msr2 + testCube.msr2 > 100";
+
+    // pass
     String q6 = "SELECT cityid, testCube.msr2 from testCube where "
       + twoDaysRange + " having testCube.msr2 > 100 AND testCube.msr2 < 1000";
+
+    // pass
     String q7 = "SELECT cityid, sum(testCube.msr2) from testCube where "
       + twoDaysRange + " having (testCube.msr2 > 100) OR (testcube.msr2 < 100" +
       " AND SUM(testcube.msr3) > 1000)";
+
+    // pass
     String q8 = "SELECT cityid, sum(testCube.msr2) * sum(testCube.msr3) from" +
       " testCube where " + twoDaysRange;
 
@@ -733,8 +748,8 @@ public class TestCubeDriver {
           "C1_testfact_DAILY"));
 
     String tests[] = {q1, q2, q3, q4, q5, q6, q7, q8};
-    String expected[] = {expectedq1, expectedq2, expectedq3, expectedq4,
-        expectedq5, expectedq6, expectedq7,expectedq8};
+    String expected[] = {expectedq1, /*fail*/ expectedq2, expectedq3, expectedq4,
+        /*fail*/ expectedq5, expectedq6, expectedq7,expectedq8};
 
     for (int i = 0; i < tests.length; i++) {
       String hql = null;
