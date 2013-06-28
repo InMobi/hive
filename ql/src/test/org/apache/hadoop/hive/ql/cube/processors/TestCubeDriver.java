@@ -304,7 +304,13 @@ public class TestCubeDriver {
   }
 
   private void compareQueries(String expected, String actual) {
-    System.out.println("Expected:" + expected);
+    if (expected == null && actual == null) {
+      return;
+    } else if (expected == null) {
+      Assert.fail();
+    } else if (actual == null) {
+      Assert.fail();
+    }
     expected = expected.replaceAll("\\W", "");
     actual = actual.replaceAll("\\W", "");
     Assert.assertTrue(expected.equalsIgnoreCase(actual));
@@ -731,15 +737,19 @@ public class TestCubeDriver {
         expectedq5, expectedq6, expectedq7,expectedq8};
 
     for (int i = 0; i < tests.length; i++) {
+      String hql = null;
+      Throwable th = null;
       try {
-        String hql = driver.compileCubeQuery(tests[i]);
-        if (expected[i] != null) {
-          compareQueries(expected[i], hql);
-        } else {
-          Assert.assertTrue("Should not reach here", false);
-        }
+        hql = driver.compileCubeQuery(tests[i]);
       } catch (SemanticException e) {
+        th = e;
         e.printStackTrace();
+      }
+      System.out.println("expected[" + i + "]:" + expected[i]);
+      if (expected[i] != null) {
+        compareQueries(expected[i], hql);
+      } else {
+        Assert.assertNotNull(th);
       }
     }
     String failq = "SELECT cityid, testCube.noAggrMsr FROM testCube where "
