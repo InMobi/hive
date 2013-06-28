@@ -10,15 +10,9 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 public class MetastoreUtil implements MetastoreConstants {
 
-  public static final String getVirtualFactTableName(String factName,
-      UpdatePeriod updatePeriod) {
-    return factName + "_" + updatePeriod.name();
-  }
-
   public static final String getFactStorageTableName(String factName,
-      UpdatePeriod updatePeriod, String storagePrefix) {
-    return getStorageTableName(getVirtualFactTableName(factName,
-        updatePeriod), storagePrefix);
+      String storagePrefix) {
+    return getStorageTableName(factName, storagePrefix);
   }
 
   public static final String getDimStorageTableName(String dimName,
@@ -29,11 +23,6 @@ public class MetastoreUtil implements MetastoreConstants {
   public static final String getStorageTableName(String virtualTableName,
       String storagePrefix) {
     return storagePrefix + virtualTableName;
-  }
-
-  public static String getCubeNameFromVirtualName(String virtualName,
-      CubeTableType type) {
-    return virtualName.substring(type.name().length() + 1);
   }
 
   // ///////////////////////
@@ -66,7 +55,8 @@ public class MetastoreUtil implements MetastoreConstants {
         + columnName.toLowerCase();
   }
 
-  public static final String getDimensionDestReference(List<TableReference> references) {
+  public static final String getDimensionDestReference(
+      List<TableReference> references) {
     String toks[] = new String[references.size()];
 
     for (int i = 0; i < references.size(); i++) {
