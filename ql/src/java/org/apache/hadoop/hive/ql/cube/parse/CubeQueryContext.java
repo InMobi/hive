@@ -90,9 +90,8 @@ public class CubeQueryContext {
   protected final Map<CubeFactTable, Map<UpdatePeriod, List<String>>>
   factPartitionMap =
   new HashMap<CubeFactTable, Map<UpdatePeriod, List<String>>>();
-  private final Map<CubeFactTable, Map<UpdatePeriod, List<String>>>
-  factStorageMap =
-  new HashMap<CubeFactTable, Map<UpdatePeriod, List<String>>>();
+  private final Map<CubeFactTable, List<String>> factStorageMap =
+      new HashMap<CubeFactTable, List<String>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
   private final Map<String, String> storageTableToWhereClause =
@@ -458,7 +457,8 @@ public class CubeQueryContext {
     if (cube != null) {
       // go over the columns accessed in the query and find out which tables
       // can answer the query
-      String str = conf.get(CubeQueryConstants.VALID_FACT_TABLES);
+      String str = conf.get(CubeQueryConfUtil.getValidFactTablesKey(
+          cube.getName()));
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
         Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
       for (Iterator<CubeFactTable> i = candidateFactTables.iterator();
@@ -958,43 +958,22 @@ public class CubeQueryContext {
     }
 
     if (fact != null) {
-      Map<UpdatePeriod, List<String>> storageTableMap = factStorageMap.get(
-          fact);
-      Map<UpdatePeriod, List<String>> partColMap = factPartitionMap.get(fact);
-
-      StringBuilder query = new StringBuilder();
-      Iterator<UpdatePeriod> it = partColMap.keySet().iterator();
-      while (it.hasNext()) {
-        UpdatePeriod updatePeriod = it.next();
-        if (storageTableMap.get(updatePeriod) == null ||
-            storageTableMap.get(updatePeriod).isEmpty()) {
-          throw new SemanticException("No storage table available for fact" +
-              fact + " for update period" + updatePeriod);
-        }
-        String storageTable = storageTableMap.get(updatePeriod).get(0);
-        storageTableToQuery.put(getCube(), storageTable);
-        query.append(toHQL(storageTable));
-        if (it.hasNext()) {
-          query.append(" UNION ALL ");
-        }
-      }
-      if (partColMap.keySet().size() > 1) {
-        return getUnionQuery(query.toString());
-      } else {
-        return query.toString();
-      }
+      List<String> storageTableMap = factStorageMap.get(fact);
+      // choosing the first storage table one in the list
+      String storageTable = storageTableMap.get(0);
+      storageTableToQuery.put(getCube(), storageTable);
+      return toHQL(storageTable);
     } else {
       return toHQL(null);
     }
   }
 
-  public Map<CubeFactTable, Map<UpdatePeriod, List<String>>> getFactStorageMap()
-  {
+  public Map<CubeFactTable, List<String>> getFactStorageMap() {
     return factStorageMap;
   }
 
-  public void setFactStorageMap(Map<CubeFactTable,
-      Map<UpdatePeriod, List<String>>> factStorageMap) {
+  public void setFactStorageMap(Map<CubeFactTable, List<String>> factStorageMap)
+  {
     this.factStorageMap.putAll(factStorageMap);
   }
 
@@ -1147,6 +1126,6 @@ public class CubeQueryContext {
   }
 
   public String getTimeDimension() {
-     return timeDim;
+    return timeDim;
   }
 }

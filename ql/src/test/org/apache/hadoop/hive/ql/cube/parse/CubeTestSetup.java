@@ -402,13 +402,12 @@ public class CubeTestSetup {
     Map<String, List<UpdatePeriod>> storageUpdatePeriods =
         new HashMap<String, List<UpdatePeriod>>();
 
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
+    Set<Storage> storages = new HashSet<Storage>();
     Storage hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage.addToPartCols(Storage.getDatePartition());
-    storageAggregatePeriods.put(hdfsStorage, updates);
+    storages.add(hdfsStorage);
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
 
     // create cube fact summary1
@@ -418,17 +417,16 @@ public class CubeTestSetup {
         validColumns);
     CubeFactTable fact1 = new CubeFactTable(cubeName, factName, factColumns,
         storageUpdatePeriods, 10L, properties);
-    client.createCubeTable(fact1, storageAggregatePeriods);
+    client.createCubeTable(fact1, storages);
 
     // create summary2 - same schema, different valid columns
     factName = "summary2";
-    storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
+    storages = new HashSet<Storage>();
     hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage.addToPartCols(Storage.getDatePartition());
-    storageAggregatePeriods.put(hdfsStorage, updates);
+    storages.add(hdfsStorage);
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
     properties = new HashMap<String, String>();
     validColumns = commonCols.toString() + ",dim1,dim2";
@@ -436,16 +434,15 @@ public class CubeTestSetup {
         validColumns);
     CubeFactTable fact2 = new CubeFactTable(cubeName, factName, factColumns,
         storageUpdatePeriods, 20L, properties);
-    client.createCubeTable(fact2, storageAggregatePeriods);
+    client.createCubeTable(fact2, storages);
 
     factName = "summary3";
-    storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
+    storages = new HashSet<Storage>();
     hdfsStorage = new HDFSStorage("C1",
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage.addToPartCols(Storage.getDatePartition());
-    storageAggregatePeriods.put(hdfsStorage, updates);
+    storages.add(hdfsStorage);
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
     properties = new HashMap<String, String>();
     validColumns = commonCols.toString() + ",dim1,dim2,cityid";
@@ -453,7 +450,7 @@ public class CubeTestSetup {
         validColumns);
     CubeFactTable fact3 = new CubeFactTable(cubeName, factName, factColumns,
         storageUpdatePeriods, 30L, properties);
-    client.createCubeTable(fact3, storageAggregatePeriods);
+    client.createCubeTable(fact3, storages);
   }
 
   public static boolean isFirstDayOfMonth() {

@@ -189,7 +189,7 @@ public class TestCubeMetastoreClient {
       List<UpdatePeriod> updatePeriodsList = entry.getValue();
       for (UpdatePeriod period : updatePeriodsList) {
         String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, period, entry.getKey().getPrefix());
+            factName, entry.getKey().getPrefix());
         Assert.assertTrue(client.tableExists(storageTableName));
       }
     }
@@ -249,7 +249,7 @@ public class TestCubeMetastoreClient {
       List<UpdatePeriod> updatePeriodsList = entry.getValue();
       for (UpdatePeriod period : updatePeriodsList) {
         String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, period, entry.getKey().getPrefix());
+            factName, entry.getKey().getPrefix());
         Assert.assertTrue(client.tableExists(storageTableName));
       }
     }
@@ -312,7 +312,7 @@ public class TestCubeMetastoreClient {
       List<UpdatePeriod> updatePeriodsList = entry.getValue();
       for (UpdatePeriod period : updatePeriodsList) {
         String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, period, entry.getKey().getPrefix());
+            factName, entry.getKey().getPrefix());
         Assert.assertTrue(client.tableExists(storageTableName));
       }
     }
@@ -375,7 +375,7 @@ public class TestCubeMetastoreClient {
       List<UpdatePeriod> updatePeriodsList = entry.getValue();
       for (UpdatePeriod period : updatePeriodsList) {
         String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factNameWithPart, period, entry.getKey().getPrefix());
+            factNameWithPart, entry.getKey().getPrefix());
         Assert.assertTrue(client.tableExists(storageTableName));
       }
     }
@@ -443,7 +443,7 @@ public class TestCubeMetastoreClient {
       List<UpdatePeriod> updatePeriodsList = entry.getValue();
       for (UpdatePeriod period : updatePeriodsList) {
         String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factNameWithPart, period, entry.getKey().getPrefix());
+            factNameWithPart, entry.getKey().getPrefix());
         Assert.assertTrue(client.tableExists(storageTableName));
       }
     }
@@ -521,7 +521,7 @@ public class TestCubeMetastoreClient {
       List<UpdatePeriod> updatePeriodsList = entry.getValue();
       for (UpdatePeriod period : updatePeriodsList) {
         String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, period, entry.getKey().getPrefix());
+            factName, entry.getKey().getPrefix());
         Assert.assertTrue(client.tableExists(storageTableName));
       }
     }

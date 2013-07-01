@@ -35,14 +35,15 @@ public class StorageTableResolver implements ContextRewriter {
   private final boolean allStoragesSupported;
   CubeMetastoreClient client;
   private final boolean failOnPartialData;
-  private final List<String> validFactStorageTables;
   private final List<String> validDimTables;
   private final Map<CubeFactTable, Map<UpdatePeriod, List<String>>>
-  factStorageMap =
+  updatePeriodStorageMap =
   new HashMap<CubeFactTable, Map<UpdatePeriod, List<String>>>();
   private final Map<CubeFactTable, Map<UpdatePeriod, List<String>>>
   factPartMap =
   new HashMap<CubeFactTable, Map<UpdatePeriod, List<String>>>();
+  Map<CubeFactTable, List<String>> factStorageMap =
+      new HashMap<CubeFactTable, List<String>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
   private final Map<String, String> storageTableToWhereClause =
@@ -54,18 +55,15 @@ public class StorageTableResolver implements ContextRewriter {
     this.supportedStorages = getSupportedStorages(conf);
     this.allStoragesSupported = (supportedStorages == null);
     this.failOnPartialData = conf.getBoolean(
-        CubeQueryConstants.FAIL_QUERY_ON_PARTIAL_DATA, false);
-    String str = conf.get(CubeQueryConstants.VALID_STORAGE_FACT_TABLES);
-    validFactStorageTables = StringUtils.isBlank(str) ? null :
-      Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
-    str = conf.get(CubeQueryConstants.VALID_STORAGE_DIM_TABLES);
+        CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, false);
+    String str = conf.get(CubeQueryConfUtil.VALID_STORAGE_DIM_TABLES);
     validDimTables = StringUtils.isBlank(str) ? null :
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
   }
 
   private List<String> getSupportedStorages(Configuration conf) {
     String[] storages = conf.getStrings(
-        CubeQueryConstants.DRIVER_SUPPORTED_STORAGES);
+        CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES);
     if (storages != null) {
       return Arrays.asList(storages);
     }
@@ -92,10 +90,9 @@ public class StorageTableResolver implements ContextRewriter {
     if (!cubeql.getCandidateFactTables().isEmpty()) {
       // resolve storage table names
       resolveFactStorageTableNames(cubeql);
-      cubeql.setFactStorageMap(factStorageMap);
-
       // resolve storage partitions
       resolveFactStoragePartitions(cubeql);
+      cubeql.setFactStorageMap(factStorageMap);
       cubeql.setFactPartitionMap(factPartMap);
     }
     // resolve dimension tables
@@ -125,7 +122,8 @@ public class StorageTableResolver implements ContextRewriter {
           storageTables.add(tableName);
           if (dim.hasStorageSnapshots(storage)) {
             storageTableToWhereClause.put(tableName,
-                getWherePartClause(cubeql.getAliasForTabName(dim.getName()),
+                getWherePartClause(Storage.getDatePartitionKey(),
+                    cubeql.getAliasForTabName(dim.getName()),
                     Storage.getPartitionsForLatest()));
           }
         } else {
@@ -141,7 +139,12 @@ public class StorageTableResolver implements ContextRewriter {
       CubeFactTable fact = i.next();
       Map<UpdatePeriod, List<String>> storageTableMap =
           new HashMap<UpdatePeriod, List<String>>();
-      factStorageMap.put(fact, storageTableMap);
+      updatePeriodStorageMap.put(fact, storageTableMap);
+      String str = conf.get(CubeQueryConfUtil.getValidStorageTablesKey(
+          fact.getName()));
+      List<String> validFactStorageTables = StringUtils.isBlank(str) ? null :
+        Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
+
       for (Map.Entry<String, List<UpdatePeriod>> entry : fact
           .getUpdatePeriods().entrySet()) {
         String storage = entry.getKey();
@@ -149,10 +152,19 @@ public class StorageTableResolver implements ContextRewriter {
         if (!isStorageSupported(storage)) {
           continue;
         }
+        List<String> validUpdatePeriods = CubeQueryConfUtil.getStringList(conf,
+            CubeQueryConfUtil.getValidUpdatePeriodsKey(fact.getName(), storage));
+
         for (UpdatePeriod updatePeriod : entry.getValue()) {
+          if (validUpdatePeriods != null && !validUpdatePeriods
+              .contains(updatePeriod.name().toLowerCase())) {
+            continue;
+          }
+
           String tableName;
           // skip the update period if the storage is not valid
-          if ((tableName = getStorageTableName(fact, updatePeriod, storage))
+          if ((tableName = getStorageTableName(fact, storage,
+              validFactStorageTables))
               == null) {
             continue;
           }
@@ -190,18 +202,54 @@ public class StorageTableResolver implements ContextRewriter {
         continue;
       }
       factPartMap.put(fact, partitionColMap);
-      Map<UpdatePeriod, List<String>> storageTblMap = factStorageMap.get(fact);
-      for (UpdatePeriod updatePeriod : partitionColMap.keySet()) {
-        List<String> parts = partitionColMap.get(updatePeriod);
-        LOG.info("For fact:" + fact + " updatePeriod:" + updatePeriod
-            + " Parts:" + parts + " storageTables:"
-            + storageTblMap.get(updatePeriod));
-        for (String storageTableName : storageTblMap.get(updatePeriod)) {
-          storageTableToWhereClause.put(storageTableName, getWherePartClause(
-              cubeql.getAliasForTabName(fact.getCubeName()), parts));
+
+      List<String> storageTables = getStorageTableForUpdatePeriods(
+          fact, partitionColMap.keySet());
+      if (storageTables == null) {
+        LOG.info("Not considering the fact table:" + fact +" as there is no" +
+            " single storage table that can answer the query");
+        i.remove();
+        continue;
+      }
+      factStorageMap.put(fact, storageTables);
+
+      for (String storageTableName : storageTables) {
+        List<String> parts = new ArrayList<String>();
+        for (UpdatePeriod p : partitionColMap.keySet()) {
+          parts.addAll(partitionColMap.get(p));
         }
+        LOG.info("For fact:" + fact + " updatePeriod:" + partitionColMap.keySet()
+            + " Parts:" + parts + " storageTable:" + storageTableName);
+        storageTableToWhereClause.put(storageTableName, getWherePartClause(
+            cubeql.getTimeDimension(),
+            cubeql.getAliasForTabName(fact.getCubeName()), parts));
       }
     }
+  }
+
+  private List<String> getStorageTableForUpdatePeriods(CubeFactTable fact,
+      Set<UpdatePeriod> queriedPeriods) {
+    List<String> answeringTables = null;
+    UpdatePeriod first = queriedPeriods.iterator().next();
+    List<String> storageTables = updatePeriodStorageMap.get(fact).get(first);
+    for (String tblName : storageTables) {
+      boolean validStorage = true;
+      for (UpdatePeriod p : queriedPeriods) {
+        if (!updatePeriodStorageMap.get(fact).get(p).contains(tblName)) {
+          validStorage = false;
+          break;
+        }
+      }
+      if (!validStorage) {
+        continue;
+      } else {
+        if (answeringTables == null) {
+          answeringTables = new ArrayList<String>();
+        }
+        answeringTables.add(tblName);
+      }
+    }
+    return answeringTables;
   }
 
   private Map<UpdatePeriod, List<String>> getPartitionColMap(CubeFactTable fact,
@@ -209,7 +257,7 @@ public class StorageTableResolver implements ContextRewriter {
           throws SemanticException {
     Map<UpdatePeriod, List<String>> partitionColMap =
         new TreeMap<UpdatePeriod, List<String>>();
-    Set<UpdatePeriod> updatePeriods = factStorageMap.get(fact).keySet();
+    Set<UpdatePeriod> updatePeriods = getValidUpdatePeriods(fact);
     try {
       if (!getPartitions(fact, fromDate, toDate, partitionColMap,
           updatePeriods, true)) {
@@ -221,11 +269,14 @@ public class StorageTableResolver implements ContextRewriter {
     return partitionColMap;
   }
 
-  String getStorageTableName(CubeFactTable fact, UpdatePeriod updatePeriod,
-      String storage) {
+  private Set<UpdatePeriod> getValidUpdatePeriods(CubeFactTable fact) {
+    return updatePeriodStorageMap.get(fact).keySet();
+  }
+
+  String getStorageTableName(CubeFactTable fact, String storage,
+      List<String> validFactStorageTables) {
     String tableName = MetastoreUtil.getFactStorageTableName(
-        fact.getName(), updatePeriod, Storage.getPrefix(storage))
-        .toLowerCase();
+        fact.getName(), Storage.getPrefix(storage)).toLowerCase();
     if (validFactStorageTables != null && !validFactStorageTables
         .contains(tableName)) {
       return null;
@@ -237,7 +288,8 @@ public class StorageTableResolver implements ContextRewriter {
       Map<UpdatePeriod, List<String>> partitionColMap,
       Set<UpdatePeriod> updatePeriods, boolean addNonExistingParts)
           throws HiveException {
-    LOG.info("getPartitions for " + fact + " from fromDate:" + fromDate + " toDate:" + toDate);
+    LOG.info("getPartitions for " + fact + " from fromDate:" + fromDate
+        + " toDate:" + toDate);
     if (fromDate.equals(toDate) || fromDate.after(toDate)) {
       return true;
     }
@@ -251,7 +303,7 @@ public class StorageTableResolver implements ContextRewriter {
 
     Date ceilFromDate = DateUtil.getCeilDate(fromDate, interval);
     Date floorToDate = DateUtil.getFloorDate(toDate, interval);
-    List<String> storageTbls = factStorageMap.get(fact).get(interval);
+    List<String> storageTbls = updatePeriodStorageMap.get(fact).get(interval);
 
     // add partitions from ceilFrom to floorTo
     String fmt = interval.format();
@@ -308,8 +360,8 @@ public class StorageTableResolver implements ContextRewriter {
             toDate, partitionColMap, updatePeriods, addNonExistingParts));
   }
 
-  public static String getWherePartClause(String tableName,
-      List<String> parts) {
+  public static String getWherePartClause(String timeDimName,
+      String tableName, List<String> parts) {
     if (parts.size() == 0) {
       return "";
     }
