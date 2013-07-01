@@ -19,7 +19,9 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.PLUS;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.STAR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.StringLiteral;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONDI;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECTDI;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -104,7 +106,7 @@ public class HQLParser {
     ParseDriver driver = new ParseDriver();
     ASTNode tree = driver.parse(query);
     tree = ParseUtils.findRootNonNullToken(tree);
-    printAST(tree);
+    //printAST(tree);
     return tree;
   }
 
@@ -277,6 +279,17 @@ public class HQLParser {
         }
       }
       buf.append(")");
+    } else if (TOK_FUNCTIONDI == rootType) {
+      String fname = ((ASTNode) root.getChild(0)).getText();
+      buf.append(fname).append("( DISTINCT ");
+      for (int i = 1; i < root.getChildCount(); i++) {
+        toInfixString((ASTNode) root.getChild(i), buf);
+        if (i != root.getChildCount() - 1) {
+          buf.append(", ");
+        }
+      }
+      buf.append(")");
+
     } else if (TOK_SELECT == rootType) {
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
@@ -284,7 +297,16 @@ public class HQLParser {
           buf.append(", ");
         }
       }
-    } else {
+    } else if (TOK_SELECTDI == rootType) {
+      buf.append(" DISTINCT ");
+      for (int i = 0; i < root.getChildCount(); i++) {
+        toInfixString((ASTNode) root.getChild(i), buf);
+        if (i != root.getChildCount() - 1) {
+          buf.append(", ");
+        }
+      }
+    }
+    else {
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
