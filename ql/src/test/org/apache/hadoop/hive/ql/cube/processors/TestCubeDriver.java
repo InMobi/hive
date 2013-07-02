@@ -847,4 +847,12 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_summary3"));
     compareQueries(expected, hqlQuery);
   }
+
+  @Test
+  public void testDistinctColWithoutAlias() throws Exception {
+    String hqlQuery = driver.compileCubeQuery("select DISTINCT name, stateid from citytable");
+    String expected = getExpectedQuery("citytable", "select DISTINCT citytable.name," +
+      " citytable.stateid from ", null, "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+  }
 }
