@@ -195,6 +195,19 @@ public class TestJdbcDriver2 extends TestCase {
         expectedException);
   }
 
+  public void testBadURL() throws Exception {
+    Class.forName(driverName);
+     try{
+
+       DriverManager.getConnection("jdbc:hive2://localhost:10000;principal=test", "", "");
+       fail("should have thrown IllegalArgumentException but did not ");
+
+     }catch(IllegalArgumentException i){
+       assertEquals("Bad URL format and it should be in the format of jdbc:hive2://<hostame>:<port>/<DB_name>", i.getMessage());
+     }
+  }
+
+
   public void testDataTypes2() throws Exception {
     Statement stmt = con.createStatement();
 
@@ -477,6 +490,12 @@ public class TestJdbcDriver2 extends TestCase {
     // test getBoolean rules on non-boolean columns
     assertEquals(true, res.getBoolean(1));
     assertEquals(true, res.getBoolean(4));
+
+    // test case sensitivity
+    assertFalse(meta.isCaseSensitive(1));
+    assertFalse(meta.isCaseSensitive(2));
+    assertFalse(meta.isCaseSensitive(3));
+    assertTrue(meta.isCaseSensitive(4));
 
     // no more rows
     assertFalse(res.next());
@@ -1293,5 +1312,7 @@ public class TestJdbcDriver2 extends TestCase {
     Connection conn = driver.connect("jdbc:derby://localhost:10000/default", new Properties());
     assertNull(conn);
   }
+
+
 
 }
