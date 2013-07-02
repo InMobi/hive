@@ -49,10 +49,10 @@ public class AggregateResolver implements ContextRewriter {
 
     validateAggregates(cubeql, cubeql.getSelectAST(), false, false, false);
     validateAggregates(cubeql, cubeql.getHavingAST(), false, false, false);
-    String rewritSelect = resolveForSelect(cubeql, cubeql.getSelectTree());
+    String rewritSelect = resolveClause(cubeql, cubeql.getSelectAST());
     cubeql.setSelectTree(rewritSelect);
 
-    String rewritHaving = resolveForHaving(cubeql);
+    String rewritHaving = resolveClause(cubeql, cubeql.getHavingAST());
     if (StringUtils.isNotBlank(rewritHaving)) {
       cubeql.setHavingTree(rewritHaving);
     }
@@ -170,85 +170,23 @@ public class AggregateResolver implements ContextRewriter {
     }
   }
 
-  private String resolveForSelect(CubeQueryContext cubeql, String exprTree)
-      throws SemanticException {
-    // Aggregate resolver needs cube to be resolved first
-    assert cubeql.getCube() != null;
 
-    if (StringUtils.isBlank(exprTree)) {
-      return "";
-    }
-
-    String exprTokens[] = StringUtils.split(exprTree, ",");
-    for (int i = 0; i < exprTokens.length; i++) {
-      String token = exprTokens[i].trim();
-      String tokenAlias = cubeql.getAlias(token.toLowerCase());
-      boolean hasAlias = false;
-      if (StringUtils.isNotBlank(tokenAlias)) {
-        token = token.substring(0, exprTree.lastIndexOf(tokenAlias)).trim();
-        hasAlias = true;
-      }
-
-      if (!cubeql.isAggregateExpr(token)) {
-        if (cubeql.isCubeMeasure(token)) {
-          // Take care of brackets added around col names
-          // in HQLParsrer.getString
-          if (token.startsWith("(") && token.endsWith(")")
-              && token.length() > 2) {
-            token = token.substring(1, token.length() - 1);
-          }
-
-          String splits[] = StringUtils.split(token, ".");
-          for (int j = 0; j < splits.length; j++) {
-            splits[j] = splits[j].trim();
-          }
-
-          String msrName = (splits.length <= 1) ? splits[0] : splits[1];
-          CubeMeasure measure = cubeql.getCube().getMeasureByName(msrName);
-          if (measure != null) {
-            String msrAggregate = measure.getAggregate();
-
-            if (StringUtils.isNotBlank(msrAggregate)) {
-              exprTokens[i] = msrAggregate + "( " + token + ")" + (hasAlias ?
-                  " " + tokenAlias : "");
-              exprTokens[i] = exprTokens[i].toLowerCase();
-              // Add this expression to aggregate expr set so that group by
-              // resolver can skip
-              // over expressions changed during aggregate resolver.
-              cubeql.addAggregateExpr(exprTokens[i]);
-            } else {
-              throw new SemanticException("Default aggregate is not set for" +
-                  " measure: " + msrName);
-            }
-          } else {
-            // should not be here, since if it is a measure, we should get a
-            // cube measure object
-            throw new SemanticException("Measure not found for " + msrName);
-          }
-        }
-      }
-    }
-
-    return StringUtils.join(exprTokens, ", ");
-  }
-
-  // We need to traverse the AST for Having clause.
-  // We need to skip any columns that are inside an aggregate UDAF or
+  // We need to traverse the clause looking for eligible measures which can be wrapped inside
+  // Aggregates
+  // We have to skip any columns that are already inside an aggregate UDAF or
   // inside an arithmetic expression
-  private String resolveForHaving(CubeQueryContext cubeql)
+  private String resolveClause(CubeQueryContext cubeql, ASTNode clause)
       throws SemanticException {
-    ASTNode havingTree = cubeql.getHavingAST();
-    String havingTreeStr = cubeql.getHavingTree();
 
-    if (StringUtils.isBlank(havingTreeStr) || havingTree == null) {
+    if (clause == null) {
       return null;
     }
 
-    for (int i = 0; i < havingTree.getChildCount(); i++) {
-      transform(cubeql, havingTree, (ASTNode) havingTree.getChild(i), i);
+    for (int i = 0; i < clause.getChildCount(); i++) {
+      transform(cubeql, clause, (ASTNode) clause.getChild(i), i);
     }
 
-    return HQLParser.getString(havingTree);
+    return HQLParser.getString(clause);
   }
 
   private void transform(CubeQueryContext cubeql, ASTNode parent, ASTNode node,
@@ -265,6 +203,15 @@ public class AggregateResolver implements ContextRewriter {
         ASTNode wrapped = wrapAggregate(cubeql, node);
         if (wrapped != node) {
           parent.setChild(nodePos, wrapped);
+          // Check if this node has an alias
+          ASTNode sibling = HQLParser.findNodeByPath(parent, Identifier);
+          String expr;
+          if (sibling != null) {
+            expr = HQLParser.getString(parent).toLowerCase();
+          } else {
+            expr = HQLParser.getString(wrapped).toLowerCase();
+          }
+          cubeql.addAggregateExpr(expr.trim());
         }
       } else {
         // Dig deeper in non-leaf nodes

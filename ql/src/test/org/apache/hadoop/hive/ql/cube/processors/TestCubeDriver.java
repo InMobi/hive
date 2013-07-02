@@ -301,10 +301,22 @@ public class TestCubeDriver {
     } else if (actual == null) {
       Assert.fail("Rewritten query is null");
     }
-    System.out.println("Expected:" + expected);
-    expected = expected.replaceAll("\\W", "");
-    actual = actual.replaceAll("\\W", "");
-    Assert.assertTrue(expected.equalsIgnoreCase(actual));
+    String expectedTrimmed = expected.replaceAll("\\W", "");
+    String actualTrimmed = actual.replaceAll("\\W", "");
+
+    if(!expectedTrimmed.equalsIgnoreCase(actualTrimmed)) {
+      String method = null;
+      for (StackTraceElement trace : Thread.currentThread().getStackTrace()) {
+          if (trace.getMethodName().startsWith("test")) {
+            method = trace.getMethodName() + ":" + trace.getLineNumber();
+          }
+       }
+
+      System.err.println("__FAILED__ " + method
+          + "\n\tExpected: " + expected + "\n\t---------\n\tActual: " + actual);
+      System.err.println("\t__AGGR_EXPRS:" + driver.rewrittenQuery.getAggregateExprs());
+    }
+    Assert.assertTrue(expectedTrimmed.equalsIgnoreCase(actualTrimmed));
   }
 
   @Test
