@@ -269,6 +269,30 @@ public class TestCubeDriver {
     compareQueries(expected, hqlQuery);
   }
 
+  @Test
+  public void testCubeInsert() throws Exception {
+    String hqlQuery = driver.compileCubeQuery("insert overwrite directory" +
+      " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);
+    String expected = "insert overwrite directory '/tmp/test' " +
+      getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
+      getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("insert overwrite local directory" +
+      " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);
+    expected = "insert overwrite local directory '/tmp/test' " +
+      getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
+      getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("insert overwrite table temp" +
+      " select SUM(msr2) from testCube where " + twoDaysRange);
+    expected = "insert overwrite table temp " +
+      getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
+      getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+    compareQueries(expected, hqlQuery);
+  }
+
   private void compareQueries(String expected, String actual) {
     if (expected == null && actual == null) {
       return;

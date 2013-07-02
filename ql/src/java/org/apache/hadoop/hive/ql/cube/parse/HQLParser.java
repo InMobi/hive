@@ -18,10 +18,13 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.Number;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.PLUS;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.STAR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.StringLiteral;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_DIR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONDI;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LOCAL_DIR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECTDI;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TAB;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -304,6 +307,21 @@ public class HQLParser {
         if (i != root.getChildCount() - 1) {
           buf.append(", ");
         }
+      }
+    } else if (TOK_DIR == rootType) {
+      buf.append(" DIRECTORY ");
+      for (int i = 0; i < root.getChildCount(); i++) {
+        toInfixString((ASTNode) root.getChild(i), buf);
+      }
+    } else if (TOK_LOCAL_DIR == rootType) {
+      buf.append(" LOCAL DIRECTORY ");
+      for (int i = 0; i < root.getChildCount(); i++) {
+        toInfixString((ASTNode) root.getChild(i), buf);
+      }
+    } else if (TOK_TAB == rootType) {
+      buf.append(" TABLE ");
+      for (int i = 0; i < root.getChildCount(); i++) {
+        toInfixString((ASTNode) root.getChild(i), buf);
       }
     }
     else {

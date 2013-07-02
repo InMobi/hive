@@ -8,6 +8,7 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TMP_FILE;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -627,6 +628,12 @@ public class CubeQueryContext {
       QBJoinTree joinTree = qb.getQbJoinTree();
       printJoinTree(joinTree, builder);
     }
+
+    if (qb.getParseInfo().getDestForClause(clause) != null) {
+      builder.append("\n Destination:");
+      builder.append("\n\t dest expr:" +
+        qb.getParseInfo().getDestForClause(clause).dump());
+    }
     LOG.info(builder.toString());
   }
 
@@ -873,7 +880,15 @@ public class CubeQueryContext {
   private String toHQL(String tableName) throws SemanticException {
     String qfmt = getQueryFormat();
     LOG.info("qfmt:" + qfmt);
-    return String.format(qfmt, getQueryTreeStrings(tableName));
+    String baseQuery = String.format(qfmt, getQueryTreeStrings(tableName));
+    String insertString = "";
+    ASTNode destTree = qb.getParseInfo().getDestForClause(clauseName);
+    if (destTree != null && ((ASTNode)(destTree.getChild(0)))
+        .getToken().getType() != TOK_TMP_FILE) {
+      insertString = "INSERT OVERWRITE" + HQLParser.getString(
+          qb.getParseInfo().getDestForClause(clauseName));
+    }
+    return insertString + baseQuery;
   }
 
   private String getUnionQuery(String baseQuery) {
