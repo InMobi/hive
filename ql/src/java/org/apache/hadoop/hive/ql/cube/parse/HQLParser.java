@@ -21,7 +21,9 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.StringLiteral;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_DIR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONDI;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_GROUPBY;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LOCAL_DIR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ORDERBY;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECTDI;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TAB;
@@ -119,6 +121,7 @@ public class HQLParser {
     } catch (Exception e) {
       e.printStackTrace();
     }
+    System.out.println();
   }
 
   /**
@@ -293,7 +296,7 @@ public class HQLParser {
       }
       buf.append(")");
 
-    } else if (TOK_SELECT == rootType) {
+    } else if (TOK_SELECT == rootType || TOK_ORDERBY == rootType || TOK_GROUPBY == rootType) {
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
         if (i != root.getChildCount() - 1) {
