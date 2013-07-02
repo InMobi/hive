@@ -290,6 +290,7 @@ public class TestCubeDriver {
 
       System.err.println("__FAILED__ " + method
           + "\n\tExpected: " + expected + "\n\t---------\n\tActual: " + actual);
+      System.err.println("\t__AGGR_EXPRS:" + driver.rewrittenQuery.getAggregateExprs());
     }
     Assert.assertTrue(expectedTrimmed.equalsIgnoreCase(actualTrimmed));
   }

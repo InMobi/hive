@@ -1087,6 +1087,10 @@ public class CubeQueryContext {
     aggregateExprs.add(expr);
   }
 
+  public Set<String> getAggregateExprs() {
+    return aggregateExprs;
+  }
+
   public ASTNode getHavingAST() {
     return havingAST;
   }
