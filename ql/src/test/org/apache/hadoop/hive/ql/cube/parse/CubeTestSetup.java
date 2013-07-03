@@ -44,13 +44,11 @@ public class CubeTestSetup {
   public static Date twodaysBack;
   public static Date twoMonthsBack;
   private static boolean zerothHour;
-  private static boolean firstDayOfMonth;
 
   static {
     Calendar cal = Calendar.getInstance();
     now = cal.getTime();
     zerothHour = (cal.get(Calendar.HOUR_OF_DAY) == 0);
-    firstDayOfMonth = (cal.get(Calendar.DAY_OF_MONTH) == 0);
     System.out.println("Test now:" + now);
     cal.add(Calendar.DAY_OF_MONTH, -2);
     twodaysBack = cal.getTime();
@@ -451,9 +449,5 @@ public class CubeTestSetup {
     CubeFactTable fact3 = new CubeFactTable(cubeName, factName, factColumns,
         storageUpdatePeriods, 30L, properties);
     client.createCubeTable(fact3, storages);
-  }
-
-  public static boolean isFirstDayOfMonth() {
-    return firstDayOfMonth;
   }
 }

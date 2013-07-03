@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -179,15 +180,19 @@ public class TestCubeDriver {
     Map<String, String> storageTableToWhereClause =
         new LinkedHashMap<String, String>();
     List<String> parts = new ArrayList<String>();
+    Date dayStart;
     if (!CubeTestSetup.isZerothHour()) {
       addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
           DateUtil.getCeilDate(twodaysBack, UpdatePeriod.DAILY));
       addParts(parts, UpdatePeriod.HOURLY,
           DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
           DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+      dayStart = DateUtil.getCeilDate(
+          twodaysBack, UpdatePeriod.DAILY);
+    } else {
+      dayStart = twodaysBack;
     }
-    addParts(parts, UpdatePeriod.DAILY, DateUtil.getCeilDate(
-        twodaysBack, UpdatePeriod.DAILY),
+    addParts(parts, UpdatePeriod.DAILY, dayStart,
         DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
     storageTableToWhereClause.put(storageTable,
         StorageTableResolver.getWherePartClause("dt", cubeName, parts));
@@ -199,23 +204,30 @@ public class TestCubeDriver {
     Map<String, String> storageTableToWhereClause =
         new LinkedHashMap<String, String>();
     List<String> parts = new ArrayList<String>();
+    Date dayStart = twoMonthsBack;
+    Date monthStart = twoMonthsBack;
     if (!CubeTestSetup.isZerothHour()) {
       addParts(parts, UpdatePeriod.HOURLY, twoMonthsBack,
           DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.DAILY));
       addParts(parts, UpdatePeriod.HOURLY,
           DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
           DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+      dayStart = DateUtil.getCeilDate(
+          twoMonthsBack, UpdatePeriod.DAILY);
     }
-    if (!CubeTestSetup.isFirstDayOfMonth()) {
-      addParts(parts, UpdatePeriod.DAILY, DateUtil.getCeilDate(
-          twoMonthsBack, UpdatePeriod.DAILY),
+    Calendar cal = new GregorianCalendar();
+    cal.setTime(dayStart);
+    System.out.println("day of the month:" + cal.get(Calendar.DAY_OF_MONTH));
+    if (cal.get(Calendar.DAY_OF_MONTH) != 1) {
+      addParts(parts, UpdatePeriod.DAILY, dayStart,
           DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
-      addParts(parts, UpdatePeriod.DAILY,
+      monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
+    }
+    addParts(parts, UpdatePeriod.DAILY,
           DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY),
           DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
-    }
-    addParts(parts, UpdatePeriod.MONTHLY, DateUtil.getCeilDate(
-        twoMonthsBack, UpdatePeriod.MONTHLY),
+    addParts(parts, UpdatePeriod.MONTHLY,
+        monthStart,
         DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
     storageTableToWhereClause.put(storageTable,
         StorageTableResolver.getWherePartClause("dt", cubeName, parts));
@@ -247,6 +259,7 @@ public class TestCubeDriver {
 
   private void addParts(List<String> partitions, UpdatePeriod updatePeriod,
       Date from, Date to) {
+    System.out.println("addParts from:" + from + "to:" + to);
     String fmt = updatePeriod.format();
     Calendar cal = Calendar.getInstance();
     cal.setTime(from);
@@ -411,7 +424,7 @@ public class TestCubeDriver {
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "citytable", Storage.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select sum(testcube.msr2)" +
-      " FROM ", "INNER JOIN c1_citytable citytable ON" +
+      " FROM ", " INNER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id", null, null, joinWhereConds,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
@@ -436,6 +449,28 @@ public class TestCubeDriver {
       " ziptable ON citytable.zipcode = ziptable.code", null, " group by" +
       " statetable.name ", joinWhereConds,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("select st.name, SUM(msr2) from"
+      + " testCube TC"
+      + " join citytable CT on TC.cityid = CT.id"
+      + " left outer join statetable ST on ST.id = CT.stateid"
+      + " right outer join ziptable ZT on CT.zipcode = ZT.code"
+      + " where " + twoDaysRange);
+    joinWhereConds = new ArrayList<String>();
+    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+        "st", Storage.getPartitionsForLatest()));
+    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+        "ct", Storage.getPartitionsForLatest()));
+    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+        "zt", Storage.getPartitionsForLatest()));
+    expected = getExpectedQuery("tc", "select st.name," +
+      " sum(tc.msr2) FROM ", " INNER JOIN c1_citytable ct ON" +
+      " tc.cityid = ct.id LEFT OUTER JOIN c1_statetable st"
+      + " ON st.id = ct.stateid RIGHT OUTER JOIN c1_ziptable" +
+      " zt ON ct.zipcode = zt.code", null, " group by" +
+      " st.name ", joinWhereConds,
+      getWhereForDailyAndHourly2days("tc", "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
     hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube"
@@ -889,6 +924,19 @@ public class TestCubeDriver {
     String hqlQuery = driver.compileCubeQuery("select DISTINCT name, stateid from citytable");
     String expected = getExpectedQuery("citytable", "select DISTINCT citytable.name," +
       " citytable.stateid from ", null, "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("select id, sum(distinct id) from" +
+      " citytable group by id");
+    expected = getExpectedQuery("citytable", "select citytable.id," +
+      " sum(DISTINCT citytable.id) from ", "group by citytable.id",
+      "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("select count(distinct id) from" +
+      " citytable");
+    expected = getExpectedQuery("citytable", "select count(DISTINCT" +
+      " citytable.id) from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
   }
 }
