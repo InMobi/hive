@@ -832,7 +832,7 @@ public class CubeQueryContext {
         getQLString(joinTree.getJoinSrc(), builder);
       }
     } else { // (joinTree.getBaseSrc()[0] != null){
-      String tblName = joinTree.getBaseSrc()[0].toLowerCase();
+      String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[0]).toLowerCase();
       builder.append(storageTableToQuery.get(cubeTbls.get(tblName))
           + " " + getAliasForTabName(tblName));
     }
@@ -845,7 +845,7 @@ public class CubeQueryContext {
         getQLString(joinTree.getJoinSrc(), builder);
       }
     } else { // (joinTree.getBaseSrc()[1] != null){
-      String tblName = joinTree.getBaseSrc()[1].toLowerCase();
+      String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[1]).toLowerCase();
       builder.append(storageTableToQuery.get(cubeTbls.get(tblName))
           + " " + getAliasForTabName(tblName));
     }
@@ -973,9 +973,15 @@ public class CubeQueryContext {
     }
 
     if (fact != null) {
+      LOG.info("Candidate fact table:" + fact);
       List<String> storageTableMap = factStorageMap.get(fact);
       // choosing the first storage table one in the list
       String storageTable = storageTableMap.get(0);
+      if (storageTableMap.get(0) == null) {
+        throw new SemanticException("No storage table available for candidate"
+          + " fact:" + fact);
+      }
+      LOG.info("Choosing the storage table:" + storageTable + " for fact:" + fact);
       storageTableToQuery.put(getCube(), storageTable);
       return toHQL(storageTable);
     } else {
