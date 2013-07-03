@@ -3,8 +3,8 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class GroupbyResolver implements ContextRewriter {
@@ -19,13 +19,13 @@ public class GroupbyResolver implements ContextRewriter {
     String groupByTree = cubeql.getGroupByTree();
     String selectTree = cubeql.getSelectTree();
     List<String> selectExprs = new ArrayList<String>();
-    String[] sel = StringUtils.split(selectTree, ",");
+    String[] sel = getExpressions(cubeql.getSelectAST()).toArray(new String[]{});
     for (String s : sel) {
       selectExprs.add(s.trim().toLowerCase());
     }
     List<String> groupByExprs = new ArrayList<String>();
     if (groupByTree != null) {
-      String[] gby = StringUtils.split(groupByTree, ",");
+      String[] gby = getExpressions(cubeql.getGroupByAST()).toArray(new String[]{});
       for (String g : gby) {
         groupByExprs.add(g.trim().toLowerCase());
       }
@@ -62,6 +62,21 @@ public class GroupbyResolver implements ContextRewriter {
       }
     }
     cubeql.setSelectTree(selectTree);
+  }
+
+  List<String> getExpressions(ASTNode node) {
+
+    List<String> list = new ArrayList<String>();
+
+    if (node == null) {
+      return null;
+    }
+
+    for (int i = 0; i < node.getChildCount(); i++) {
+      list.add(HQLParser.getString((ASTNode)node.getChild(i)));
+    }
+
+    return list;
   }
 
 }
