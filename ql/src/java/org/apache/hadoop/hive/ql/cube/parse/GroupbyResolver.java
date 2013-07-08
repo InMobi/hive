@@ -34,10 +34,7 @@ public class GroupbyResolver implements ContextRewriter {
     // aggregation on the column, then it is added to group by columns.
     for (String expr : selectExprs) {
       if (cubeql.hasAggregates()) {
-        String alias = cubeql.getAlias(expr);
-        if (alias != null) {
-          expr = expr.substring(0, (expr.length() - alias.length())).trim();
-        }
+        expr = getExpressionWithoutAlias(cubeql, expr);
         if (!groupByExprs.contains(expr)) {
           if (!cubeql.isAggregateExpr(expr)) {
             String groupbyExpr = expr;
@@ -57,14 +54,34 @@ public class GroupbyResolver implements ContextRewriter {
     }
 
     for (String expr : groupByExprs) {
-      if (!selectExprs.contains(expr)) {
+      if (!contains(cubeql, selectExprs, expr)) {
         selectTree = expr + ", " + selectTree;
       }
     }
     cubeql.setSelectTree(selectTree);
   }
 
-  List<String> getExpressions(ASTNode node) {
+  private String getExpressionWithoutAlias(CubeQueryContext cubeql,
+      String sel) {
+    String alias = cubeql.getAlias(sel);
+    if (alias != null) {
+      sel = sel.substring(0, (sel.length() - alias.length())).trim();
+    }
+    return sel;
+  }
+
+  private boolean contains(CubeQueryContext cubeql, List<String> selExprs,
+      String expr) {
+    for (String sel : selExprs) {
+      sel = getExpressionWithoutAlias(cubeql, sel);
+      if (sel.equals(expr)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private List<String> getExpressions(ASTNode node) {
 
     List<String> list = new ArrayList<String>();
 

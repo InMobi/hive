@@ -555,6 +555,16 @@ public class TestCubeDriver {
       " group by round(testcube.zipcode), testcube.cityid",
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("select round(zipcode) rzc, cityid," +
+      " msr2 from testCube where " + twoDaysRange + " group by round(zipcode)" +
+      " order by rzc");
+    expected = getExpectedQuery(cubeName, "select round(testcube.zipcode) rzc,"
+      + " testcube.cityid, sum(testcube.msr2) FROM ", null,
+      " group by round(testcube.zipcode), testcube.cityid order by rzc",
+    getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+    compareQueries(expected, hqlQuery);
+
   }
 
   @Test
@@ -682,6 +692,14 @@ public class TestCubeDriver {
     expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c2_citytable", false);
     compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("select name n, count(1) from citytable"
+      + " group by name order by n ");
+    expected = getExpectedQuery("citytable", "select citytable.name n," +
+      " count(1) from ", "groupby citytable.name order by n", "c2_citytable",
+      false);
+    compareQueries(expected, hqlQuery);
+
   }
 
   @Test
