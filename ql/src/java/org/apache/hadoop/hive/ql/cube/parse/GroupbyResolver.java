@@ -21,13 +21,13 @@ public class GroupbyResolver implements ContextRewriter {
     List<String> selectExprs = new ArrayList<String>();
     String[] sel = getExpressions(cubeql.getSelectAST()).toArray(new String[]{});
     for (String s : sel) {
-      selectExprs.add(s.trim().toLowerCase());
+      selectExprs.add(s.trim());
     }
     List<String> groupByExprs = new ArrayList<String>();
     if (groupByTree != null) {
       String[] gby = getExpressions(cubeql.getGroupByAST()).toArray(new String[]{});
       for (String g : gby) {
-        groupByExprs.add(g.trim().toLowerCase());
+        groupByExprs.add(g.trim());
       }
     }
     // each selected column, if it is not a cube measure, and does not have

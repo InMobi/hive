@@ -264,20 +264,31 @@ public class HQLParser {
       return;
     }
     int rootType = root.getToken().getType();
+    String rootText = root.getText();
     // Operand, print contents
     if (Identifier == rootType || Number == rootType ||
         StringLiteral == rootType) {
-      buf.append(' ').append(root.getText()).append(' ');
+      // StringLiterals should not be lower cased.
+      if (StringLiteral == rootType) {
+        buf.append(' ').append(rootText).append(' ');
+      } else {
+        buf.append(' ').append(rootText == null ? "" : rootText.toLowerCase()).append(' ');
+      }
     } else if (BINARY_OPERATORS.contains(
         Integer.valueOf(root.getToken().getType()))) {
       buf.append("(");
+      // Left operand
       toInfixString((ASTNode) root.getChild(0), buf);
-      buf.append(' ').append(root.getText()).append(' ');
+      // Operand name
+      buf.append(' ').append(rootText.toLowerCase()).append(' ');
+      // Right operand
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append(")");
     } else if (TOK_FUNCTION == root.getToken().getType()) {
       String fname = ((ASTNode) root.getChild(0)).getText();
-      buf.append(fname).append("(");
+      // Function name
+      buf.append(fname.toLowerCase()).append("(");
+      // Arguments separated by comma
       for (int i = 1; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
         if (i != root.getChildCount() - 1) {
@@ -286,8 +297,12 @@ public class HQLParser {
       }
       buf.append(")");
     } else if (TOK_FUNCTIONDI == rootType) {
+      // Distinct is a different case.
       String fname = ((ASTNode) root.getChild(0)).getText();
-      buf.append(fname).append("( DISTINCT ");
+
+      buf.append(fname.toLowerCase()).append("( distinct ");
+
+      // Arguments to distinct separated by comma
       for (int i = 1; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
         if (i != root.getChildCount() - 1) {
@@ -304,7 +319,7 @@ public class HQLParser {
         }
       }
     } else if (TOK_SELECTDI == rootType) {
-      buf.append(" DISTINCT ");
+      buf.append(" distinct ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
         if (i != root.getChildCount() - 1) {
@@ -312,17 +327,17 @@ public class HQLParser {
         }
       }
     } else if (TOK_DIR == rootType) {
-      buf.append(" DIRECTORY ");
+      buf.append(" directory ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
     } else if (TOK_LOCAL_DIR == rootType) {
-      buf.append(" LOCAL DIRECTORY ");
+      buf.append(" local directory ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
     } else if (TOK_TAB == rootType) {
-      buf.append(" TABLE ");
+      buf.append(" table ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }

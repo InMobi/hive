@@ -128,28 +128,28 @@ public class CubeQueryContext {
     }
     if (qb.getParseInfo().getWhrForClause(clauseName) != null) {
       this.whereTree = HQLParser.getString(
-          qb.getParseInfo().getWhrForClause(clauseName)).toLowerCase();
+          qb.getParseInfo().getWhrForClause(clauseName));
       this.whereAST = qb.getParseInfo().getWhrForClause(clauseName);
     }
     if (qb.getParseInfo().getHavingForClause(clauseName) != null) {
       this.havingTree = HQLParser.getString(qb.getParseInfo().getHavingForClause(
-          clauseName)).toLowerCase();
+          clauseName));
       this.havingAST = qb.getParseInfo().getHavingForClause(
           clauseName);
     }
     if (qb.getParseInfo().getOrderByForClause(clauseName) != null) {
       this.orderByTree = HQLParser.getString(qb.getParseInfo()
-          .getOrderByForClause(clauseName)).toLowerCase();
+          .getOrderByForClause(clauseName));
       this.orderByAST = qb.getParseInfo().getOrderByForClause(clauseName);
     }
     if (qb.getParseInfo().getGroupByForClause(clauseName) != null) {
       this.groupByTree = HQLParser.getString(qb.getParseInfo()
-          .getGroupByForClause(clauseName)).toLowerCase();
+          .getGroupByForClause(clauseName));
       this.groupByAST = qb.getParseInfo().getGroupByForClause(clauseName);
     }
     if (qb.getParseInfo().getSelForClause(clauseName) != null) {
       this.selectTree = HQLParser.getString(qb.getParseInfo().getSelForClause(
-          clauseName)).toLowerCase();
+          clauseName));
       this.selectAST = qb.getParseInfo().getSelForClause(
           clauseName);
     }
@@ -312,7 +312,7 @@ public class CubeQueryContext {
         clauseName).values()) {
       getColsForTree(aggrTree, aggregateCols, null, null);
       String aggr = HQLParser.getString(aggrTree);
-      aggregateExprs.add(aggr.toLowerCase());
+      aggregateExprs.add(aggr);
     }
     if (cube != null) {
       String cubeAlias = getAliasForTabName(cube.getName());
@@ -407,7 +407,7 @@ public class CubeQueryContext {
             // trees
             ASTNode alias = HQLParser.findNodeByPath(node, Identifier);
             if (alias != null) {
-              exprToAlias.put(HQLParser.getString(node).trim().toLowerCase(),
+              exprToAlias.put(HQLParser.getString(node).trim(),
                   alias.getText().toLowerCase());
             }
           }

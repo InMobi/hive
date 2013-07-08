@@ -101,7 +101,7 @@ public class AggregateResolver implements ContextRewriter {
           // Valid complex aggregate expression: sum(msr1) + sum(msr2)
           // We have to add it to aggregate set, as Hive analyzer will add parts of the expression,
           // but not the whole expression itself
-          cubeql.addAggregateExpr(HQLParser.getString(node).toLowerCase());
+          cubeql.addAggregateExpr(HQLParser.getString(node));
         }
       } else {
         throw new SemanticException("Invalid projection expression: mismatched aggregates and measures"
@@ -207,9 +207,9 @@ public class AggregateResolver implements ContextRewriter {
           ASTNode sibling = HQLParser.findNodeByPath(parent, Identifier);
           String expr;
           if (sibling != null) {
-            expr = HQLParser.getString(parent).toLowerCase();
+            expr = HQLParser.getString(parent);
           } else {
-            expr = HQLParser.getString(wrapped).toLowerCase();
+            expr = HQLParser.getString(wrapped);
           }
           cubeql.addAggregateExpr(expr.trim());
         }

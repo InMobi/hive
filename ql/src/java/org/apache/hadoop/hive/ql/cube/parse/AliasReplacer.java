@@ -138,7 +138,7 @@ public class AliasReplacer implements ContextRewriter {
     }
 
     if (HQLParser.isAggregateAST(root)) {
-      cubeql.addAggregateExpr(HQLParser.getString(root).trim().toLowerCase());
+      cubeql.addAggregateExpr(HQLParser.getString(root).trim());
     } else {
       for (int i = 0; i < root.getChildCount(); i++) {
         ASTNode child = (ASTNode) root.getChild(i);
@@ -155,7 +155,7 @@ public class AliasReplacer implements ContextRewriter {
     if (root.getToken().getType() == TOK_SELEXPR) {
         ASTNode alias = HQLParser.findNodeByPath(root, Identifier);
         if (alias != null) {
-          cubeql.addExprToAlias(HQLParser.getString(root).trim().toLowerCase(),
+          cubeql.addExprToAlias(HQLParser.getString(root).trim(),
               alias.getText());
         }
     } else {
