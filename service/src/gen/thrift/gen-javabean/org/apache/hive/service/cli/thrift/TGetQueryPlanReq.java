@@ -31,8 +31,8 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteStatementReq, TExecuteStatementReq._Fields>, java.io.Serializable, Cloneable {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TExecuteStatementReq");
+public class TGetQueryPlanReq implements org.apache.thrift.TBase<TGetQueryPlanReq, TGetQueryPlanReq._Fields>, java.io.Serializable, Cloneable {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TGetQueryPlanReq");
 
   private static final org.apache.thrift.protocol.TField SESSION_HANDLE_FIELD_DESC = new org.apache.thrift.protocol.TField("sessionHandle", org.apache.thrift.protocol.TType.STRUCT, (short)1);
   private static final org.apache.thrift.protocol.TField STATEMENT_FIELD_DESC = new org.apache.thrift.protocol.TField("statement", org.apache.thrift.protocol.TType.STRING, (short)2);
@@ -40,8 +40,8 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
-    schemes.put(StandardScheme.class, new TExecuteStatementReqStandardSchemeFactory());
-    schemes.put(TupleScheme.class, new TExecuteStatementReqTupleSchemeFactory());
+    schemes.put(StandardScheme.class, new TGetQueryPlanReqStandardSchemeFactory());
+    schemes.put(TupleScheme.class, new TGetQueryPlanReqTupleSchemeFactory());
   }
 
   private TSessionHandle sessionHandle; // required
@@ -126,13 +126,13 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
-    org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TExecuteStatementReq.class, metaDataMap);
+    org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TGetQueryPlanReq.class, metaDataMap);
   }
 
-  public TExecuteStatementReq() {
+  public TGetQueryPlanReq() {
   }
 
-  public TExecuteStatementReq(
+  public TGetQueryPlanReq(
     TSessionHandle sessionHandle,
     String statement)
   {
@@ -144,7 +144,7 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
   /**
    * Performs a deep copy on <i>other</i>.
    */
-  public TExecuteStatementReq(TExecuteStatementReq other) {
+  public TGetQueryPlanReq(TGetQueryPlanReq other) {
     if (other.isSetSessionHandle()) {
       this.sessionHandle = new TSessionHandle(other.sessionHandle);
     }
@@ -168,8 +168,8 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
     }
   }
 
-  public TExecuteStatementReq deepCopy() {
-    return new TExecuteStatementReq(this);
+  public TGetQueryPlanReq deepCopy() {
+    return new TGetQueryPlanReq(this);
   }
 
   @Override
@@ -324,12 +324,12 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
   public boolean equals(Object that) {
     if (that == null)
       return false;
-    if (that instanceof TExecuteStatementReq)
-      return this.equals((TExecuteStatementReq)that);
+    if (that instanceof TGetQueryPlanReq)
+      return this.equals((TGetQueryPlanReq)that);
     return false;
   }
 
-  public boolean equals(TExecuteStatementReq that) {
+  public boolean equals(TGetQueryPlanReq that) {
     if (that == null)
       return false;
 
@@ -385,13 +385,13 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
     return builder.toHashCode();
   }
 
-  public int compareTo(TExecuteStatementReq other) {
+  public int compareTo(TGetQueryPlanReq other) {
     if (!getClass().equals(other.getClass())) {
       return getClass().getName().compareTo(other.getClass().getName());
     }
 
     int lastComparison = 0;
-    TExecuteStatementReq typedOther = (TExecuteStatementReq)other;
+    TGetQueryPlanReq typedOther = (TGetQueryPlanReq)other;
 
     lastComparison = Boolean.valueOf(isSetSessionHandle()).compareTo(typedOther.isSetSessionHandle());
     if (lastComparison != 0) {
@@ -440,7 +440,7 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("TExecuteStatementReq(");
+    StringBuilder sb = new StringBuilder("TGetQueryPlanReq(");
     boolean first = true;
 
     sb.append("sessionHandle:");
@@ -504,15 +504,15 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
     }
   }
 
-  private static class TExecuteStatementReqStandardSchemeFactory implements SchemeFactory {
-    public TExecuteStatementReqStandardScheme getScheme() {
-      return new TExecuteStatementReqStandardScheme();
+  private static class TGetQueryPlanReqStandardSchemeFactory implements SchemeFactory {
+    public TGetQueryPlanReqStandardScheme getScheme() {
+      return new TGetQueryPlanReqStandardScheme();
     }
   }
 
-  private static class TExecuteStatementReqStandardScheme extends StandardScheme<TExecuteStatementReq> {
+  private static class TGetQueryPlanReqStandardScheme extends StandardScheme<TGetQueryPlanReq> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, TExecuteStatementReq struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, TGetQueryPlanReq struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
       while (true)
@@ -542,15 +542,15 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
           case 3: // CONF_OVERLAY
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
-                org.apache.thrift.protocol.TMap _map144 = iprot.readMapBegin();
-                struct.confOverlay = new HashMap<String,String>(2*_map144.size);
-                for (int _i145 = 0; _i145 < _map144.size; ++_i145)
+                org.apache.thrift.protocol.TMap _map172 = iprot.readMapBegin();
+                struct.confOverlay = new HashMap<String,String>(2*_map172.size);
+                for (int _i173 = 0; _i173 < _map172.size; ++_i173)
                 {
-                  String _key146; // required
-                  String _val147; // optional
-                  _key146 = iprot.readString();
-                  _val147 = iprot.readString();
-                  struct.confOverlay.put(_key146, _val147);
+                  String _key174; // required
+                  String _val175; // optional
+                  _key174 = iprot.readString();
+                  _val175 = iprot.readString();
+                  struct.confOverlay.put(_key174, _val175);
                 }
                 iprot.readMapEnd();
               }
@@ -568,7 +568,7 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, TExecuteStatementReq struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, TGetQueryPlanReq struct) throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -587,10 +587,10 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
           oprot.writeFieldBegin(CONF_OVERLAY_FIELD_DESC);
           {
             oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.confOverlay.size()));
-            for (Map.Entry<String, String> _iter148 : struct.confOverlay.entrySet())
+            for (Map.Entry<String, String> _iter176 : struct.confOverlay.entrySet())
             {
-              oprot.writeString(_iter148.getKey());
-              oprot.writeString(_iter148.getValue());
+              oprot.writeString(_iter176.getKey());
+              oprot.writeString(_iter176.getValue());
             }
             oprot.writeMapEnd();
           }
@@ -603,16 +603,16 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
 
   }
 
-  private static class TExecuteStatementReqTupleSchemeFactory implements SchemeFactory {
-    public TExecuteStatementReqTupleScheme getScheme() {
-      return new TExecuteStatementReqTupleScheme();
+  private static class TGetQueryPlanReqTupleSchemeFactory implements SchemeFactory {
+    public TGetQueryPlanReqTupleScheme getScheme() {
+      return new TGetQueryPlanReqTupleScheme();
     }
   }
 
-  private static class TExecuteStatementReqTupleScheme extends TupleScheme<TExecuteStatementReq> {
+  private static class TGetQueryPlanReqTupleScheme extends TupleScheme<TGetQueryPlanReq> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, TExecuteStatementReq struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, TGetQueryPlanReq struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       struct.sessionHandle.write(oprot);
       oprot.writeString(struct.statement);
@@ -624,17 +624,17 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
       if (struct.isSetConfOverlay()) {
         {
           oprot.writeI32(struct.confOverlay.size());
-          for (Map.Entry<String, String> _iter149 : struct.confOverlay.entrySet())
+          for (Map.Entry<String, String> _iter177 : struct.confOverlay.entrySet())
           {
-            oprot.writeString(_iter149.getKey());
-            oprot.writeString(_iter149.getValue());
+            oprot.writeString(_iter177.getKey());
+            oprot.writeString(_iter177.getValue());
           }
         }
       }
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, TExecuteStatementReq struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, TGetQueryPlanReq struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.sessionHandle = new TSessionHandle();
       struct.sessionHandle.read(iprot);
@@ -644,15 +644,15 @@ public class TExecuteStatementReq implements org.apache.thrift.TBase<TExecuteSta
       BitSet incoming = iprot.readBitSet(1);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TMap _map150 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.confOverlay = new HashMap<String,String>(2*_map150.size);
-          for (int _i151 = 0; _i151 < _map150.size; ++_i151)
+          org.apache.thrift.protocol.TMap _map178 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.confOverlay = new HashMap<String,String>(2*_map178.size);
+          for (int _i179 = 0; _i179 < _map178.size; ++_i179)
           {
-            String _key152; // required
-            String _val153; // optional
-            _key152 = iprot.readString();
-            _val153 = iprot.readString();
-            struct.confOverlay.put(_key152, _val153);
+            String _key180; // required
+            String _val181; // optional
+            _key180 = iprot.readString();
+            _val181 = iprot.readString();
+            struct.confOverlay.put(_key180, _val181);
           }
         }
         struct.setConfOverlayIsSet(true);

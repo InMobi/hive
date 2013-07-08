@@ -42,6 +42,11 @@ class TCLIServiceHandler : virtual public TCLIServiceIf {
     printf("ExecuteStatement\n");
   }
 
+  void ExecuteStatementAsync(TExecuteStatementAsyncResp& _return, const TExecuteStatementAsyncReq& req) {
+    // Your implementation goes here
+    printf("ExecuteStatementAsync\n");
+  }
+
   void GetTypeInfo(TGetTypeInfoResp& _return, const TGetTypeInfoReq& req) {
     // Your implementation goes here
     printf("GetTypeInfo\n");
@@ -100,6 +105,11 @@ class TCLIServiceHandler : virtual public TCLIServiceIf {
   void FetchResults(TFetchResultsResp& _return, const TFetchResultsReq& req) {
     // Your implementation goes here
     printf("FetchResults\n");
+  }
+
+  void GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req) {
+    // Your implementation goes here
+    printf("GetQueryPlan\n");
   }
 
 };

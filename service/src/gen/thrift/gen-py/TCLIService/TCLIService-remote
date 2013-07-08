@@ -27,6 +27,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  TCloseSessionResp CloseSession(TCloseSessionReq req)'
   print '  TGetInfoResp GetInfo(TGetInfoReq req)'
   print '  TExecuteStatementResp ExecuteStatement(TExecuteStatementReq req)'
+  print '  TExecuteStatementAsyncResp ExecuteStatementAsync(TExecuteStatementAsyncReq req)'
   print '  TGetTypeInfoResp GetTypeInfo(TGetTypeInfoReq req)'
   print '  TGetCatalogsResp GetCatalogs(TGetCatalogsReq req)'
   print '  TGetSchemasResp GetSchemas(TGetSchemasReq req)'
@@ -39,6 +40,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  TCloseOperationResp CloseOperation(TCloseOperationReq req)'
   print '  TGetResultSetMetadataResp GetResultSetMetadata(TGetResultSetMetadataReq req)'
   print '  TFetchResultsResp FetchResults(TFetchResultsReq req)'
+  print '  TGetQueryPlanResp GetQueryPlan(TGetQueryPlanReq req)'
   print ''
   sys.exit(0)
 
@@ -114,6 +116,12 @@ elif cmd == 'ExecuteStatement':
     sys.exit(1)
   pp.pprint(client.ExecuteStatement(eval(args[0]),))
 
+elif cmd == 'ExecuteStatementAsync':
+  if len(args) != 1:
+    print 'ExecuteStatementAsync requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.ExecuteStatementAsync(eval(args[0]),))
+
 elif cmd == 'GetTypeInfo':
   if len(args) != 1:
     print 'GetTypeInfo requires 1 args'
@@ -185,6 +193,12 @@ elif cmd == 'FetchResults':
     print 'FetchResults requires 1 args'
     sys.exit(1)
   pp.pprint(client.FetchResults(eval(args[0]),))
+
+elif cmd == 'GetQueryPlan':
+  if len(args) != 1:
+    print 'GetQueryPlan requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.GetQueryPlan(eval(args[0]),))
 
 else:
   print 'Unrecognized method %s' % cmd
