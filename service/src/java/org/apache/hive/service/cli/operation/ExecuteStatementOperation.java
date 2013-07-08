@@ -56,4 +56,5 @@ public abstract class ExecuteStatementOperation extends Operation {
       return new SQLOperation(parentSession, statement, confOverlay);
     }
   }
+
 }

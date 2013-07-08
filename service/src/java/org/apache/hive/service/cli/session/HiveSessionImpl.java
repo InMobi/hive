@@ -18,7 +18,6 @@
 
 package org.apache.hive.service.cli.session;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -54,6 +52,7 @@ import org.apache.hive.service.cli.operation.GetTableTypesOperation;
 import org.apache.hive.service.cli.operation.GetTypeInfoOperation;
 import org.apache.hive.service.cli.operation.MetadataOperation;
 import org.apache.hive.service.cli.operation.OperationManager;
+import org.apache.hive.service.cli.operation.SQLOperation;
 
 /**
  * HiveSession
@@ -93,7 +92,7 @@ public class HiveSessionImpl implements HiveSession {
     sessionState = new SessionState(hiveConf);
   }
 
-  private SessionManager getSessionManager() {
+  public SessionManager getSessionManager() {
     return sessionManager;
   }
 
@@ -172,12 +171,17 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
-  public OperationHandle executeStatement(String statement, Map<String, String> confOverlay)
+  public OperationHandle executeStatement(String statement, Map<String, String> confOverlay,
+      boolean runAsync)
       throws HiveSQLException {
     acquire();
     try {
       ExecuteStatementOperation operation = getOperationManager()
           .newExecuteStatementOperation(getSession(), statement, confOverlay);
+      if (operation instanceof SQLOperation) {
+        ((SQLOperation) operation).setRunAsync(runAsync);
+        ((SQLOperation) operation).setSessionState(SessionState.get());
+      }
       operation.run();
       OperationHandle opHandle = operation.getHandle();
       opHandleSet.add(opHandle);
@@ -384,5 +388,19 @@ public class HiveSessionImpl implements HiveSession {
 
   protected HiveSession getSession() {
     return this;
+  }
+
+  @Override
+  public String getQueryPlan(String statement, Map<String, String> params)
+      throws HiveSQLException {
+    ExecuteStatementOperation operation = getOperationManager()
+        .newExecuteStatementOperation(getSession(), statement, params);
+
+    if (operation instanceof SQLOperation) {
+      SQLOperation sqlOperation = (SQLOperation) operation;
+      return sqlOperation.getQueryPlan();
+    } else {
+      throw new HiveSQLException("Not an SQL statement: " + statement);
+    }
   }
 }

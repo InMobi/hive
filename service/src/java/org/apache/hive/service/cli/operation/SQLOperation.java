@@ -18,18 +18,22 @@
 
 package org.apache.hive.service.cli.operation;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hadoop.hive.ql.CommandNeedRetryException;
 import org.apache.hadoop.hive.ql.Driver;
+import org.apache.hadoop.hive.ql.TaskStatus;
 import org.apache.hadoop.hive.ql.parse.VariableSubstitution;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -49,6 +53,9 @@ import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.HiveSession;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * SQLOperation.
@@ -61,8 +68,10 @@ public class SQLOperation extends ExecuteStatementOperation {
   private TableSchema resultSchema = null;
   private Schema mResultSchema = null;
   private SerDe serde = null;
-
-
+  private boolean runAsync;
+  private Future<?> backgroundHandle;
+  private SessionState sessionState;
+  
   public SQLOperation(HiveSession parentSession, String statement, Map<String, String> confOverlay) {
     // TODO: call setRemoteUser in ExecuteStatementOperation or higher.
     super(parentSession, statement, confOverlay);
@@ -72,9 +81,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   public void prepare() throws HiveSQLException {
   }
 
-  @Override
-  public void run() throws HiveSQLException {
-    setState(OperationState.RUNNING);
+  private void runInternal() throws HiveSQLException {
     String statement_trimmed = statement.trim();
     String[] tokens = statement_trimmed.split("\\s");
     String cmd_1 = statement_trimmed.substring(tokens[0].length()).trim();
@@ -114,10 +121,40 @@ public class SQLOperation extends ExecuteStatementOperation {
     }
     setState(OperationState.FINISHED);
   }
-
   @Override
-  public void cancel() throws HiveSQLException {
-    setState(OperationState.CANCELED);
+  public void run() throws HiveSQLException {
+    setState(OperationState.RUNNING);
+    if (!shouldRunAsync()) {
+      runInternal();
+    } else {
+      Runnable backgroundTask = new Runnable() {
+        @Override
+        public void run() {
+          SessionState.start(sessionState);
+          try {
+            runInternal();
+          } catch (HiveSQLException e) {
+            e.printStackTrace();
+          }
+        }
+      };
+      try {
+        this.backgroundHandle =
+          getParentSession().getSessionManager().submitBackgroundTask(backgroundTask);
+      } catch (RejectedExecutionException rejected) {
+        setState(OperationState.ERROR);
+        throw new HiveSQLException(rejected);
+      }
+    }
+  }
+
+  private void cleanup(OperationState state) throws HiveSQLException {
+    setState(state);
+    if (shouldRunAsync()) {
+      if (backgroundHandle != null) {
+        backgroundHandle.cancel(true);
+      }
+    }
     if (driver != null) {
       driver.close();
       driver.destroy();
@@ -130,17 +167,13 @@ public class SQLOperation extends ExecuteStatementOperation {
   }
 
   @Override
-  public void close() throws HiveSQLException {
-    setState(OperationState.CLOSED);
-    if (driver != null) {
-      driver.close();
-      driver.destroy();
-    }
+  public void cancel() throws HiveSQLException {
+    cleanup(OperationState.CANCELED);
+  }
 
-    SessionState session = SessionState.get();
-    if (session.getTmpOutputFile() != null) {
-      session.getTmpOutputFile().delete();
-    }
+  @Override
+  public void close() throws HiveSQLException {
+    cleanup(OperationState.CLOSED);
   }
 
   @Override
@@ -259,4 +292,64 @@ public class SQLOperation extends ExecuteStatementOperation {
     return serde;
   }
 
+  public String getQueryPlan() throws HiveSQLException {
+    try {
+      driver = new Driver(getParentSession().getHiveConf());
+      int errorCode = driver.compile(statement);
+      if (errorCode != 0) {
+        throw new HiveSQLException("Error getting query plan: " + errorCode);
+      } else {
+        return driver.getPlan().toThriftJSONString();
+      }
+    } catch (IOException e) {
+      throw new HiveSQLException(e);
+    }
+  }
+
+
+  public void setRunAsync(boolean runInBackground) {
+    this.runAsync = runInBackground;
+  }
+
+  private boolean shouldRunAsync() {
+    return runAsync;
+  }
+
+
+  public void setSessionState(SessionState sessionState) {
+    this.sessionState = sessionState;
+  }
+
+  @Override
+  public String getTaskStatus() throws HiveSQLException {
+    if (driver != null) {
+      List<TaskStatus> statuses = driver.getTaskStatuses();
+      if (statuses != null) {
+        ByteArrayOutputStream out = null;
+        try {
+          ObjectMapper mapper = new ObjectMapper();
+          out = new ByteArrayOutputStream();
+          mapper.writeValue(out, statuses);
+          return out.toString("UTF-8");
+        } catch (JsonGenerationException e) {
+          throw new HiveSQLException(e);
+        } catch (JsonMappingException e) {
+          throw new HiveSQLException(e);
+        } catch (IOException e) {
+          throw new HiveSQLException(e);
+        } finally {
+          if (out != null) {
+            try {
+              out.close();
+            } catch (IOException e) {
+              throw new HiveSQLException(e);
+            }
+          }
+        }
+      }
+    }
+
+    // Driver not initialized
+    return null;
+  }
 }

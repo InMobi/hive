@@ -40,7 +40,7 @@ public interface HiveSession {
    * @param sessionManager
    */
   public void setSessionManager(SessionManager sessionManager);
-
+  public SessionManager getSessionManager();
   /**
    * Set operation manager for the session
    * @param operationManager
@@ -69,11 +69,12 @@ public interface HiveSession {
    * execute operation handler
    * @param statement
    * @param confOverlay
+   * @param runAsync
    * @return
    * @throws HiveSQLException
    */
   public OperationHandle executeStatement(String statement,
-      Map<String, String> confOverlay) throws HiveSQLException;
+      Map<String, String> confOverlay, boolean runAsync) throws HiveSQLException;
 
   /**
    * getTypeInfo operation handler
@@ -164,4 +165,7 @@ public interface HiveSession {
   public String getUserName();
 
   public void setUserName(String userName);
+
+  public String getQueryPlan(String statement, Map<String, String> confOverlay)
+      throws HiveSQLException;
 }

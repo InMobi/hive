@@ -169,4 +169,5 @@ public class OperationManager extends AbstractService {
       throws HiveSQLException {
     return getOperation(opHandle).getNextRowSet(orientation, maxRows);
   }
+
 }

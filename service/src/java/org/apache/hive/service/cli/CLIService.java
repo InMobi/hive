@@ -29,12 +29,16 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.ql.TaskStatus;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.auth.HiveAuthFactory;
+import org.apache.hive.service.cli.operation.Operation;
+import org.apache.hive.service.cli.operation.SQLOperation;
+import org.apache.hive.service.cli.session.HiveSession;
 import org.apache.hive.service.cli.session.SessionManager;
 
 /**
@@ -143,11 +147,21 @@ public class CLIService extends CompositeService implements ICLIService {
    * @see org.apache.hive.service.cli.ICLIService#executeStatement(org.apache.hive.service.cli.SessionHandle, java.lang.String, java.util.Map)
    */
   @Override
-  public OperationHandle executeStatement(SessionHandle sessionHandle, String statement, Map<String, String> confOverlay)
+  public OperationHandle executeStatement(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay)
       throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
-        .executeStatement(statement, confOverlay);
+        .executeStatement(statement, confOverlay, false);
     LOG.info(sessionHandle + ": executeStatement()");
+    return opHandle;
+  }
+
+  @Override
+  public OperationHandle executeStatementAsync(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException {
+    OperationHandle opHandle = sessionManager.getSession(sessionHandle)
+        .executeStatement(statement, confOverlay, true);
+    LOG.info(sessionHandle + ": executeStatementAsync()");
     return opHandle;
   }
 
@@ -240,11 +254,16 @@ public class CLIService extends CompositeService implements ICLIService {
    * @see org.apache.hive.service.cli.ICLIService#getOperationStatus(org.apache.hive.service.cli.OperationHandle)
    */
   @Override
-  public OperationState getOperationStatus(OperationHandle opHandle)
+  public OperationStatus getOperationStatus(OperationHandle opHandle)
       throws HiveSQLException {
     OperationState opState = sessionManager.getOperationManager().getOperationState(opHandle);
+    
+    Operation op = sessionManager.getOperationManager().getOperation(opHandle);
+    
+    OperationStatus status = new OperationStatus(opState, op.getTaskStatus());
+    
     LOG.info(opHandle + ": getOperationStatus()");
-    return opState;
+    return status;
   }
 
   /* (non-Javadoc)
@@ -305,6 +324,15 @@ public class CLIService extends CompositeService implements ICLIService {
     return rowSet;
   }
 
+  @Override
+  public String getQueryPlan(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException {
+    HiveSession session = sessionManager.getSession(sessionHandle);
+    String plan = session.getQueryPlan(statement, confOverlay);
+    LOG.info(sessionHandle + " : getQueryPlan()");
+    return plan;
+  }
+
   // obtain delegation token for the give user from metastore
   public synchronized String getDelegationTokenFromMetaStore(String owner)
       throws HiveSQLException, UnsupportedOperationException, LoginException, IOException {
@@ -325,4 +353,5 @@ public class CLIService extends CompositeService implements ICLIService {
       }
     }
   }
+
 }

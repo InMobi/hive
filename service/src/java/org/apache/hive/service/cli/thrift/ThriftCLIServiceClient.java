@@ -28,6 +28,7 @@ import org.apache.hive.service.cli.GetInfoValue;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationHandle;
 import org.apache.hive.service.cli.OperationState;
+import org.apache.hive.service.cli.OperationStatus;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.SessionHandle;
 import org.apache.hive.service.cli.TableSchema;
@@ -277,12 +278,13 @@ public class ThriftCLIServiceClient extends CLIServiceClient {
    * @see org.apache.hive.service.cli.ICLIService#getOperationStatus(org.apache.hive.service.cli.OperationHandle)
    */
   @Override
-  public OperationState getOperationStatus(OperationHandle opHandle) throws HiveSQLException {
+  public OperationStatus getOperationStatus(OperationHandle opHandle) throws HiveSQLException {
     try {
       TGetOperationStatusReq req = new TGetOperationStatusReq(opHandle.toTOperationHandle());
       TGetOperationStatusResp resp = cliService.GetOperationStatus(req);
       checkStatus(resp.getStatus());
-      return OperationState.getOperationState(resp.getOperationState());
+      OperationState state = OperationState.getOperationState(resp.getOperationState());
+      return new OperationStatus(state, resp.getTaskStatus());
     } catch (HiveSQLException e) {
       throw e;
     } catch (Exception e) {
@@ -369,5 +371,39 @@ public class ThriftCLIServiceClient extends CLIServiceClient {
   public RowSet fetchResults(OperationHandle opHandle) throws HiveSQLException {
     // TODO: set the correct default fetch size
     return fetchResults(opHandle, FetchOrientation.FETCH_NEXT, 10000);
+  }
+
+  @Override
+  public String getQueryPlan(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException {
+    try {
+      TGetQueryPlanReq req = new TGetQueryPlanReq(sessionHandle.toTSessionHandle(),
+          statement);
+      req.setConfOverlay(confOverlay);
+      TGetQueryPlanResp resp = cliService.GetQueryPlan(req);
+      checkStatus(resp.getStatus());
+      return resp.getPlan();
+    } catch (HiveSQLException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new HiveSQLException(e);
+    }
+  }
+
+  @Override
+  public OperationHandle executeStatementAsync(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException {
+    try {
+      TExecuteStatementAsyncReq req =
+          new TExecuteStatementAsyncReq(sessionHandle.toTSessionHandle(), statement);
+      req.setConfOverlay(confOverlay);
+      TExecuteStatementAsyncResp resp = cliService.ExecuteStatementAsync(req);
+      checkStatus(resp.getStatus());
+      return new OperationHandle(resp.getOperationHandle());
+    } catch (HiveSQLException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new HiveSQLException(e);
+    }
   }
 }
