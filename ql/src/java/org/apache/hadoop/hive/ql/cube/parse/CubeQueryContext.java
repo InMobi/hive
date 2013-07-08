@@ -365,6 +365,10 @@ public class CubeQueryContext {
           ASTNode ident = (ASTNode) node.getChild(0);
           String column = ident.getText().toLowerCase();
           if (tblToCols != null) {
+            if (exprToAlias != null && exprToAlias.values().contains(column)) {
+              // column is an existing alias
+              return;
+            }
             List<String> colList = tblToCols.get(DEFAULT_TABLE);
             if (colList == null) {
               colList = new ArrayList<String>();

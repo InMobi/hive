@@ -742,6 +742,11 @@ public class TestCubeDriver {
     String q8 = "SELECT cityid, sum(testCube.msr2) * sum(testCube.msr3) from" +
       " testCube where " + twoDaysRange;
 
+    // pass
+    String q9 = "SELECT cityid c1, sum(msr3) m3 from testCube where "
+      + "c1 > 100 and " + twoDaysRange + " having (msr2 < 100" +
+      " AND m3 > 1000)";
+
     String expectedq1 = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
       " sum(testCube.msr2) from ", null, "group by testcube.cityid",
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
@@ -767,9 +772,14 @@ public class TestCubeDriver {
         " sum(testCube.msr2) * sum(testCube.msr3) from ", null,
         "group by testcube.cityid",
         getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
-    String tests[] = {q1, q2, q3, q4, q5, q6, q7, q8};
+    String expectedq9 = getExpectedQuery(cubeName, "SELECT testcube.cityid c1,"
+        + " sum(testCube.msr3) m3 from ", "c1 > 100", "group by testcube.cityid" +
+        " having sum(testCube.msr2) < 100 AND (m3 > 1000)",
+        getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+
+    String tests[] = {q1, q2, q3, q4, q5, q6, q7, q8, q9};
     String expected[] = {expectedq1, /*fail*/ expectedq2, expectedq3, expectedq4,
-        /*fail*/ expectedq5, expectedq6, expectedq7,expectedq8};
+        /*fail*/ expectedq5, expectedq6, expectedq7, expectedq8, expectedq9};
 
     for (int i = 0; i < tests.length; i++) {
       String hql = null;
