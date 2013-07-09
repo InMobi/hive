@@ -8,13 +8,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
 import org.antlr.runtime.tree.Tree;
-import org.apache.hadoop.hbase.coprocessor.TestMasterCoprocessorExceptionWithAbort.BuggyMasterObserver;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
@@ -263,12 +261,8 @@ public class HQLParser {
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append(")");
     } else if (TOK_FUNCTION == root.getToken().getType()) {
-      
-      ASTNode kwCase = findNodeByPath(root, KW_CASE);
-      ASTNode kwWhen = findNodeByPath(root, KW_WHEN);
-      
       // special handling for CASE udf
-      if (kwCase != null) {
+      if (findNodeByPath(root, KW_CASE) != null) {
         buf.append(" case ");
         toInfixString((ASTNode)root.getChild(1), buf);
         // each of the conditions
@@ -291,8 +285,9 @@ public class HQLParser {
         }
         
         buf.append(" end ");
-      } else if (kwWhen != null) {
+      } else if (findNodeByPath(root, KW_WHEN) != null) {
         // 2nd form of case statement
+        
         buf.append(" case ");
         // each of the conditions
         ArrayList<Node> caseChildren = root.getChildren();
@@ -314,8 +309,15 @@ public class HQLParser {
         }
         
         buf.append(" end ");
-      }
-      else {
+      } else if (findNodeByPath(root, TOK_ISNULL) != null) {
+        // IS NULL operator
+        toInfixString((ASTNode)root.getChild(1), buf);
+        buf.append(" is null ");
+      } else if (findNodeByPath(root, TOK_ISNOTNULL) != null) {
+        // IS NOT NULL operator
+        toInfixString((ASTNode)root.getChild(1), buf);
+        buf.append(" is not null ");
+      } else {
         // Normal UDF
         String fname = ((ASTNode) root.getChild(0)).getText();
         // Function name

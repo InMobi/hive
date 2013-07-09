@@ -112,5 +112,24 @@ public class TestHQLParser {
         + " end  complex_case_statement_2", selectStr.trim());
 
   }
+  
+  @Test
+  public void testIsNullCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 IS NULL";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  is null", whereStr.trim());
+  }
+  
+  
+  @Test
+  public void testIsNotNullCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 IS NOT NULL";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  is not null", whereStr.trim());
+  }
 
 }
