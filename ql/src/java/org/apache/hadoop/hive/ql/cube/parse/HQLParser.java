@@ -67,9 +67,10 @@ public class HQLParser {
     ops.add(DIVIDE);
     ops.add(MOD);
     ops.add(KW_LIKE);
+    ops.add(KW_RLIKE);
+    ops.add(KW_REGEXP);
     BINARY_OPERATORS = Collections.unmodifiableSet(ops);
-
-
+    
     ARITHMETIC_OPERATORS = new HashSet<Integer>();
     ARITHMETIC_OPERATORS.add(PLUS);
     ARITHMETIC_OPERATORS.add(MINUS);
@@ -243,10 +244,14 @@ public class HQLParser {
     String rootText = root.getText();
     // Operand, print contents
     if (Identifier == rootType || Number == rootType ||
-        StringLiteral == rootType) {
+        StringLiteral == rootType || KW_TRUE == rootType || KW_FALSE == rootType) {
       // StringLiterals should not be lower cased.
       if (StringLiteral == rootType) {
         buf.append(' ').append(rootText).append(' ');
+      } else if (KW_TRUE == rootType) {
+        buf.append(" true ");
+      } else if (KW_FALSE == rootType) {
+        buf.append(" false ");
       } else {
         buf.append(' ').append(rootText == null ? "" : rootText.toLowerCase()).append(' ');
       }
@@ -317,7 +322,29 @@ public class HQLParser {
         // IS NOT NULL operator
         toInfixString((ASTNode)root.getChild(1), buf);
         buf.append(" is not null ");
-      } else {
+      } else if (((ASTNode)root.getChild(0)).getToken().getType() == Identifier
+          && ((ASTNode)root.getChild(0)).getToken().getText().equalsIgnoreCase("between")) {
+        // Handle between and not in between
+        ASTNode tokTrue = findNodeByPath(root, KW_TRUE);
+        ASTNode tokFalse = findNodeByPath(root, KW_FALSE);
+        if (tokTrue != null) {
+          // NOT BETWEEN
+          toInfixString((ASTNode)root.getChild(2), buf);
+          buf.append( " not between ");
+          toInfixString((ASTNode)root.getChild(3), buf);
+          buf.append(" and ");
+          toInfixString((ASTNode)root.getChild(4), buf);
+        } else if (tokFalse != null) {
+          // BETWEEN
+          toInfixString((ASTNode)root.getChild(2), buf);
+          buf.append( " between ");
+          toInfixString((ASTNode)root.getChild(3), buf);
+          buf.append(" and ");
+          toInfixString((ASTNode)root.getChild(4), buf);
+        }
+        
+      }
+      else {
         // Normal UDF
         String fname = ((ASTNode) root.getChild(0)).getText();
         // Function name

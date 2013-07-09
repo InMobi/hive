@@ -131,5 +131,23 @@ public class TestHQLParser {
     System.out.println(whereStr);
     Assert.assertEquals("col1  is not null", whereStr.trim());
   }
+  
+  
+  @Test
+  public void testBetweenCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 BETWEEN 10 AND 100";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  between  10  and  100", whereStr.trim());
+  }
 
+  @Test
+  public void testNotBetweenCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 NOT BETWEEN 10 AND 100";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  not between  10  and  100", whereStr.trim());
+  }
 }
