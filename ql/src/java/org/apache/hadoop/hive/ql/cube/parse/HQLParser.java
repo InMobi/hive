@@ -1,44 +1,22 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import static org.apache.hadoop.hive.ql.parse.HiveParser.DIVIDE;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.EQUAL;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.GREATERTHAN;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.GREATERTHANOREQUALTO;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_AND;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_LIKE;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_OR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.LESSTHAN;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.LESSTHANOREQUALTO;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.MINUS;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.MOD;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.NOTEQUAL;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.Number;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.PLUS;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.STAR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.StringLiteral;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_DIR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONDI;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_GROUPBY;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LOCAL_DIR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ORDERBY;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECT;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECTDI;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TAB;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
 import org.antlr.runtime.tree.Tree;
+import org.apache.hadoop.hbase.coprocessor.TestMasterCoprocessorExceptionWithAbort.BuggyMasterObserver;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
+import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
@@ -285,17 +263,72 @@ public class HQLParser {
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append(")");
     } else if (TOK_FUNCTION == root.getToken().getType()) {
-      String fname = ((ASTNode) root.getChild(0)).getText();
-      // Function name
-      buf.append(fname.toLowerCase()).append("(");
-      // Arguments separated by comma
-      for (int i = 1; i < root.getChildCount(); i++) {
-        toInfixString((ASTNode) root.getChild(i), buf);
-        if (i != root.getChildCount() - 1) {
-          buf.append(", ");
+      
+      ASTNode kwCase = findNodeByPath(root, KW_CASE);
+      ASTNode kwWhen = findNodeByPath(root, KW_WHEN);
+      
+      // special handling for CASE udf
+      if (kwCase != null) {
+        buf.append(" case ");
+        toInfixString((ASTNode)root.getChild(1), buf);
+        // each of the conditions
+        ArrayList<Node> caseChildren = root.getChildren();
+        int from = 2;
+        int nchildren = caseChildren.size();
+        int to = nchildren % 2 == 1 ? nchildren - 1 : nchildren;
+        
+        for (int i = from; i < to; i += 2) {
+          buf.append(" when ");
+          toInfixString((ASTNode) caseChildren.get(i), buf);
+          buf.append(" then ");
+          toInfixString((ASTNode) caseChildren.get(i + 1), buf);
         }
+        
+        // check if there is an ELSE node
+        if (nchildren % 2 == 1) {
+          buf.append(" else " );
+          toInfixString((ASTNode) caseChildren.get(nchildren -1), buf);
+        }
+        
+        buf.append(" end ");
+      } else if (kwWhen != null) {
+        // 2nd form of case statement
+        buf.append(" case ");
+        // each of the conditions
+        ArrayList<Node> caseChildren = root.getChildren();
+        int from = 1;
+        int nchildren = caseChildren.size();
+        int to = nchildren % 2 == 1 ? nchildren : nchildren - 1;
+        
+        for (int i = from; i < to; i += 2) {
+          buf.append(" when ");
+          toInfixString((ASTNode) caseChildren.get(i), buf);
+          buf.append(" then ");
+          toInfixString((ASTNode) caseChildren.get(i + 1), buf);
+        }
+        
+        // check if there is an ELSE node
+        if (nchildren % 2 == 0) {
+          buf.append(" else " );
+          toInfixString((ASTNode) caseChildren.get(nchildren -1), buf);
+        }
+        
+        buf.append(" end ");
       }
-      buf.append(")");
+      else {
+        // Normal UDF
+        String fname = ((ASTNode) root.getChild(0)).getText();
+        // Function name
+        buf.append(fname.toLowerCase()).append("(");
+        // Arguments separated by comma
+        for (int i = 1; i < root.getChildCount(); i++) {
+          toInfixString((ASTNode) root.getChild(i), buf);
+          if (i != root.getChildCount() - 1) {
+            buf.append(", ");
+          }
+        }
+        buf.append(")");
+      }
     } else if (TOK_FUNCTIONDI == rootType) {
       // Distinct is a different case.
       String fname = ((ASTNode) root.getChild(0)).getText();
