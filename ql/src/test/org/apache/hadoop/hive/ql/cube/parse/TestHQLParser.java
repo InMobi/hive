@@ -12,7 +12,6 @@ public class TestHQLParser {
   public void testGroupByOrderByGetString() throws Exception {
     String query = "SELECT a,b, sum(c) FROM tab GROUP BY a,f(b), d+e ORDER BY a, g(b), e/100";
     ASTNode node = HQLParser.parseHQL(query);
-    HQLParser.printAST(node);
 
     ASTNode groupby = HQLParser.findNodeByPath(node, TOK_INSERT, TOK_GROUPBY);
     String expected = "a , f( b ), ( d  +  e )";
@@ -22,8 +21,8 @@ public class TestHQLParser {
     String expectedOrderBy = "a , g( b ), ( e  /  100 )";
     Assert.assertEquals(expectedOrderBy, HQLParser.getString(orderby).trim());
   }
-  
-  
+
+
   @Test
   public void testLiteralCaseIsPreserved() throws Exception {
     String literalQuery = "SELECT 'abc' AS col1, 'DEF' AS col2 FROM foo where col3='GHI' "
@@ -42,4 +41,153 @@ public class TestHQLParser {
     Assert.assertEquals(expectedWhere, whereStr);
   }
 
+  @Test
+  public void testCaseStatementGetString() throws Exception {
+    String query = "SELECT  "
+        + "CASE (col1 * 100)/200 + 5 "
+        + "WHEN 'ABC' THEN 'def' "
+        + "WHEN 'EFG' THEN 'hij' "
+        + "ELSE 'XyZ' "
+        + "END AS ComplexCaseStatement FROM FOO";
+
+    ASTNode tree = HQLParser.parseHQL(query);
+    ASTNode select = HQLParser.findNodeByPath(tree, TOK_INSERT, TOK_SELECT);
+    String selectStr = HQLParser.getString(select);
+    System.out.println("reconstructed clause ");
+    System.out.println(selectStr);
+    Assert.assertEquals("case ((( col1  *  100 ) /  200 ) +  5 )"
+        + " when  'ABC'  then  'def'  when  'EFG'  then  'hij'  else  'XyZ'  "
+        + "end  complexcasestatement", selectStr.trim());
+
+    String q2 = "SELECT "
+        + "CASE WHEN col1 = 'abc' then 'def' "
+        + "when col1 = 'ghi' then 'jkl' "
+        + "else 'none' END AS Complex_Case_Statement_2"
+        + " from FOO";
+
+    tree = HQLParser.parseHQL(q2);
+    select = HQLParser.findNodeByPath(tree, TOK_INSERT, TOK_SELECT);
+    selectStr = HQLParser.getString(select);
+    System.out.println("reconstructed clause 2");
+    System.out.println(selectStr);
+    Assert.assertEquals("case  "
+        + "when ( col1  =  'abc' ) then  'def'  "
+        + "when ( col1  =  'ghi' ) then  'jkl'  "
+        + "else  'none'  end  complex_case_statement_2", selectStr.trim());
+
+
+    String q3 = "SELECT  "
+        + "CASE (col1 * 100)/200 + 5 "
+        + "WHEN 'ABC' THEN 'def' "
+        + "WHEN 'EFG' THEN 'hij' "
+        + "END AS ComplexCaseStatement FROM FOO";
+
+    tree = HQLParser.parseHQL(q3);
+    select = HQLParser.findNodeByPath(tree, TOK_INSERT, TOK_SELECT);
+    selectStr = HQLParser.getString(select);
+    System.out.println("reconstructed clause ");
+    System.out.println(selectStr);
+    Assert.assertEquals("case ((( col1  *  100 ) /  200 ) +  5 ) "
+        + "when  'ABC'  then  'def'  "
+        + "when  'EFG'  then  'hij'  "
+        + "end  complexcasestatement",
+        selectStr.trim());
+
+
+    String q4 = "SELECT "
+        + "CASE WHEN col1 = 'abc' then 'def' "
+        + "when col1 = 'ghi' then 'jkl' "
+        + "END AS Complex_Case_Statement_2"
+        + " from FOO";
+
+    tree = HQLParser.parseHQL(q4);
+    select = HQLParser.findNodeByPath(tree, TOK_INSERT, TOK_SELECT);
+    selectStr = HQLParser.getString(select);
+    System.out.println("reconstructed clause 2");
+    System.out.println(selectStr);
+    Assert.assertEquals("case  "
+        + "when ( col1  =  'abc' ) then  'def'  "
+        + "when ( col1  =  'ghi' ) then  'jkl' "
+        + " end  complex_case_statement_2", selectStr.trim());
+
+  }
+
+  @Test
+  public void testIsNullCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 IS NULL";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  is null", whereStr.trim());
+  }
+
+
+  @Test
+  public void testIsNotNullCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 IS NOT NULL";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  is not null", whereStr.trim());
+  }
+
+
+  @Test
+  public void testBetweenCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 BETWEEN 10 AND 100";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  between  10  and  100", whereStr.trim());
+  }
+
+  @Test
+  public void testNotBetweenCondition() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE col1 NOT BETWEEN 10 AND 100";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("col1  not between  10  and  100", whereStr.trim());
+  }
+
+  @Test
+  public void testBinaryOperators() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE "
+        + "(A <=> 10) AND (B & C = 10) AND (D | E = 10) "
+        + "AND (F ^ G = 10) AND (H % 2 = 1) AND  (~I = 10)"
+        + "AND (!J) AND (NOT K) AND TRUE AND FALSE";
+
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    String expected = "(((((((((( a  <=>  10 ) and (( b  &  c ) =  10 )) and (( d  |  e ) =  10 )) "
+        + "and (( f  ^  g ) =  10 )) and (( h  %  2 ) =  1 )) and ( ~  i  =  10 )) and  not  j ) "
+        + "and  not  k ) and  true ) and  false )";
+    System.out.println(whereStr);
+    Assert.assertEquals(expected, whereStr.trim());
+  }
+
+  @Test
+  public void testCompelxTypeOperators() throws Exception {
+    String q1 = "SELECT A[2], B['key'], C.D FROM FOO";
+
+    ASTNode select = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_SELECT);
+    String selectStr = HQLParser.getString(select);
+    System.out.println(selectStr);
+    Assert.assertEquals("a [ 2 ],  b [ 'key' ], ( c  .  d )", selectStr.trim());
+  }
+
+  @Test
+  public void testInAndNotInOperator() throws Exception {
+    String q1 = "SELECT * FROM FOO WHERE A IN ('B', 'C', 'D', 'E', 'F')";
+    ASTNode where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    String whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("a  in ( 'B'  ,  'C'  ,  'D'  ,  'E'  ,  'F' )", whereStr.trim());
+
+    q1 = "SELECT * FROM FOO WHERE A NOT IN ('B', 'C', 'D', 'E', 'F')";
+    where = HQLParser.findNodeByPath(HQLParser.parseHQL(q1), TOK_INSERT, TOK_WHERE);
+    whereStr = HQLParser.getString(where);
+    System.out.println(whereStr);
+    Assert.assertEquals("a  not  in ( 'B'  ,  'C'  ,  'D'  ,  'E'  ,  'F' )", whereStr.trim());
+  }
 }
