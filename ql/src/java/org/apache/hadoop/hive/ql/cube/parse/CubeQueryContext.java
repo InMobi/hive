@@ -772,29 +772,11 @@ public class CubeQueryContext {
       throws SemanticException {
     List<String> qstrs = new ArrayList<String>();
     qstrs.add(getSelectTree());
-    String whereString = genWhereClauseWithPartitions(factStorageTable);
     qstrs.add(getFromString());
+    String whereString = genWhereClauseWithPartitions(factStorageTable);
     if (whereString != null) {
       qstrs.add(whereString);
     }
-    if (getGroupByTree() != null) {
-      qstrs.add(getGroupByTree());
-    }
-    if (getHavingTree() != null) {
-      qstrs.add(getHavingTree());
-    }
-    if (getOrderByTree() != null) {
-      qstrs.add(getOrderByTree());
-    }
-    if (getLimitValue() != null) {
-      qstrs.add(String.valueOf(getLimitValue()));
-    }
-    return qstrs.toArray(new String[0]);
-  }
-
-  private Object[] getUnionQueryTreeStrings(String baseQuery) {
-    List<String> qstrs = new ArrayList<String>();
-    qstrs.add("(" + baseQuery + ") "+ getAliasForTabName(cube.getName()));
     if (getGroupByTree() != null) {
       qstrs.add(getGroupByTree());
     }
@@ -829,8 +811,10 @@ public class CubeQueryContext {
     return fromString;
   }
 
+  private final Set<String> tablesAlreadyAdded = new HashSet<String>();
   private void getQLString(QBJoinTree joinTree, StringBuilder builder)
       throws SemanticException {
+    String joiningTable = null;
     if (joinTree.getBaseSrc()[0] == null) {
       if (joinTree.getJoinSrc() != null) {
         getQLString(joinTree.getJoinSrc(), builder);
@@ -839,6 +823,9 @@ public class CubeQueryContext {
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[0]).toLowerCase();
       builder.append(storageTableToQuery.get(cubeTbls.get(tblName))
           + " " + getAliasForTabName(tblName));
+      if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.RIGHTOUTER)) {
+        joiningTable = tblName;
+      }
     }
     if (joinTree.getJoinCond() != null) {
       builder.append(getString(joinTree.getJoinCond()[0].getJoinType()));
@@ -852,12 +839,21 @@ public class CubeQueryContext {
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[1]).toLowerCase();
       builder.append(storageTableToQuery.get(cubeTbls.get(tblName))
           + " " + getAliasForTabName(tblName));
+      if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.LEFTOUTER)) {
+        joiningTable = tblName;
+      }
     }
 
     String joinCond = joinConds.get(joinTree);
     if (joinCond != null) {
       builder.append(" ON ");
       builder.append(joinCond);
+      if (joiningTable != null) {
+        // assuming the joining table to be dimension table
+        appendWhereClause((CubeDimensionTable)cubeTbls.get(joiningTable),
+            builder, true);
+        tablesAlreadyAdded.add(joiningTable);
+      }
     } else {
       throw new SemanticException("No join condition available");
     }
@@ -882,6 +878,7 @@ public class CubeQueryContext {
   }
 
   private String toHQL(String tableName) throws SemanticException {
+    findDimStorageTables();
     String qfmt = getQueryFormat();
     LOG.info("qfmt:" + qfmt);
     String baseQuery = String.format(qfmt, getQueryTreeStrings(tableName));
@@ -895,12 +892,6 @@ public class CubeQueryContext {
     return insertString + baseQuery;
   }
 
-  private String getUnionQuery(String baseQuery) {
-    String qfmt = getUnionQueryFormat();
-    LOG.info("union query format:" + qfmt);
-    return String.format(qfmt, getUnionQueryTreeStrings(baseQuery));
-
-  }
   private void appendWhereClause(StringBuilder whereWithoutTimerange,
       String whereClause, boolean hasMore) {
     if (hasMore) {
@@ -912,9 +903,10 @@ public class CubeQueryContext {
   private void appendWhereClause(CubeDimensionTable dim,
       StringBuilder whereString,
       boolean hasMore) {
-    String storageTable = dimStorageMap.get(dim).get(0);
-    storageTableToQuery.put(dim, storageTable);
-    String whereClause = storageTableToWhereClause.get(storageTable);
+    if (tablesAlreadyAdded.contains(dim.getName())) {
+      return;
+    }
+    String whereClause = storageTableToWhereClause.get(storageTableToQuery.get(dim));
     if (whereClause != null) {
       appendWhereClause(whereString, whereClause, hasMore);
     }
@@ -963,6 +955,15 @@ public class CubeQueryContext {
       return null;
     }
     return whereBuf.toString();
+  }
+
+  private void findDimStorageTables() {
+    Iterator<CubeDimensionTable> it = dimensions.iterator();
+    while (it.hasNext()) {
+      CubeDimensionTable dim = it.next();
+      String storageTable = dimStorageMap.get(dim).get(0);
+      storageTableToQuery.put(dim, storageTable);
+    }
   }
 
   public String toHQL() throws SemanticException {

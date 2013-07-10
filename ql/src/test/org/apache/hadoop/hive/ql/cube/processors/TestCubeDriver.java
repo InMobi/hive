@@ -217,7 +217,6 @@ public class TestCubeDriver {
     }
     Calendar cal = new GregorianCalendar();
     cal.setTime(dayStart);
-    System.out.println("day of the month:" + cal.get(Calendar.DAY_OF_MONTH));
     if (cal.get(Calendar.DAY_OF_MONTH) != 1) {
       addParts(parts, UpdatePeriod.DAILY, dayStart,
           DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
@@ -259,7 +258,6 @@ public class TestCubeDriver {
 
   private void addParts(List<String> partitions, UpdatePeriod updatePeriod,
       Date from, Date to) {
-    System.out.println("addParts from:" + from + "to:" + to);
     String fmt = updatePeriod.format();
     Calendar cal = Calendar.getInstance();
     cal.setTime(from);
@@ -437,15 +435,14 @@ public class TestCubeDriver {
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
-        "statetable", Storage.getPartitionsForLatest()));
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "citytable", Storage.getPartitionsForLatest()));
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "ziptable", Storage.getPartitionsForLatest()));
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id LEFT OUTER JOIN c1_statetable statetable"
-      + " ON statetable.id = citytable.stateid RIGHT OUTER JOIN c1_ziptable" +
+      + " ON statetable.id = citytable.stateid AND " +
+      "(statetable.dt = 'latest') RIGHT OUTER JOIN c1_ziptable" +
       " ziptable ON citytable.zipcode = ziptable.code", null, " group by" +
       " statetable.name ", joinWhereConds,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
@@ -459,18 +456,32 @@ public class TestCubeDriver {
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
-        "st", Storage.getPartitionsForLatest()));
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "ct", Storage.getPartitionsForLatest()));
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "zt", Storage.getPartitionsForLatest()));
     expected = getExpectedQuery("tc", "select st.name," +
       " sum(tc.msr2) FROM ", " INNER JOIN c1_citytable ct ON" +
       " tc.cityid = ct.id LEFT OUTER JOIN c1_statetable st"
-      + " ON st.id = ct.stateid RIGHT OUTER JOIN c1_ziptable" +
+      + " ON st.id = ct.stateid and (st.dt = 'latest') " +
+      "RIGHT OUTER JOIN c1_ziptable" +
       " zt ON ct.zipcode = zt.code", null, " group by" +
       " st.name ", joinWhereConds,
       getWhereForDailyAndHourly2days("tc", "C1_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("select statetable.name, SUM(msr2) from"
+      + " testCube"
+      + " left outer join citytable on testCube.cityid = citytable.id"
+      + " left outer join ziptable on citytable.zipcode = ziptable.code"
+      + " where " + twoDaysRange);
+    expected = getExpectedQuery(cubeName, "select statetable.name," +
+      " sum(testcube.msr2) FROM ", " LEFT OUTER JOIN c1_citytable citytable ON" +
+      " testCube.cityid = citytable.id and (citytable.dt = 'latest') " +
+      " LEFT OUTER JOIN c1_ziptable" +
+      " ziptable ON citytable.zipcode = ziptable.code AND " +
+      "(ziptable.dt = 'latest')", null, " group by" +
+      " statetable.name ", null,
+    getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
     hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube"
@@ -489,7 +500,6 @@ public class TestCubeDriver {
     } catch (SemanticException e) {
       e.printStackTrace();
     }
-
   }
 
   @Test
@@ -949,9 +959,10 @@ public class TestCubeDriver {
 
   @Test
   public void testDistinctColWithoutAlias() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select DISTINCT name, stateid from citytable");
-    String expected = getExpectedQuery("citytable", "select DISTINCT citytable.name," +
-      " citytable.stateid from ", null, "c1_citytable", true);
+    String hqlQuery = driver.compileCubeQuery("select DISTINCT name, stateid" +
+      " from citytable");
+    String expected = getExpectedQuery("citytable", "select DISTINCT" +
+      " citytable.name, citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     hqlQuery = driver.compileCubeQuery("select id, sum(distinct id) from" +
