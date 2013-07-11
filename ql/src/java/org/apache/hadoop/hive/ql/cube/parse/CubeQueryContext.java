@@ -241,16 +241,25 @@ public class CubeQueryContext {
       timenode = HQLParser.findNodeByPath(whereTree, TOK_FUNCTION);
     } else if (KW_AND == whereTree.getChild(0).getType()) {
       // expect time condition as the right sibling of KW_AND
-      timenode = HQLParser.findNodeByPath(whereTree, KW_AND, TOK_FUNCTION);
+      ASTNode and = (ASTNode) whereTree.getChild(0);
+      
+      for (int i = 0; i < and.getChildCount(); i++) {
+        ASTNode child = (ASTNode) and.getChild(i);
+
+        if (TOK_FUNCTION == child.getToken().getType()) {
+          ASTNode fname = HQLParser.findNodeByPath(child, Identifier);
+          if (fname != null && TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
+            timenode = child;
+            break;
+          }
+        }
+        
+      }
+      
     }
 
     if (timenode == null) {
       throw new SemanticException("Unable to get time range");
-    }
-
-    ASTNode fname = HQLParser.findNodeByPath(timenode, Identifier);
-    if (!TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
-      throw new SemanticException("Expected time range as " + TIME_RANGE_FUNC);
     }
 
     String timeDimName = PlanUtils.stripQuotes(timenode.getChild(1).getText());
