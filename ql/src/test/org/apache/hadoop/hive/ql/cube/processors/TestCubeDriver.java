@@ -895,6 +895,12 @@ public class TestCubeDriver {
     Assert.assertEquals("Time dimension should be " + Storage.getDatePartitionKey(),
         Storage.getDatePartitionKey(),
         driver.rewrittenQuery.getTimeDimension());
+    
+    // GRILL-38 NPE in extracting time range
+    q1 = "SELECT cityid, testCube.msr2 from testCube where " + timeRange + " AND cityid IS NULL";
+    driver.compileCubeQuery(q1);
+    q1 = "SELECT cityid, testCube.msr2 from testCube where cityid IS NULL AND " + timeRange;
+    driver.compileCubeQuery(q1);
   }
 
   @Test
