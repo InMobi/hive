@@ -8,6 +8,7 @@ import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryRewriter;
+import org.apache.hadoop.hive.ql.cube.parse.HQLParser;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.ParseDriver;
@@ -58,17 +59,27 @@ public class CubeDriver extends Driver {
     ASTNode tree = pd.parse(query, ctx);
     tree = ParseUtils.findRootNonNullToken(tree);
     boolean explain = false;
+    System.out.println("Tree dump:" + tree.dump());
+    String explainOptions = null;
     if (tree.getToken().getType() == (HiveParser.TOK_EXPLAIN)) {
+      if ( tree.getChildCount() > 1) {
+        explainOptions = HQLParser.getString((ASTNode)tree.getChild(1));
+      }
       tree = (ASTNode) tree.getChild(0);
       explain = true;
     }
+
     // compile the cube query and rewrite it to HQL query
     CubeQueryRewriter rewriter = new CubeQueryRewriter(getConf());
     CubeQueryContext rewrittenQuery = rewriter.rewrite(tree);
     this.rewrittenQuery = rewrittenQuery;
     String hql = rewrittenQuery.toHQL();
     if (explain) {
-      hql = "EXPLAIN " + hql;
+      String explainStr = "explain " ;
+      if (explainOptions != null) {
+        explainStr += explainOptions;
+      }
+      hql = explainStr + hql;
     }
     System.out.println("Rewritten query:" + hql);
     return hql;

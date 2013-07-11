@@ -278,6 +278,13 @@ public class TestCubeDriver {
       "select sum(testcube.msr2) FROM ", null, null,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
+
+    hqlQuery = driver.compileCubeQuery("explain extended select" +
+      " SUM(msr2) from testCube where " + twoDaysRange);
+    expected = "EXPLAIN extended " + getExpectedQuery(cubeName,
+      "select sum(testcube.msr2) FROM ", null, null,
+      getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
+    compareQueries(expected, hqlQuery);
   }
 
   @Test
