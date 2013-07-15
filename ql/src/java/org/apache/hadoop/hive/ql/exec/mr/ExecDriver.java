@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hive.ql.exec;
+package org.apache.hadoop.hive.ql.exec.mr;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,6 +54,15 @@ import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.QueryPlan;
+import org.apache.hadoop.hive.ql.exec.FetchOperator;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.exec.HiveTotalOrderPartitioner;
+import org.apache.hadoop.hive.ql.exec.JobCloseFeedBack;
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.PartitionKeySampler;
+import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.io.BucketizedHiveInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveKey;
@@ -93,7 +102,12 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.varia.NullAppender;
 
 /**
- * ExecDriver.
+ * ExecDriver is the central class in co-ordinating execution of any map-reduce task. 
+ * It's main responsabilities are:
+ *
+ * - Converting the plan (MapredWork) into a MR Job (JobConf)
+ * - Submitting a MR job to the cluster via JobClient and ExecHelper
+ * - Executing MR job in local execution mode (where applicable)
  *
  */
 public class ExecDriver extends Task<MapredWork> implements Serializable, HadoopJobExecHook {
@@ -419,13 +433,14 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
 
       Utilities.setMapRedWork(job, work, ctx.getMRTmpFileURI());
 
-      if (work.getSamplingType() > 0) {
+      if (work.getSamplingType() > 0 && work.getNumReduceTasks() > 1) {
         try {
           handleSampling(driverContext, work, job, new HiveConf(conf));
           job.setPartitionerClass(HiveTotalOrderPartitioner.class);
         } catch (Exception e) {
-          LOG.info("Failed to use sampling", e);
-          work.setNumReduceTasks(1);  // rollback
+          console.printInfo("Not enough sampling data.. Rolling back to single reducer task");
+          work.setNumReduceTasks(1);
+          job.setNumReduceTasks(1);
         }
       }
 
