@@ -110,7 +110,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 public class Driver implements CommandProcessor {
 
   static final private Log LOG = LogFactory.getLog(Driver.class.getName());
-  static final protected LogHelper console = new LogHelper(LOG);
+  static final private LogHelper console = new LogHelper(LOG);
 
   private static final Object compileMonitor = new Object();
 
@@ -124,8 +124,8 @@ public class Driver implements CommandProcessor {
   private Schema schema;
   private HiveLockManager hiveLockMgr;
 
-  protected String errorMessage;
-  protected String SQLState;
+  private String errorMessage;
+  private String SQLState;
 
   // A limit on the number of threads that can be launched
   private int maxthreads;
@@ -325,10 +325,6 @@ public class Driver implements CommandProcessor {
     if (SessionState.get() != null) {
       conf = SessionState.get().getConf();
     }
-  }
-
-  protected HiveConf getConf() {
-    return conf;
   }
 
   /**
@@ -906,9 +902,7 @@ public class Driver implements CommandProcessor {
       ret = compile(command);
     }
     if (ret != 0) {
-      if (ctx != null) {
-        releaseLocks(ctx.getHiveLocks());
-      }
+      releaseLocks(ctx.getHiveLocks());
       return new CommandProcessorResponse(ret, errorMessage, SQLState);
     }
 
