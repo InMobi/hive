@@ -54,6 +54,7 @@ import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.QueryProperties;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryRewriter;
 import org.apache.hadoop.hive.ql.exec.AbstractMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.ArchiveUtils;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
@@ -792,6 +793,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (ast.getToken() != null) {
       skipRecursion = true;
       switch (ast.getToken().getType()) {
+      case HiveParser.TOK_QUERY:
+        if (((ASTNode) ast.getChild(0)).getToken().getType() == HiveParser.KW_CUBE) {
+          CubeQueryRewriter rewriter = new CubeQueryRewriter(conf);
+          ast = rewriter.rewrite((ASTNode)ast).toAST(ctx);
+          LOG.info("Rewritten AST:" + ast);
+        }
+        skipRecursion = false;
+        break;
       case HiveParser.TOK_SELECTDI:
         qb.countSelDi();
         // fall through
@@ -885,7 +894,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
               ErrorMsg.ORDERBY_DISTRIBUTEBY_CONFLICT.getMsg()));
         }
         break;
-        
+
       case HiveParser.TOK_SORTBY:
      // Get the sort by aliases - these are aliased to the entries in the
         // select list

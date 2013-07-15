@@ -25,6 +25,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
@@ -38,6 +39,9 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.JoinCond;
 import org.apache.hadoop.hive.ql.parse.JoinType;
+import org.apache.hadoop.hive.ql.parse.ParseDriver;
+import org.apache.hadoop.hive.ql.parse.ParseException;
+import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.QB;
 import org.apache.hadoop.hive.ql.parse.QBJoinTree;
 import org.apache.hadoop.hive.ql.parse.QBParseInfo;
@@ -242,7 +246,7 @@ public class CubeQueryContext {
     } else if (KW_AND == whereTree.getChild(0).getType()) {
       // expect time condition as the right sibling of KW_AND
       ASTNode and = (ASTNode) whereTree.getChild(0);
-      
+
       for (int i = 0; i < and.getChildCount(); i++) {
         ASTNode child = (ASTNode) and.getChild(i);
 
@@ -253,9 +257,9 @@ public class CubeQueryContext {
             break;
           }
         }
-        
+
       }
-      
+
     }
 
     if (timenode == null) {
@@ -1001,6 +1005,19 @@ public class CubeQueryContext {
     } else {
       return toHQL(null);
     }
+  }
+
+  public ASTNode toAST(Context ctx) throws SemanticException {
+    String hql = toHQL();
+    ParseDriver pd = new ParseDriver();
+    ASTNode tree;
+    try {
+      LOG.info("HQL:" + hql);
+      tree = pd.parse(hql, ctx);
+    } catch (ParseException e) {
+      throw new SemanticException(e);
+    }
+    return ParseUtils.findRootNonNullToken(tree);
   }
 
   public Map<CubeFactTable, List<String>> getFactStorageMap() {

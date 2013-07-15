@@ -39,6 +39,15 @@ public class CubeSemanticAnalyzer extends SemanticAnalyzer {
       throw new SemanticException("Create table/view is not allowed");
     }
 
+    if (ast.getToken().getType() == HiveParser.TOK_QUERY) {
+      if (((ASTNode) ast.getChild(0)).getToken().getType() == HiveParser.KW_CUBE) {
+        // remove cube child from AST
+        for (int i = 0; i < ast.getChildCount() - 1; i++) {
+          ast.setChild(i, ast.getChild(i + 1));
+        }
+        ast.deleteChild(ast.getChildCount() - 1);
+      }
+    }
     // analyzing from the ASTNode.
     if (!doPhase1(ast, qb, initPhase1Ctx())) {
       // if phase1Result false return

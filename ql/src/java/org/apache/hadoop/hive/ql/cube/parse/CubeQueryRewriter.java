@@ -6,7 +6,9 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
+import org.apache.hadoop.hive.ql.parse.ParseDriver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
+import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class CubeQueryRewriter {
@@ -33,14 +35,21 @@ public class CubeQueryRewriter {
     rewriters.add(new LeastDimensionResolver(conf));
   }
 
-  public CubeQueryContext rewrite(ASTNode astnode)
-      throws SemanticException, ParseException {
+  public CubeQueryContext rewrite(ASTNode astnode) throws SemanticException {
     CubeSemanticAnalyzer analyzer = new CubeSemanticAnalyzer(
         new HiveConf(conf, HiveConf.class));
     analyzer.analyzeInternal(astnode);
     CubeQueryContext ctx = analyzer.getQueryContext();
     rewrite(rewriters, ctx);
     return ctx;
+  }
+
+  CubeQueryContext rewrite(String command)
+      throws ParseException,SemanticException {
+    ParseDriver pd = new ParseDriver();
+    ASTNode tree = pd.parse(command, null);
+    tree = ParseUtils.findRootNonNullToken(tree);
+    return rewrite(tree);
   }
 
   private void rewrite(List<ContextRewriter> rewriters, CubeQueryContext ctx)
