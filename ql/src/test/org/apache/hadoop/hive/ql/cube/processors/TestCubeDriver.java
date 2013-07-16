@@ -20,7 +20,9 @@ import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryConfUtil;
 import org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup;
 import org.apache.hadoop.hive.ql.cube.parse.DateUtil;
+import org.apache.hadoop.hive.ql.cube.parse.HQLParser;
 import org.apache.hadoop.hive.ql.cube.parse.StorageTableResolver;
+import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -110,7 +112,7 @@ public class TestCubeDriver {
     }
 
   }
-
+  
   public String getExpectedQuery(String cubeName, String selExpr,
       String whereExpr, String postWhereExpr,
       Map<String, String> storageTableToWhereClause) {
@@ -415,9 +417,13 @@ public class TestCubeDriver {
 
   @Test
   public void testCubeJoinQuery() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube"
-      + " join citytable on testCube.cityid = citytable.id"
-      + " where " + twoDaysRange);
+    
+    // q1
+    String q1 = "select SUM(msr2) from testCube"
+        + " join citytable on testCube.cityid = citytable.id"
+        + " where " + twoDaysRange;
+    CubeTestSetup.printQueryAST(q1, "join_test_1");
+    String hqlQuery = driver.compileCubeQuery(q1);
     List<String> joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "citytable", Storage.getPartitionsForLatest()));
@@ -427,12 +433,16 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select statetable.name, SUM(msr2) from"
-      + " testCube"
-      + " join citytable on testCube.cityid = citytable.id"
-      + " left outer join statetable on statetable.id = citytable.stateid"
-      + " right outer join ziptable on citytable.zipcode = ziptable.code"
-      + " where " + twoDaysRange);
+    // q2
+    String q2 = "select statetable.name, SUM(msr2) from"
+        + " testCube"
+        + " join citytable on testCube.cityid = citytable.id"
+        + " left outer join statetable on statetable.id = citytable.stateid"
+        + " right outer join ziptable on citytable.zipcode = ziptable.code"
+        + " where " + twoDaysRange;
+    CubeTestSetup.printQueryAST(q2, "join_test_2");
+    hqlQuery = driver.compileCubeQuery(q2);
+    
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "citytable", Storage.getPartitionsForLatest()));
@@ -448,12 +458,15 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select st.name, SUM(msr2) from"
-      + " testCube TC"
-      + " join citytable CT on TC.cityid = CT.id"
-      + " left outer join statetable ST on ST.id = CT.stateid"
-      + " right outer join ziptable ZT on CT.zipcode = ZT.code"
-      + " where " + twoDaysRange);
+    // q3
+    String q3 = "select st.name, SUM(msr2) from"
+        + " testCube TC"
+        + " join citytable CT on TC.cityid = CT.id"
+        + " left outer join statetable ST on ST.id = CT.stateid"
+        + " right outer join ziptable ZT on CT.zipcode = ZT.code"
+        + " where " + twoDaysRange;
+    CubeTestSetup.printQueryAST(q3, "join_test_3");
+    hqlQuery = driver.compileCubeQuery(q3);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "ct", Storage.getPartitionsForLatest()));
@@ -469,11 +482,14 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days("tc", "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select statetable.name, SUM(msr2) from"
-      + " testCube"
-      + " left outer join citytable on testCube.cityid = citytable.id"
-      + " left outer join ziptable on citytable.zipcode = ziptable.code"
-      + " where " + twoDaysRange);
+    // q4
+    String q4 = "select statetable.name, SUM(msr2) from"
+        + " testCube"
+        + " left outer join citytable on testCube.cityid = citytable.id"
+        + " left outer join ziptable on citytable.zipcode = ziptable.code"
+        + " where " + twoDaysRange;
+    CubeTestSetup.printQueryAST(q4, "join_test_1");
+    hqlQuery = driver.compileCubeQuery(q4);
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", " LEFT OUTER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id and (citytable.dt = 'latest') " +
@@ -484,9 +500,12 @@ public class TestCubeDriver {
     getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube"
-      + " join countrytable on testCube.countryid = countrytable.id"
-      + " where " + twoMonthsRangeUptoMonth);
+    // q5
+    String q5 = "select SUM(msr2) from testCube"
+        + " join countrytable on testCube.countryid = countrytable.id"
+        + " where " + twoMonthsRangeUptoMonth;
+    CubeTestSetup.printQueryAST(q5, "join_test_5");
+    hqlQuery = driver.compileCubeQuery(q5);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       " INNER JOIN c1_countrytable countrytable ON testCube.countryid = " +
       " countrytable.id", null, null, null,
@@ -500,6 +519,7 @@ public class TestCubeDriver {
     } catch (SemanticException e) {
       e.printStackTrace();
     }
+    
   }
 
   @Test
