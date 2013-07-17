@@ -50,6 +50,26 @@ public class JoinResolver implements ContextRewriter {
       toTable = toTab;
     }
     
+    public String getFromColumn() {
+      return fromColumn;
+    }
+    
+    public String getToColumn() {
+      return toColumn;
+    }
+    
+    public AbstractCubeTable getFromTable() {
+      return fromTable;
+    }
+    
+    public AbstractCubeTable getToTable() {
+      return toTable;
+    }
+    
+    public String getJoinCondition() {
+      return fromTable.getName() + "." + fromColumn + "=" + toTable.getName() + "." + toColumn;
+    }
+    
     @Override
     public String toString() {
       return fromTable.getName() + "." + fromColumn + "->" + toTable.getName() + "." + toColumn;
@@ -81,6 +101,13 @@ public class JoinResolver implements ContextRewriter {
   void autoResolveJoins(CubeQueryContext cubeql) throws SemanticException {
     Cube cube = cubeql.getCube();
     
+    if (cube == null) {
+      LOG.warn("Can't auto resolve joins as cube is null");
+      cubeql.setJoinsResolvedAutomatically(false);
+      return;
+    }
+    LOG.info("Resolving joins automatically for cube " + cube.getName());
+    
     Map<AbstractCubeTable, List<TableRelationship>> graph;
     try {
       graph = buildGraph(cube);
@@ -92,6 +119,7 @@ public class JoinResolver implements ContextRewriter {
     Map<CubeDimensionTable, List<TableRelationship>> joinChain = 
         new LinkedHashMap<CubeDimensionTable, List<TableRelationship>>();
 
+    // Resolve join path for each dimension accessed in the query
     for (CubeDimensionTable joinee : dimTables) {
       ArrayList<TableRelationship> chain = new ArrayList<TableRelationship>();
       if (findJoinChain(joinee, cube, graph, chain)) {
@@ -103,7 +131,7 @@ public class JoinResolver implements ContextRewriter {
       }
     }
     
-    cubeql.setJoinsResolvedAutomatically();
+    cubeql.setJoinsResolvedAutomatically(true);
     cubeql.setAutoResolvedJoinChain(joinChain);
   }
   

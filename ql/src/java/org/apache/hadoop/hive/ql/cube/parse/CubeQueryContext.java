@@ -1,14 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_AND;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ALLCOLREF;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TMP_FILE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1186,8 +1178,8 @@ public class CubeQueryContext {
     return timeDim;
   }
 
-  public void setJoinsResolvedAutomatically() {
-    this.joinsResolvedAutomatically = true;
+  public void setJoinsResolvedAutomatically(boolean flag) {
+    this.joinsResolvedAutomatically = flag;
   }
   
   public boolean joinsResolvedAutomatically() {
