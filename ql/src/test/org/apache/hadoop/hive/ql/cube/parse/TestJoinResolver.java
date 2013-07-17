@@ -3,6 +3,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
@@ -16,7 +17,6 @@ import org.junit.AfterClass;
 
 import static org.junit.Assert.*;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -51,20 +51,18 @@ public class TestJoinResolver {
   @Test
   public void testBuildGraph() throws Exception {
     JoinResolver resolver = new JoinResolver(hconf);
-    Cube cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
-    Map<AbstractCubeTable, List<TableRelationship>> graph = resolver.buildGraph(cube);
+    
+    Map<AbstractCubeTable, Set<TableRelationship>> graph = resolver.buildSchemaGraph();
+    printGraph(graph);
     assertNotNull(graph);
     
-    for (AbstractCubeTable refDim : graph.keySet()) {
-      System.out.println("edges for " + refDim.getName()+ " : " + graph.get(refDim));
-    }
-    
     // Let's do some lookups
-    List<TableRelationship> dim4Edges = graph.get(metastore.getDimensionTable("testdim4"));
+    Set<TableRelationship> dim4Edges = graph.get(metastore.getDimensionTable("testdim4"));
     assertNotNull(dim4Edges);
     assertEquals(1, dim4Edges.size());
     
-    TableRelationship dim4edge = dim4Edges.get(0);
+    List<TableRelationship> edges = new ArrayList<TableRelationship>(dim4Edges);
+    TableRelationship dim4edge = edges.get(0);
     assertEquals("id", dim4edge.toColumn);
     assertEquals(metastore.getDimensionTable("testdim4"), dim4edge.toTable);
     assertEquals("testdim4id", dim4edge.fromColumn);
@@ -75,16 +73,34 @@ public class TestJoinResolver {
   public void testFindChain() throws Exception {
     JoinResolver resolver = new JoinResolver(hconf);
     Cube cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
-    Map<AbstractCubeTable, List<TableRelationship>> graph = resolver.buildGraph(cube);
+    Map<AbstractCubeTable, Set<TableRelationship>> graph = resolver.buildSchemaGraph();
     assertNotNull(graph);
     
-    CubeDimensionTable dimTable = metastore.getDimensionTable("testdim4");
+    CubeDimensionTable testDim4 = metastore.getDimensionTable("testdim4");
     List<TableRelationship> chain = new ArrayList<TableRelationship>();
-    assertTrue(resolver.findJoinChain(dimTable, cube, graph, chain));
+    assertTrue(resolver.findJoinChain(testDim4, cube, graph, chain));
     System.out.println(chain);
     
     chain.clear();
     CubeDimensionTable cityTable = metastore.getDimensionTable("citytable");
     assertFalse(resolver.findJoinChain(cityTable, cube, graph, chain));
+    
+    // find chains between dimensions
+    chain.clear();
+    CubeDimensionTable stateTable = metastore.getDimensionTable("statetable");
+    assertTrue(resolver.findJoinChain(stateTable, cityTable, graph, chain));
+    System.out.println("Dim chain state -> city : " + chain);
+    
+    chain.clear();
+    CubeDimensionTable dim2 = metastore.getDimensionTable("testdim2");
+    assertTrue(resolver.findJoinChain(testDim4, dim2, graph, chain));
+    System.out.println("Dim chain testdim4 -> testdim2 : " + chain);
+  }
+  
+  private void printGraph(Map<AbstractCubeTable, Set<TableRelationship>> graph) {
+    System.out.println("--Graph-Nodes=" + graph.size());
+    for (AbstractCubeTable tab : graph.keySet()) {
+      System.out.println(tab.getName() + "::" + graph.get(tab));
+    }
   }
 }
