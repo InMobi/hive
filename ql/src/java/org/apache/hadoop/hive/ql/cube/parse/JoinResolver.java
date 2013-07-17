@@ -17,6 +17,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
+import org.apache.hadoop.hive.ql.cube.metadata.HierarchicalDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.ReferencedDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.TableReference;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -184,12 +185,29 @@ public class JoinResolver implements ContextRewriter {
   
   
   // Build schema graph for a cube
-  Map<AbstractCubeTable, Set<TableRelationship>> buildCubeGraph(Cube cube, 
-      Map<AbstractCubeTable, Set<TableRelationship>> schemaGraph) throws HiveException {
+  void buildCubeGraph(Cube cube, Map<AbstractCubeTable, Set<TableRelationship>> schemaGraph) 
+      throws HiveException {
     CubeMetastoreClient metastore = getMetastoreClient();
+    List<CubeDimension> refDimensions = new ArrayList<CubeDimension>();
+    // find out all dimensions which link to other dimension tables
     for (CubeDimension dim : cube.getDimensions()) {
-      // Find out references leading from dimension columns of the cube if any
       if (dim instanceof ReferencedDimension) {
+        refDimensions.add(dim);
+      } else if (dim instanceof HierarchicalDimension) {
+        for (CubeDimension hdim : ((HierarchicalDimension)dim).getHierarchy()) {
+          if (hdim instanceof ReferencedDimension) {
+            refDimensions.add(hdim);
+          }
+        }
+      }
+    }
+    
+    // build graph for each linked dimension
+    for (CubeDimension dim : refDimensions) {
+      // Find out references leading from dimension columns of the cube if any
+      if (dim instanceof ReferencedDimension 
+          || dim instanceof HierarchicalDimension
+          ) {
         ReferencedDimension refDim = (ReferencedDimension) dim;
         List<TableReference> refs = refDim.getReferences();
         
@@ -220,8 +238,6 @@ public class JoinResolver implements ContextRewriter {
         } // end loop for refs from a dim
       }
     }
-    
-    return schemaGraph;
   }
   
   // Build schema graph starting at a dimension

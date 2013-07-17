@@ -83,8 +83,8 @@ public class TestJoinResolver {
     
     chain.clear();
     CubeDimensionTable cityTable = metastore.getDimensionTable("citytable");
-    assertFalse(resolver.findJoinChain(cityTable, cube, graph, chain));
-    
+    assertTrue(resolver.findJoinChain(cityTable, cube, graph, chain));
+    System.out.println("City -> cube chain: " + chain);
     // find chains between dimensions
     chain.clear();
     CubeDimensionTable stateTable = metastore.getDimensionTable("statetable");
