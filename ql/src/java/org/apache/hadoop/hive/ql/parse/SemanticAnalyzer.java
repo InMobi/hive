@@ -3508,7 +3508,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     List<List<Integer>> distinctColIndices = getDistinctColIndicesForReduceSink(parseInfo, dest,
-        reduceKeys, reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames);
+        reduceKeys, reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames,
+        colExprMap);
 
     ArrayList<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
     HashMap<String, ASTNode> aggregationTrees = parseInfo
@@ -3581,7 +3582,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private List<List<Integer>> getDistinctColIndicesForReduceSink(QBParseInfo parseInfo,
       String dest,
       List<ExprNodeDesc> reduceKeys, RowResolver reduceSinkInputRowResolver,
-      RowResolver reduceSinkOutputRowResolver, List<String> outputKeyColumnNames)
+      RowResolver reduceSinkOutputRowResolver, List<String> outputKeyColumnNames,
+      Map<String, ExprNodeDesc> colExprMap)
       throws SemanticException {
 
     List<List<Integer>> distinctColIndices = new ArrayList<List<Integer>>();
@@ -3620,6 +3622,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           ColumnInfo colInfo = new ColumnInfo(field, expr.getTypeInfo(), null, false);
           reduceSinkOutputRowResolver.putExpression(parameter, colInfo);
           numExprs++;
+          colExprMap.put(colInfo.getInternalName(), expr);
         }
         distinctColIndices.add(distinctIndices);
       }
@@ -3681,7 +3684,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         colExprMap);
 
     List<List<Integer>> distinctColIndices = getDistinctColIndicesForReduceSink(parseInfo, dest,
-        reduceKeys, reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames);
+        reduceKeys, reduceSinkInputRowResolver, reduceSinkOutputRowResolver, outputKeyColumnNames,
+        colExprMap);
 
     ArrayList<ExprNodeDesc> reduceValues = new ArrayList<ExprNodeDesc>();
 
@@ -6961,6 +6965,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
               reduceValues.size() - 1).getTypeInfo(), "", false);
           reduceSinkOutputRowResolver.putExpression(grpbyExpr, colInfo);
           outputColumnNames.add(getColumnInternalName(reduceValues.size() - 1));
+          colExprMap.put(colInfo.getInternalName(), grpByExprNode);
         }
       }
 
