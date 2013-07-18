@@ -2,6 +2,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +39,9 @@ public class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
   
+  /*
+   * An edge in the schema graph
+   */
   public static class TableRelationship {
     final String fromColumn;
     final AbstractCubeTable fromTable;
@@ -79,6 +83,7 @@ public class JoinResolver implements ContextRewriter {
     
     @Override
     public boolean equals(Object obj) {
+      //TODO Make sure that edges a->b and b->a are equal
       if (!(obj instanceof TableRelationship)) {
         return false;
       }
@@ -97,6 +102,200 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
+  /**
+   * Graph of tables in the cube metastore
+   * SchemaGraph.
+   *
+   */
+  public static class SchemaGraph {
+    private final CubeMetastoreClient metastore;
+    // Graph for each cube
+    private Map<Cube, Map<AbstractCubeTable, Set<TableRelationship>>> cubeToGraph;
+
+    // sub graph that contains only dimensions, mainly used while checking connectivity
+    // between a set of dimensions
+    private Map<AbstractCubeTable, Set<TableRelationship>> dimOnlySubGraph;
+    
+    public SchemaGraph(CubeMetastoreClient metastore) {
+      this.metastore = metastore;
+    }
+    
+    protected Map<AbstractCubeTable, Set<TableRelationship>> getCubeGraph(Cube cube) {
+      return cubeToGraph.get(cube);
+    }
+    
+    protected Map<AbstractCubeTable, Set<TableRelationship>> getDimOnlyGraph() {
+      return dimOnlySubGraph;
+    }
+    
+    /**
+     * Build the schema graph for all cubes and dimensions
+     * @return
+     * @throws HiveException
+     */
+    public void buildSchemaGraph() throws HiveException {
+      cubeToGraph = new HashMap<Cube, Map<AbstractCubeTable, Set<TableRelationship>>>();
+      for (Cube cube : metastore.getAllCubes()) {
+        Map<AbstractCubeTable, Set<TableRelationship>> graph = 
+            new HashMap<AbstractCubeTable, Set<TableRelationship>>();
+        buildCubeGraph(cube, graph);
+        
+        for (CubeDimensionTable dim : metastore.getAllDimensionTables()) {
+          buildDimGraph(dim, graph);
+        }
+        
+        cubeToGraph.put(cube, graph);
+      }
+      
+      dimOnlySubGraph = new HashMap<AbstractCubeTable, Set<TableRelationship>>();
+      for (CubeDimensionTable dim : metastore.getAllDimensionTables()) {
+        buildDimGraph(dim, dimOnlySubGraph);
+      }
+      
+    }
+    
+    // Build schema graph for a cube
+    private void buildCubeGraph(Cube cube, Map<AbstractCubeTable, Set<TableRelationship>> graph)
+        throws HiveException {
+      List<CubeDimension> refDimensions = new ArrayList<CubeDimension>();
+      // find out all dimensions which link to other dimension tables
+      for (CubeDimension dim : cube.getDimensions()) {
+        if (dim instanceof ReferencedDimension) {
+          refDimensions.add(dim);
+        } else if (dim instanceof HierarchicalDimension) {
+          for (CubeDimension hdim : ((HierarchicalDimension)dim).getHierarchy()) {
+            if (hdim instanceof ReferencedDimension) {
+              refDimensions.add(hdim);
+            }
+          }
+        }
+      }
+      
+      // build graph for each linked dimension
+      for (CubeDimension dim : refDimensions) {
+        // Find out references leading from dimension columns of the cube if any
+        if (dim instanceof ReferencedDimension 
+            || dim instanceof HierarchicalDimension
+            ) {
+          ReferencedDimension refDim = (ReferencedDimension) dim;
+          List<TableReference> refs = refDim.getReferences();
+          
+          for (TableReference ref : refs) {
+            String destColumnName = ref.getDestColumn();
+            String destTableName = ref.getDestTable();
+            
+            if (metastore.isDimensionTable(destTableName)) {
+              // Cube -> Dimension reference
+              CubeDimensionTable relatedDim = metastore.getDimensionTable(destTableName);
+              
+              TableRelationship rel = new TableRelationship(refDim.getName(), cube, 
+                  destColumnName, relatedDim);
+              
+              Set<TableRelationship> edges = graph.get(relatedDim);
+              
+              if (edges == null) {
+                edges = new LinkedHashSet<TableRelationship>();
+                graph.put(relatedDim, edges);
+              }
+              edges.add(rel);
+             
+              // build graph for the related dim
+              buildDimGraph(relatedDim, graph);
+            } else if (metastore.isFactTable(destTableName)) {
+              throw new HiveException("Cube -> Fact references are not supported");
+            }
+          } // end loop for refs from a dim
+        }
+      }
+    }
+    
+    // Build schema graph starting at a dimension
+    private void buildDimGraph(CubeDimensionTable tab, 
+        Map<AbstractCubeTable, Set<TableRelationship>> graph) throws HiveException {
+      Map<String, List<TableReference>> references = tab.getDimensionReferences();
+      
+      if (references != null && !references.isEmpty()) {
+        // for each column that leads to another dim table
+        for (Map.Entry<String, List<TableReference>> referredColumn : references.entrySet()) {
+          String colName = referredColumn.getKey();
+          List<TableReference> dests = referredColumn.getValue();
+          
+          // for each link which leads from this column
+          for (TableReference destRef : dests) {
+            String destCol = destRef.getDestColumn();
+            String destTab = destRef.getDestTable();
+            
+            if (metastore.isDimensionTable(destTab)) {
+              CubeDimensionTable relTab = metastore.getDimensionTable(destTab);
+              TableRelationship rel = new TableRelationship(colName, tab, destCol, relTab);
+              Set<TableRelationship> edges = graph.get(relTab);
+              if (edges == null) {
+                edges = new LinkedHashSet<TableRelationship>();
+                graph.put(relTab, edges);
+              }
+              edges.add(rel);
+              // recurse down to build graph for the referenced dim
+              buildDimGraph(relTab, graph);
+            } else {
+              // not dealing with dim->fact references
+              throw new HiveException("Dimension -> Fact references not supported");
+            }
+          } // end loop for refs from a column
+        }
+      }
+    }
+    
+    // This returns the first path found between the dimTable and the target
+    private boolean findJoinChain(CubeDimensionTable dimTable, AbstractCubeTable target, 
+        Map<AbstractCubeTable, Set<TableRelationship>> graph,
+        List<TableRelationship> chain) {
+      
+      Set<TableRelationship> edges = graph.get(dimTable);
+      if (edges == null || edges.isEmpty()) {
+        return false;
+      }
+      boolean foundPath = false;
+      for (TableRelationship edge : edges) {
+        if (edge.fromTable.equals(target)) {
+          chain.add(edge);
+          // Search successful
+          foundPath = true;
+          break;
+        } else if (edge.fromTable instanceof CubeDimensionTable) {
+          List<TableRelationship> tmpChain = new ArrayList<TableRelationship>();
+          if (findJoinChain((CubeDimensionTable) edge.fromTable, target, graph, tmpChain)) {
+            // This dim eventually leads to the cube
+            chain.add(edge);
+            chain.addAll(tmpChain);
+            foundPath = true;
+            break;
+          }
+
+        } // else - this edge doesn't lead to the cube, try next one
+      }
+      
+      return foundPath;
+    }
+
+    /**
+     * Find if there is a join chain (path) between the given dimension table and the target table
+     * @param joinee
+     * @param target
+     * @param chain
+     * @return
+     */
+    public boolean findJoinChain(CubeDimensionTable joinee, AbstractCubeTable target,
+        List<TableRelationship> chain) {
+      if (target instanceof Cube) {
+        return findJoinChain(joinee, target, cubeToGraph.get(target), chain);
+      } else if (target instanceof CubeDimensionTable) {
+        return findJoinChain(joinee, target, dimOnlySubGraph, chain);
+      } else {
+        return false;
+      }
+    }
+  }
+  
   private CubeMetastoreClient metastore;
   
   public JoinResolver(Configuration conf) {
@@ -130,182 +329,83 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
-  // Resolve joins automatically for the given query.
-  void autoResolveJoins(CubeQueryContext cubeql) throws SemanticException {
-    Cube cube = cubeql.getCube();
+  /**
+   * Resolve joins automatically for the given query.
+   * @param cubeql
+   * @throws SemanticException
+   */
+  public void autoResolveJoins(CubeQueryContext cubeql) throws SemanticException {
+    // Check if this query needs a join -
+    // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
+    // dimensions
     
-    Map<AbstractCubeTable, Set<TableRelationship>> graph;
+    // Query has a cube and at least one dimension
+    boolean cubeAndDimQuery = cubeql.getCube() != null && cubeql.getDimensionTables() != null &&
+        cubeql.getDimensionTables().size() >= 1;
+    
+    // This query has only dimensions in it
+    boolean dimOnlyQuery = cubeql.getCube() == null && cubeql.getDimensionTables() != null &&
+        cubeql.getDimensionTables().size() >= 2;
+        
+    if (!cubeAndDimQuery && !dimOnlyQuery) {
+      LOG.info("Join not needed");
+      return;
+    }
+    
+    SchemaGraph graph;
     try {
-      graph = buildSchemaGraph();
+      graph = new SchemaGraph(getMetastoreClient());
+      graph.buildSchemaGraph();
     } catch (HiveException e) {
       throw new SemanticException(e);
     }
     
-    if (cube == null) {
-      // this is all dimensions query
-    } else {
-      // this is a cube + dimension query
-      LOG.info("Resolving joins automatically for cube " + cube.getName());
+    AbstractCubeTable target = null;
+    if (cubeAndDimQuery) {
+      // this is a cube + dimension query      
+      target = cubeql.getCube();;
+      LOG.info("resolvin joins for cube");
+    } else if (dimOnlyQuery){
+      // We'll take the dimension in the from clause to be the left (target) table while
+      // finding join path
+      String targetTable = cubeql.getQB().getTabAliases().iterator().next();
+      try {
+        target = getMetastoreClient().getDimensionTable(targetTable);
+        LOG.info("resolving joins for dimensions");
+      } catch (HiveException e) {
+        throw new SemanticException(e);
+      }
     }
     
-    Set<CubeDimensionTable> dimTables = cubeql.getDimensionTables();
+    assert target != null;
+    
+    Set<CubeDimensionTable> dimTables = 
+        new HashSet<CubeDimensionTable>(cubeql.getDimensionTables());
+    // Remove self
+    dimTables.remove(target);
+
     Map<CubeDimensionTable, List<TableRelationship>> joinChain = 
         new LinkedHashMap<CubeDimensionTable, List<TableRelationship>>();
-
     // Resolve join path for each dimension accessed in the query
+    boolean joinsResolved = false;
     for (CubeDimensionTable joinee : dimTables) {
       ArrayList<TableRelationship> chain = new ArrayList<TableRelationship>();
-      if (findJoinChain(joinee, cube, graph, chain)) {
+      if (graph.findJoinChain(joinee, target, chain)) {
+        joinsResolved = true;
         joinChain.put(joinee, chain);
       } else {
         // No link to cube from this dim, can't proceed with query
-        throw new SemanticException("No join path from dimension table " + joinee.getName() 
-            + " to cube " + cube.getName());
+        throw new SemanticException("No join path from " + joinee.getName() 
+            + " to " + target.getName());
       }
     }
     
-    cubeql.setJoinsResolvedAutomatically(true);
-    cubeql.setAutoResolvedJoinChain(joinChain);
-  }
-  
-  // Build the schema graph for all cubes and dimensions
-  Map<AbstractCubeTable, Set<TableRelationship>> buildSchemaGraph() throws HiveException {
-    Map<AbstractCubeTable, Set<TableRelationship>> graph = 
-        new HashMap<AbstractCubeTable, Set<TableRelationship>>();
-    for (Cube cube : getMetastoreClient().getAllCubes()) {
-      buildCubeGraph(cube, graph);
-    }
-    
-    for (CubeDimensionTable dim : getMetastoreClient().getAllDimensionTables()) {
-      buildDimGraph(getMetastoreClient(), dim, graph);
-    }
-    
-    return graph;
-  }
-  
-  
-  // Build schema graph for a cube
-  void buildCubeGraph(Cube cube, Map<AbstractCubeTable, Set<TableRelationship>> schemaGraph) 
-      throws HiveException {
-    CubeMetastoreClient metastore = getMetastoreClient();
-    List<CubeDimension> refDimensions = new ArrayList<CubeDimension>();
-    // find out all dimensions which link to other dimension tables
-    for (CubeDimension dim : cube.getDimensions()) {
-      if (dim instanceof ReferencedDimension) {
-        refDimensions.add(dim);
-      } else if (dim instanceof HierarchicalDimension) {
-        for (CubeDimension hdim : ((HierarchicalDimension)dim).getHierarchy()) {
-          if (hdim instanceof ReferencedDimension) {
-            refDimensions.add(hdim);
-          }
-        }
-      }
-    }
-    
-    // build graph for each linked dimension
-    for (CubeDimension dim : refDimensions) {
-      // Find out references leading from dimension columns of the cube if any
-      if (dim instanceof ReferencedDimension 
-          || dim instanceof HierarchicalDimension
-          ) {
-        ReferencedDimension refDim = (ReferencedDimension) dim;
-        List<TableReference> refs = refDim.getReferences();
-        
-        for (TableReference ref : refs) {
-          String destColumnName = ref.getDestColumn();
-          String destTableName = ref.getDestTable();
-          
-          if (metastore.isDimensionTable(destTableName)) {
-            // Cube -> Dimension reference
-            CubeDimensionTable relatedDim = metastore.getDimensionTable(destTableName);
-            
-            TableRelationship rel = new TableRelationship(refDim.getName(), cube, 
-                destColumnName, relatedDim);
-            
-            Set<TableRelationship> edges = schemaGraph.get(relatedDim);
-            
-            if (edges == null) {
-              edges = new LinkedHashSet<TableRelationship>();
-              schemaGraph.put(relatedDim, edges);
-            }
-            edges.add(rel);
-           
-            // build graph for the related dim
-            buildDimGraph(metastore, relatedDim, schemaGraph);
-          } else if (metastore.isFactTable(destTableName)) {
-            throw new HiveException("Cube -> Fact references are not supported");
-          }
-        } // end loop for refs from a dim
-      }
+    if (joinsResolved) {
+      cubeql.setJoinsResolvedAutomatically(joinsResolved);
+      cubeql.setAutoResolvedJoinChain(joinChain);
     }
   }
   
-  // Build schema graph starting at a dimension
-  void buildDimGraph(CubeMetastoreClient metastore, CubeDimensionTable tab, 
-      Map<AbstractCubeTable, Set<TableRelationship>> graph) throws HiveException {
-    Map<String, List<TableReference>> references = tab.getDimensionReferences();
-    
-    if (references != null && !references.isEmpty()) {
-      // for each column that leads to another dim table
-      for (Map.Entry<String, List<TableReference>> referredColumn : references.entrySet()) {
-        String colName = referredColumn.getKey();
-        List<TableReference> dests = referredColumn.getValue();
-        
-        // for each link which leads from this column
-        for (TableReference destRef : dests) {
-          String destCol = destRef.getDestColumn();
-          String destTab = destRef.getDestTable();
-          
-          if (metastore.isDimensionTable(destTab)) {
-            CubeDimensionTable relTab = metastore.getDimensionTable(destTab);
-            TableRelationship rel = new TableRelationship(colName, tab, destCol, relTab);
-            Set<TableRelationship> edges = graph.get(relTab);
-            if (edges == null) {
-              edges = new LinkedHashSet<TableRelationship>();
-              graph.put(relTab, edges);
-            }
-            edges.add(rel);
-            // recurse down to build graph for the referenced dim
-            buildDimGraph(metastore, relTab, graph);
-          } else {
-            // not dealing with dim->fact references
-            throw new HiveException("Dimension -> Fact references not supported");
-          }
-        } // end loop for refs from a column
-      }
-    }
-  }
-
-  // Find if there is a join chain starting from the dimension to the target table
-  boolean findJoinChain(CubeDimensionTable dimTable, AbstractCubeTable target, 
-      Map<AbstractCubeTable, Set<TableRelationship>> graph, List<TableRelationship> chain) {
-    
-    Set<TableRelationship> edges = graph.get(dimTable);
-    if (edges == null || edges.isEmpty()) {
-      return false;
-    }
-    boolean foundPath = false;
-    for (TableRelationship edge : edges) {
-      if (edge.fromTable.equals(target)) {
-        chain.add(edge);
-        // Search successful
-        foundPath = true;
-        break;
-      } else if (edge.fromTable instanceof CubeDimensionTable) {
-        List<TableRelationship> tmpChain = new ArrayList<TableRelationship>();
-        if (findJoinChain((CubeDimensionTable)edge.fromTable, target, graph, tmpChain)) {
-          // This dim eventually leads to the cube
-          chain.add(edge);
-          chain.addAll(tmpChain);
-          foundPath = true;
-          break;
-        }
-      } // else - this edge doesn't lead to the cube, try next one
-    }
-    
-    return foundPath;
-  }
-
   // Recursively find out join conditions
   private QBJoinTree genJoinTree(QB qb, ASTNode joinParseTree,
       CubeQueryContext cubeql)
