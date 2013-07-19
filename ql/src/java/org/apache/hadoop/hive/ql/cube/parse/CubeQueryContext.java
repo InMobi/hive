@@ -63,6 +63,10 @@ public class CubeQueryContext {
   // Dimension tables accessed in the query
   protected Set<CubeDimensionTable> dimensions =
       new HashSet<CubeDimensionTable>();
+  
+  // Dimension table accessed but not in from
+  protected Set<CubeDimensionTable> autoJoinDims = new HashSet<CubeDimensionTable>();
+  
   // Name to table object mapping of tables accessed in this query
   private final Map<String, AbstractCubeTable> cubeTbls =
       new HashMap<String, AbstractCubeTable>();
@@ -336,6 +340,19 @@ public class CubeQueryContext {
         cubeColumnsQueried.addAll(tblAliasToColumns.get(cubeAlias));
       }
     }
+    
+    // Update auto join dimension tables
+    autoJoinDims.addAll(dimensions);
+    for (String table : tblAliasToColumns.keySet()) {
+      try {
+        if (!DEFAULT_TABLE.equalsIgnoreCase(table) && client.isDimensionTable(table)) {
+          System.out.println("### adding auto join dim " + table);
+          autoJoinDims.add(client.getDimensionTable(table));
+        }
+      } catch (HiveException e) {
+        LOG.warn("Can't find table " + table);
+      }
+    }
   }
 
   private ASTNode getExprTree(CubeQueryExpr expr) {
@@ -406,6 +423,7 @@ public class CubeQueryContext {
 
           String column = colIdent.getText().toLowerCase();
           String table = tabident.getText().toLowerCase();
+          
           if (tblToCols != null) {
             List<String> colList = tblToCols.get(table);
             if (colList == null) {
@@ -493,8 +511,10 @@ public class CubeQueryContext {
             continue;
           }
         }
+        
         List<String> factCols = cubeTabToCols.get(fact);
         List<String> validFactCols = fact.getValidColumns();
+        
         for (String col : cubeColumnsQueried) {
           if (!factCols.contains(col.toLowerCase())) {
             LOG.info("Not considering the fact table:" + fact +
@@ -550,6 +570,10 @@ public class CubeQueryContext {
 
   public Set<CubeDimensionTable> getDimensionTables() {
     return dimensions;
+  }
+  
+  public Set<CubeDimensionTable> getAutoJoinDimensions() {
+    return autoJoinDims;
   }
 
   public String getAliasForTabName(String tabName) {
@@ -819,6 +843,11 @@ public class CubeQueryContext {
         fromString = storageTableToQuery.get(dim) + " " + getAliasForTabName(
             dim.getName());
       }
+      
+      if(joinsResolvedAutomatically()) {
+        fromString += " " + getAutoResolvedJoinChain();
+      }
+      
     } else {
       StringBuilder builder = new StringBuilder();
       getQLString(qb.getQbJoinTree(), builder);
@@ -829,7 +858,7 @@ public class CubeQueryContext {
 
   private final Set<String> tablesAlreadyAdded = new HashSet<String>();
   private boolean joinsResolvedAutomatically;
-  private Map<CubeDimensionTable, List<TableRelationship>> autoResolvedJoinChain;
+  private String autoResolvedJoinClause;
   
   private void getQLString(QBJoinTree joinTree, StringBuilder builder)
       throws SemanticException {
@@ -1186,11 +1215,11 @@ public class CubeQueryContext {
     return joinsResolvedAutomatically;
   }
 
-  public void setAutoResolvedJoinChain(Map<CubeDimensionTable, List<TableRelationship>> joinChain) {
-    this.autoResolvedJoinChain = joinChain;
+  public void setAutoResolvedJoinClause(String clause) {
+    this.autoResolvedJoinClause = clause;
   }
   
-  public Map<CubeDimensionTable, List<TableRelationship>> getAutoResolvedJoinChain() {
-    return this.autoResolvedJoinChain;
+  public String getAutoResolvedJoinChain() {
+    return this.autoResolvedJoinClause;
   }
 }

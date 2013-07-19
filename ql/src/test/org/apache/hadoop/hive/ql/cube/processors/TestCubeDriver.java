@@ -422,7 +422,6 @@ public class TestCubeDriver {
     String q1 = "select SUM(msr2) from testCube"
         + " join citytable on testCube.cityid = citytable.id"
         + " where " + twoDaysRange;
-    CubeTestSetup.printQueryAST(q1, "join_test_1");
     String hqlQuery = driver.compileCubeQuery(q1);
     List<String> joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
@@ -440,7 +439,6 @@ public class TestCubeDriver {
         + " left outer join statetable on statetable.id = citytable.stateid"
         + " right outer join ziptable on citytable.zipcode = ziptable.code"
         + " where " + twoDaysRange;
-    CubeTestSetup.printQueryAST(q2, "join_test_2");
     hqlQuery = driver.compileCubeQuery(q2);
     
     joinWhereConds = new ArrayList<String>();
@@ -465,7 +463,6 @@ public class TestCubeDriver {
         + " left outer join statetable ST on ST.id = CT.stateid"
         + " right outer join ziptable ZT on CT.zipcode = ZT.code"
         + " where " + twoDaysRange;
-    CubeTestSetup.printQueryAST(q3, "join_test_3");
     hqlQuery = driver.compileCubeQuery(q3);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
@@ -488,7 +485,6 @@ public class TestCubeDriver {
         + " left outer join citytable on testCube.cityid = citytable.id"
         + " left outer join ziptable on citytable.zipcode = ziptable.code"
         + " where " + twoDaysRange;
-    CubeTestSetup.printQueryAST(q4, "join_test_1");
     hqlQuery = driver.compileCubeQuery(q4);
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", " LEFT OUTER JOIN c1_citytable citytable ON" +
@@ -504,7 +500,6 @@ public class TestCubeDriver {
     String q5 = "select SUM(msr2) from testCube"
         + " join countrytable on testCube.countryid = countrytable.id"
         + " where " + twoMonthsRangeUptoMonth;
-    CubeTestSetup.printQueryAST(q5, "join_test_5");
     hqlQuery = driver.compileCubeQuery(q5);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       " INNER JOIN c1_countrytable countrytable ON testCube.countryid = " +
@@ -1003,5 +998,15 @@ public class TestCubeDriver {
     expected = getExpectedQuery("citytable", "select count(DISTINCT" +
       " citytable.id) from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
+  }
+  
+  @Test
+  public void testAutoJoinResolver() throws Exception {
+    System.out.println("@@@@");
+    String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where " 
+    + twoDaysRange;
+    
+    String hql = driver.compileCubeQuery(query);
+    System.out.println("@@Resolved_join_chain " + driver.rewrittenQuery.getAutoResolvedJoinChain());
   }
 }

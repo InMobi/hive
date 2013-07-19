@@ -1,6 +1,7 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -103,9 +105,7 @@ public class JoinResolver implements ContextRewriter {
   }
 
   /**
-   * Graph of tables in the cube metastore
-   * SchemaGraph.
-   *
+   * Graph of tables in the cube metastore. Links between the tables are relationships in the cube.
    */
   public static class SchemaGraph {
     private final CubeMetastoreClient metastore;
@@ -151,7 +151,6 @@ public class JoinResolver implements ContextRewriter {
       for (CubeDimensionTable dim : metastore.getAllDimensionTables()) {
         buildDimGraph(dim, dimOnlySubGraph);
       }
-      
     }
     
     // Build schema graph for a cube
@@ -174,9 +173,7 @@ public class JoinResolver implements ContextRewriter {
       // build graph for each linked dimension
       for (CubeDimension dim : refDimensions) {
         // Find out references leading from dimension columns of the cube if any
-        if (dim instanceof ReferencedDimension 
-            || dim instanceof HierarchicalDimension
-            ) {
+        if (dim instanceof ReferencedDimension) {
           ReferencedDimension refDim = (ReferencedDimension) dim;
           List<TableReference> refs = refDim.getReferences();
           
@@ -339,16 +336,18 @@ public class JoinResolver implements ContextRewriter {
     // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
     // dimensions
     
+    Set<CubeDimensionTable> autoJoinDims = cubeql.getAutoJoinDimensions();
+    System.out.println(cubeql.getCube()+ "-..-" + autoJoinDims);
+    
     // Query has a cube and at least one dimension
-    boolean cubeAndDimQuery = cubeql.getCube() != null && cubeql.getDimensionTables() != null &&
-        cubeql.getDimensionTables().size() >= 1;
+    boolean cubeAndDimQuery = cubeql.hasCubeInQuery() && (autoJoinDims != null &&
+        autoJoinDims.size() >= 1);
     
     // This query has only dimensions in it
-    boolean dimOnlyQuery = cubeql.getCube() == null && cubeql.getDimensionTables() != null &&
-        cubeql.getDimensionTables().size() >= 2;
+    boolean dimOnlyQuery = !cubeql.hasCubeInQuery() && (autoJoinDims != null &&
+        autoJoinDims.size() >= 2);
         
     if (!cubeAndDimQuery && !dimOnlyQuery) {
-      LOG.info("Join not needed");
       return;
     }
     
@@ -359,19 +358,17 @@ public class JoinResolver implements ContextRewriter {
     } catch (HiveException e) {
       throw new SemanticException(e);
     }
-    
+
     AbstractCubeTable target = null;
     if (cubeAndDimQuery) {
       // this is a cube + dimension query      
       target = cubeql.getCube();;
-      LOG.info("resolvin joins for cube");
     } else if (dimOnlyQuery){
       // We'll take the dimension in the from clause to be the left (target) table while
       // finding join path
       String targetTable = cubeql.getQB().getTabAliases().iterator().next();
       try {
         target = getMetastoreClient().getDimensionTable(targetTable);
-        LOG.info("resolving joins for dimensions");
       } catch (HiveException e) {
         throw new SemanticException(e);
       }
@@ -380,7 +377,7 @@ public class JoinResolver implements ContextRewriter {
     assert target != null;
     
     Set<CubeDimensionTable> dimTables = 
-        new HashSet<CubeDimensionTable>(cubeql.getDimensionTables());
+        new HashSet<CubeDimensionTable>(autoJoinDims);
     // Remove self
     dimTables.remove(target);
 
@@ -402,10 +399,36 @@ public class JoinResolver implements ContextRewriter {
     
     if (joinsResolved) {
       cubeql.setJoinsResolvedAutomatically(joinsResolved);
-      cubeql.setAutoResolvedJoinChain(joinChain);
+      String joinClause = getMergedJoinClause(joinChain);
+      System.out.println("@@join_clause " + joinClause);
+      cubeql.setAutoResolvedJoinClause(joinClause);
+    } else {
+      System.out.println("!!! could not resolve joins");
     }
   }
   
+  private String getMergedJoinClause(Map<CubeDimensionTable, List<TableRelationship>> joinChains) {
+    for (List<TableRelationship> chain : joinChains.values()) {
+      // Need to reverse the chain so that left most table in join comes first
+      Collections.reverse(chain);
+    }
+    
+    Set<String> clauses = new LinkedHashSet<String>();
+    
+    for (List<TableRelationship> chain : joinChains.values()) {
+      for (TableRelationship rel : chain) {
+        StringBuilder clause = new StringBuilder(" join ");
+        clause.append(rel.toTable.getName())
+        .append(" on ")
+        .append(rel.fromTable.getName()).append(".").append(rel.fromColumn)
+        .append(" = ").append(rel.toTable.getName()).append(".").append(rel.toColumn);
+        clauses.add(clause.toString());
+      }
+    }
+    
+    return StringUtils.join(clauses, " ");
+  }
+
   // Recursively find out join conditions
   private QBJoinTree genJoinTree(QB qb, ASTNode joinParseTree,
       CubeQueryContext cubeql)
