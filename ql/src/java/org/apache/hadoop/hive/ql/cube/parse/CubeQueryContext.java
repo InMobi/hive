@@ -346,7 +346,6 @@ public class CubeQueryContext {
     for (String table : tblAliasToColumns.keySet()) {
       try {
         if (!DEFAULT_TABLE.equalsIgnoreCase(table) && client.isDimensionTable(table)) {
-          System.out.println("### adding auto join dim " + table);
           autoJoinDims.add(client.getDimensionTable(table));
         }
       } catch (HiveException e) {

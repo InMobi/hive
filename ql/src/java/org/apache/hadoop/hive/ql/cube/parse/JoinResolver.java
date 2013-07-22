@@ -268,7 +268,7 @@ public class JoinResolver implements ContextRewriter {
             break;
           }
 
-        } // else - this edge doesn't lead to the cube, try next one
+        } // else - this edge doesn't lead to the target, try next one
       }
       
       return foundPath;
@@ -337,7 +337,6 @@ public class JoinResolver implements ContextRewriter {
     // dimensions
     
     Set<CubeDimensionTable> autoJoinDims = cubeql.getAutoJoinDimensions();
-    System.out.println(cubeql.getCube()+ "-..-" + autoJoinDims);
     
     // Query has a cube and at least one dimension
     boolean cubeAndDimQuery = cubeql.hasCubeInQuery() && (autoJoinDims != null &&
@@ -400,10 +399,7 @@ public class JoinResolver implements ContextRewriter {
     if (joinsResolved) {
       cubeql.setJoinsResolvedAutomatically(joinsResolved);
       String joinClause = getMergedJoinClause(joinChain);
-      System.out.println("@@join_clause " + joinClause);
       cubeql.setAutoResolvedJoinClause(joinClause);
-    } else {
-      System.out.println("!!! could not resolve joins");
     }
   }
   

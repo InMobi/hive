@@ -1002,11 +1002,26 @@ public class TestCubeDriver {
   
   @Test
   public void testAutoJoinResolver() throws Exception {
-    System.out.println("@@@@");
+    //Test 1 Cube + dim
     String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where " 
     + twoDaysRange;
-    
     String hql = driver.compileCubeQuery(query);
-    System.out.println("@@Resolved_join_chain " + driver.rewrittenQuery.getAutoResolvedJoinChain());
+    
+    
+    //Test 2  Dim only query
+    String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where " 
+    + twoDaysRange;
+    hql = driver.compileCubeQuery(dimOnlyQuery);
+    
+    //Test 3 Dim only query should throw error
+    String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where " 
+    + twoDaysRange;
+    try {
+      hql = driver.compileCubeQuery(errDimOnlyQuery);
+      Assert.assertTrue("dim only query should throw error", false);
+    } catch (SemanticException exc) {
+      Assert.assertTrue(true);
+    }
+    
   }
 }
