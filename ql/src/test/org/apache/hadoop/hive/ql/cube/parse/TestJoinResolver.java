@@ -12,7 +12,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.SchemaGraph;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
-import org.apache.hadoop.hive.ql.cube.processors.TestCubeDriver;
 import org.junit.AfterClass;
 
 import static org.junit.Assert.*;
@@ -30,7 +29,7 @@ public class TestJoinResolver {
   @BeforeClass
   public static void setup() throws Exception {
     setup = new CubeTestSetup();
-    setup.createSources(hconf, TestCubeDriver.class.getSimpleName());
+    setup.createSources(hconf, TestJoinResolver.class.getSimpleName());
   }
 
   @AfterClass

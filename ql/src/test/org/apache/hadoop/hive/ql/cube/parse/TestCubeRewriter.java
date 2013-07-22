@@ -20,7 +20,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryConfUtil;
 import org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup;
 import org.apache.hadoop.hive.ql.cube.parse.DateUtil;
-import org.apache.hadoop.hive.ql.cube.parse.HQLParser;
 import org.apache.hadoop.hive.ql.cube.parse.StorageTableResolver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
