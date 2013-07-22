@@ -21,13 +21,13 @@ public class CubeQueryRewriter {
   }
 
   private void setupRewriters() {
-    // Resolve joins and generate base join tree
-    rewriters.add(new JoinResolver(conf));
     // Rewrite base trees (groupby, having, orderby, limit) using aliases
     rewriters.add(new AliasReplacer(conf));
     // Resolve aggregations and generate base select tree
     rewriters.add(new AggregateResolver(conf));
     rewriters.add(new GroupbyResolver(conf));
+    // Resolve joins and generate base join tree
+    rewriters.add(new JoinResolver(conf));
     // Resolve storage partitions and table names
     rewriters.add(new StorageTableResolver(conf));
     rewriters.add(new LeastPartitionResolver(conf));

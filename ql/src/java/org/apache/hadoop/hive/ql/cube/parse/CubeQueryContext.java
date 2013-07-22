@@ -1,14 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_AND;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ALLCOLREF;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TMP_FILE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +27,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.ASTNodeVisitor;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.TreeNode;
+import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.JoinCond;
@@ -65,27 +58,45 @@ public class CubeQueryContext {
 
   // metadata
   private Cube cube;
+  // All measures in this cube
   private List<String> cubeMeasureNames;
+  // All dimensions in this cube
   private List<String> cubeDimNames;
+  // Dimensions used to decide partitions
   private Set<String> timedDimensions;
+  // Dimension tables accessed in the query
   protected Set<CubeDimensionTable> dimensions =
       new HashSet<CubeDimensionTable>();
+  
+  // Dimension table accessed but not in from
+  protected Set<CubeDimensionTable> autoJoinDims = new HashSet<CubeDimensionTable>();
+  
+  // Name to table object mapping of tables accessed in this query
   private final Map<String, AbstractCubeTable> cubeTbls =
       new HashMap<String, AbstractCubeTable>();
+  // Mapping of table objects to all columns of that table accessed in the query
   private final Map<AbstractCubeTable, List<String>> cubeTabToCols =
       new HashMap<AbstractCubeTable, List<String>>();
 
-  // fields queried
+  // Alias name to fields queried
   private final Map<String, List<String>> tblAliasToColumns =
       new HashMap<String, List<String>>();
+  // All columns accessed in this query
   private final Set<String> cubeColumnsQueried = new HashSet<String>();
+  // Mapping of a qualified column name to its table alias
   private final Map<String, String> columnToTabAlias =
       new HashMap<String, String>();
+  // Mapping of an expression to the columns within that expression
   private final Map<CubeQueryExpr, Set<String>> exprToCols =
       new HashMap<CubeQueryExpr, Set<String>>();
+  
+  // Mapping of an expression to its column alias in the query
   private final Map<String, String> exprToAlias = new HashMap<String, String>();
+  // Columns inside aggregate expressions in the query
   private final Set<String> aggregateCols = new HashSet<String>();
+  // All aggregate expressions in the query
   private final Set<String> aggregateExprs = new HashSet<String>();
+  // Join conditions used in all join expressions
   private final Map<QBJoinTree, String> joinConds =
       new HashMap<QBJoinTree, String>();
 
@@ -333,6 +344,18 @@ public class CubeQueryContext {
         cubeColumnsQueried.addAll(tblAliasToColumns.get(cubeAlias));
       }
     }
+    
+    // Update auto join dimension tables
+    autoJoinDims.addAll(dimensions);
+    for (String table : tblAliasToColumns.keySet()) {
+      try {
+        if (!DEFAULT_TABLE.equalsIgnoreCase(table) && client.isDimensionTable(table)) {
+          autoJoinDims.add(client.getDimensionTable(table));
+        }
+      } catch (HiveException e) {
+        LOG.warn("Can't find table " + table);
+      }
+    }
   }
 
   private ASTNode getExprTree(CubeQueryExpr expr) {
@@ -403,6 +426,7 @@ public class CubeQueryContext {
 
           String column = colIdent.getText().toLowerCase();
           String table = tabident.getText().toLowerCase();
+          
           if (tblToCols != null) {
             List<String> colList = tblToCols.get(table);
             if (colList == null) {
@@ -490,8 +514,10 @@ public class CubeQueryContext {
             continue;
           }
         }
+        
         List<String> factCols = cubeTabToCols.get(fact);
         List<String> validFactCols = fact.getValidColumns();
+        
         for (String col : cubeColumnsQueried) {
           if (!factCols.contains(col.toLowerCase())) {
             LOG.info("Not considering the fact table:" + fact +
@@ -547,6 +573,10 @@ public class CubeQueryContext {
 
   public Set<CubeDimensionTable> getDimensionTables() {
     return dimensions;
+  }
+  
+  public Set<CubeDimensionTable> getAutoJoinDimensions() {
+    return autoJoinDims;
   }
 
   public String getAliasForTabName(String tabName) {
@@ -816,6 +846,11 @@ public class CubeQueryContext {
         fromString = storageTableToQuery.get(dim) + " " + getAliasForTabName(
             dim.getName());
       }
+      
+      if(joinsResolvedAutomatically()) {
+        fromString += " " + getAutoResolvedJoinChain();
+      }
+      
     } else {
       StringBuilder builder = new StringBuilder();
       getQLString(qb.getQbJoinTree(), builder);
@@ -825,6 +860,9 @@ public class CubeQueryContext {
   }
 
   private final Set<String> tablesAlreadyAdded = new HashSet<String>();
+  private boolean joinsResolvedAutomatically;
+  private String autoResolvedJoinClause;
+  
   private void getQLString(QBJoinTree joinTree, StringBuilder builder)
       throws SemanticException {
     String joiningTable = null;
@@ -1183,5 +1221,21 @@ public class CubeQueryContext {
 
   public String getTimeDimension() {
     return timeDim;
+  }
+
+  public void setJoinsResolvedAutomatically(boolean flag) {
+    this.joinsResolvedAutomatically = flag;
+  }
+  
+  public boolean joinsResolvedAutomatically() {
+    return joinsResolvedAutomatically;
+  }
+
+  public void setAutoResolvedJoinClause(String clause) {
+    this.autoResolvedJoinClause = clause;
+  }
+  
+  public String getAutoResolvedJoinChain() {
+    return this.autoResolvedJoinClause;
   }
 }

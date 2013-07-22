@@ -17,6 +17,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryConfUtil;
+import org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup;
+import org.apache.hadoop.hive.ql.cube.parse.DateUtil;
+import org.apache.hadoop.hive.ql.cube.parse.StorageTableResolver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.junit.AfterClass;
@@ -107,7 +111,7 @@ public class TestCubeRewriter {
     }
 
   }
-
+  
   public String getExpectedQuery(String cubeName, String selExpr,
       String whereExpr, String postWhereExpr,
       Map<String, String> storageTableToWhereClause) {
@@ -418,6 +422,7 @@ public class TestCubeRewriter {
 
   @Test
   public void testCubeJoinQuery() throws Exception {
+    // q1
     String hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
       + " join citytable on testCube.cityid = citytable.id"
       + " where " + twoDaysRange);
@@ -430,6 +435,7 @@ public class TestCubeRewriter {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
+    // q2 
     hqlQuery = rewrite(driver, "select statetable.name, SUM(msr2) from"
       + " testCube"
       + " join citytable on testCube.cityid = citytable.id"
@@ -451,6 +457,7 @@ public class TestCubeRewriter {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
+    // q3
     hqlQuery = rewrite(driver, "select st.name, SUM(msr2) from"
       + " testCube TC"
       + " join citytable CT on TC.cityid = CT.id"
@@ -472,6 +479,7 @@ public class TestCubeRewriter {
       getWhereForDailyAndHourly2days("tc", "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
+    // q4
     hqlQuery = rewrite(driver, "select statetable.name, SUM(msr2) from"
       + " testCube"
       + " left outer join citytable on testCube.cityid = citytable.id"
@@ -503,6 +511,7 @@ public class TestCubeRewriter {
     } catch (SemanticException e) {
       e.printStackTrace();
     }
+    
   }
 
   @Test
@@ -986,5 +995,29 @@ public class TestCubeRewriter {
     expected = getExpectedQuery("citytable", "select count(DISTINCT" +
       " citytable.id) from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
+  }
+  
+  @Test
+  public void testAutoJoinResolver() throws Exception {
+    //Test 1 Cube + dim
+    String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where " 
+    + twoDaysRange;
+    String hql = rewrite(driver, query);
+    
+    //Test 2  Dim only query
+    String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where " 
+    + twoDaysRange;
+    hql = rewrite(driver, dimOnlyQuery);
+    
+    //Test 3 Dim only query should throw error
+    String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where " 
+    + twoDaysRange;
+    try {
+      hql = rewrite(driver, errDimOnlyQuery);
+      Assert.assertTrue("dim only query should throw error", false);
+    } catch (SemanticException exc) {
+      Assert.assertTrue(true);
+    }
+    
   }
 }
