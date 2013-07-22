@@ -1,6 +1,51 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.AMPERSAND;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.BITWISEOR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.BITWISEXOR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.DIVIDE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.EQUAL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.EQUAL_NS;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.GREATERTHAN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.GREATERTHANOREQUALTO;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_AND;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_CASE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_DEPENDENCY;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_EXTENDED;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_FALSE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_FORMATTED;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_IN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_LIKE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_NOT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_OR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_REGEXP;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_RLIKE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_TRUE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_WHEN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.LESSTHAN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.LESSTHANOREQUALTO;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.LSQUARE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.MINUS;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.MOD;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.NOTEQUAL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.Number;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.PLUS;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.STAR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.StringLiteral;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TILDE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_DIR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONDI;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_GROUPBY;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ISNOTNULL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ISNULL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LOCAL_DIR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ORDERBY;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECTDI;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TAB;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -75,16 +120,16 @@ public class HQLParser {
     ops.add(AMPERSAND);
     ops.add(BITWISEOR);
     ops.add(BITWISEXOR);
-    
+
     BINARY_OPERATORS = Collections.unmodifiableSet(ops);
-    
+
     ARITHMETIC_OPERATORS = new HashSet<Integer>();
     ARITHMETIC_OPERATORS.add(PLUS);
     ARITHMETIC_OPERATORS.add(MINUS);
     ARITHMETIC_OPERATORS.add(STAR);
     ARITHMETIC_OPERATORS.add(DIVIDE);
     ARITHMETIC_OPERATORS.add(MOD);
-    
+
     HashSet<Integer> unaryOps = new HashSet<Integer>();
     unaryOps.add(KW_NOT);
     unaryOps.add(TILDE);
@@ -255,7 +300,9 @@ public class HQLParser {
     String rootText = root.getText();
     // Operand, print contents
     if (Identifier == rootType || Number == rootType ||
-        StringLiteral == rootType || KW_TRUE == rootType || KW_FALSE == rootType) {
+        StringLiteral == rootType || KW_TRUE == rootType ||
+        KW_FALSE == rootType || KW_FORMATTED == rootType ||
+        KW_EXTENDED == rootType || KW_DEPENDENCY == rootType) {
       // StringLiterals should not be lower cased.
       if (StringLiteral == rootType) {
         buf.append(' ').append(rootText).append(' ');
@@ -266,7 +313,7 @@ public class HQLParser {
       } else {
         buf.append(' ').append(rootText == null ? "" : rootText.toLowerCase()).append(' ');
       }
-      
+
     } else if (UNARY_OPERATORS.contains(Integer.valueOf(rootType))) {
       if (KW_NOT == rootType) {
         // Check if this is actually NOT IN
@@ -276,11 +323,11 @@ public class HQLParser {
       } else if (TILDE == rootType) {
         buf.append(" ~ ");
       }
-      
+
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
-      
+
     } else if (BINARY_OPERATORS.contains(
         Integer.valueOf(root.getToken().getType()))) {
       buf.append("(");
@@ -291,18 +338,18 @@ public class HQLParser {
       // Right operand
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append(")");
-      
+
     } else if (LSQUARE == rootType) {
       // square brackets for array and map types
       toInfixString((ASTNode) root.getChild(0), buf);
       buf.append("[");
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append("]");
-      
+
     } else if (TOK_FUNCTION == root.getToken().getType()) {
       // Handle UDFs, conditional operators.
       functionString(root, buf);
-      
+
     } else if (TOK_FUNCTIONDI == rootType) {
       // Distinct is a different case.
       String fname = ((ASTNode) root.getChild(0)).getText();
@@ -325,7 +372,7 @@ public class HQLParser {
           buf.append(", ");
         }
       }
-      
+
     } else if (TOK_SELECTDI == rootType) {
       buf.append(" distinct ");
       for (int i = 0; i < root.getChildCount(); i++) {
@@ -334,25 +381,25 @@ public class HQLParser {
           buf.append(", ");
         }
       }
-      
+
     } else if (TOK_DIR == rootType) {
       buf.append(" directory ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
-      
+
     } else if (TOK_LOCAL_DIR == rootType) {
       buf.append(" local directory ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
-      
+
     } else if (TOK_TAB == rootType) {
       buf.append(" table ");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
-      
+
     }
     else {
       for (int i = 0; i < root.getChildCount(); i++) {
@@ -372,57 +419,57 @@ public class HQLParser {
       int from = 2;
       int nchildren = caseChildren.size();
       int to = nchildren % 2 == 1 ? nchildren - 1 : nchildren;
-      
+
       for (int i = from; i < to; i += 2) {
         buf.append(" when ");
         toInfixString((ASTNode) caseChildren.get(i), buf);
         buf.append(" then ");
         toInfixString((ASTNode) caseChildren.get(i + 1), buf);
       }
-      
+
       // check if there is an ELSE node
       if (nchildren % 2 == 1) {
         buf.append(" else " );
         toInfixString((ASTNode) caseChildren.get(nchildren -1), buf);
       }
-      
+
       buf.append(" end ");
-      
+
     } else if (findNodeByPath(root, KW_WHEN) != null) {
       // 2nd form of case statement
-      
+
       buf.append(" case ");
       // each of the conditions
       ArrayList<Node> caseChildren = root.getChildren();
       int from = 1;
       int nchildren = caseChildren.size();
       int to = nchildren % 2 == 1 ? nchildren : nchildren - 1;
-      
+
       for (int i = from; i < to; i += 2) {
         buf.append(" when ");
         toInfixString((ASTNode) caseChildren.get(i), buf);
         buf.append(" then ");
         toInfixString((ASTNode) caseChildren.get(i + 1), buf);
       }
-      
+
       // check if there is an ELSE node
       if (nchildren % 2 == 0) {
         buf.append(" else " );
         toInfixString((ASTNode) caseChildren.get(nchildren -1), buf);
       }
-      
+
       buf.append(" end ");
-      
+
     } else if (findNodeByPath(root, TOK_ISNULL) != null) {
       // IS NULL operator
       toInfixString((ASTNode)root.getChild(1), buf);
       buf.append(" is null ");
-      
+
     } else if (findNodeByPath(root, TOK_ISNOTNULL) != null) {
       // IS NOT NULL operator
       toInfixString((ASTNode)root.getChild(1), buf);
       buf.append(" is not null ");
-      
+
     } else if (((ASTNode)root.getChild(0)).getToken().getType() == Identifier
         && ((ASTNode)root.getChild(0)).getToken().getText().equalsIgnoreCase("between")) {
       // Handle between and not in between
@@ -443,29 +490,29 @@ public class HQLParser {
         buf.append(" and ");
         toInfixString((ASTNode)root.getChild(4), buf);
       }
-      
+
     } else if (findNodeByPath(root, KW_IN) != null) {
       // IN operator
-      
+
       toInfixString((ASTNode) root.getChild(1), buf);
-      
+
       // check if this is NOT In
       ASTNode rootParent = (ASTNode) root.getParent();
       if (rootParent != null && rootParent.getToken().getType() == KW_NOT) {
         buf.append(" not ");
       }
-      
+
       buf.append(" in (");
-      
+
       for (int i = 2; i < root.getChildCount(); i++) {
         toInfixString((ASTNode)root.getChild(i), buf);
         if (i < root.getChildCount()-1) {
           buf.append(" , ");
         }
       }
-      
+
       buf.append(")");
-      
+
     }
     else {
       // Normal UDF

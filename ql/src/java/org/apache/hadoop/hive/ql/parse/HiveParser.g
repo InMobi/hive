@@ -1817,6 +1817,7 @@ queryStatement
 
 regular_body
    :
+   cubeClause?
    insertClause
    selectClause
    fromClause
@@ -1828,7 +1829,7 @@ regular_body
    distributeByClause?
    sortByClause?
    window_clause?
-   limitClause? -> ^(TOK_QUERY fromClause ^(TOK_INSERT insertClause
+   limitClause? -> ^(TOK_QUERY cubeClause? fromClause ^(TOK_INSERT insertClause
                      selectClause whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
                      distributeByClause? sortByClause? window_clause? limitClause?))
    |
@@ -1837,6 +1838,7 @@ regular_body
 
 selectStatement
    :
+   cubeClause?
    selectClause
    fromClause
    whereClause?
@@ -1847,7 +1849,7 @@ selectStatement
    distributeByClause?
    sortByClause?
    window_clause?
-   limitClause? -> ^(TOK_QUERY fromClause ^(TOK_INSERT ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
+   limitClause? -> ^(TOK_QUERY cubeClause? fromClause ^(TOK_INSERT ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
                      selectClause whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
                      distributeByClause? sortByClause? window_clause? limitClause?))
    ;
@@ -1910,4 +1912,10 @@ limitClause
    KW_LIMIT num=Number -> ^(TOK_LIMIT $num)
    ;
 
+cubeClause
+@init { msgs.push("cube clause"); }
+@after { msgs.pop(); }
+   :
+   KW_CUBE -> ^(KW_CUBE)
+   ;
 

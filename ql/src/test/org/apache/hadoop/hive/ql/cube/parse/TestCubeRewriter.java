@@ -1,4 +1,4 @@
-package org.apache.hadoop.hive.ql.cube.processors;
+package org.apache.hadoop.hive.ql.cube.parse;
 
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.now;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoMonthsBack;
@@ -30,10 +30,10 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class TestCubeDriver {
+public class TestCubeRewriter {
 
   private Configuration conf;
-  private CubeDriver driver;
+  private CubeQueryRewriter driver;
   private final String cubeName = "testcube";
   private final String twoDaysRange = "time_range_in('dt', '" + getDateUptoHours(
       twodaysBack) + "','" + getDateUptoHours(now) + "')";
@@ -43,11 +43,11 @@ public class TestCubeDriver {
       getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
 
   static CubeTestSetup setup;
-  static HiveConf hconf = new HiveConf(TestCubeDriver.class);
+  static HiveConf hconf = new HiveConf(TestCubeRewriter.class);
   @BeforeClass
   public static void setup() throws Exception {
     setup = new CubeTestSetup();
-    setup.createSources(hconf, TestCubeDriver.class.getSimpleName());
+    setup.createSources(hconf, TestCubeRewriter.class.getSimpleName());
   }
 
   @AfterClass
@@ -58,7 +58,7 @@ public class TestCubeDriver {
   @Before
   public void setupDriver() throws Exception {
     conf = new Configuration();
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
   }
 
   public static String HOUR_FMT = "yyyy-MM-dd HH";
@@ -81,7 +81,7 @@ public class TestCubeDriver {
   public void testQueryWithNow() throws Exception {
     Throwable th = null;
     try {
-      driver.compileCubeQuery("select SUM(msr2) from testCube where" +
+      rewrite(driver, "select SUM(msr2) from testCube where" +
         " time_range_in('dt', 'NOW - 2DAYS', 'NOW')");
     } catch (SemanticException e) {
       th = e;
@@ -94,7 +94,7 @@ public class TestCubeDriver {
   public void testCandidateTables() throws Exception {
     Throwable th = null;
     try {
-      driver.compileCubeQuery("select dim12, SUM(msr2) from testCube" +
+      rewrite(driver, "select dim12, SUM(msr2) from testCube" +
         " where " + twoDaysRange);
     } catch (SemanticException e) {
       th = e;
@@ -103,7 +103,7 @@ public class TestCubeDriver {
     Assert.assertNotNull(th);
     try {
       // this query should through exception because invalidMsr is invalid
-      driver.compileCubeQuery("SELECT cityid, invalidMsr from testCube " +
+      rewrite(driver, "SELECT cityid, invalidMsr from testCube " +
         " where " + twoDaysRange);
       Assert.assertTrue("Should not reach here", false);
     } catch (SemanticException exc) {
@@ -272,11 +272,17 @@ public class TestCubeDriver {
     }
   }
 
+  private CubeQueryContext rewrittenQuery;
+  private String rewrite(CubeQueryRewriter driver, String query)
+      throws SemanticException, ParseException {
+    rewrittenQuery = driver.rewrite(query);
+    return rewrittenQuery.toHQL();
+  }
   @Test
-  public void testCubeExplain() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("explain select SUM(msr2) from " +
-      "testCube where " + twoDaysRange);
-    String expected = "EXPLAIN " + getExpectedQuery(cubeName,
+  public void testCubeQuery() throws Exception {
+    String hqlQuery = rewrite(driver, "cube select" +
+      " SUM(msr2) from testCube where " + twoDaysRange);
+    String expected = getExpectedQuery(cubeName,
       "select sum(testcube.msr2) FROM ", null, null,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
@@ -284,21 +290,21 @@ public class TestCubeDriver {
 
   @Test
   public void testCubeInsert() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("insert overwrite directory" +
+    String hqlQuery = rewrite(driver, "insert overwrite directory" +
       " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);
     String expected = "insert overwrite directory '/tmp/test' " +
       getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("insert overwrite local directory" +
+    hqlQuery = rewrite(driver, "insert overwrite local directory" +
       " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);
     expected = "insert overwrite local directory '/tmp/test' " +
       getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("insert overwrite table temp" +
+    hqlQuery = rewrite(driver, "insert overwrite table temp" +
       " select SUM(msr2) from testCube where " + twoDaysRange);
     expected = "insert overwrite table temp " +
       getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
@@ -327,14 +333,14 @@ public class TestCubeDriver {
 
       System.err.println("__FAILED__ " + method
           + "\n\tExpected: " + expected + "\n\t---------\n\tActual: " + actual);
-      System.err.println("\t__AGGR_EXPRS:" + driver.rewrittenQuery.getAggregateExprs());
+      System.err.println("\t__AGGR_EXPRS:" + rewrittenQuery.getAggregateExprs());
     }
     Assert.assertTrue(expectedTrimmed.equalsIgnoreCase(actualTrimmed));
   }
 
   @Test
   public void testCubeWhereQuery() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    String hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     String expected = getExpectedQuery(cubeName,
       "select sum(testcube.msr2) FROM ", null, null,
@@ -343,8 +349,8 @@ public class TestCubeDriver {
 
     // Test with partition existence
     conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, true);
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForHourly2days("c1_testfact2"));
@@ -353,8 +359,8 @@ public class TestCubeDriver {
 
     // Tests for valid tables
     conf.set(CubeQueryConfUtil.getValidFactTablesKey(cubeName), "testFact");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
@@ -362,8 +368,8 @@ public class TestCubeDriver {
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C2");
     conf.set(CubeQueryConfUtil.getValidFactTablesKey(cubeName), "testFact");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
@@ -371,8 +377,8 @@ public class TestCubeDriver {
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1");
     conf.set(CubeQueryConfUtil.getValidFactTablesKey(cubeName), "testFact2");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForHourly2days("c1_testfact2"));
@@ -382,8 +388,8 @@ public class TestCubeDriver {
     conf.set(CubeQueryConfUtil.getValidFactTablesKey(cubeName), "testFact2");
     conf.set(CubeQueryConfUtil.getValidStorageTablesKey("testFact2"),
         "C1_testFact2");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForHourly2days("c1_testfact2"));
@@ -395,8 +401,8 @@ public class TestCubeDriver {
         "C1_testFact");
     conf.set(CubeQueryConfUtil.getValidUpdatePeriodsKey("testfact",
         "C1"), "HOURLY");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForHourly2days("c1_testfact"));
@@ -407,8 +413,8 @@ public class TestCubeDriver {
         "C2_testFact");
     conf.set(CubeQueryConfUtil.getValidUpdatePeriodsKey("testfact", "C2"),
         "HOURLY");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForHourly2days("c2_testfact"));
@@ -417,12 +423,10 @@ public class TestCubeDriver {
 
   @Test
   public void testCubeJoinQuery() throws Exception {
-    
     // q1
-    String q1 = "select SUM(msr2) from testCube"
-        + " join citytable on testCube.cityid = citytable.id"
-        + " where " + twoDaysRange;
-    String hqlQuery = driver.compileCubeQuery(q1);
+    String hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
+      + " join citytable on testCube.cityid = citytable.id"
+      + " where " + twoDaysRange);
     List<String> joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "citytable", Storage.getPartitionsForLatest()));
@@ -432,15 +436,13 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    // q2
-    String q2 = "select statetable.name, SUM(msr2) from"
-        + " testCube"
-        + " join citytable on testCube.cityid = citytable.id"
-        + " left outer join statetable on statetable.id = citytable.stateid"
-        + " right outer join ziptable on citytable.zipcode = ziptable.code"
-        + " where " + twoDaysRange;
-    hqlQuery = driver.compileCubeQuery(q2);
-    
+    // q2 
+    hqlQuery = rewrite(driver, "select statetable.name, SUM(msr2) from"
+      + " testCube"
+      + " join citytable on testCube.cityid = citytable.id"
+      + " left outer join statetable on statetable.id = citytable.stateid"
+      + " right outer join ziptable on citytable.zipcode = ziptable.code"
+      + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "citytable", Storage.getPartitionsForLatest()));
@@ -457,13 +459,12 @@ public class TestCubeDriver {
     compareQueries(expected, hqlQuery);
 
     // q3
-    String q3 = "select st.name, SUM(msr2) from"
-        + " testCube TC"
-        + " join citytable CT on TC.cityid = CT.id"
-        + " left outer join statetable ST on ST.id = CT.stateid"
-        + " right outer join ziptable ZT on CT.zipcode = ZT.code"
-        + " where " + twoDaysRange;
-    hqlQuery = driver.compileCubeQuery(q3);
+    hqlQuery = rewrite(driver, "select st.name, SUM(msr2) from"
+      + " testCube TC"
+      + " join citytable CT on TC.cityid = CT.id"
+      + " left outer join statetable ST on ST.id = CT.stateid"
+      + " right outer join ziptable ZT on CT.zipcode = ZT.code"
+      + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
         "ct", Storage.getPartitionsForLatest()));
@@ -480,12 +481,11 @@ public class TestCubeDriver {
     compareQueries(expected, hqlQuery);
 
     // q4
-    String q4 = "select statetable.name, SUM(msr2) from"
-        + " testCube"
-        + " left outer join citytable on testCube.cityid = citytable.id"
-        + " left outer join ziptable on citytable.zipcode = ziptable.code"
-        + " where " + twoDaysRange;
-    hqlQuery = driver.compileCubeQuery(q4);
+    hqlQuery = rewrite(driver, "select statetable.name, SUM(msr2) from"
+      + " testCube"
+      + " left outer join citytable on testCube.cityid = citytable.id"
+      + " left outer join ziptable on citytable.zipcode = ziptable.code"
+      + " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", " LEFT OUTER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id and (citytable.dt = 'latest') " +
@@ -496,11 +496,9 @@ public class TestCubeDriver {
     getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    // q5
-    String q5 = "select SUM(msr2) from testCube"
-        + " join countrytable on testCube.countryid = countrytable.id"
-        + " where " + twoMonthsRangeUptoMonth;
-    hqlQuery = driver.compileCubeQuery(q5);
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
+      + " join countrytable on testCube.countryid = countrytable.id"
+      + " where " + twoMonthsRangeUptoMonth);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       " INNER JOIN c1_countrytable countrytable ON testCube.countryid = " +
       " countrytable.id", null, null, null,
@@ -508,7 +506,7 @@ public class TestCubeDriver {
     compareQueries(expected, hqlQuery);
 
     try {
-      hqlQuery = driver.compileCubeQuery("select name, SUM(msr2) from testCube"
+      hqlQuery = rewrite(driver, "select name, SUM(msr2) from testCube"
           + " join citytable" + " where " + twoDaysRange + " group by name");
       Assert.assertTrue(false);
     } catch (SemanticException e) {
@@ -519,7 +517,7 @@ public class TestCubeDriver {
 
   @Test
   public void testCubeGroupbyQuery() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select name, SUM(msr2) from" +
+    String hqlQuery = rewrite(driver, "select name, SUM(msr2) from" +
       " testCube join citytable on testCube.cityid = citytable.id where " +
       twoDaysRange);
     List<String> joinWhereConds = new ArrayList<String>();
@@ -531,33 +529,33 @@ public class TestCubeDriver {
       joinWhereConds, getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube"
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
       + " join citytable on testCube.cityid = citytable.id"
       + " where " + twoDaysRange + " group by name");
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select cityid, SUM(msr2) from testCube"
+    hqlQuery = rewrite(driver, "select cityid, SUM(msr2) from testCube"
       + " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select testcube.cityid," +
       " sum(testcube.msr2) FROM ", null, " group by testcube.cityid ",
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select round(cityid), SUM(msr2) from" +
+    hqlQuery = rewrite(driver, "select round(cityid), SUM(msr2) from" +
       " testCube where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select round(testcube.cityid)," +
       " sum(testcube.msr2) FROM ", null, " group by round(testcube.cityid) ",
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube"
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
       + "  where " + twoDaysRange + "group by round(zipcode)");
     expected = getExpectedQuery(cubeName, "select round(testcube.zipcode)," +
       " sum(testcube.msr2) FROM ", null, " group by round(testcube.zipcode) ",
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select round(cityid), SUM(msr2) from" +
+    hqlQuery = rewrite(driver, "select round(cityid), SUM(msr2) from" +
       " testCube where " + twoDaysRange + " group by zipcode");
     expected = getExpectedQuery(cubeName, "select testcube.zipcode," +
       " round(testcube.cityid), sum(testcube.msr2) FROM ", null,
@@ -565,7 +563,7 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select cityid, SUM(msr2) from testCube"
+    hqlQuery = rewrite(driver, "select cityid, SUM(msr2) from testCube"
       + " where " + twoDaysRange + " group by round(zipcode)");
     expected = getExpectedQuery(cubeName, "select round(testcube.zipcode)," +
       " testcube.cityid, sum(testcube.msr2) FROM ", null,
@@ -573,7 +571,7 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select cityid, msr2 from testCube"
+    hqlQuery = rewrite(driver, "select cityid, msr2 from testCube"
       + " where " + twoDaysRange + " group by round(zipcode)");
     expected = getExpectedQuery(cubeName, "select round(testcube.zipcode)," +
       " testcube.cityid, sum(testcube.msr2) FROM ", null,
@@ -581,7 +579,7 @@ public class TestCubeDriver {
       getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select round(zipcode) rzc, cityid," +
+    hqlQuery = rewrite(driver, "select round(zipcode) rzc, cityid," +
       " msr2 from testCube where " + twoDaysRange + " group by round(zipcode)" +
       " order by rzc");
     expected = getExpectedQuery(cubeName, "select round(testcube.zipcode) rzc,"
@@ -594,32 +592,32 @@ public class TestCubeDriver {
 
   @Test
   public void testCubeQueryWithAilas() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select SUM(msr2) m2 from" +
+    String hqlQuery = rewrite(driver, "select SUM(msr2) m2 from" +
       " testCube where " + twoDaysRange);
     String expected = getExpectedQuery(cubeName, "select sum(testcube.msr2)" +
       " m2 FROM ", null, null, getWhereForDailyAndHourly2days(cubeName,
           "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube mycube" +
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube mycube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery("mycube", "select sum(mycube.msr2) FROM ", null,
       null, getWhereForDailyAndHourly2days("mycube", "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select SUM(testCube.msr2) from testCube"
+    hqlQuery = rewrite(driver, "select SUM(testCube.msr2) from testCube"
       + " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select mycube.msr2 m2 from testCube" +
+    hqlQuery = rewrite(driver, "select mycube.msr2 m2 from testCube" +
       " mycube where " + twoDaysRange);
     expected = getExpectedQuery("mycube", "select sum(mycube.msr2) m2 FROM ",
       null, null, getWhereForDailyAndHourly2days("mycube", "C1_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select testCube.msr2 m2 from testCube" +
+    hqlQuery = rewrite(driver, "select testCube.msr2 m2 from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) m2 FROM ",
       null, null, getWhereForDailyAndHourly2days(cubeName, "C1_testfact"));
@@ -628,7 +626,7 @@ public class TestCubeDriver {
 
   @Test
   public void testCubeWhereQueryForMonth() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+    String hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoMonthsRangeUptoHours);
     String expected = getExpectedQuery(cubeName,
       "select sum(testcube.msr2) FROM ", null, null,
@@ -636,19 +634,19 @@ public class TestCubeDriver {
     compareQueries(expected, hqlQuery);
 
     conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, true);
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     try {
-      hqlQuery = driver.compileCubeQuery("select SUM(msr2) from testCube" +
+      hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
         " where " + twoMonthsRangeUptoHours);
       Assert.assertTrue(false);
     } catch (SemanticException e) {
       e.printStackTrace();
     }
     conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, false);
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
 
     // this should consider only two month partitions.
-    hqlQuery = driver.compileCubeQuery("select cityid, SUM(msr2) from testCube"
+    hqlQuery = rewrite(driver, "select cityid, SUM(msr2) from testCube"
       + " where " + twoMonthsRangeUptoMonth);
     expected = getExpectedQuery(cubeName, "select testcube.cityid," +
       " sum(testcube.msr2) FROM ", null, "group by testcube.cityid",
@@ -676,49 +674,49 @@ public class TestCubeDriver {
 
   @Test
   public void testDimensionQueryWithMultipleStorages() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select name, stateid from" +
+    String hqlQuery = rewrite(driver, "select name, stateid from" +
       " citytable");
     String expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select name, c.stateid from citytable" +
+    hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
       " c");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ", null,
       "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C2");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select name, stateid from citytable");
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from citytable");
     expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c2_citytable", false);
     compareQueries(expected, hqlQuery);
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select name, stateid from citytable");
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from citytable");
     expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "");
     conf.set(CubeQueryConfUtil.VALID_STORAGE_DIM_TABLES, "C1_citytable");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select name, stateid from citytable");
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from citytable");
     expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "");
     conf.set(CubeQueryConfUtil.VALID_STORAGE_DIM_TABLES, "C2_citytable");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select name, stateid from citytable");
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from citytable");
     expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c2_citytable", false);
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select name n, count(1) from citytable"
+    hqlQuery = rewrite(driver, "select name n, count(1) from citytable"
       + " group by name order by n ");
     expected = getExpectedQuery("citytable", "select citytable.name n," +
       " count(1) from ", "groupby citytable.name order by n", "c2_citytable",
@@ -729,21 +727,21 @@ public class TestCubeDriver {
 
   @Test
   public void testLimitQueryOnDimension() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select name, stateid from" +
+    String hqlQuery = rewrite(driver, "select name, stateid from" +
       " citytable limit 100");
     String expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", " limit 100", "c1_citytable", true);
     compareQueries(expected, hqlQuery);
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C2");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select name, stateid from citytable " +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from citytable " +
       "limit 100");
     expected = getExpectedQuery("citytable", "select citytable.name," +
       "citytable.stateid from ", " limit 100", "c2_citytable", false);
     compareQueries(expected, hqlQuery);
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1");
-    driver = new CubeDriver(new HiveConf(conf, HiveConf.class));
-    hqlQuery = driver.compileCubeQuery("select name, stateid from citytable" +
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from citytable" +
       " limit 100");
     expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", " limit 100", "c1_citytable", true);
@@ -828,7 +826,7 @@ public class TestCubeDriver {
       String hql = null;
       Throwable th = null;
       try {
-        hql = driver.compileCubeQuery(tests[i]);
+        hql = rewrite(driver, tests[i]);
       } catch (SemanticException e) {
         th = e;
         e.printStackTrace();
@@ -845,7 +843,7 @@ public class TestCubeDriver {
     try {
       // Should throw exception in aggregate resolver because noAggrMsr does
       //not have a default aggregate defined.
-      String hql = driver.compileCubeQuery(failq);
+      String hql = rewrite(driver, failq);
       Assert.assertTrue("Should not reach here: " + hql, false);
     } catch (SemanticException exc) {
       Assert.assertNotNull(exc);
@@ -859,7 +857,7 @@ public class TestCubeDriver {
       " citytable on testcube.cityid = citytable.id where " + twoDaysRange;
 
     try {
-      String hql = driver.compileCubeQuery(query);
+      String hql = rewrite(driver, query);
       Assert.assertTrue("Should not reach here:" + hql, false);
     } catch (SemanticException exc) {
       Assert.assertNotNull(exc);
@@ -870,7 +868,7 @@ public class TestCubeDriver {
       " statetable on citytable.stateid = statetable.id join countrytable on" +
       " statetable.countryid = countrytable.id";
     try {
-      String hql = driver.compileCubeQuery(q2);
+      String hql = rewrite(driver, q2);
       Assert.assertTrue("Should not reach here: " + hql, false);
     } catch (SemanticException exc) {
       Assert.assertNotNull(exc);
@@ -885,7 +883,7 @@ public class TestCubeDriver {
         + "','" + getDateUptoHours(twodaysBack) + "')";
     try {
       // this should throw exception because from date is after to date
-      driver.compileCubeQuery("SELECT cityid, testCube.msr2 from" +
+      rewrite(driver, "SELECT cityid, testCube.msr2 from" +
           " testCube where " + timeRange2);
       Assert.assertTrue("Should not reach here", false);
     } catch (SemanticException exc) {
@@ -898,24 +896,24 @@ public class TestCubeDriver {
         + "','" + getDateUptoHours(now) + "')";
     String q1 = "SELECT cityid, testCube.msr2 from testCube where " + timeRange + " AND cityid=1";
 
-    String hql = driver.compileCubeQuery(q1);
+    String hql = rewrite(driver, q1);
     // TODO compare queries
 
     String q2 = "SELECT cityid, testCube.msr3 from testCube where cityid=1 AND " + timeRange;
 
-    hql = driver.compileCubeQuery(q2);
+    hql = rewrite(driver, q2);
     //TODO compare queries
 
     // Check that column name in time range is extracted properly
     Assert.assertEquals("Time dimension should be " + Storage.getDatePartitionKey(),
         Storage.getDatePartitionKey(),
-        driver.rewrittenQuery.getTimeDimension());
-    
+        rewrittenQuery.getTimeDimension());
+
     // GRILL-38 NPE in extracting time range
     q1 = "SELECT cityid, testCube.msr2 from testCube where " + timeRange + " AND cityid IS NULL";
-    driver.compileCubeQuery(q1);
+    rewrite(driver, q1);
     q1 = "SELECT cityid, testCube.msr2 from testCube where cityid IS NULL AND " + timeRange;
-    driver.compileCubeQuery(q1);
+    rewrite(driver, q1);
   }
 
   @Test
@@ -943,14 +941,14 @@ public class TestCubeDriver {
     };
 
     for (int i = 0; i < queries.length; i++) {
-      String hql = driver.compileCubeQuery(queries[i]);
+      String hql = rewrite(driver, queries[i]);
       compareQueries(expectedQueries[i], hql);
     }
   }
 
   @Test
   public void testFactsWithInvalidColumns() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select dim1, AVG(msr1)," +
+    String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
       " msr2 from testCube" +
       " where " + twoDaysRange);
     String expected = getExpectedQuery(cubeName,
@@ -958,7 +956,7 @@ public class TestCubeDriver {
       null, " group by testcube.dim1",
       getWhereForDailyAndHourly2days(cubeName, "C1_summary1"));
     compareQueries(expected, hqlQuery);
-    hqlQuery = driver.compileCubeQuery("select dim1, dim2, COUNT(msr1)," +
+    hqlQuery = rewrite(driver, "select dim1, dim2, COUNT(msr1)," +
       " SUM(msr2), msr3 from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName,
@@ -967,7 +965,7 @@ public class TestCubeDriver {
       " group by testcube.dim1, testcube.dim2",
       getWhereForDailyAndHourly2days(cubeName, "C1_summary2"));
     compareQueries(expected, hqlQuery);
-    hqlQuery = driver.compileCubeQuery("select dim1, dim2, cityid, SUM(msr1)," +
+    hqlQuery = rewrite(driver, "select dim1, dim2, cityid, SUM(msr1)," +
       " SUM(msr2), msr3 from testCube" +
       " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName,
@@ -980,20 +978,20 @@ public class TestCubeDriver {
 
   @Test
   public void testDistinctColWithoutAlias() throws Exception {
-    String hqlQuery = driver.compileCubeQuery("select DISTINCT name, stateid" +
+    String hqlQuery = rewrite(driver, "select DISTINCT name, stateid" +
       " from citytable");
     String expected = getExpectedQuery("citytable", "select DISTINCT" +
       " citytable.name, citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select id, sum(distinct id) from" +
+    hqlQuery = rewrite(driver, "select id, sum(distinct id) from" +
       " citytable group by id");
     expected = getExpectedQuery("citytable", "select citytable.id," +
       " sum(DISTINCT citytable.id) from ", "group by citytable.id",
       "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = driver.compileCubeQuery("select count(distinct id) from" +
+    hqlQuery = rewrite(driver, "select count(distinct id) from" +
       " citytable");
     expected = getExpectedQuery("citytable", "select count(DISTINCT" +
       " citytable.id) from ", null, "c1_citytable", true);
@@ -1005,19 +1003,18 @@ public class TestCubeDriver {
     //Test 1 Cube + dim
     String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where " 
     + twoDaysRange;
-    String hql = driver.compileCubeQuery(query);
-    
+    String hql = rewrite(driver, query);
     
     //Test 2  Dim only query
     String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where " 
     + twoDaysRange;
-    hql = driver.compileCubeQuery(dimOnlyQuery);
+    hql = rewrite(driver, dimOnlyQuery);
     
     //Test 3 Dim only query should throw error
     String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where " 
     + twoDaysRange;
     try {
-      hql = driver.compileCubeQuery(errDimOnlyQuery);
+      hql = rewrite(driver, errDimOnlyQuery);
       Assert.assertTrue("dim only query should throw error", false);
     } catch (SemanticException exc) {
       Assert.assertTrue(true);
