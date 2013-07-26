@@ -1961,6 +1961,119 @@ class TExecuteStatementResp {
 
 void swap(TExecuteStatementResp &a, TExecuteStatementResp &b);
 
+typedef struct _TExecuteStatementAsyncReq__isset {
+  _TExecuteStatementAsyncReq__isset() : confOverlay(false) {}
+  bool confOverlay;
+} _TExecuteStatementAsyncReq__isset;
+
+class TExecuteStatementAsyncReq {
+ public:
+
+  static const char* ascii_fingerprint; // = "4CDA19909D21B7D9907F85E3387EAB27";
+  static const uint8_t binary_fingerprint[16]; // = {0x4C,0xDA,0x19,0x90,0x9D,0x21,0xB7,0xD9,0x90,0x7F,0x85,0xE3,0x38,0x7E,0xAB,0x27};
+
+  TExecuteStatementAsyncReq() : statement() {
+  }
+
+  virtual ~TExecuteStatementAsyncReq() throw() {}
+
+  TSessionHandle sessionHandle;
+  std::string statement;
+  std::map<std::string, std::string>  confOverlay;
+
+  _TExecuteStatementAsyncReq__isset __isset;
+
+  void __set_sessionHandle(const TSessionHandle& val) {
+    sessionHandle = val;
+  }
+
+  void __set_statement(const std::string& val) {
+    statement = val;
+  }
+
+  void __set_confOverlay(const std::map<std::string, std::string> & val) {
+    confOverlay = val;
+    __isset.confOverlay = true;
+  }
+
+  bool operator == (const TExecuteStatementAsyncReq & rhs) const
+  {
+    if (!(sessionHandle == rhs.sessionHandle))
+      return false;
+    if (!(statement == rhs.statement))
+      return false;
+    if (__isset.confOverlay != rhs.__isset.confOverlay)
+      return false;
+    else if (__isset.confOverlay && !(confOverlay == rhs.confOverlay))
+      return false;
+    return true;
+  }
+  bool operator != (const TExecuteStatementAsyncReq &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TExecuteStatementAsyncReq & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(TExecuteStatementAsyncReq &a, TExecuteStatementAsyncReq &b);
+
+typedef struct _TExecuteStatementAsyncResp__isset {
+  _TExecuteStatementAsyncResp__isset() : operationHandle(false) {}
+  bool operationHandle;
+} _TExecuteStatementAsyncResp__isset;
+
+class TExecuteStatementAsyncResp {
+ public:
+
+  static const char* ascii_fingerprint; // = "02A075A0FF88D3A172916D8F23C7B286";
+  static const uint8_t binary_fingerprint[16]; // = {0x02,0xA0,0x75,0xA0,0xFF,0x88,0xD3,0xA1,0x72,0x91,0x6D,0x8F,0x23,0xC7,0xB2,0x86};
+
+  TExecuteStatementAsyncResp() {
+  }
+
+  virtual ~TExecuteStatementAsyncResp() throw() {}
+
+  TStatus status;
+  TOperationHandle operationHandle;
+
+  _TExecuteStatementAsyncResp__isset __isset;
+
+  void __set_status(const TStatus& val) {
+    status = val;
+  }
+
+  void __set_operationHandle(const TOperationHandle& val) {
+    operationHandle = val;
+    __isset.operationHandle = true;
+  }
+
+  bool operator == (const TExecuteStatementAsyncResp & rhs) const
+  {
+    if (!(status == rhs.status))
+      return false;
+    if (__isset.operationHandle != rhs.__isset.operationHandle)
+      return false;
+    else if (__isset.operationHandle && !(operationHandle == rhs.operationHandle))
+      return false;
+    return true;
+  }
+  bool operator != (const TExecuteStatementAsyncResp &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TExecuteStatementAsyncResp & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(TExecuteStatementAsyncResp &a, TExecuteStatementAsyncResp &b);
+
 
 class TGetTypeInfoReq {
  public:
@@ -2788,23 +2901,25 @@ class TGetOperationStatusReq {
 void swap(TGetOperationStatusReq &a, TGetOperationStatusReq &b);
 
 typedef struct _TGetOperationStatusResp__isset {
-  _TGetOperationStatusResp__isset() : operationState(false) {}
+  _TGetOperationStatusResp__isset() : operationState(false), taskStatus(false) {}
   bool operationState;
+  bool taskStatus;
 } _TGetOperationStatusResp__isset;
 
 class TGetOperationStatusResp {
  public:
 
-  static const char* ascii_fingerprint; // = "4F27EC6715D9B6D702A4842459E6587B";
-  static const uint8_t binary_fingerprint[16]; // = {0x4F,0x27,0xEC,0x67,0x15,0xD9,0xB6,0xD7,0x02,0xA4,0x84,0x24,0x59,0xE6,0x58,0x7B};
+  static const char* ascii_fingerprint; // = "FA7B29961930695EBE2F7CD5430542C4";
+  static const uint8_t binary_fingerprint[16]; // = {0xFA,0x7B,0x29,0x96,0x19,0x30,0x69,0x5E,0xBE,0x2F,0x7C,0xD5,0x43,0x05,0x42,0xC4};
 
-  TGetOperationStatusResp() : operationState((TOperationState::type)0) {
+  TGetOperationStatusResp() : operationState((TOperationState::type)0), taskStatus() {
   }
 
   virtual ~TGetOperationStatusResp() throw() {}
 
   TStatus status;
   TOperationState::type operationState;
+  std::string taskStatus;
 
   _TGetOperationStatusResp__isset __isset;
 
@@ -2817,6 +2932,11 @@ class TGetOperationStatusResp {
     __isset.operationState = true;
   }
 
+  void __set_taskStatus(const std::string& val) {
+    taskStatus = val;
+    __isset.taskStatus = true;
+  }
+
   bool operator == (const TGetOperationStatusResp & rhs) const
   {
     if (!(status == rhs.status))
@@ -2824,6 +2944,10 @@ class TGetOperationStatusResp {
     if (__isset.operationState != rhs.__isset.operationState)
       return false;
     else if (__isset.operationState && !(operationState == rhs.operationState))
+      return false;
+    if (__isset.taskStatus != rhs.__isset.taskStatus)
+      return false;
+    else if (__isset.taskStatus && !(taskStatus == rhs.taskStatus))
       return false;
     return true;
   }
@@ -3194,6 +3318,110 @@ class TFetchResultsResp {
 };
 
 void swap(TFetchResultsResp &a, TFetchResultsResp &b);
+
+typedef struct _TGetQueryPlanReq__isset {
+  _TGetQueryPlanReq__isset() : confOverlay(false) {}
+  bool confOverlay;
+} _TGetQueryPlanReq__isset;
+
+class TGetQueryPlanReq {
+ public:
+
+  static const char* ascii_fingerprint; // = "4CDA19909D21B7D9907F85E3387EAB27";
+  static const uint8_t binary_fingerprint[16]; // = {0x4C,0xDA,0x19,0x90,0x9D,0x21,0xB7,0xD9,0x90,0x7F,0x85,0xE3,0x38,0x7E,0xAB,0x27};
+
+  TGetQueryPlanReq() : statement() {
+  }
+
+  virtual ~TGetQueryPlanReq() throw() {}
+
+  TSessionHandle sessionHandle;
+  std::string statement;
+  std::map<std::string, std::string>  confOverlay;
+
+  _TGetQueryPlanReq__isset __isset;
+
+  void __set_sessionHandle(const TSessionHandle& val) {
+    sessionHandle = val;
+  }
+
+  void __set_statement(const std::string& val) {
+    statement = val;
+  }
+
+  void __set_confOverlay(const std::map<std::string, std::string> & val) {
+    confOverlay = val;
+    __isset.confOverlay = true;
+  }
+
+  bool operator == (const TGetQueryPlanReq & rhs) const
+  {
+    if (!(sessionHandle == rhs.sessionHandle))
+      return false;
+    if (!(statement == rhs.statement))
+      return false;
+    if (__isset.confOverlay != rhs.__isset.confOverlay)
+      return false;
+    else if (__isset.confOverlay && !(confOverlay == rhs.confOverlay))
+      return false;
+    return true;
+  }
+  bool operator != (const TGetQueryPlanReq &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TGetQueryPlanReq & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(TGetQueryPlanReq &a, TGetQueryPlanReq &b);
+
+
+class TGetQueryPlanResp {
+ public:
+
+  static const char* ascii_fingerprint; // = "08A7F68AF7400F358E5CF08185165CB7";
+  static const uint8_t binary_fingerprint[16]; // = {0x08,0xA7,0xF6,0x8A,0xF7,0x40,0x0F,0x35,0x8E,0x5C,0xF0,0x81,0x85,0x16,0x5C,0xB7};
+
+  TGetQueryPlanResp() : plan() {
+  }
+
+  virtual ~TGetQueryPlanResp() throw() {}
+
+  TStatus status;
+  std::string plan;
+
+  void __set_status(const TStatus& val) {
+    status = val;
+  }
+
+  void __set_plan(const std::string& val) {
+    plan = val;
+  }
+
+  bool operator == (const TGetQueryPlanResp & rhs) const
+  {
+    if (!(status == rhs.status))
+      return false;
+    if (!(plan == rhs.plan))
+      return false;
+    return true;
+  }
+  bool operator != (const TGetQueryPlanResp &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TGetQueryPlanResp & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(TGetQueryPlanResp &a, TGetQueryPlanResp &b);
 
 }}}}} // namespace
 

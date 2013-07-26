@@ -20,9 +20,6 @@ package org.apache.hive.service.cli;
 import java.util.List;
 import java.util.Map;
 
-
-
-
 public interface ICLIService {
 
   public abstract SessionHandle openSession(String username, String password,
@@ -42,6 +39,11 @@ public interface ICLIService {
   public abstract OperationHandle executeStatement(SessionHandle sessionHandle, String statement,
       Map<String, String> confOverlay)
       throws HiveSQLException;
+
+  public abstract OperationHandle executeStatementAsync(SessionHandle sessionHandle,
+      String statement, Map<String, String> confOverlay)
+      throws HiveSQLException;
+
 
   public abstract OperationHandle getTypeInfo(SessionHandle sessionHandle)
       throws HiveSQLException;
@@ -68,8 +70,9 @@ public interface ICLIService {
       String catalogName, String schemaName, String functionName)
       throws HiveSQLException;
 
-  public abstract OperationState getOperationStatus(OperationHandle opHandle)
+  public abstract OperationStatus getOperationStatus(OperationHandle opHandle)
       throws HiveSQLException;
+
 
   public abstract void cancelOperation(OperationHandle opHandle)
       throws HiveSQLException;
@@ -85,6 +88,10 @@ public interface ICLIService {
       throws HiveSQLException;
 
   public abstract RowSet fetchResults(OperationHandle opHandle)
+      throws HiveSQLException;
+
+  public abstract String getQueryPlan(SessionHandle sessionHandle,
+      String statement, Map<String, String> confOverlay)
       throws HiveSQLException;
 
 }

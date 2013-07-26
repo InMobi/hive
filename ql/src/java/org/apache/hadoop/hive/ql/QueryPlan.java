@@ -630,6 +630,7 @@ public class QueryPlan implements Serializable {
     org.apache.hadoop.hive.ql.plan.api.Query q = getQueryPlan();
     TMemoryBuffer tmb = new TMemoryBuffer(q.toString().length() * 5);
     TJSONProtocol oprot = new TJSONProtocol(tmb);
+    
     try {
       q.write(oprot);
     } catch (TException e) {

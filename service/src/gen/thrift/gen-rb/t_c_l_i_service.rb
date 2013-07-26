@@ -71,6 +71,21 @@ module TCLIService
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'ExecuteStatement failed: unknown result')
     end
 
+    def ExecuteStatementAsync(req)
+      send_ExecuteStatementAsync(req)
+      return recv_ExecuteStatementAsync()
+    end
+
+    def send_ExecuteStatementAsync(req)
+      send_message('ExecuteStatementAsync', ExecuteStatementAsync_args, :req => req)
+    end
+
+    def recv_ExecuteStatementAsync()
+      result = receive_message(ExecuteStatementAsync_result)
+      return result.success unless result.success.nil?
+      raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'ExecuteStatementAsync failed: unknown result')
+    end
+
     def GetTypeInfo(req)
       send_GetTypeInfo(req)
       return recv_GetTypeInfo()
@@ -251,6 +266,21 @@ module TCLIService
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'FetchResults failed: unknown result')
     end
 
+    def GetQueryPlan(req)
+      send_GetQueryPlan(req)
+      return recv_GetQueryPlan()
+    end
+
+    def send_GetQueryPlan(req)
+      send_message('GetQueryPlan', GetQueryPlan_args, :req => req)
+    end
+
+    def recv_GetQueryPlan()
+      result = receive_message(GetQueryPlan_result)
+      return result.success unless result.success.nil?
+      raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'GetQueryPlan failed: unknown result')
+    end
+
   end
 
   class Processor
@@ -282,6 +312,13 @@ module TCLIService
       result = ExecuteStatement_result.new()
       result.success = @handler.ExecuteStatement(args.req)
       write_result(result, oprot, 'ExecuteStatement', seqid)
+    end
+
+    def process_ExecuteStatementAsync(seqid, iprot, oprot)
+      args = read_args(iprot, ExecuteStatementAsync_args)
+      result = ExecuteStatementAsync_result.new()
+      result.success = @handler.ExecuteStatementAsync(args.req)
+      write_result(result, oprot, 'ExecuteStatementAsync', seqid)
     end
 
     def process_GetTypeInfo(seqid, iprot, oprot)
@@ -366,6 +403,13 @@ module TCLIService
       result = FetchResults_result.new()
       result.success = @handler.FetchResults(args.req)
       write_result(result, oprot, 'FetchResults', seqid)
+    end
+
+    def process_GetQueryPlan(seqid, iprot, oprot)
+      args = read_args(iprot, GetQueryPlan_args)
+      result = GetQueryPlan_result.new()
+      result.success = @handler.GetQueryPlan(args.req)
+      write_result(result, oprot, 'GetQueryPlan', seqid)
     end
 
   end
@@ -490,6 +534,38 @@ module TCLIService
 
     FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TExecuteStatementResp}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class ExecuteStatementAsync_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQ = 1
+
+    FIELDS = {
+      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::TExecuteStatementAsyncReq}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class ExecuteStatementAsync_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    SUCCESS = 0
+
+    FIELDS = {
+      SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TExecuteStatementAsyncResp}
     }
 
     def struct_fields; FIELDS; end
@@ -874,6 +950,38 @@ module TCLIService
 
     FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TFetchResultsResp}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class GetQueryPlan_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQ = 1
+
+    FIELDS = {
+      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::TGetQueryPlanReq}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class GetQueryPlan_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    SUCCESS = 0
+
+    FIELDS = {
+      SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TGetQueryPlanResp}
     }
 
     def struct_fields; FIELDS; end

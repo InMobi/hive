@@ -17,9 +17,12 @@
  */
 package org.apache.hive.service.cli.operation;
 
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.TaskStatus;
 import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationHandle;
@@ -124,4 +127,9 @@ public abstract class Operation {
   public RowSet getNextRowSet() throws HiveSQLException {
     return getNextRowSet(FetchOrientation.FETCH_NEXT, DEFAULT_FETCH_MAX_ROWS);
   }
+
+  public String getTaskStatus() throws HiveSQLException {
+    return null;
+  }
+
 }

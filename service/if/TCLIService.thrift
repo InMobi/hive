@@ -31,7 +31,6 @@
 // Services
 // * Service names begin with the letter "T", use a capital letter for each
 //   new word (with no underscores), and end with the word "Service".
-
 namespace java org.apache.hive.service.cli.thrift
 namespace cpp apache.hive.service.cli.thrift
 
@@ -355,7 +354,6 @@ enum TOperationState {
   UKNOWN_STATE,
 }
 
-
 // A string identifier. This is interpreted literally.
 typedef string TIdentifier
 
@@ -593,6 +591,31 @@ struct TExecuteStatementReq {
 }
 
 struct TExecuteStatementResp {
+  1: required TStatus status
+  2: optional TOperationHandle operationHandle
+}
+
+// ExecuteStatementAsync()
+//
+// Execute a statement asynchronously.
+// The returned OperationHandle can be used to check on the
+// status of the statement, and to fetch results once the
+// statement has finished executing.
+struct TExecuteStatementAsyncReq {
+  // The session to exexcute the statement against
+  1: required TSessionHandle sessionHandle
+
+  // The statement to be executed (DML, DDL, SET, etc)
+  2: required string statement
+
+  // Configuration properties that are overlayed on top of the
+  // the existing session configuration before this statement
+  // is executed. These properties apply to this statement
+  // only and will not affect the subsequent state of the Session.
+  3: optional map<string, string> confOverlay
+}
+
+struct TExecuteStatementAsyncResp {
   1: required TStatus status
   2: optional TOperationHandle operationHandle
 }
@@ -860,9 +883,14 @@ struct TGetOperationStatusReq {
   1: required TOperationHandle operationHandle
 }
 
+
+
 struct TGetOperationStatusResp {
   1: required TStatus status
+  // State of the whole operation
   2: optional TOperationState operationState
+  // List of statuses of sub tasks
+  3: optional string taskStatus
 }
 
 
@@ -964,6 +992,29 @@ struct TFetchResultsResp {
   3: optional TRowSet results
 }
 
+// GetQueryPlan()
+// Get query plan of a query
+struct TGetQueryPlanReq {
+  // The session to exexcute the statement against
+  1: required TSessionHandle sessionHandle
+
+  // The statement to get the plan for
+  2: required string statement
+
+  // Configuration properties that are overlayed on top of the
+  // the existing session configuration before this statement
+  // is executed. These properties apply to this statement
+  // only and will not affect the subsequent state of the Session.
+  3: optional map<string, string> confOverlay
+}
+
+
+struct TGetQueryPlanResp {
+	1: required TStatus status
+	// Queryplan
+	2: required string plan
+}
+
 service TCLIService {
 
   TOpenSessionResp OpenSession(1:TOpenSessionReq req);
@@ -973,6 +1024,8 @@ service TCLIService {
   TGetInfoResp GetInfo(1:TGetInfoReq req);
 
   TExecuteStatementResp ExecuteStatement(1:TExecuteStatementReq req);
+  
+  TExecuteStatementAsyncResp ExecuteStatementAsync(1:TExecuteStatementAsyncReq req);
 
   TGetTypeInfoResp GetTypeInfo(1:TGetTypeInfoReq req);
 
@@ -997,4 +1050,6 @@ service TCLIService {
   TGetResultSetMetadataResp GetResultSetMetadata(1:TGetResultSetMetadataReq req);
   
   TFetchResultsResp FetchResults(1:TFetchResultsReq req);
+  
+  TGetQueryPlanResp GetQueryPlan(1:TGetQueryPlanReq req);
 }

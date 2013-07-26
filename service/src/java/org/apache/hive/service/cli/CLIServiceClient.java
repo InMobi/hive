@@ -63,6 +63,13 @@ public abstract class CLIServiceClient implements ICLIService {
       Map<String, String> confOverlay) throws HiveSQLException;
 
   /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.ICLIService#executeStatementAsync(org.apache.hive.service.cli.SessionHandle, java.lang.String, java.util.Map)
+   */
+  @Override
+  public abstract OperationHandle executeStatementAsync(SessionHandle sessionHandle,
+      String statement, Map<String, String> confOverlay) throws HiveSQLException;
+
+  /* (non-Javadoc)
    * @see org.apache.hive.service.cli.ICLIService#getTypeInfo(org.apache.hive.service.cli.SessionHandle)
    */
   @Override
@@ -113,7 +120,7 @@ public abstract class CLIServiceClient implements ICLIService {
    * @see org.apache.hive.service.cli.ICLIService#getOperationStatus(org.apache.hive.service.cli.OperationHandle)
    */
   @Override
-  public abstract OperationState getOperationStatus(OperationHandle opHandle) throws HiveSQLException;
+  public abstract OperationStatus getOperationStatus(OperationHandle opHandle) throws HiveSQLException;
 
   /* (non-Javadoc)
    * @see org.apache.hive.service.cli.ICLIService#cancelOperation(org.apache.hive.service.cli.OperationHandle)
@@ -148,5 +155,9 @@ public abstract class CLIServiceClient implements ICLIService {
     // TODO: provide STATIC default value
     return fetchResults(opHandle, FetchOrientation.FETCH_NEXT, 1000);
   }
+
+  @Override
+  public abstract String getQueryPlan(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException;
 
 }

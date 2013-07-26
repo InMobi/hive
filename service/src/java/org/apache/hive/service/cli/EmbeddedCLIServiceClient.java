@@ -75,6 +75,15 @@ public class EmbeddedCLIServiceClient extends CLIServiceClient {
   }
 
   /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.CLIServiceClient#executeStatementAsync(org.apache.hive.service.cli.SessionHandle, java.lang.String, java.util.Map)
+   */
+  @Override
+  public OperationHandle executeStatementAsync(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException {
+    return cliService.executeStatementAsync(sessionHandle, statement, confOverlay);
+  }
+
+  /* (non-Javadoc)
    * @see org.apache.hive.service.cli.CLIServiceClient#getTypeInfo(org.apache.hive.service.cli.SessionHandle)
    */
   @Override
@@ -139,7 +148,7 @@ public class EmbeddedCLIServiceClient extends CLIServiceClient {
    * @see org.apache.hive.service.cli.CLIServiceClient#getOperationStatus(org.apache.hive.service.cli.OperationHandle)
    */
   @Override
-  public OperationState getOperationStatus(OperationHandle opHandle) throws HiveSQLException {
+  public OperationStatus getOperationStatus(OperationHandle opHandle) throws HiveSQLException {
     return cliService.getOperationStatus(opHandle);
   }
 
@@ -174,6 +183,12 @@ public class EmbeddedCLIServiceClient extends CLIServiceClient {
   public RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation, long maxRows)
       throws HiveSQLException {
     return cliService.fetchResults(opHandle, orientation, maxRows);
+  }
+
+  @Override
+  public String getQueryPlan(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay) throws HiveSQLException {
+    return cliService.getQueryPlan(sessionHandle, statement, confOverlay);
   }
 
 }

@@ -134,6 +134,8 @@ public class Driver implements CommandProcessor {
   private int maxthreads;
   private static final int SLEEP_TIME = 2000;
   protected int tryCount = Integer.MAX_VALUE;
+  private DriverContext driverCxt;
+
 
   private boolean checkLockManager() {
     boolean supportConcurrency = conf.getBoolVar(HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY);
@@ -1179,7 +1181,7 @@ public class Driver implements CommandProcessor {
       Queue<Task<? extends Serializable>> runnable = new ConcurrentLinkedQueue<Task<? extends Serializable>>();
       Map<TaskResult, TaskRunner> running = new HashMap<TaskResult, TaskRunner>();
 
-      DriverContext driverCxt = new DriverContext(runnable, ctx);
+      this.driverCxt = new DriverContext(runnable, ctx);
       ctx.setHDFSCleanup(true);
 
       SessionState.get().setLastMapRedStatsList(new ArrayList<MapRedStats>());
@@ -1583,5 +1585,35 @@ public class Driver implements CommandProcessor {
 
   public org.apache.hadoop.hive.ql.plan.api.Query getQueryPlan() throws IOException {
     return plan.getQueryPlan();
+  }
+
+  public List<TaskStatus> getTaskStatuses() {
+    if (plan == null) {
+      return null;
+    }
+
+    List<Task<?>> tasks = new ArrayList<Task<?>>();
+    tasks.addAll(plan.getRootTasks());
+    for (int i = 0; i < tasks.size(); i++) {
+      Task<?> tsk = tasks.get(i);
+      if (tsk.getDependentTasks() != null) {
+        tasks.addAll(tsk.getDependentTasks());
+      }
+    }
+
+    // add backup tasks if any
+    if (driverCxt != null) {
+      for (Task<?> runnable : driverCxt.getRunnable()) {
+        if (!tasks.contains(runnable)) {
+          tasks.add(runnable);
+        }
+      }
+    }
+
+    List<TaskStatus> statuses = new ArrayList<TaskStatus>(tasks.size());
+    for (Task<?> tsk : tasks) {
+      statuses.add(new TaskStatus(tsk.getId(), tsk.getExternalHandle(), tsk.getTaskState()));
+    }
+    return statuses;
   }
 }

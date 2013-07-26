@@ -29,6 +29,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.ql.plan.api.Query;
 import org.apache.hive.service.AbstractService;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.CLIService;
@@ -38,6 +39,7 @@ import org.apache.hive.service.cli.GetInfoValue;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationHandle;
 import org.apache.hive.service.cli.OperationState;
+import org.apache.hive.service.cli.OperationStatus;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.SessionHandle;
 import org.apache.hive.service.cli.TableSchema;
@@ -210,6 +212,26 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
     }
     return resp;
   }
+  
+  
+  @Override
+  public TExecuteStatementAsyncResp ExecuteStatementAsync(TExecuteStatementAsyncReq req) 
+      throws TException {
+    TExecuteStatementAsyncResp resp = new TExecuteStatementAsyncResp();
+    try {
+      SessionHandle sessionHandle = new SessionHandle(req.getSessionHandle());
+      String statement = req.getStatement();
+      Map<String, String> confOverlay = req.getConfOverlay();
+      OperationHandle operationHandle =
+          cliService.executeStatementAsync(sessionHandle, statement, confOverlay);
+      resp.setOperationHandle(operationHandle.toTOperationHandle());
+      resp.setStatus(OK_STATUS);
+    } catch (Exception e) {
+      e.printStackTrace();
+      resp.setStatus(HiveSQLException.toTStatus(e));
+    }
+    return resp;
+  }
 
   @Override
   public TGetTypeInfoResp GetTypeInfo(TGetTypeInfoReq req) throws TException {
@@ -323,8 +345,10 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
   public TGetOperationStatusResp GetOperationStatus(TGetOperationStatusReq req) throws TException {
     TGetOperationStatusResp resp = new TGetOperationStatusResp();
     try {
-      OperationState operationState = cliService.getOperationStatus(new OperationHandle(req.getOperationHandle()));
-      resp.setOperationState(operationState.toTOperationState());
+      OperationHandle ophandle = new OperationHandle(req.getOperationHandle());
+      OperationStatus status = cliService.getOperationStatus(ophandle);
+      resp.setOperationState(status.getState().toTOperationState());
+      resp.setTaskStatus(status.getTaskStatus());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
       e.printStackTrace();
@@ -392,6 +416,23 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
     return resp;
   }
 
+  @Override
+  public TGetQueryPlanResp GetQueryPlan(TGetQueryPlanReq req) throws TException {
+    TGetQueryPlanResp resp = new TGetQueryPlanResp();
+
+    try {
+      SessionHandle sessionHandle = new SessionHandle(req.getSessionHandle());
+      String statement = req.getStatement();
+      Map<String, String> confOverlay = req.getConfOverlay();
+      String query = cliService.getQueryPlan(sessionHandle, statement, confOverlay);
+      resp.setPlan(query);
+      resp.setStatus(OK_STATUS);
+    } catch (Exception e) {
+      e.printStackTrace();
+      resp.setStatus(HiveSQLException.toTStatus(e));
+    }
+    return resp;
+  }
 
   @Override
   public void run() {
