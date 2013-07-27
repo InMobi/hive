@@ -58,6 +58,7 @@ enum TTypeId {
   USER_DEFINED_TYPE,
   DECIMAL_TYPE,
   NULL_TYPE,
+  DATE_TYPE
 }
   
 const set<TTypeId> PRIMITIVE_TYPES = [
@@ -73,6 +74,7 @@ const set<TTypeId> PRIMITIVE_TYPES = [
   TTypeId.BINARY_TYPE,
   TTypeId.DECIMAL_TYPE,
   TTypeId.NULL_TYPE
+  TTypeId.DATE_TYPE
 ]
 
 const set<TTypeId> COMPLEX_TYPES = [
@@ -105,6 +107,7 @@ const map<TTypeId,string> TYPE_NAMES = {
   TTypeId.UNION_TYPE: "UNIONTYPE",
   TTypeId.DECIMAL_TYPE: "DECIMAL",
   TTypeId.NULL_TYPE: "NULL"
+  TTypeId.DATE_TYPE: "DATE"
 }
 
 // Thrift does not support recursively defined types or forward declarations,
