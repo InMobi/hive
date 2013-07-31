@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hive.ql.optimizer.listbucketingpruner;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.FilterOperator;
@@ -25,6 +28,7 @@ import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.PrunerOperatorFactory;
 import org.apache.hadoop.hive.ql.optimizer.pcr.PcrOpProcFactory;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
@@ -55,16 +59,19 @@ public class LBPartitionProcFactory extends PrunerOperatorFactory {
 
       //Run partition pruner to get partitions
       ParseContext parseCtx = owc.getParseContext();
-      PrunedPartitionList prunedPartList = parseCtx.getOpToPartList().get(top);
+      List<PrunedPartitionList> prunedPartList = parseCtx.getOpToPartList().get(top);
       if (prunedPartList == null) {
         // We never pruned the partition. Try to prune it.
         ExprNodeDesc ppr_pred = parseCtx.getOpToPartPruner().get(top);
         if (ppr_pred != null) {
           try {
-            prunedPartList = PartitionPruner.prune(parseCtx.getTopToTable().get(top),
+            prunedPartList = new ArrayList<PrunedPartitionList>();
+            for (Table tab : parseCtx.getTopToTables().get(top)) {
+            prunedPartList.add(PartitionPruner.prune(tab,
                 ppr_pred, parseCtx.getConf(),
                 (String) parseCtx.getTopOps().keySet()
-                .toArray()[0], parseCtx.getPrunedPartitions());
+                .toArray()[0], parseCtx.getPrunedPartitions()));
+            }
             if (prunedPartList != null) {
               owc.getParseContext().getOpToPartList().put(top, prunedPartList);
             }

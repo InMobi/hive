@@ -496,8 +496,14 @@ public class BucketingSortingReduceSinkOptimizer implements Transform {
             }
 
             if (srcTable.isPartitioned()) {
-              PrunedPartitionList prunedParts = pGraphContext.getOpToPartList().get(op);
-              List<Partition> partitions = prunedParts.getNotDeniedPartns();
+              List<PrunedPartitionList> prunedParts = pGraphContext.getOpToPartList().get(op);
+              List<Partition> partitions = null;
+              if (prunedParts != null) {
+                partitions = new ArrayList<Partition>();
+                for (PrunedPartitionList ppl : prunedParts) {
+                  partitions.addAll(ppl.getNotDeniedPartns());
+                }
+              }
 
               // Support for dynamic partitions can be added later
               // The following is not optimized:

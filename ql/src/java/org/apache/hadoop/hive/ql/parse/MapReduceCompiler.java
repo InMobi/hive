@@ -441,7 +441,7 @@ public class MapReduceCompiler {
     return new ParseContext(conf, pCtx.getQB(), pCtx.getParseTree(),
         pCtx.getOpToPartPruner(), pCtx.getOpToPartList(), pCtx.getTopOps(),
         pCtx.getTopSelOps(), pCtx.getOpParseCtx(), pCtx.getJoinContext(),
-        pCtx.getSmbMapJoinContext(), pCtx.getTopToTable(), pCtx.getFsopToTable(),
+        pCtx.getSmbMapJoinContext(), pCtx.getTopToTables(), pCtx.getFsopToTable(),
         pCtx.getLoadTableWork(), pCtx.getLoadFileWork(), pCtx.getContext(),
         pCtx.getIdToTableNameMap(), pCtx.getDestTableId(), pCtx.getUCtx(),
         pCtx.getListMapJoinOpsNoReducer(), pCtx.getGroupOpToInputTables(),

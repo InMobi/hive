@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hive.ql.optimizer.listbucketingpruner;
 
+import java.util.List;
+
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
@@ -29,7 +31,7 @@ public class LBOpPartitionWalkerCtx implements NodeProcessorCtx {
 
   private final ParseContext parseContext;
 
-  private PrunedPartitionList partitions;
+  private List<PrunedPartitionList> partitions;
 
   /**
    * Constructor.
@@ -52,7 +54,7 @@ public class LBOpPartitionWalkerCtx implements NodeProcessorCtx {
    *
    * @return the partitions
    */
-  public PrunedPartitionList getPartitions() {
+  public List<PrunedPartitionList> getPartitions() {
     return partitions;
   }
 
@@ -61,7 +63,7 @@ public class LBOpPartitionWalkerCtx implements NodeProcessorCtx {
    *
    * @param partitions the partitions to set
    */
-  public void setPartitions(PrunedPartitionList partitions) {
+  public void setPartitions(List<PrunedPartitionList> partitions) {
     this.partitions = partitions;
   }
 

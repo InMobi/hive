@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.ql.optimizer.listbucketingpruner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,11 +60,13 @@ public class ListBucketingPruner implements Transform {
     PrunerUtils.walkOperatorTree(pctx, opPartWalkerCtx, LBPartitionProcFactory.getFilterProc(),
         LBPartitionProcFactory.getDefaultProc());
 
-    PrunedPartitionList partsList = ((LBOpPartitionWalkerCtx) opPartWalkerCtx).getPartitions();
+    List<PrunedPartitionList> partsList = ((LBOpPartitionWalkerCtx) opPartWalkerCtx).getPartitions();
     if (partsList != null) {
-      Set<Partition> parts = null;
-      parts = partsList.getConfirmedPartns();
-      parts.addAll(partsList.getUnknownPartns());
+      Set<Partition> parts = new HashSet<Partition>();
+      for (PrunedPartitionList ppl : partsList) {
+        parts.addAll(ppl.getConfirmedPartns());
+        parts.addAll(ppl.getUnknownPartns());
+      }
       if ((parts != null) && (parts.size() > 0)) {
         for (Partition part : parts) {
           // only process partition which is skewed and list bucketed

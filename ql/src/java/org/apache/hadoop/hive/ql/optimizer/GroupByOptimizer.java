@@ -307,8 +307,8 @@ public class GroupByOptimizer implements Transform {
       // Create a mapping from the group by columns to the table columns
       Map<String, String> tableColsMapping = new HashMap<String, String>();
       Set<String> constantCols = new HashSet<String>();
-      Table table = pGraphContext.getTopToTable().get(currOp);
-      for (FieldSchema col : table.getAllCols()) {
+      List<Table> tables = pGraphContext.getTopToTables().get(currOp);
+      for (FieldSchema col : tables.get(0).getAllCols()) {
         tableColsMapping.put(col.getName(), col.getName());
       }
 
@@ -384,28 +384,33 @@ public class GroupByOptimizer implements Transform {
         }
       }
 
-      if (!table.isPartitioned()) {
-        List<String> sortCols = Utilities.getColumnNamesFromSortCols(table.getSortCols());
-        List<String> bucketCols = table.getBucketCols();
+      if (tables.size() == 1 && (!tables.get(0).isPartitioned())) {
+        List<String> sortCols = Utilities.getColumnNamesFromSortCols(
+            tables.get(0).getSortCols());
+        List<String> bucketCols = tables.get(0).getBucketCols();
         return matchBucketSortCols(groupByCols, bucketCols, sortCols);
       } else {
-        PrunedPartitionList partsList = null;
+        List<PrunedPartitionList> partsList = null;
+        List<Partition> notDeniedPartns = new ArrayList<Partition>();
         try {
           partsList = pGraphContext.getOpToPartList().get(tableScanOp);
           if (partsList == null) {
-            partsList = PartitionPruner.prune(table,
-                pGraphContext.getOpToPartPruner().get(tableScanOp),
-                pGraphContext.getConf(),
-                table.getTableName(),
-                pGraphContext.getPrunedPartitions());
+            partsList = new ArrayList<PrunedPartitionList>();
+            for (Table table : tables) {
+              PrunedPartitionList ppl = PartitionPruner.prune(table,
+                  pGraphContext.getOpToPartPruner().get(tableScanOp),
+                  pGraphContext.getConf(),
+                  table.getTableName(),
+                  pGraphContext.getPrunedPartitions());
+              partsList.add(ppl);
+              notDeniedPartns.addAll(ppl.getNotDeniedPartns());
+            }
             pGraphContext.getOpToPartList().put(tableScanOp, partsList);
           }
         } catch (HiveException e) {
           LOG.error(StringUtils.stringifyException(e));
           throw new SemanticException(e.getMessage(), e);
         }
-
-        List<Partition> notDeniedPartns = partsList.getNotDeniedPartns();
 
         GroupByOptimizerSortMatch currentMatch =
             notDeniedPartns.isEmpty() ? GroupByOptimizerSortMatch.NO_MATCH :

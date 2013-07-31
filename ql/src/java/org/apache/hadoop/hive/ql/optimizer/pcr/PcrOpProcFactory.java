@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.ql.optimizer.pcr;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 import org.apache.commons.logging.Log;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -100,7 +102,7 @@ public final class PcrOpProcFactory {
       }
 
 
-      PrunedPartitionList prunedPartList = owc.getParseContext().getOpToPartList().get(top);
+      List<PrunedPartitionList> prunedPartList = owc.getParseContext().getOpToPartList().get(top);
       if (prunedPartList == null) {
         // We never pruned the partition. Try to prune it.
         ExprNodeDesc ppr_pred = owc.getParseContext().getOpToPartPruner().get(top);
@@ -109,10 +111,13 @@ public final class PcrOpProcFactory {
           return null;
         }
         try {
-          prunedPartList = PartitionPruner.prune(owc.getParseContext().getTopToTable().get(top),
-              ppr_pred, owc.getParseContext().getConf(),
-              (String) owc.getParseContext().getTopOps().keySet()
-              .toArray()[0], owc.getParseContext().getPrunedPartitions());
+          prunedPartList = new ArrayList<PrunedPartitionList>();
+          for (Table tbl : owc.getParseContext().getTopToTables().get(top)) {
+            prunedPartList.add(PartitionPruner.prune(tbl, ppr_pred,
+                owc.getParseContext().getConf(),
+                (String) owc.getParseContext().getTopOps().keySet()
+                .toArray()[0], owc.getParseContext().getPrunedPartitions()));
+          }
           if (prunedPartList != null) {
             owc.getParseContext().getOpToPartList().put(top, prunedPartList);
           }
@@ -128,23 +133,25 @@ public final class PcrOpProcFactory {
       String alias = top.getConf().getAlias();
 
       ArrayList<Partition> partitions = new ArrayList<Partition>();
-      if (prunedPartList == null) {
+      if (prunedPartList == null || prunedPartList.isEmpty()) {
         return null;
       }
 
-      for (Partition p : prunedPartList.getConfirmedPartns()) {
-        if (!p.getTable().isPartitioned()) {
-          return null;
+      for (PrunedPartitionList ppl : prunedPartList) {
+        for (Partition p : ppl.getConfirmedPartns()) {
+          if (!p.getTable().isPartitioned()) {
+            return null;
+          }
         }
-      }
-      for (Partition p : prunedPartList.getUnknownPartns()) {
-        if (!p.getTable().isPartitioned()) {
-          return null;
+        for (Partition p : ppl.getUnknownPartns()) {
+          if (!p.getTable().isPartitioned()) {
+            return null;
+          }
         }
-      }
 
-      partitions.addAll(prunedPartList.getConfirmedPartns());
-      partitions.addAll(prunedPartList.getUnknownPartns());
+        partitions.addAll(ppl.getConfirmedPartns());
+        partitions.addAll(ppl.getUnknownPartns());
+      }
 
       PcrExprProcFactory.NodeInfoWrapper wrapper = PcrExprProcFactory.walkExprTree(
           alias, partitions, predicate);

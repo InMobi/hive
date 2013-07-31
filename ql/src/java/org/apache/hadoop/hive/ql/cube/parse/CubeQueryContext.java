@@ -746,15 +746,6 @@ public class CubeQueryContext {
     return orderByTree;
   }
 
-  public ASTNode getFromTree() {
-    if (cube != null) {
-      return qb.getParseInfo().getSrcForAlias(getAliasForTabName(
-          cube.getName()));
-    }
-    return qb.getParseInfo().getSrcForAlias(qb.getTabAliases().iterator()
-        .next());
-  }
-
   public Integer getLimitValue() {
     return qb.getParseInfo().getDestLimit(getClause());
   }

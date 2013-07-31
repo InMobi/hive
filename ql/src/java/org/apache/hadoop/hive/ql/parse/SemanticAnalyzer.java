@@ -73,8 +73,6 @@ import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UnionOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.WindowFunctionInfo;
-import org.apache.hadoop.hive.ql.exec.mr.ExecDriver;
-import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
@@ -183,7 +181,7 @@ import org.apache.hadoop.mapred.InputFormat;
 
 public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private HashMap<TableScanOperator, ExprNodeDesc> opToPartPruner;
-  private HashMap<TableScanOperator, PrunedPartitionList> opToPartList;
+  private HashMap<TableScanOperator, List<PrunedPartitionList>> opToPartList;
   private HashMap<String, Operator<? extends OperatorDesc>> topOps;
   private HashMap<String, Operator<? extends OperatorDesc>> topSelOps;
   private LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext> opParseCtx;
@@ -191,7 +189,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   private List<LoadFileDesc> loadFileWork;
   private Map<JoinOperator, QBJoinTree> joinContext;
   private Map<SMBMapJoinOperator, QBJoinTree> smbMapJoinContext;
-  private final HashMap<TableScanOperator, Table> topToTable;
+  private final HashMap<TableScanOperator, List<Table>> topToTable;
   private final Map<FileSinkOperator, Table> fsopToTable;
   private final List<ReduceSinkOperator> reduceSinkOperatorsAddedByEnforceBucketingSorting;
   private QB qb;
@@ -244,7 +242,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     super(conf);
     opToPartPruner = new HashMap<TableScanOperator, ExprNodeDesc>();
-    opToPartList = new HashMap<TableScanOperator, PrunedPartitionList>();
+    opToPartList = new HashMap<TableScanOperator, List<PrunedPartitionList>>();
     opToSamplePruner = new HashMap<TableScanOperator, sampleDesc>();
     nameToSplitSample = new HashMap<String, SplitSample>();
     topOps = new HashMap<String, Operator<? extends OperatorDesc>>();
@@ -254,7 +252,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     opParseCtx = new LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext>();
     joinContext = new HashMap<JoinOperator, QBJoinTree>();
     smbMapJoinContext = new HashMap<SMBMapJoinOperator, QBJoinTree>();
-    topToTable = new HashMap<TableScanOperator, Table>();
+    topToTable = new HashMap<TableScanOperator, List<Table>>();
     fsopToTable = new HashMap<FileSinkOperator, Table>();
     reduceSinkOperatorsAddedByEnforceBucketingSorting = new ArrayList<ReduceSinkOperator>();
     destTableId = 1;
@@ -474,40 +472,53 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // is used as an alias)
     boolean tableSamplePresent = false;
     boolean splitSamplePresent = false;
+    int tableIndex = 0;
 
     int aliasIndex = 0;
-    if (tabref.getChildCount() == 2) {
+    if (tabref.getChildCount() > 1) {
       // tablename tablesample
       // OR
       // tablename alias
-      ASTNode ct = (ASTNode) tabref.getChild(1);
-      if (ct.getToken().getType() == HiveParser.TOK_TABLEBUCKETSAMPLE) {
+      // tablename tablesample alias
+      // tablename,tablename alias
+      // tablename,tablename tablesample alias
+      // tablename,tablename,tablename alias
+      // tablename,tablename,tablename tablesample alias
+      ASTNode lastchild = (ASTNode) tabref.getChild(tabref.getChildCount() - 1);
+      if (lastchild.getToken().getType() == HiveParser.TOK_TABLEBUCKETSAMPLE) {
         tableSamplePresent = true;
-      } else if (ct.getToken().getType() == HiveParser.TOK_TABLESPLITSAMPLE) {
+      } else if (lastchild.getToken().getType() == HiveParser.TOK_TABLESPLITSAMPLE) {
         splitSamplePresent = true;
       } else {
-        aliasIndex = 1;
+        aliasIndex = tabref.getChildCount() - 1;
       }
-    } else if (tabref.getChildCount() == 3) {
-      // table name table sample alias
-      aliasIndex = 2;
-      ASTNode ct = (ASTNode) tabref.getChild(1);
-      if (ct.getToken().getType() == HiveParser.TOK_TABLEBUCKETSAMPLE) {
-        tableSamplePresent = true;
-      } else if (ct.getToken().getType() == HiveParser.TOK_TABLESPLITSAMPLE) {
-        splitSamplePresent = true;
+      if (aliasIndex != 0) {
+        // tablename tablesample alias
+        // tablename,tablename alias
+        // tablename,tablename tablesample alias
+        // tablename,tablename,tablename alias
+        // tablename,tablename,tablename tablesample alias
+        tableIndex = aliasIndex - 2;
+        ASTNode secondLastChild = (ASTNode) tabref.getChild(tabref.getChildCount() - 2);
+        if (secondLastChild.getToken().getType() == HiveParser.TOK_TABLEBUCKETSAMPLE) {
+          tableSamplePresent = true;
+        } else if (secondLastChild.getToken().getType() == HiveParser.TOK_TABLESPLITSAMPLE) {
+          splitSamplePresent = true;
+        } else {
+          tableIndex = aliasIndex - 1;
+        }
       }
     }
-    ASTNode tableTree = (ASTNode) (tabref.getChild(0));
-
-    String tabIdName = getUnescapedName(tableTree);
-
+    List<String> tblNames = new ArrayList<String>();
+    for (int i = 0; i <= tableIndex; i++) {
+      tblNames.add(getUnescapedName(((ASTNode)tabref.getChild(i))));
+    }
     String alias;
     if (aliasIndex != 0) {
       alias = unescapeIdentifier(tabref.getChild(aliasIndex).getText());
     }
     else {
-      alias = getUnescapedUnqualifiedTableName(tableTree);
+      alias = getUnescapedUnqualifiedTableName((ASTNode)tabref.getChild(0));
     }
 
     // If the alias is already there then we have a conflict
@@ -581,12 +592,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       nameToSplitSample.put(alias_id, sample);
     }
     // Insert this map into the stats
-    qb.setTabAlias(alias, tabIdName);
+  //  qb.setTabAlias(alias, tabIdName);
+    qb.setTabAlias(alias, tblNames);
     qb.addAlias(alias);
 
-    qb.getParseInfo().setSrcForAlias(alias, tableTree);
+    qb.getParseInfo().setSrcForAlias(alias, tabref);
 
-    unparseTranslator.addTableNameTranslation(tableTree, db.getCurrentDatabase());
+    unparseTranslator.addTableNameTranslation(tabref, db.getCurrentDatabase());
     if (aliasIndex != 0) {
       unparseTranslator.addIdentifierTranslation((ASTNode) tabref
           .getChild(aliasIndex));
@@ -1064,99 +1076,99 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       Map<String, ObjectPair<String, ReadEntity>> aliasToViewInfo =
           new HashMap<String, ObjectPair<String, ReadEntity>>();
       for (String alias : tabAliases) {
-        String tab_name = qb.getTabNameForAlias(alias);
-        Table tab = null;
-        try {
-          tab = db.getTable(tab_name);
-        } catch (InvalidTableException ite) {
-          throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(qb
-              .getParseInfo().getSrcForAlias(alias)));
-        }
+        for (String tab_name : qb.getTabNamesForAlias(alias)) {
+          Table tab = null;
+          try {
+            tab = db.getTable(tab_name);
+          } catch (InvalidTableException ite) {
+            throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(qb
+                .getParseInfo().getSrcForAlias(alias)));
+          }
 
-        // Disallow INSERT INTO on bucketized tables
-        if (qb.getParseInfo().isInsertIntoTable(tab.getDbName(), tab.getTableName()) &&
-            tab.getNumBuckets() > 0) {
-          throw new SemanticException(ErrorMsg.INSERT_INTO_BUCKETIZED_TABLE.
-              getMsg("Table: " + tab_name));
-        }
+          // Disallow INSERT INTO on bucketized tables
+          if (qb.getParseInfo().isInsertIntoTable(tab.getDbName(), tab.getTableName()) &&
+              tab.getNumBuckets() > 0) {
+            throw new SemanticException(ErrorMsg.INSERT_INTO_BUCKETIZED_TABLE.
+                getMsg("Table: " + tab_name));
+          }
 
-        // We check offline of the table, as if people only select from an
-        // non-existing partition of an offline table, the partition won't
-        // be added to inputs and validate() won't have the information to
-        // check the table's offline status.
-        // TODO: Modify the code to remove the checking here and consolidate
-        // it in validate()
-        //
-        if (tab.isOffline()) {
-          throw new SemanticException(ErrorMsg.OFFLINE_TABLE_OR_PARTITION.
-              getMsg("Table " + getUnescapedName(qb.getParseInfo().getSrcForAlias(alias))));
-        }
+          // We check offline of the table, as if people only select from an
+          // non-existing partition of an offline table, the partition won't
+          // be added to inputs and validate() won't have the information to
+          // check the table's offline status.
+          // TODO: Modify the code to remove the checking here and consolidate
+          // it in validate()
+          //
+          if (tab.isOffline()) {
+            throw new SemanticException(ErrorMsg.OFFLINE_TABLE_OR_PARTITION.
+                getMsg("Table " + getUnescapedName(qb.getParseInfo().getSrcForAlias(alias))));
+          }
 
-        if (tab.isView()) {
+          if (tab.isView()) {
+            if (qb.getParseInfo().isAnalyzeCommand()) {
+              throw new SemanticException(ErrorMsg.ANALYZE_VIEW.getMsg());
+            }
+            String fullViewName = tab.getDbName() + "." + tab.getTableName();
+            // Prevent view cycles
+            if (viewsExpanded.contains(fullViewName)) {
+              throw new SemanticException("Recursive view " + fullViewName +
+                  " detected (cycle: " + StringUtils.join(viewsExpanded, " -> ") +
+                  " -> " + fullViewName + ").");
+            }
+            replaceViewReferenceWithDefinition(qb, tab, tab_name, alias);
+            // This is the last time we'll see the Table objects for views, so add it to the inputs
+            // now
+            ReadEntity viewInput = new ReadEntity(tab, parentInput);
+            viewInput = PlanUtils.addInput(inputs, viewInput);
+            aliasToViewInfo.put(alias, new ObjectPair<String, ReadEntity>(fullViewName, viewInput));
+            viewAliasToInput.put(getAliasId(alias, qb), viewInput);
+            continue;
+          }
+
+          if (!InputFormat.class.isAssignableFrom(tab.getInputFormatClass())) {
+            throw new SemanticException(generateErrorMessage(
+                qb.getParseInfo().getSrcForAlias(alias),
+                ErrorMsg.INVALID_INPUT_FORMAT_TYPE.getMsg()));
+          }
+
+          qb.getMetaData().setSrcForAlias(alias, tab);
+
           if (qb.getParseInfo().isAnalyzeCommand()) {
-            throw new SemanticException(ErrorMsg.ANALYZE_VIEW.getMsg());
-          }
-          String fullViewName = tab.getDbName() + "." + tab.getTableName();
-          // Prevent view cycles
-          if (viewsExpanded.contains(fullViewName)) {
-            throw new SemanticException("Recursive view " + fullViewName +
-                " detected (cycle: " + StringUtils.join(viewsExpanded, " -> ") +
-                " -> " + fullViewName + ").");
-          }
-          replaceViewReferenceWithDefinition(qb, tab, tab_name, alias);
-          // This is the last time we'll see the Table objects for views, so add it to the inputs
-          // now
-          ReadEntity viewInput = new ReadEntity(tab, parentInput);
-          viewInput = PlanUtils.addInput(inputs, viewInput);
-          aliasToViewInfo.put(alias, new ObjectPair<String, ReadEntity>(fullViewName, viewInput));
-          viewAliasToInput.put(getAliasId(alias, qb), viewInput);
-          continue;
-        }
-
-        if (!InputFormat.class.isAssignableFrom(tab.getInputFormatClass())) {
-          throw new SemanticException(generateErrorMessage(
-              qb.getParseInfo().getSrcForAlias(alias),
-              ErrorMsg.INVALID_INPUT_FORMAT_TYPE.getMsg()));
-        }
-
-        qb.getMetaData().setSrcForAlias(alias, tab);
-
-        if (qb.getParseInfo().isAnalyzeCommand()) {
-          // allow partial partition specification for nonscan since noscan is fast.
-          tableSpec ts = new tableSpec(db, conf, (ASTNode) ast.getChild(0), true, this.noscan);
-          if (ts.specType == SpecType.DYNAMIC_PARTITION) { // dynamic partitions
-            try {
-              ts.partitions = db.getPartitionsByNames(ts.tableHandle, ts.partSpec);
-            } catch (HiveException e) {
-              throw new SemanticException(generateErrorMessage(
-                  qb.getParseInfo().getSrcForAlias(alias),
-                  "Cannot get partitions for " + ts.partSpec), e);
+            // allow partial partition specification for nonscan since noscan is fast.
+            tableSpec ts = new tableSpec(db, conf, (ASTNode) ast.getChild(0), true, this.noscan);
+            if (ts.specType == SpecType.DYNAMIC_PARTITION) { // dynamic partitions
+              try {
+                ts.partitions = db.getPartitionsByNames(ts.tableHandle, ts.partSpec);
+              } catch (HiveException e) {
+                throw new SemanticException(generateErrorMessage(
+                    qb.getParseInfo().getSrcForAlias(alias),
+                    "Cannot get partitions for " + ts.partSpec), e);
+              }
             }
-          }
-          // validate partial scan command
-          QBParseInfo qbpi = qb.getParseInfo();
-          if (qbpi.isPartialScanAnalyzeCommand()) {
-            Class<? extends InputFormat> inputFormatClass = null;
-            switch (ts.specType) {
-            case TABLE_ONLY:
-              inputFormatClass = ts.tableHandle.getInputFormatClass();
-              break;
-            case STATIC_PARTITION:
-              inputFormatClass = ts.partHandle.getInputFormatClass();
-              break;
-            default:
-              assert false;
+            // validate partial scan command
+            QBParseInfo qbpi = qb.getParseInfo();
+            if (qbpi.isPartialScanAnalyzeCommand()) {
+              Class<? extends InputFormat> inputFormatClass = null;
+              switch (ts.specType) {
+              case TABLE_ONLY:
+                inputFormatClass = ts.tableHandle.getInputFormatClass();
+                break;
+              case STATIC_PARTITION:
+                inputFormatClass = ts.partHandle.getInputFormatClass();
+                break;
+              default:
+                assert false;
+              }
+              // throw a HiveException for non-rcfile.
+              if (!inputFormatClass.equals(RCFileInputFormat.class)) {
+                throw new SemanticException(ErrorMsg.ANALYZE_TABLE_PARTIALSCAN_NON_RCFILE.getMsg());
+              }
             }
-            // throw a HiveException for non-rcfile.
-            if (!inputFormatClass.equals(RCFileInputFormat.class)) {
-              throw new SemanticException(ErrorMsg.ANALYZE_TABLE_PARTIALSCAN_NON_RCFILE.getMsg());
-            }
-          }
 
-          qb.getParseInfo().addTableSpec(alias, ts);
+            qb.getParseInfo().addTableSpec(alias, ts);
+          }
         }
       }
-
       LOG.info("Get metadata for subqueries");
       // Go over the subqueries and getMetaData for these
       for (String alias : qb.getSubqAliases()) {
@@ -7665,11 +7677,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     return (qb.getId() == null ? alias : qb.getId() + ":" + alias);
   }
 
+  private String getAliasId(String alias, QB qb, int srcNo) {
+    return getAliasId(alias, qb) + "-" + srcNo;
+  }
+
   @SuppressWarnings("nls")
   private Operator genTablePlan(String alias, QB qb) throws SemanticException {
 
     String alias_id = getAliasId(alias, qb);
-    Table tab = qb.getMetaData().getSrcForAlias(alias);
+    List<Table> tabs = qb.getMetaData().getSrcsForAlias(alias);
     RowResolver rwsch;
 
     // is the table already present
@@ -7682,8 +7698,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     if (top == null) {
       rwsch = new RowResolver();
       try {
-        StructObjectInspector rowObjectInspector = (StructObjectInspector) tab
-            .getDeserializer().getObjectInspector();
+        StructObjectInspector rowObjectInspector =
+            (StructObjectInspector) tabs.get(0).getDeserializer()
+            .getObjectInspector();
         List<? extends StructField> fields = rowObjectInspector
             .getAllStructFieldRefs();
         for (int i = 0; i < fields.size(); i++) {
@@ -7702,12 +7719,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
       // Hack!! - refactor once the metadata APIs with types are ready
       // Finally add the partitioning columns
+      for (Table tab : tabs) {
       for (FieldSchema part_col : tab.getPartCols()) {
         LOG.trace("Adding partition col: " + part_col);
         // TODO: use the right type by calling part_col.getType() instead of
         // String.class
         rwsch.put(alias, part_col.getName(), new ColumnInfo(part_col.getName(),
             TypeInfoFactory.stringTypeInfo, alias, true));
+      }
       }
 
       // put all virutal columns in RowResolver.
@@ -7723,7 +7742,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       // Create the root of the operator tree
       TableScanDesc tsDesc = new TableScanDesc(alias, vcList);
-      setupStats(tsDesc, qb.getParseInfo(), tab, alias, rwsch);
+      setupStats(tsDesc, qb.getParseInfo(), tabs.get(0), alias, rwsch);
 
       SplitSample sample = nameToSplitSample.get(alias);
       if (sample != null && sample.getRowCount() != null) {
@@ -7739,7 +7758,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       topOps.put(alias_id, top);
 
       // Add a mapping from the table scan operator to Table
-      topToTable.put((TableScanOperator) top, tab);
+      topToTable.put((TableScanOperator) top, tabs);
     } else {
       rwsch = opParseCtx.get(top).getRowResolver();
       top.setChildOperators(null);
@@ -7749,6 +7768,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     Operator<? extends OperatorDesc> tableOp = top;
     TableSample ts = qb.getParseInfo().getTabSample(alias);
     if (ts != null) {
+      Table tab = tabs.get(0);
       int num = ts.getNumerator();
       int den = ts.getDenominator();
       ArrayList<ASTNode> sampleExprs = ts.getExprs();
@@ -7824,6 +7844,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     } else {
       boolean testMode = conf.getBoolVar(HiveConf.ConfVars.HIVETESTMODE);
       if (testMode) {
+        Table tab = tabs.get(0);
         String tabName = tab.getTableName();
 
         // has the user explicitly asked not to sample this table
@@ -10406,5 +10427,4 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     return selSpec;
   }
-
 }

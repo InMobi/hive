@@ -204,7 +204,6 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
         new LinkedHashMap<String, List<List<String>>>();
 
     HashMap<String, Operator<? extends OperatorDesc>> topOps = pGraphContext.getTopOps();
-    Map<TableScanOperator, Table> topToTable = pGraphContext.getTopToTable();
 
     // (partition to bucket file names) and (partition to bucket number) for
     // the big table;
@@ -266,16 +265,19 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
         joinKeyOrder = new Integer[keys.size()];
       }
 
-      Table tbl = topToTable.get(tso);
-      if (tbl.isPartitioned()) {
-        PrunedPartitionList prunedParts;
+      List<Table> tables = pGraphContext.getTopToTables().get(tso);
+      if (tables.size() > 1 || tables.get(0).isPartitioned()) {
+        List<PrunedPartitionList> prunedParts;
         try {
           prunedParts = pGraphContext.getOpToPartList().get(tso);
           if (prunedParts == null) {
-            prunedParts =
-                PartitionPruner.prune(tbl, pGraphContext.getOpToPartPruner().get(tso),
-                    pGraphContext.getConf(), alias,
-                    pGraphContext.getPrunedPartitions());
+            prunedParts = new ArrayList<PrunedPartitionList>();
+            for (Table tbl : tables) {
+              prunedParts.add(PartitionPruner.prune(tbl,
+                  pGraphContext.getOpToPartPruner().get(tso),
+                  pGraphContext.getConf(), alias,
+                  pGraphContext.getPrunedPartitions()));
+            }
             pGraphContext.getOpToPartList().put(tso, prunedParts);
           }
         } catch (HiveException e) {
@@ -284,7 +286,10 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
           LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
           throw new SemanticException(e.getMessage(), e);
         }
-        List<Partition> partitions = prunedParts.getNotDeniedPartns();
+        List<Partition> partitions = new ArrayList<Partition>();
+        for (PrunedPartitionList ppl : prunedParts) {
+          partitions.addAll(ppl.getNotDeniedPartns());
+        }
         // construct a mapping of (Partition->bucket file names) and (Partition -> bucket number)
         if (partitions.isEmpty()) {
           if (!alias.equals(baseBigAlias)) {
@@ -305,7 +310,7 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
 
             if (fileNames.size() != 0 && fileNames.size() != bucketCount) {
               String msg = "The number of buckets for table " +
-                  tbl.getTableName() + " partition " + p.getName() + " is " +
+                  p.getTable().getTableName() + " partition " + p.getName() + " is " +
                   p.getBucketCount() + ", whereas the number of files is " + fileNames.size();
               throw new SemanticException(
                   ErrorMsg.BUCKETED_TABLE_METADATA_INCORRECT.getMsg(msg));
@@ -325,6 +330,7 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
           }
         }
       } else {
+        Table tbl = tables.get(0);
         if (!checkBucketColumns(tbl.getBucketCols(), keys, joinKeyOrder)) {
           return false;
         }

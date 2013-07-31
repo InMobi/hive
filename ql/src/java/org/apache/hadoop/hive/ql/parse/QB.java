@@ -41,7 +41,7 @@ public class QB {
   private final int numGbys = 0;
   private int numSels = 0;
   private int numSelDi = 0;
-  private HashMap<String, String> aliasToTabs;
+  private HashMap<String, List<String>> aliasToTabs;
   private HashMap<String, QBExpr> aliasToSubq;
   private List<String> aliases;
   private QBParseInfo qbp;
@@ -79,7 +79,7 @@ public class QB {
   }
 
   public QB(String outer_id, String alias, boolean isSubQ) {
-    aliasToTabs = new HashMap<String, String>();
+    aliasToTabs = new HashMap<String, List<String>>();
     aliasToSubq = new HashMap<String, QBExpr>();
     aliases = new ArrayList<String>();
     if (alias != null) {
@@ -135,7 +135,16 @@ public class QB {
   }
 
   public void setTabAlias(String alias, String tabName) {
-    aliasToTabs.put(alias.toLowerCase(), tabName);
+    List<String> tabNames = aliasToTabs.get(alias);
+    if (tabNames == null) {
+      tabNames = new ArrayList<String>();
+      aliasToTabs.put(alias.toLowerCase(), tabNames);
+    }
+    tabNames.add(tabName);
+  }
+
+  public void setTabAlias(String alias, List<String> tblNames) {
+    aliasToTabs.put(alias.toLowerCase(), tblNames);
   }
 
   public void setSubqAlias(String alias, QBExpr qbexpr) {
@@ -185,12 +194,16 @@ public class QB {
   }
 
   public String getTabNameForAlias(String alias) {
+    return getTabNamesForAlias(alias).get(0);
+  }
+
+  public List<String> getTabNamesForAlias(String alias) {
     return aliasToTabs.get(alias.toLowerCase());
   }
 
   public void rewriteViewToSubq(String alias, String viewName, QBExpr qbexpr) {
     alias = alias.toLowerCase();
-    String tableName = aliasToTabs.remove(alias);
+    String tableName = aliasToTabs.remove(alias).get(0);
     assert (viewName.equals(tableName));
     aliasToSubq.put(alias, qbexpr);
   }
