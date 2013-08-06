@@ -154,7 +154,8 @@ public class SQLOperation extends ExecuteStatementOperation {
   private void cleanup(OperationState state) throws HiveSQLException {
     setState(state);
     if (shouldRunAsync()) {
-      if (backgroundHandle != null && !backgroundHandle.isDone() && !backgroundHandle.isDone()) {
+      if (backgroundHandle != null && !backgroundHandle.isDone()
+          && !backgroundHandle.isCancelled()) {
         backgroundHandle.cancel(true);
       }
     }
