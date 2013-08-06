@@ -71,7 +71,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   private boolean runAsync;
   private Future<?> backgroundHandle;
   private SessionState sessionState;
-  
+
   public SQLOperation(HiveSession parentSession, String statement, Map<String, String> confOverlay) {
     // TODO: call setRemoteUser in ExecuteStatementOperation or higher.
     super(parentSession, statement, confOverlay);
@@ -112,6 +112,10 @@ public class SQLOperation extends ExecuteStatementOperation {
       } else {
         setHasResultSet(false);
       }
+      // Check if we are closed or cancelled already
+      if (getState() != OperationState.CLOSED && getState() != OperationState.CANCELED) {
+        setState(OperationState.FINISHED);
+      }
     } catch (HiveSQLException e) {
       setState(OperationState.ERROR);
       throw e;
@@ -119,7 +123,6 @@ public class SQLOperation extends ExecuteStatementOperation {
       setState(OperationState.ERROR);
       throw new HiveSQLException("Error running query: " + e.toString(), e);
     }
-    setState(OperationState.FINISHED);
   }
   @Override
   public void run() throws HiveSQLException {
@@ -151,7 +154,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   private void cleanup(OperationState state) throws HiveSQLException {
     setState(state);
     if (shouldRunAsync()) {
-      if (backgroundHandle != null) {
+      if (backgroundHandle != null && !backgroundHandle.isDone() && !backgroundHandle.isDone()) {
         backgroundHandle.cancel(true);
       }
     }
