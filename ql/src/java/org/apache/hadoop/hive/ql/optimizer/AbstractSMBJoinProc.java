@@ -42,7 +42,6 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
 import org.apache.hadoop.hive.ql.parse.QB;
@@ -311,17 +310,7 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
     if (tbls.size() > 1 || tbls.get(0).isPartitioned()) {
       List<PrunedPartitionList> prunedParts = null;
       try {
-        prunedParts = pGraphContext.getOpToPartList().get(tso);
-        if (prunedParts == null) {
-          prunedParts = new ArrayList<PrunedPartitionList>();
-          for (Table tbl : tbls) {
-            PrunedPartitionList ppl = PartitionPruner.prune(tbl, pGraphContext
-                .getOpToPartPruner().get(tso), pGraphContext.getConf(), alias,
-              pGraphContext.getPrunedPartitions());
-            prunedParts.add(ppl);
-          }
-          pGraphContext.getOpToPartList().put(tso, prunedParts);
-        }
+        prunedParts = pGraphContext.getPrunedPartitions(alias, tso);
       } catch (HiveException e) {
         LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
         throw new SemanticException(e.getMessage(), e);

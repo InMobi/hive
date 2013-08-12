@@ -269,17 +269,7 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
       if (tables.size() > 1 || tables.get(0).isPartitioned()) {
         List<PrunedPartitionList> prunedParts;
         try {
-          prunedParts = pGraphContext.getOpToPartList().get(tso);
-          if (prunedParts == null) {
-            prunedParts = new ArrayList<PrunedPartitionList>();
-            for (Table tbl : tables) {
-              prunedParts.add(PartitionPruner.prune(tbl,
-                  pGraphContext.getOpToPartPruner().get(tso),
-                  pGraphContext.getConf(), alias,
-                  pGraphContext.getPrunedPartitions()));
-            }
-            pGraphContext.getOpToPartList().put(tso, prunedParts);
-          }
+          prunedParts = pGraphContext.getPrunedPartitions(alias, tso);
         } catch (HiveException e) {
           // Has to use full name to make sure it does not conflict with
           // org.apache.commons.lang.StringUtils

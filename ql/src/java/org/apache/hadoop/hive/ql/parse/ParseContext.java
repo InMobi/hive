@@ -19,7 +19,6 @@
 package org.apache.hadoop.hive.ql.parse;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -651,12 +650,7 @@ public class ParseContext {
       throws HiveException {
     List<PrunedPartitionList> partsList = opToPartList.get(ts);
     if (partsList == null) {
-      partsList = new ArrayList<PrunedPartitionList>();
-      for (Table tab : topToTables.get(ts)) {
-        PrunedPartitionList ppl = PartitionPruner.prune(tab,
-            opToPartPruner.get(ts), conf, alias, prunedPartitions);
-        partsList.add(ppl);
-      }
+      partsList = PartitionPruner.prune(ts, this, alias);
       opToPartList.put(ts, partsList);
     }
     return partsList;
