@@ -23,6 +23,10 @@ public class CubeQueryConfUtil {
       "cube.query.fail.if.data.partial";
   public static final String NON_EXISTING_PARTITIONS =
       "cube.query.nonexisting.partitions";
+  public static final String ENABLE_MULTI_TABLE_SELECT =
+      "cube.query.enable.multi.table.select";
+
+  public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
 
   private static String getValidKeyCubePFX(String cubeName) {
     return VALID_PFX + cubeName.toLowerCase();

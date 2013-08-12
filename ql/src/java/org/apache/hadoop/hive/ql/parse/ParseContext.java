@@ -323,21 +323,6 @@ public class ParseContext {
     return topTblMap;
   }
 
-  /**
-   * @param topToTable
-   *          the topToTable to set
-   */
-  public void setTopToTable(HashMap<TableScanOperator, Table> topToTable) {
-    for (Map.Entry<TableScanOperator, Table> entry : topToTable.entrySet()) {
-      List<Table> tables = topToTables.get(entry.getKey());
-      if (tables == null) {
-        tables = new ArrayList<Table>();
-        topToTables.put(entry.getKey(), tables);
-      }
-      tables.add(entry.getValue());
-    }
-  }
-
   public void setTopToTables(HashMap<TableScanOperator, List<Table>> topToTable) {
     this.topToTables = topToTable;
   }

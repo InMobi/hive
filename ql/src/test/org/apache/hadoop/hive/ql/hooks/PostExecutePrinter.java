@@ -22,11 +22,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.hooks.HookContext.HookType;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.BaseColumnInfo;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.Dependency;
@@ -161,7 +163,7 @@ public class PostExecutePrinter implements ExecuteWithHookContext {
 
         sb.append("[");
         for(BaseColumnInfo col: dep.getBaseCols()) {
-          sb.append("("+col.getTabAlias().getTable().getTableName() + ")"
+          sb.append("("+getTableNames(col.getTabAlias().getTables()) + ")"
               + col.getTabAlias().getAlias() + "."
               + col.getColumn() + ", ");
         }
@@ -172,4 +174,13 @@ public class PostExecutePrinter implements ExecuteWithHookContext {
     }
   }
 
+  private static String getTableNames(List<Table> tables) {
+    String ret = "";
+    for (int i = 0; i < tables.size() -1; i++) {
+      ret += tables.get(i).getTableName();
+      ret += ",";
+    }
+    ret += tables.get(tables.size() -1).getTableName();
+    return ret;
+  }
 }

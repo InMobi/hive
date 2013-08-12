@@ -62,21 +62,33 @@ public class AvgPartitionSizeBasedBigTableSelectorForAutoSMJ
         }
         int numPartitions = 1; // in case the sizes match, preference is
                                // given to the table with fewer partitions
-        Table table = parseCtx.getTopToTable().get(topOp);
+        List<Table> tables = parseCtx.getTopToTables().get(topOp);
         long averageSize = 0;
 
-        if (!table.isPartitioned()) {
-          averageSize = getSize(conf, table);
+        if (tables.size() == 1 && !tables.get(0).isPartitioned()) {
+          averageSize = getSize(conf, tables.get(0));
         }
         else {
           // For partitioned tables, get the size of all the partitions
-          PrunedPartitionList partsList =
-            PartitionPruner.prune(parseCtx.getTopToTable().get(topOp),
-              parseCtx.getOpToPartPruner().get(topOp), parseCtx.getConf(),
-              null, parseCtx.getPrunedPartitions());
-          numPartitions = partsList.getNotDeniedPartns().size();
+          List<PrunedPartitionList> prunedParts =
+              parseCtx.getOpToPartList().get(topOp);
+
+          List<Partition> partitions = new ArrayList<Partition>();
+          if (prunedParts == null) {
+            prunedParts = new ArrayList<PrunedPartitionList>();
+            for (Table tbl : tables) {
+              PrunedPartitionList ppl = PartitionPruner.prune(
+                  tbl,
+                  parseCtx.getOpToPartPruner().get(topOp), parseCtx.getConf(),
+                  null, parseCtx.getPrunedPartitions());
+              prunedParts.add(ppl);
+              partitions.addAll(ppl.getNotDeniedPartns());
+            }
+            parseCtx.getOpToPartList().put(topOp, prunedParts);
+          }
+          numPartitions = partitions.size();
           long totalSize = 0;
-          for (Partition part : partsList.getNotDeniedPartns()) {
+          for (Partition part : partitions) {
             totalSize += getSize(conf, part);
           }
           averageSize = numPartitions == 0 ? 0 : totalSize/numPartitions;

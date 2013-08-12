@@ -19,7 +19,7 @@
 package org.apache.hadoop.hive.ql.optimizer.listbucketingpruner;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +62,7 @@ public class ListBucketingPruner implements Transform {
 
     List<PrunedPartitionList> partsList = ((LBOpPartitionWalkerCtx) opPartWalkerCtx).getPartitions();
     if (partsList != null) {
-      Set<Partition> parts = new HashSet<Partition>();
+      Set<Partition> parts = new LinkedHashSet<Partition>();
       for (PrunedPartitionList ppl : partsList) {
         parts.addAll(ppl.getConfirmedPartns());
         parts.addAll(ppl.getUnknownPartns());

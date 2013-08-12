@@ -52,19 +52,31 @@ implements BigTableSelectorForAutoSMJ {
         if (topOp == null) {
           return -1;
         }
-        Table table = parseCtx.getTopToTable().get(topOp);
+        List<Table> tables = parseCtx.getTopToTables().get(topOp);
         long currentSize = 0;
 
-        if (!table.isPartitioned()) {
-          currentSize = getSize(conf, table);
+        if (tables.size() == 1 && !tables.get(0).isPartitioned()) {
+          currentSize = getSize(conf, tables.get(0));
         }
         else {
           // For partitioned tables, get the size of all the partitions
-          PrunedPartitionList partsList =
-            PartitionPruner.prune(parseCtx.getTopToTable().get(topOp),
-              parseCtx.getOpToPartPruner().get(topOp), parseCtx.getConf(),
-              null, parseCtx.getPrunedPartitions());
-          for (Partition part : partsList.getNotDeniedPartns()) {
+          List<PrunedPartitionList> prunedParts =
+              parseCtx.getOpToPartList().get(topOp);
+
+          List<Partition> partitions = new ArrayList<Partition>();
+          if (prunedParts == null) {
+            prunedParts = new ArrayList<PrunedPartitionList>();
+            for (Table tbl : tables) {
+              PrunedPartitionList ppl = PartitionPruner.prune(
+                  tbl,
+                  parseCtx.getOpToPartPruner().get(topOp), parseCtx.getConf(),
+                  null, parseCtx.getPrunedPartitions());
+              prunedParts.add(ppl);
+              partitions.addAll(ppl.getNotDeniedPartns());
+            }
+            parseCtx.getOpToPartList().put(topOp, prunedParts);
+          }
+          for (Partition part : partitions) {
             currentSize += getSize(conf, part);
           }
         }

@@ -133,8 +133,9 @@ public final class RewriteQueryUsingAggregateIndex {
 
       //Need to remove the original TableScanOperators from these data structures
       // and add new ones
-      Map<TableScanOperator, Table>  topToTable =
-        rewriteQueryCtx.getParseContext().getTopToTable();
+      Map<TableScanOperator, List<Table>>  topToTables =
+        rewriteQueryCtx.getParseContext().getTopToTables();
+      List<Table> indexTables = new ArrayList<Table>();
       Map<String, Operator<? extends OperatorDesc>>  topOps =
         rewriteQueryCtx.getParseContext().getTopOps();
       Map<Operator<? extends OperatorDesc>, OpParseContext>  opParseContext =
@@ -144,7 +145,7 @@ public final class RewriteQueryUsingAggregateIndex {
       OpParseContext operatorContext = opParseContext.get(scanOperator);
 
       //remove original TableScanOperator
-      topToTable.remove(scanOperator);
+      topToTables.remove(scanOperator);
       topOps.remove(baseTableName);
       opParseContext.remove(scanOperator);
 
@@ -195,13 +196,14 @@ public final class RewriteQueryUsingAggregateIndex {
        }
 
       //Scan operator now points to other table
-      topToTable.put(scanOperator, indexTableHandle);
+      indexTables.add(indexTableHandle);
+      topToTables.put(scanOperator, indexTables);
       scanOperator.getConf().setAlias(tabNameWithAlias);
       scanOperator.setAlias(indexTableName);
       topOps.put(tabNameWithAlias, scanOperator);
       opParseContext.put(scanOperator, operatorContext);
-      rewriteQueryCtx.getParseContext().setTopToTable(
-        (HashMap<TableScanOperator, Table>) topToTable);
+      rewriteQueryCtx.getParseContext().setTopToTables(
+        (HashMap<TableScanOperator, List<Table>>) topToTables);
       rewriteQueryCtx.getParseContext().setTopOps(
         (HashMap<String, Operator<? extends OperatorDesc>>) topOps);
       rewriteQueryCtx.getParseContext().setOpParseCtx(

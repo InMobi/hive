@@ -12,11 +12,14 @@ import java.util.Set;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.thrift.TException;
 
 /**
  * Wrapper class around Hive metastore to do cube metastore operations.
@@ -140,12 +143,12 @@ public class CubeMetastoreClient {
         storage.getTableType(), storage.getPartCols());
   }
 
-  private Map<String, List<UpdatePeriod>> getUpdatePeriods(
-      Map<Storage, List<UpdatePeriod>> storageAggregatePeriods) {
+  private Map<String, Set<UpdatePeriod>> getUpdatePeriods(
+      Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods) {
     if (storageAggregatePeriods != null) {
-      Map<String, List<UpdatePeriod>> updatePeriods =
-          new HashMap<String, List<UpdatePeriod>>();
-      for (Map.Entry<Storage, List<UpdatePeriod>> entry :
+      Map<String, Set<UpdatePeriod>> updatePeriods =
+          new HashMap<String, Set<UpdatePeriod>>();
+      for (Map.Entry<Storage, Set<UpdatePeriod>> entry :
           storageAggregatePeriods.entrySet()) {
         updatePeriods.put(entry.getKey().getName(), entry.getValue());
       }
@@ -210,7 +213,7 @@ public class CubeMetastoreClient {
    */
   public void createCubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
-      Map<Storage, List<UpdatePeriod>> storageAggregatePeriods, double weight,
+      Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods, double weight,
       Map<String, String> properties)
           throws HiveException {
     CubeFactTable factTable = new CubeFactTable(cubeName, factName, columns,
@@ -496,6 +499,12 @@ public class CubeMetastoreClient {
         getPartitionSpec(updatePeriod, partitionTimestamps));
   }
 
+  public boolean partitionExistsByFilter(String storageTableName, String filter)
+      throws MetaException, NoSuchObjectException, HiveException, TException {
+    List<Partition> parts = getClient().getPartitionsByFilter(
+        getTable(storageTableName), filter);
+    return !(parts.isEmpty());
+  }
   public boolean partitionExists(String storageTableName,
       UpdatePeriod updatePeriod,
       Date partitionTimestamp)
@@ -824,5 +833,16 @@ public class CubeMetastoreClient {
       throw new HiveException("Could not get all tables", e);
     }
     return factTables;
+  }
+
+  public boolean partColExists(String tableName, String partCol)
+      throws HiveException {
+    Table tbl = getTable(tableName);
+    for (FieldSchema f : tbl.getPartCols()) {
+      if (f.getName().equalsIgnoreCase(partCol)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

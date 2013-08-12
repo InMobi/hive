@@ -596,9 +596,10 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     qb.setTabAlias(alias, tblNames);
     qb.addAlias(alias);
 
-    qb.getParseInfo().setSrcForAlias(alias, tabref);
+    qb.getParseInfo().setSrcForAlias(alias, (ASTNode) tabref.getChild(0));
 
-    unparseTranslator.addTableNameTranslation(tabref, db.getCurrentDatabase());
+    unparseTranslator.addTableNameTranslation((ASTNode) (tabref.getChild(0)),
+        db.getCurrentDatabase());
     if (aliasIndex != 0) {
       unparseTranslator.addIdentifierTranslation((ASTNode) tabref
           .getChild(aliasIndex));

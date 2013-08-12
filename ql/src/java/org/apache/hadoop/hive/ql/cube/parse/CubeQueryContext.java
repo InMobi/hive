@@ -1,9 +1,18 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_AND;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ALLCOLREF;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TMP_FILE;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,7 +36,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.ASTNodeVisitor;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.TreeNode;
-import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.JoinCond;
@@ -67,10 +75,10 @@ public class CubeQueryContext {
   // Dimension tables accessed in the query
   protected Set<CubeDimensionTable> dimensions =
       new HashSet<CubeDimensionTable>();
-  
+
   // Dimension table accessed but not in from
   protected Set<CubeDimensionTable> autoJoinDims = new HashSet<CubeDimensionTable>();
-  
+
   // Name to table object mapping of tables accessed in this query
   private final Map<String, AbstractCubeTable> cubeTbls =
       new HashMap<String, AbstractCubeTable>();
@@ -89,7 +97,7 @@ public class CubeQueryContext {
   // Mapping of an expression to the columns within that expression
   private final Map<CubeQueryExpr, Set<String>> exprToCols =
       new HashMap<CubeQueryExpr, Set<String>>();
-  
+
   // Mapping of an expression to its column alias in the query
   private final Map<String, String> exprToAlias = new HashMap<String, String>();
   // Columns inside aggregate expressions in the query
@@ -106,14 +114,14 @@ public class CubeQueryContext {
   protected final Map<CubeFactTable, Map<UpdatePeriod, List<String>>>
   factPartitionMap =
   new HashMap<CubeFactTable, Map<UpdatePeriod, List<String>>>();
-  private final Map<CubeFactTable, List<String>> factStorageMap =
-      new HashMap<CubeFactTable, List<String>>();
+  private final Map<CubeFactTable, Set<String>> factStorageMap =
+      new HashMap<CubeFactTable, Set<String>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
   private final Map<String, String> storageTableToWhereClause =
       new HashMap<String, String>();
-  private final Map<AbstractCubeTable, String> storageTableToQuery =
-      new HashMap<AbstractCubeTable, String>();
+  private final Map<AbstractCubeTable, Set<String>> storageTableToQuery =
+      new HashMap<AbstractCubeTable, Set<String>>();
 
   // query trees
   private String whereTree;
@@ -344,16 +352,21 @@ public class CubeQueryContext {
         cubeColumnsQueried.addAll(tblAliasToColumns.get(cubeAlias));
       }
     }
-    
+
     // Update auto join dimension tables
     autoJoinDims.addAll(dimensions);
     for (String table : tblAliasToColumns.keySet()) {
       try {
-        if (!DEFAULT_TABLE.equalsIgnoreCase(table) && client.isDimensionTable(table)) {
-          autoJoinDims.add(client.getDimensionTable(table));
+        if (!DEFAULT_TABLE.equalsIgnoreCase(table)) {
+          if (qb.getTabNameForAlias(table) != null) {
+            table = qb.getTabNameForAlias(table);
+          }
+          if (client.isDimensionTable(table)) {
+            autoJoinDims.add(client.getDimensionTable(table));
+          }
         }
       } catch (HiveException e) {
-        LOG.warn("Can't find table " + table);
+        throw new SemanticException(e);
       }
     }
   }
@@ -426,7 +439,7 @@ public class CubeQueryContext {
 
           String column = colIdent.getText().toLowerCase();
           String table = tabident.getText().toLowerCase();
-          
+
           if (tblToCols != null) {
             List<String> colList = tblToCols.get(table);
             if (colList == null) {
@@ -514,10 +527,10 @@ public class CubeQueryContext {
             continue;
           }
         }
-        
+
         List<String> factCols = cubeTabToCols.get(fact);
         List<String> validFactCols = fact.getValidColumns();
-        
+
         for (String col : cubeColumnsQueried) {
           if (!factCols.contains(col.toLowerCase())) {
             LOG.info("Not considering the fact table:" + fact +
@@ -574,7 +587,7 @@ public class CubeQueryContext {
   public Set<CubeDimensionTable> getDimensionTables() {
     return dimensions;
   }
-  
+
   public Set<CubeDimensionTable> getAutoJoinDimensions() {
     return autoJoinDims;
   }
@@ -679,7 +692,7 @@ public class CubeQueryContext {
     if (qb.getParseInfo().getDestForClause(clause) != null) {
       builder.append("\n Destination:");
       builder.append("\n\t dest expr:" +
-        qb.getParseInfo().getDestForClause(clause).dump());
+          qb.getParseInfo().getDestForClause(clause).dump());
     }
     LOG.info(builder.toString());
   }
@@ -802,12 +815,12 @@ public class CubeQueryContext {
     return queryFormat.toString();
   }
 
-  private Object[] getQueryTreeStrings(String factStorageTable)
+  private Object[] getQueryTreeStrings(Set<String> factStorageTables)
       throws SemanticException {
     List<String> qstrs = new ArrayList<String>();
     qstrs.add(getSelectTree());
     qstrs.add(getFromString());
-    String whereString = genWhereClauseWithPartitions(factStorageTable);
+    String whereString = genWhereClauseWithPartitions(factStorageTables);
     if (whereString != null) {
       qstrs.add(whereString);
     }
@@ -826,22 +839,25 @@ public class CubeQueryContext {
     return qstrs.toArray(new String[0]);
   }
 
+  private String getStorageString(AbstractCubeTable tbl) {
+    return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
+        getAliasForTabName(tbl.getName());
+  }
+
   private String getFromString() throws SemanticException {
     String fromString = null;
     if (joinTree == null) {
       if (cube != null) {
-        fromString = storageTableToQuery.get(cube) + " " + getAliasForTabName(
-            cube.getName());
+        fromString = getStorageString(cube) ;
       } else {
         CubeDimensionTable dim = dimensions.iterator().next();
-        fromString = storageTableToQuery.get(dim) + " " + getAliasForTabName(
-            dim.getName());
+        fromString = getStorageString(dim);
       }
-      
-      if(joinsResolvedAutomatically()) {
+
+      if (joinsResolvedAutomatically()) {
         fromString += " " + getAutoResolvedJoinChain();
       }
-      
+
     } else {
       StringBuilder builder = new StringBuilder();
       getQLString(qb.getQbJoinTree(), builder);
@@ -853,7 +869,7 @@ public class CubeQueryContext {
   private final Set<String> tablesAlreadyAdded = new HashSet<String>();
   private boolean joinsResolvedAutomatically;
   private String autoResolvedJoinClause;
-  
+
   private void getQLString(QBJoinTree joinTree, StringBuilder builder)
       throws SemanticException {
     String joiningTable = null;
@@ -863,8 +879,7 @@ public class CubeQueryContext {
       }
     } else { // (joinTree.getBaseSrc()[0] != null){
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[0]).toLowerCase();
-      builder.append(storageTableToQuery.get(cubeTbls.get(tblName))
-          + " " + getAliasForTabName(tblName));
+      builder.append(getStorageString(cubeTbls.get(tblName)));
       if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.RIGHTOUTER)) {
         joiningTable = tblName;
       }
@@ -879,8 +894,7 @@ public class CubeQueryContext {
       }
     } else { // (joinTree.getBaseSrc()[1] != null){
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[1]).toLowerCase();
-      builder.append(storageTableToQuery.get(cubeTbls.get(tblName))
-          + " " + getAliasForTabName(tblName));
+      builder.append(getStorageString(cubeTbls.get(tblName)));
       if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.LEFTOUTER)) {
         joiningTable = tblName;
       }
@@ -919,11 +933,18 @@ public class CubeQueryContext {
     return null;
   }
 
-  private String toHQL(String tableName) throws SemanticException {
+  private String toHQL(Set<String> tableNames) throws SemanticException {
+    boolean enableMultiTableSelect = conf.getBoolean(
+        CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
+        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
+    if (tableNames != null && tableNames.size() > 1 && !enableMultiTableSelect) {
+      LOG.info("multi table select is not enabled, writing a union query");
+      return unionQuery();
+    }
     findDimStorageTables();
     String qfmt = getQueryFormat();
     LOG.info("qfmt:" + qfmt);
-    String baseQuery = String.format(qfmt, getQueryTreeStrings(tableName));
+    String baseQuery = String.format(qfmt, getQueryTreeStrings(tableNames));
     String insertString = "";
     ASTNode destTree = qb.getParseInfo().getDestForClause(clauseName);
     if (destTree != null && ((ASTNode)(destTree.getChild(0)))
@@ -932,6 +953,24 @@ public class CubeQueryContext {
           qb.getParseInfo().getDestForClause(clauseName));
     }
     return insertString + baseQuery;
+  }
+
+  void setMultiTableSelect(boolean mutliTableSelect) {
+    conf.setBoolean(CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT, mutliTableSelect);
+  }
+
+  boolean getMultiTableSelect() {
+   return conf.getBoolean(CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
+        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
+  }
+  void setNonexistingParts(List<String> nonExistingParts) {
+    conf.set(CubeQueryConfUtil.NON_EXISTING_PARTITIONS,
+        StringUtils.join(nonExistingParts, ','));
+  }
+
+  private String unionQuery() {
+    // TODO Auto-generated method stub
+    return null;
   }
 
   private void appendWhereClause(StringBuilder whereWithoutTimerange,
@@ -946,9 +985,11 @@ public class CubeQueryContext {
       StringBuilder whereString,
       boolean hasMore) {
     if (tablesAlreadyAdded.contains(dim.getName())) {
+      LOG.debug("Skipping already added where clause for " + dim);
       return;
     }
-    String whereClause = storageTableToWhereClause.get(storageTableToQuery.get(dim));
+    String whereClause = storageTableToWhereClause.get(
+        storageTableToQuery.get(dim).iterator().next());
     if (whereClause != null) {
       appendWhereClause(whereString, whereClause, hasMore);
     }
@@ -961,19 +1002,25 @@ public class CubeQueryContext {
     whereWithoutTimerange.append(")");
   }
 
-  private String genWhereClauseWithPartitions(String factStorageTable) {
+  private String genWhereClauseWithPartitions(Set<String> factStorageTables) {
     String originalWhere = getWhereTree();
     StringBuilder whereBuf;
 
-    if (factStorageTable != null) {
+    if (factStorageTables != null) {
       // Get Rid of the time range.
       int timeRangeBegin = originalWhere.indexOf(TIME_RANGE_FUNC);
       int timeRangeEnd = originalWhere.indexOf(')', timeRangeBegin) + 1;
 
       whereBuf = new StringBuilder(originalWhere.substring(0, timeRangeBegin));
-      whereBuf.append("(")
-      .append(storageTableToWhereClause.get(factStorageTable))
-      .append(")")
+      whereBuf.append("(");
+      Iterator<String> it = factStorageTables.iterator();
+      while (it.hasNext()) {
+        whereBuf.append(storageTableToWhereClause.get(it.next()));
+        if (it.hasNext()) {
+          whereBuf.append(" OR ");
+        }
+      }
+      whereBuf.append(")")
       .append(originalWhere.substring(timeRangeEnd));
     } else {
       if (originalWhere != null) {
@@ -987,7 +1034,7 @@ public class CubeQueryContext {
     Iterator<CubeDimensionTable> it = dimensions.iterator();
     if (it.hasNext()) {
       CubeDimensionTable dim = it.next();
-      appendWhereClause(dim, whereBuf, factStorageTable != null);
+      appendWhereClause(dim, whereBuf, factStorageTables != null);
       while (it.hasNext()) {
         dim = it.next();
         appendWhereClause(dim, whereBuf, true);
@@ -1004,7 +1051,7 @@ public class CubeQueryContext {
     while (it.hasNext()) {
       CubeDimensionTable dim = it.next();
       String storageTable = dimStorageMap.get(dim).get(0);
-      storageTableToQuery.put(dim, storageTable);
+      storageTableToQuery.put(dim, Collections.singleton(storageTable));
     }
   }
 
@@ -1013,6 +1060,8 @@ public class CubeQueryContext {
     if (hasCubeInQuery()) {
       if (candidateFactTables.size() > 0) {
         fact = candidateFactTables.iterator().next();
+        LOG.info("Available candidate facts:" + candidateFactTables +
+            ", picking up " + fact + " for querying");
       }
     }
     if (fact == null && !hasDimensionInQuery()) {
@@ -1020,17 +1069,14 @@ public class CubeQueryContext {
     }
 
     if (fact != null) {
-      LOG.info("Candidate fact table:" + fact);
-      List<String> storageTableMap = factStorageMap.get(fact);
-      // choosing the first storage table one in the list
-      String storageTable = storageTableMap.get(0);
-      if (storageTableMap.get(0) == null) {
+      Set<String> storageTables = factStorageMap.get(fact);
+      if (storageTables.isEmpty()) {
         throw new SemanticException("No storage table available for candidate"
-          + " fact:" + fact);
+            + " fact:" + fact);
       }
-      LOG.info("Choosing the storage table:" + storageTable + " for fact:" + fact);
-      storageTableToQuery.put(getCube(), storageTable);
-      return toHQL(storageTable);
+      // choosing the first storage table one in the list
+      storageTableToQuery.put(getCube(), storageTables);
+      return toHQL(storageTables);
     } else {
       return toHQL(null);
     }
@@ -1049,11 +1095,11 @@ public class CubeQueryContext {
     return ParseUtils.findRootNonNullToken(tree);
   }
 
-  public Map<CubeFactTable, List<String>> getFactStorageMap() {
+  public Map<CubeFactTable, Set<String>> getFactStorageMap() {
     return factStorageMap;
   }
 
-  public void setFactStorageMap(Map<CubeFactTable, List<String>> factStorageMap)
+  public void setFactStorageMap(Map<CubeFactTable, Set<String>> factStorageMap)
   {
     this.factStorageMap.putAll(factStorageMap);
   }
@@ -1160,10 +1206,6 @@ public class CubeQueryContext {
     return cubeTabToCols;
   }
 
-  public void removeCandidateFact(CubeFactTable fact) {
-    candidateFactTables.remove(fact);
-  }
-
   public void addAggregateExpr(String expr) {
     aggregateExprs.add(expr);
   }
@@ -1217,7 +1259,7 @@ public class CubeQueryContext {
   public void setJoinsResolvedAutomatically(boolean flag) {
     this.joinsResolvedAutomatically = flag;
   }
-  
+
   public boolean joinsResolvedAutomatically() {
     return joinsResolvedAutomatically;
   }
@@ -1225,7 +1267,7 @@ public class CubeQueryContext {
   public void setAutoResolvedJoinClause(String clause) {
     this.autoResolvedJoinClause = clause;
   }
-  
+
   public String getAutoResolvedJoinChain() {
     return this.autoResolvedJoinClause;
   }

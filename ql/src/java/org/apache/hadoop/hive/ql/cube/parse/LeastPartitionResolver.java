@@ -39,7 +39,7 @@ public class LeastPartitionResolver implements ContextRewriter {
           cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
         CubeFactTable fact = i.next();
         if (numPartitionsMap.get(fact) > minPartitions) {
-          LOG.info("Removing fact:" + fact +
+          LOG.info("Not considering fact:" + fact +
               " from candidate fact tables as it requires more partitions to" +
               " be queried:" + numPartitionsMap.get(fact) + " minimum:"
               + minPartitions);

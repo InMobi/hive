@@ -259,7 +259,7 @@ public class LineageInfo implements Serializable {
     /**
      * The metastore table information.
      */
-    private Table table;
+    private List<Table> tables;
 
     /**
      * @return the alias
@@ -278,15 +278,15 @@ public class LineageInfo implements Serializable {
     /**
      * @return the table
      */
-    public Table getTable() {
-      return table;
+    public List<Table> getTables() {
+      return tables;
     }
 
     /**
      * @param table the table to set
      */
-    public void setTable(Table table) {
-      this.table = table;
+    public void setTables(List<Table> table) {
+      this.tables = table;
     }
   }
 

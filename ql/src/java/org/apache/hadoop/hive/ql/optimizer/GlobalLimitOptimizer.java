@@ -118,7 +118,6 @@ public class GlobalLimitOptimizer implements Transform {
               }
             }
 
-            Set<Partition> unknownParts = new HashSet<Partition>();
             List<PrunedPartitionList> partsList = opToPartList.get(ts);
             if (containsOnlyPartCols) {
               if (partsList == null) {
@@ -129,11 +128,15 @@ public class GlobalLimitOptimizer implements Transform {
                       opToPartPruner.get(ts), conf, (String) topOps.keySet()
                       .toArray()[0], prunedPartitions);
                   partsList.add(ppl);
-                  unknownParts.addAll(ppl.getUnknownPartns());
                 }
                 opToPartList.put(ts, partsList);
               }
             }
+            Set<Partition> unknownParts = new HashSet<Partition>();
+            for (PrunedPartitionList ppl : partsList) {
+              unknownParts.addAll(ppl.getUnknownPartns());
+            }
+
             // If there is any unknown partition, create a map-reduce job for
             // the filter to prune correctly
             if ((unknownParts.size() == 0)) {

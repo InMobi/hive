@@ -8,18 +8,24 @@ explain extended select t.value, sum(t.key) from t1 t where t.p1="x" group by t.
 
 select t.value, sum(t.key) from t1 t where t.p1="x" group by t.value;
 
-explain extended select t.value, sum(t.key) from t2 t where t.p1="x" group by t.value;
-
-select t.value, sum(t.key) from t2 t where t.p1="x" group by t.value;
-
 explain extended select t.value, sum(t.key) from t2 t where t.p1="y" group by t.value;
 
 select t.value, sum(t.key) from t2 t where t.p1="y" group by t.value;
+
+explain extended select t.value, sum(t.key) from t2 t where t.p1="x" group by t.value;
+
+select t.value, sum(t.key) from t2 t where t.p1="x" group by t.value;
 
 explain extended select t.value, sum(t.key) from t1,t2 t where t.p1="x" group by t.value;
 
 select t.value, sum(t.key) from t1,t2 t where t.p1="x" group by t.value;
 
-explain extended select t.value, sum(t.key) from t1,t2 t where (t.p1="x" OR t.p1="y") group by t.value;
+LOAD DATA LOCAL INPATH '../data/files/kv1.txt' OVERWRITE INTO TABLE t2 PARTITION (p1='x', p2='x1');
 
-select t.value, sum(t.key) from t1,t2 t where (t.p1="x" OR t.p1="y") group by t.value;
+explain extended select t.value, sum(t.key) from t2 t where t.p1="x" group by t.value;
+
+select t.value, sum(t.key) from t2 t where t.p1="x" group by t.value;
+
+explain extended select t.value, sum(t.key) from t1,t2 t where t.p1="x" group by t.value;
+
+select t.value, sum(t.key) from t1,t2 t where t.p1="x" group by t.value;

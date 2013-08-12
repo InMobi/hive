@@ -188,9 +188,9 @@ public class SkewJoinOptimizer implements Transform {
 
       for (Entry<String, Operator<? extends OperatorDesc>> topOp : topOps.entrySet()) {
         TableScanOperator tso = (TableScanOperator) topOp.getValue();
-        Table origTable = parseContext.getTopToTable().get(ctx.getCloneTSOpMap().get(tso));
+        List<Table> origTables = parseContext.getTopToTables().get(ctx.getCloneTSOpMap().get(tso));
         String tabAlias = tso.getConf().getAlias();
-        parseContext.getTopToTable().put(tso, origTable);
+        parseContext.getTopToTables().put(tso, origTables);
         int initCnt = 1;
         String newAlias = "subquery" + initCnt + ":" + tabAlias;
         while (origTopOps.containsKey(newAlias)) {
@@ -395,7 +395,7 @@ public class SkewJoinOptimizer implements Transform {
         if (op instanceof TableScanOperator) {
           TableScanOperator tsOp = (TableScanOperator)op;
           if (tableScanOpsForJoin.contains(tsOp)) {
-            return parseContext.getTopToTable().get(tsOp);
+            return parseContext.getTopToTables().get(tsOp).get(0);
           }
         }
         if ((op.getParentOperators() == null) || (op.getParentOperators().size() > 1)) {

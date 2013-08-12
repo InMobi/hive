@@ -391,7 +391,6 @@ public class GroupByOptimizer implements Transform {
         return matchBucketSortCols(groupByCols, bucketCols, sortCols);
       } else {
         List<PrunedPartitionList> partsList = null;
-        List<Partition> notDeniedPartns = new ArrayList<Partition>();
         try {
           partsList = pGraphContext.getOpToPartList().get(tableScanOp);
           if (partsList == null) {
@@ -403,7 +402,6 @@ public class GroupByOptimizer implements Transform {
                   table.getTableName(),
                   pGraphContext.getPrunedPartitions());
               partsList.add(ppl);
-              notDeniedPartns.addAll(ppl.getNotDeniedPartns());
             }
             pGraphContext.getOpToPartList().put(tableScanOp, partsList);
           }
@@ -412,6 +410,10 @@ public class GroupByOptimizer implements Transform {
           throw new SemanticException(e.getMessage(), e);
         }
 
+        List<Partition> notDeniedPartns = new ArrayList<Partition>();
+        for (PrunedPartitionList ppl : partsList) {
+          notDeniedPartns.addAll(ppl.getNotDeniedPartns());
+        }
         GroupByOptimizerSortMatch currentMatch =
             notDeniedPartns.isEmpty() ? GroupByOptimizerSortMatch.NO_MATCH :
                 notDeniedPartns.size() > 1 ? GroupByOptimizerSortMatch.PARTIAL_MATCH :

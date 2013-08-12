@@ -21,9 +21,9 @@ package org.apache.hadoop.hive.ql.optimizer;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -444,7 +444,6 @@ public final class GenMapRedUtils {
 
     Path tblDir = null;
     TableDesc tblDesc = null;
-
     List<PrunedPartitionList> partsList = pList;
 
     plan.setNameToSplitSample(parseCtx.getNameToSplitSample());
@@ -470,7 +469,7 @@ public final class GenMapRedUtils {
     }
 
     // Generate the map work for this alias_id
-    Set<Partition> parts = new HashSet<Partition>();
+    Set<Partition> parts = new LinkedHashSet<Partition>();
     // pass both confirmed and unknown partitions through the map-reduce
     // framework
 
@@ -491,7 +490,7 @@ public final class GenMapRedUtils {
     // The table does not have any partitions
     if (aliasPartnDesc == null) {
       aliasPartnDesc = new PartitionDesc(Utilities.getTableDesc(parseCtx
-          .getTopToTable().get(topOp)), null);
+          .getTopToTables().get(topOp).get(0)), null);
 
     }
 
@@ -533,8 +532,9 @@ public final class GenMapRedUtils {
 
     // The table should also be considered a part of inputs, even if the table is a
     // partitioned table and whether any partition is selected or not
-    PlanUtils.addInput(inputs,
-        new ReadEntity(parseCtx.getTopToTable().get(topOp), parentViewInfo));
+    for (Table tbl : parseCtx.getTopToTables().get(topOp)) {
+      PlanUtils.addInput(inputs, new ReadEntity(tbl, parentViewInfo));
+    }
 
     for (Partition part : parts) {
       if (part.getTable().isPartitioned()) {

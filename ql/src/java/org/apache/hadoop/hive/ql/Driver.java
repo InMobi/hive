@@ -592,7 +592,7 @@ public class Driver implements CommandProcessor {
           || op.equals(HiveOperation.QUERY)) {
         SemanticAnalyzer querySem = (SemanticAnalyzer) sem;
         ParseContext parseCtx = querySem.getParseContext();
-        Map<TableScanOperator, Table> tsoTopMap = parseCtx.getTopToTable();
+        Map<TableScanOperator, List<Table>> tsoTopMap = parseCtx.getTopToTables();
 
         for (Map.Entry<String, Operator<? extends OperatorDesc>> topOpMap : querySem
             .getParseContext().getTopOps().entrySet()) {
@@ -600,7 +600,8 @@ public class Driver implements CommandProcessor {
           if (topOp instanceof TableScanOperator
               && tsoTopMap.containsKey(topOp)) {
             TableScanOperator tableScanOp = (TableScanOperator) topOp;
-            Table tbl = tsoTopMap.get(tableScanOp);
+            List<Table> tbls = tsoTopMap.get(tableScanOp);
+            Table tbl = tbls.get(0);
             List<Integer> neededColumnIds = tableScanOp.getNeededColumnIDs();
             List<FieldSchema> columns = tbl.getCols();
             List<String> cols = new ArrayList<String>();
@@ -616,16 +617,26 @@ public class Driver implements CommandProcessor {
             //map may not contain all sources, since input list may have been optimized out
             //or non-existent tho such sources may still be referenced by the TableScanOperator
             //if it's null then the partition probably doesn't exist so let's use table permission
-            if (tbl.isPartitioned() &&
+            if ((tbls.size() > 1 || tbl.isPartitioned()) &&
                 tableUsePartLevelAuth.get(tbl.getTableName()) == Boolean.TRUE) {
               String alias_id = topOpMap.getKey();
-              PrunedPartitionList partsList = PartitionPruner.prune(parseCtx
-                  .getTopToTable().get(topOp), parseCtx.getOpToPartPruner()
-                  .get(topOp), parseCtx.getConf(), alias_id, parseCtx
-                  .getPrunedPartitions());
+              List<PrunedPartitionList> partsList =
+                  parseCtx.getOpToPartList().get(topOp);
               Set<Partition> parts = new HashSet<Partition>();
-              parts.addAll(partsList.getConfirmedPartns());
-              parts.addAll(partsList.getUnknownPartns());
+              if (partsList == null) {
+                partsList = new ArrayList<PrunedPartitionList>();
+                for (Table tab : tbls) {
+                  partsList.add(PartitionPruner.prune(tab,
+                      parseCtx.getOpToPartPruner().get(topOp),
+                      parseCtx.getConf(), alias_id, parseCtx
+                      .getPrunedPartitions()));
+                }
+              }
+              for (PrunedPartitionList ppl : partsList) {
+                parts.addAll(ppl.getConfirmedPartns());
+                parts.addAll(ppl.getUnknownPartns());
+
+              }
               for (Partition part : parts) {
                 List<String> existingCols = part2Cols.get(part);
                 if (existingCols == null) {
@@ -880,14 +891,17 @@ public class Driver implements CommandProcessor {
 
   public CommandProcessorResponse run(String command) throws CommandNeedRetryException {
     CommandProcessorResponse cpr = runInternal(command);
-    if(cpr.getResponseCode() == 0) 
+    if(cpr.getResponseCode() == 0) {
       return cpr;
+    }
     SessionState ss = SessionState.get();
-    if(ss == null) 
+    if(ss == null) {
       return cpr;
+    }
     MetaDataFormatter mdf = MetaDataFormatUtils.getFormatter(ss.getConf());
-    if(!(mdf instanceof JsonMetaDataFormatter)) 
+    if(!(mdf instanceof JsonMetaDataFormatter)) {
       return cpr;
+    }
     /*Here we want to encode the error in machine readable way (e.g. JSON)
      * Ideally, errorCode would always be set to a canonical error defined in ErrorMsg.
      * In practice that is rarely the case, so the messy logic below tries to tease

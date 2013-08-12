@@ -310,7 +310,6 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
         .getTopToTables().get(tso);
     if (tbls.size() > 1 || tbls.get(0).isPartitioned()) {
       List<PrunedPartitionList> prunedParts = null;
-      List<Partition> partitions = new ArrayList<Partition>();
       try {
         prunedParts = pGraphContext.getOpToPartList().get(tso);
         if (prunedParts == null) {
@@ -320,7 +319,6 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
                 .getOpToPartPruner().get(tso), pGraphContext.getConf(), alias,
               pGraphContext.getPrunedPartitions());
             prunedParts.add(ppl);
-            partitions.addAll(ppl.getNotDeniedPartns());
           }
           pGraphContext.getOpToPartList().put(tso, prunedParts);
         }
@@ -328,6 +326,11 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
         LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
         throw new SemanticException(e.getMessage(), e);
       }
+      List<Partition> partitions = new ArrayList<Partition>();
+      for (PrunedPartitionList ppl : prunedParts) {
+        partitions.addAll(ppl.getNotDeniedPartns());
+      }
+
       // Populate the names and order of columns for the first partition of the
       // first table
       if ((pos == 0) && (partitions != null) && (!partitions.isEmpty())) {

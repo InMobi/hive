@@ -194,6 +194,9 @@ public class QB {
   }
 
   public String getTabNameForAlias(String alias) {
+    if (getTabNamesForAlias(alias) == null) {
+      return null;
+    }
     return getTabNamesForAlias(alias).get(0);
   }
 
