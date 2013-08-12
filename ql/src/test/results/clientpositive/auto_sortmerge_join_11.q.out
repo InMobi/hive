@@ -84,8 +84,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-5 is a root stage
-  Stage-4 depends on stages: Stage-5
-  Stage-2 depends on stages: Stage-4
+  Stage-2 depends on stages: Stage-5
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -110,7 +109,7 @@ STAGE PLANS:
                 1 [Column[key]]
               Position of Big Table: 1
 
-  Stage: Stage-4
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         b 
@@ -135,24 +134,14 @@ STAGE PLANS:
                   bucketGroup: false
                   mode: hash
                   outputColumnNames: _col0
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-#### A masked pattern was here ####
-                    NumFilesPerFileSink: 1
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-                        properties:
-                          columns _col0
-                          columns.types bigint
-                          escape.delim \
-                    TotalFiles: 1
-                    GatherStats: false
-                    MultiFileSpray: false
+                  Reduce Output Operator
+                    sort order: 
+                    tag: -1
+                    value expressions:
+                          expr: _col0
+                          type: bigint
       Local Work:
         Map Reduce Local Work
-      Needs Tagging: true
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -300,37 +289,7 @@ STAGE PLANS:
       Truncated Path -> Alias:
         /bucket_big/ds=2008-04-08 [b]
         /bucket_big/ds=2008-04-09 [b]
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              sort order: 
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: bigint
       Needs Tagging: false
-      Path -> Alias:
-#### A masked pattern was here ####
-      Path -> Partition:
-#### A masked pattern was here ####
-          Partition
-            base file name: -mr-10002
-            input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-            output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-            properties:
-              columns _col0
-              columns.types bigint
-              escape.delim \
-          
-              input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-              output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-              properties:
-                columns _col0
-                columns.types bigint
-                escape.delim \
       Reduce Operator Tree:
         Group By Operator
           aggregations:
@@ -361,8 +320,6 @@ STAGE PLANS:
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
-      Truncated Path -> Alias:
-#### A masked pattern was here ####
 
   Stage: Stage-0
     Fetch Operator
@@ -403,8 +360,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-5 is a root stage
-  Stage-4 depends on stages: Stage-5
-  Stage-2 depends on stages: Stage-4
+  Stage-2 depends on stages: Stage-5
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -429,7 +385,7 @@ STAGE PLANS:
                 1 [Column[key]]
               Position of Big Table: 1
 
-  Stage: Stage-4
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         b 
@@ -454,24 +410,14 @@ STAGE PLANS:
                   bucketGroup: false
                   mode: hash
                   outputColumnNames: _col0
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-#### A masked pattern was here ####
-                    NumFilesPerFileSink: 1
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-                        properties:
-                          columns _col0
-                          columns.types bigint
-                          escape.delim \
-                    TotalFiles: 1
-                    GatherStats: false
-                    MultiFileSpray: false
+                  Reduce Output Operator
+                    sort order: 
+                    tag: -1
+                    value expressions:
+                          expr: _col0
+                          type: bigint
       Local Work:
         Map Reduce Local Work
-      Needs Tagging: true
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -619,37 +565,7 @@ STAGE PLANS:
       Truncated Path -> Alias:
         /bucket_big/ds=2008-04-08 [b]
         /bucket_big/ds=2008-04-09 [b]
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              sort order: 
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: bigint
       Needs Tagging: false
-      Path -> Alias:
-#### A masked pattern was here ####
-      Path -> Partition:
-#### A masked pattern was here ####
-          Partition
-            base file name: -mr-10002
-            input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-            output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-            properties:
-              columns _col0
-              columns.types bigint
-              escape.delim \
-          
-              input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-              output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-              properties:
-                columns _col0
-                columns.types bigint
-                escape.delim \
       Reduce Operator Tree:
         Group By Operator
           aggregations:
@@ -680,8 +596,6 @@ STAGE PLANS:
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
-      Truncated Path -> Alias:
-#### A masked pattern was here ####
 
   Stage: Stage-0
     Fetch Operator
@@ -782,7 +696,6 @@ STAGE PLANS:
                           type: bigint
       Local Work:
         Map Reduce Local Work
-      Needs Tagging: false
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -880,6 +793,10 @@ STAGE PLANS:
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.bucket_big
             name: default.bucket_big
+      Truncated Path -> Alias:
+        /bucket_big/ds=2008-04-08 [b]
+        /bucket_big/ds=2008-04-09 [b]
+      Needs Tagging: false
       Reduce Operator Tree:
         Group By Operator
           aggregations:
@@ -910,9 +827,6 @@ STAGE PLANS:
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
-      Truncated Path -> Alias:
-        /bucket_big/ds=2008-04-08 [b]
-        /bucket_big/ds=2008-04-09 [b]
 
   Stage: Stage-0
     Fetch Operator

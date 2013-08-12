@@ -80,6 +80,7 @@ public class ParseContext {
   private HashMap<TableScanOperator, List<Table>> topToTables;
   private Map<FileSinkOperator, Table> fsopToTable;
   private List<ReduceSinkOperator> reduceSinkOperatorsAddedByEnforceBucketingSorting;
+  private HashMap<TableScanOperator, Map<String, String>> topToProps;
   private HashMap<String, SplitSample> nameToSplitSample;
   private List<LoadTableDesc> loadTableWork;
   private List<LoadFileDesc> loadFileWork;
@@ -171,6 +172,7 @@ public class ParseContext {
       Map<JoinOperator, QBJoinTree> joinContext,
       Map<SMBMapJoinOperator, QBJoinTree> smbMapJoinContext,
       HashMap<TableScanOperator, List<Table>> topToTable,
+      HashMap<TableScanOperator, Map<String, String>> topToProps,
       Map<FileSinkOperator, Table> fsopToTable,
       List<LoadTableDesc> loadTableWork, List<LoadFileDesc> loadFileWork,
       Context ctx, HashMap<String, String> idToTableNameMap, int destTableId,
@@ -194,6 +196,7 @@ public class ParseContext {
     this.smbMapJoinContext = smbMapJoinContext;
     this.topToTables = topToTable;
     this.fsopToTable = fsopToTable;
+    this.topToProps = topToProps;
     this.loadFileWork = loadFileWork;
     this.loadTableWork = loadTableWork;
     this.opParseCtx = opParseCtx;
@@ -346,6 +349,21 @@ public class ParseContext {
   }
 
   /**
+   * @return the topToProps
+   */
+  public HashMap<TableScanOperator, Map<String, String>> getTopToProps() {
+    return topToProps;
+  }
+
+  /**
+   * @param topToProps
+   *          the topToProps to set
+   */
+  public void setTopToProps(HashMap<TableScanOperator, Map<String, String>> topToProps) {
+    this.topToProps = topToProps;
+  }
+
+  /**
    * @return the topOps
    */
   public HashMap<String, Operator<? extends OperatorDesc>> getTopOps() {
@@ -381,6 +399,27 @@ public class ParseContext {
    */
   public LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext> getOpParseCtx() {
     return opParseCtx;
+  }
+
+  /**
+   * Remove the OpParseContext of a specific operator op
+   * @param op
+   * @return
+   */
+  public OpParseContext removeOpParseCtx(Operator<? extends OperatorDesc> op) {
+    return opParseCtx.remove(op);
+  }
+
+  /**
+   * Update the OpParseContext of operator op to newOpParseContext.
+   * If op is not in opParseCtx, a new entry will be added into opParseCtx.
+   * The key is op, and the value is newOpParseContext.
+   * @param op
+   * @param newOpParseContext
+   */
+  public void updateOpParseCtx(Operator<? extends OperatorDesc> op,
+      OpParseContext newOpParseContext) {
+    opParseCtx.put(op, newOpParseContext);
   }
 
   /**

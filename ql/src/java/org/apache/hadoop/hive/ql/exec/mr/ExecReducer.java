@@ -25,24 +25,23 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
+import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapper.reportStats;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.MapredWork;
+import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
-import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
@@ -53,10 +52,10 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 
 /**
- * ExecReducer is the generic Reducer class for Hive. Together with ExecMapper it is 
+ * ExecReducer is the generic Reducer class for Hive. Together with ExecMapper it is
  * the bridge between the map-reduce framework and the Hive operator pipeline at
  * execution time. It's main responsabilities are:
- * 
+ *
  * - Load and setup the operator pipeline from XML
  * - Run the pipeline by transforming key, value pairs to records and forwarding them to the operators
  * - Sending start and end group messages to separate records with same key from one another
@@ -74,7 +73,6 @@ public class ExecReducer extends MapReduceBase implements Reducer {
   private long cntr = 0;
   private long nextCntr = 1;
 
-  private static String[] fieldNames;
   public static final Log l4j = LogFactory.getLog("ExecReducer");
   private boolean isLogInfoEnabled = false;
 
@@ -86,13 +84,6 @@ public class ExecReducer extends MapReduceBase implements Reducer {
   // Input value serde needs to be an array to support different SerDe
   // for different tags
   private final SerDe[] inputValueDeserializer = new SerDe[Byte.MAX_VALUE];
-  static {
-    ArrayList<String> fieldNameArray = new ArrayList<String>();
-    for (Utilities.ReduceField r : Utilities.ReduceField.values()) {
-      fieldNameArray.add(r.toString());
-    }
-    fieldNames = fieldNameArray.toArray(new String[0]);
-  }
 
   TableDesc keyTableDesc;
   TableDesc[] valueTableDesc;
@@ -121,7 +112,7 @@ public class ExecReducer extends MapReduceBase implements Reducer {
       l4j.info("cannot get classpath: " + e.getMessage());
     }
     jc = job;
-    MapredWork gWork = Utilities.getMapRedWork(job);
+    ReduceWork gWork = Utilities.getReduceWork(job);
     reducer = gWork.getReducer();
     reducer.setParentOperators(null); // clear out any parents as reducer is the
     // root
@@ -146,9 +137,8 @@ public class ExecReducer extends MapReduceBase implements Reducer {
         ArrayList<ObjectInspector> ois = new ArrayList<ObjectInspector>();
         ois.add(keyObjectInspector);
         ois.add(valueObjectInspector[tag]);
-        ois.add(PrimitiveObjectInspectorFactory.writableByteObjectInspector);
         rowObjectInspector[tag] = ObjectInspectorFactory
-            .getStandardStructObjectInspector(Arrays.asList(fieldNames), ois);
+            .getStandardStructObjectInspector(Utilities.reduceFieldNameList, ois);
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -176,8 +166,7 @@ public class ExecReducer extends MapReduceBase implements Reducer {
 
   private BytesWritable groupKey;
 
-  ArrayList<Object> row = new ArrayList<Object>(3);
-  ByteWritable tag = new ByteWritable();
+  List<Object> row = new ArrayList<Object>(Utilities.reduceFieldNameList.size());
 
   public void reduce(Object key, Iterator values, OutputCollector output,
       Reporter reporter) throws IOException {
@@ -185,7 +174,7 @@ public class ExecReducer extends MapReduceBase implements Reducer {
       return;
     }
     if (oc == null) {
-      // propagete reporter and output collector to all operators
+      // propagate reporter and output collector to all operators
       oc = output;
       rp = reporter;
       reducer.setOutputCollector(oc);
@@ -195,11 +184,12 @@ public class ExecReducer extends MapReduceBase implements Reducer {
 
     try {
       BytesWritable keyWritable = (BytesWritable) key;
-      tag.set((byte) 0);
+      byte tag = 0;
       if (isTagged) {
-        // remove the tag
+        // remove the tag from key coming out of reducer
+        // and store it in separate variable.
         int size = keyWritable.getSize() - 1;
-        tag.set(keyWritable.get()[size]);
+        tag = keyWritable.get()[size];
         keyWritable.setSize(size);
       }
 
@@ -233,22 +223,19 @@ public class ExecReducer extends MapReduceBase implements Reducer {
         BytesWritable valueWritable = (BytesWritable) values.next();
         // System.err.print(who.getHo().toString());
         try {
-          valueObject[tag.get()] = inputValueDeserializer[tag.get()]
-              .deserialize(valueWritable);
+          valueObject[tag] = inputValueDeserializer[tag].deserialize(valueWritable);
         } catch (SerDeException e) {
           throw new HiveException(
               "Hive Runtime Error: Unable to deserialize reduce input value (tag="
-              + tag.get()
+              + tag
               + ") from "
               + Utilities.formatBinaryString(valueWritable.get(), 0,
               valueWritable.getSize()) + " with properties "
-              + valueTableDesc[tag.get()].getProperties(), e);
+              + valueTableDesc[tag].getProperties(), e);
         }
         row.clear();
         row.add(keyObject);
-        row.add(valueObject[tag.get()]);
-        // The tag is not used any more, we should remove it.
-        row.add(tag);
+        row.add(valueObject[tag]);
         if (isLogInfoEnabled) {
           cntr++;
           if (cntr == nextCntr) {
@@ -259,17 +246,17 @@ public class ExecReducer extends MapReduceBase implements Reducer {
           }
         }
         try {
-          reducer.process(row, tag.get());
+          reducer.process(row, tag);
         } catch (Exception e) {
           String rowString = null;
           try {
-            rowString = SerDeUtils.getJSONString(row, rowObjectInspector[tag.get()]);
+            rowString = SerDeUtils.getJSONString(row, rowObjectInspector[tag]);
           } catch (Exception e2) {
             rowString = "[Error getting row data with exception " +
                   StringUtils.stringifyException(e2) + " ]";
           }
           throw new HiveException("Hive Runtime Error while processing row (tag="
-              + tag.get() + ") " + rowString, e);
+              + tag + ") " + rowString, e);
         }
       }
 

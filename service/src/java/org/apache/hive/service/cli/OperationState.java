@@ -49,7 +49,7 @@ public enum OperationState {
     }
     return OperationState.UNKNOWN;
   }
-  
+
   public static void validateTransition(OperationState oldState, OperationState newState)
       throws HiveSQLException {
     switch (oldState) {
@@ -78,7 +78,7 @@ public enum OperationState {
     default:
       // fall-through
     }
-    throw new HiveSQLException("Illegal Operation state transition");
+    throw new HiveSQLException("Illegal Operation state transition: " + oldState + "->" + newState);
   }
 
   public void validateTransition(OperationState newState)

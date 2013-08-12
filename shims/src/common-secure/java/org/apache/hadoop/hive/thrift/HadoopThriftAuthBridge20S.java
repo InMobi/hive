@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hive.thrift;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -40,8 +42,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge.Client;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.thrift.client.TUGIAssumingTransport;
 import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
@@ -63,8 +63,6 @@ import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.apache.thrift.transport.TTransportFactory;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION;
 
  /**
   * Functions that bridge Thrift's SASL transports to Hadoop's
@@ -333,7 +331,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHE
      }
 
      @Override
-     public void startDelegationTokenSecretManager(Configuration conf)
+     public void startDelegationTokenSecretManager(Configuration conf, Object hms)
      throws IOException{
        long secretKeyInterval =
          conf.getLong(DELEGATION_KEY_UPDATE_INTERVAL_KEY,
@@ -345,10 +343,12 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHE
            conf.getLong(DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
                         DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
 
+       DelegationTokenStore dts = getTokenStore(conf);
+       dts.setStore(hms);
        secretManager = new TokenStoreDelegationTokenSecretManager(secretKeyInterval,
              tokenMaxLifetime,
              tokenRenewInterval,
-             DELEGATION_TOKEN_GC_INTERVAL, getTokenStore(conf));
+             DELEGATION_TOKEN_GC_INTERVAL, dts);
        secretManager.startThreads();
      }
 
@@ -357,7 +357,9 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHE
      throws IOException, InterruptedException {
        if (!authenticationMethod.get().equals(AuthenticationMethod.KERBEROS)) {
          throw new AuthorizationException(
-         "Delegation Token can be issued only with kerberos authentication");
+         "Delegation Token can be issued only with kerberos authentication. " +
+         "Current AuthenticationMethod: " + authenticationMethod.get()
+             );
        }
        //if the user asking the token is same as the 'owner' then don't do
        //any proxy authorization checks. For cases like oozie, where it gets
@@ -386,7 +388,9 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHE
      public long renewDelegationToken(String tokenStrForm) throws IOException {
        if (!authenticationMethod.get().equals(AuthenticationMethod.KERBEROS)) {
          throw new AuthorizationException(
-         "Delegation Token can be issued only with kerberos authentication");
+         "Delegation Token can be issued only with kerberos authentication. " +
+         "Current AuthenticationMethod: " + authenticationMethod.get()
+             );
        }
        return secretManager.renewDelegationToken(tokenStrForm);
      }
@@ -428,7 +432,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_SECURITY_AUTHE
      public String getRemoteUser() {
        return remoteUser.get();
      }
-     
+
     /** CallbackHandler for SASL DIGEST-MD5 mechanism */
     // This code is pretty much completely based on Hadoop's
     // SaslRpcServer.SaslDigestCallbackHandler - the only reason we could not

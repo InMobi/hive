@@ -40,8 +40,10 @@ import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.Utilities.StreamPrinter;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
+import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.mapred.JobConf;
@@ -101,15 +103,17 @@ public class MapRedTask extends ExecDriver implements Serializable {
           conf.getBoolVar(HiveConf.ConfVars.LOCALMODEAUTO)) {
 
         if (inputSummary == null) {
-          inputSummary = Utilities.getInputSummary(driverContext.getCtx(), work, null);
+          inputSummary = Utilities.getInputSummary(driverContext.getCtx(), work.getMapWork(), null);
         }
 
         // set the values of totalInputFileSize and totalInputNumFiles, estimating them
         // if percentage block sampling is being used
-        estimateInputSize();
+        double samplePercentage = Utilities.getHighestSamplePercentage(work.getMapWork());
+        totalInputFileSize = Utilities.getTotalInputFileSize(inputSummary, work.getMapWork(), samplePercentage);
+        totalInputNumFiles = Utilities.getTotalInputNumFiles(inputSummary, work.getMapWork(), samplePercentage);
 
         // at this point the number of reducers is precisely defined in the plan
-        int numReducers = work.getNumReduceTasks();
+        int numReducers = work.getReduceWork() == null ? 0 : work.getReduceWork().getNumReduceTasks();
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("Task: " + getId() + ", Summary: " +
@@ -177,7 +181,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
       OutputStream out = FileSystem.getLocal(conf).create(planPath);
       MapredWork plan = getWork();
       LOG.info("Generating plan file " + planPath.toString());
-      Utilities.serializeMapRedWork(plan, out);
+      Utilities.serializeObject(plan, out);
 
       String isSilent = "true".equalsIgnoreCase(System
           .getProperty("test.silent")) ? "-nolog" : "";
@@ -391,26 +395,30 @@ public class MapRedTask extends ExecDriver implements Serializable {
    * Set the number of reducers for the mapred work.
    */
   private void setNumberOfReducers() throws IOException {
+    ReduceWork rWork = work.getReduceWork();
     // this is a temporary hack to fix things that are not fixed in the compiler
-    Integer numReducersFromWork = work.getNumReduceTasks();
+    Integer numReducersFromWork = rWork == null ? 0 : rWork.getNumReduceTasks();
 
-    if (work.getReducer() == null) {
+    if (rWork == null) {
       console
           .printInfo("Number of reduce tasks is set to 0 since there's no reduce operator");
-      work.setNumReduceTasks(Integer.valueOf(0));
     } else {
       if (numReducersFromWork >= 0) {
         console.printInfo("Number of reduce tasks determined at compile time: "
-            + work.getNumReduceTasks());
+            + rWork.getNumReduceTasks());
       } else if (job.getNumReduceTasks() > 0) {
         int reducers = job.getNumReduceTasks();
-        work.setNumReduceTasks(reducers);
+        rWork.setNumReduceTasks(reducers);
         console
             .printInfo("Number of reduce tasks not specified. Defaulting to jobconf value of: "
             + reducers);
       } else {
-        int reducers = estimateNumberOfReducers();
-        work.setNumReduceTasks(reducers);
+        if (inputSummary == null) {
+          inputSummary =  Utilities.getInputSummary(driverContext.getCtx(), work.getMapWork(), null);
+        }
+        int reducers = Utilities.estimateNumberOfReducers(conf, inputSummary, work.getMapWork(), 
+                                                          work.isFinalMapRed());
+        rWork.setNumReduceTasks(reducers);
         console
             .printInfo("Number of reduce tasks not specified. Estimated from input data size: "
             + reducers);
@@ -427,121 +435,6 @@ public class MapRedTask extends ExecDriver implements Serializable {
       console.printInfo("  set " + HiveConf.ConfVars.HADOOPNUMREDUCERS
           + "=<number>");
     }
-  }
-
-  /**
-   * Estimate the number of reducers needed for this job, based on job input,
-   * and configuration parameters.
-   *
-   * The output of this method should only be used if the output of this
-   * MapRedTask is not being used to populate a bucketed table and the user
-   * has not specified the number of reducers to use.
-   *
-   * @return the number of reducers.
-   */
-  private int estimateNumberOfReducers() throws IOException {
-    long bytesPerReducer = conf.getLongVar(HiveConf.ConfVars.BYTESPERREDUCER);
-    int maxReducers = conf.getIntVar(HiveConf.ConfVars.MAXREDUCERS);
-
-    if(inputSummary == null) {
-      // compute the summary and stash it away
-      inputSummary =  Utilities.getInputSummary(driverContext.getCtx(), work, null);
-    }
-
-    // if all inputs are sampled, we should shrink the size of reducers accordingly.
-    estimateInputSize();
-
-    if (totalInputFileSize != inputSummary.getLength()) {
-      LOG.info("BytesPerReducer=" + bytesPerReducer + " maxReducers="
-          + maxReducers + " estimated totalInputFileSize=" + totalInputFileSize);
-    } else {
-      LOG.info("BytesPerReducer=" + bytesPerReducer + " maxReducers="
-        + maxReducers + " totalInputFileSize=" + totalInputFileSize);
-    }
-
-    int reducers = (int) ((totalInputFileSize + bytesPerReducer - 1) / bytesPerReducer);
-    reducers = Math.max(1, reducers);
-    reducers = Math.min(maxReducers, reducers);
-
-    // If this map reduce job writes final data to a table and bucketing is being inferred,
-    // and the user has configured Hive to do this, make sure the number of reducers is a
-    // power of two
-    if (conf.getBoolVar(HiveConf.ConfVars.HIVE_INFER_BUCKET_SORT_NUM_BUCKETS_POWER_TWO) &&
-        work.isFinalMapRed() && !work.getBucketedColsByDirectory().isEmpty()) {
-
-      int reducersLog = (int)(Math.log(reducers) / Math.log(2)) + 1;
-      int reducersPowerTwo = (int)Math.pow(2, reducersLog);
-
-      // If the original number of reducers was a power of two, use that
-      if (reducersPowerTwo / 2 == reducers) {
-        return reducers;
-      } else if (reducersPowerTwo > maxReducers) {
-        // If the next power of two greater than the original number of reducers is greater
-        // than the max number of reducers, use the preceding power of two, which is strictly
-        // less than the original number of reducers and hence the max
-        reducers = reducersPowerTwo / 2;
-      } else {
-        // Otherwise use the smallest power of two greater than the original number of reducers
-        reducers = reducersPowerTwo;
-      }
-    }
-
-    return reducers;
-  }
-
-  /**
-   * Sets the values of totalInputFileSize and totalInputNumFiles.  If percentage
-   * block sampling is used, these values are estimates based on the highest
-   * percentage being used for sampling multiplied by the value obtained from the
-   * input summary.  Otherwise, these values are set to the exact value obtained
-   * from the input summary.
-   *
-   * Once the function completes, inputSizeEstimated is set so that the logic is
-   * never run more than once.
-   */
-  private void estimateInputSize() {
-    if (inputSizeEstimated) {
-      // If we've already run this function, return
-      return;
-    }
-
-    // Initialize the values to be those taken from the input summary
-    totalInputFileSize = inputSummary.getLength();
-    totalInputNumFiles = inputSummary.getFileCount();
-
-    if (work.getNameToSplitSample() == null || work.getNameToSplitSample().isEmpty()) {
-      // If percentage block sampling wasn't used, we don't need to do any estimation
-      inputSizeEstimated = true;
-      return;
-    }
-
-    // if all inputs are sampled, we should shrink the size of the input accordingly
-    double highestSamplePercentage = 0;
-    boolean allSample = false;
-    for (String alias : work.getAliasToWork().keySet()) {
-      if (work.getNameToSplitSample().containsKey(alias)) {
-        allSample = true;
-        Double rate = work.getNameToSplitSample().get(alias).getPercent();
-        if (rate != null && rate > highestSamplePercentage) {
-          highestSamplePercentage = rate;
-        }
-      } else {
-        allSample = false;
-        break;
-      }
-    }
-    if (allSample) {
-      // This is a little bit dangerous if inputs turns out not to be able to be sampled.
-      // In that case, we significantly underestimate the input.
-      // It's the same as estimateNumberOfReducers(). It's just our best
-      // guess and there is no guarantee.
-      totalInputFileSize = Math.min((long) (totalInputFileSize * highestSamplePercentage / 100D)
-          , totalInputFileSize);
-      totalInputNumFiles = Math.min((long) (totalInputNumFiles * highestSamplePercentage / 100D)
-          , totalInputNumFiles);
-    }
-
-    inputSizeEstimated = true;
   }
 
   /**
@@ -588,7 +481,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
 
   @Override
   public Operator<? extends OperatorDesc> getReducer() {
-    return getWork().getReducer();
+    return getWork().getReduceWork() == null ? null : getWork().getReduceWork().getReducer();
   }
 
   @Override

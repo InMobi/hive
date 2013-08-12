@@ -184,10 +184,6 @@ public final class FunctionRegistry {
 
   static Map<String, WindowFunctionInfo> windowFunctions = Collections.synchronizedMap(new LinkedHashMap<String, WindowFunctionInfo>());
 
-  /*
-   * UDAFS that only work when the input rows have an order.
-   */
-  public static final HashSet<String> UDAFS_IMPLY_ORDER = new HashSet<String>();
 
   static {
     registerUDF("concat", UDFConcat.class, false);
@@ -343,6 +339,8 @@ public final class FunctionRegistry {
     registerUDF(serdeConstants.STRING_TYPE_NAME, UDFToString.class, false,
         UDFToString.class.getSimpleName());
 
+    registerGenericUDF(serdeConstants.DATE_TYPE_NAME,
+        GenericUDFToDate.class);
     registerGenericUDF(serdeConstants.TIMESTAMP_TYPE_NAME,
         GenericUDFTimestamp.class);
     registerGenericUDF(serdeConstants.BINARY_TYPE_NAME,
@@ -439,15 +437,6 @@ public final class FunctionRegistry {
     registerWindowFunction("last_value", new GenericUDAFLastValue());
     registerWindowFunction(LEAD_FUNC_NAME, new GenericUDAFLead(), false);
     registerWindowFunction(LAG_FUNC_NAME, new GenericUDAFLag(), false);
-
-    UDAFS_IMPLY_ORDER.add("rank");
-    UDAFS_IMPLY_ORDER.add("dense_rank");
-    UDAFS_IMPLY_ORDER.add("percent_rank");
-    UDAFS_IMPLY_ORDER.add("cume_dist");
-    UDAFS_IMPLY_ORDER.add(LEAD_FUNC_NAME);
-    UDAFS_IMPLY_ORDER.add(LAG_FUNC_NAME);
-    UDAFS_IMPLY_ORDER.add("first_value");
-    UDAFS_IMPLY_ORDER.add("last_value");
 
     registerTableFunction(NOOP_TABLE_FUNCTION, NoopResolver.class);
     registerTableFunction(NOOP_MAP_TABLE_FUNCTION, NoopWithMapResolver.class);
@@ -705,6 +694,11 @@ public final class FunctionRegistry {
     }
     // Void can be converted to any type
     if (from.equals(TypeInfoFactory.voidTypeInfo)) {
+      return true;
+    }
+    // Allow implicit String to Date conversion
+    if (from.equals(TypeInfoFactory.dateTypeInfo)
+        && to.equals(TypeInfoFactory.stringTypeInfo)) {
       return true;
     }
 
@@ -1267,7 +1261,8 @@ public final class FunctionRegistry {
         udfClass == UDFToDouble.class || udfClass == UDFToFloat.class ||
         udfClass == UDFToInteger.class || udfClass == UDFToLong.class ||
         udfClass == UDFToShort.class || udfClass == UDFToString.class ||
-        udfClass == GenericUDFTimestamp.class || udfClass == GenericUDFToBinary.class;
+        udfClass == GenericUDFTimestamp.class || udfClass == GenericUDFToBinary.class ||
+        udfClass == GenericUDFToDate.class;
   }
 
   /**
@@ -1423,8 +1418,30 @@ public final class FunctionRegistry {
     return windowFunctions.get(name.toLowerCase());
   }
 
+  /**
+   * Both UDF and UDAF functions can imply order for analytical functions
+   *
+   * @param name
+   *          name of function
+   * @return true if a GenericUDF or GenericUDAF exists for this name and implyOrder is true, false
+   *         otherwise.
+   */
   public static boolean impliesOrder(String functionName) {
-    return functionName == null ? false : UDAFS_IMPLY_ORDER.contains(functionName.toLowerCase());
+
+    FunctionInfo info = mFunctions.get(functionName.toLowerCase());
+    if (info != null) {
+      if (info.isGenericUDF()) {
+        UDFType type = info.getGenericUDF().getClass().getAnnotation(UDFType.class);
+        if (type != null) {
+          return type.impliesOrder();
+        }
+      }
+    }
+    WindowFunctionInfo windowInfo = windowFunctions.get(functionName.toLowerCase());
+    if (windowInfo != null) {
+      return windowInfo.isImpliesOrder();
+    }
+    return false;
   }
 
   static void registerHiveUDAFsAsWindowFunctions()
@@ -1472,4 +1489,23 @@ public final class FunctionRegistry {
     mFunctions.put(name.toLowerCase(), tInfo);
   }
 
+  /**
+   * Use this to check if function is ranking function
+   *
+   * @param name
+   *          name of a function
+   * @return true if function is a UDAF, has WindowFunctionDescription annotation and the annotations
+   *         confirms a ranking function, false otherwise
+   */
+  public static boolean isRankingFunction(String name){
+    FunctionInfo info = mFunctions.get(name.toLowerCase());
+    GenericUDAFResolver res = info.getGenericUDAFResolver();
+    if (res != null){
+      WindowFunctionDescription desc = res.getClass().getAnnotation(WindowFunctionDescription.class);
+      if (desc != null){
+        return desc.rankingFunction();
+      }
+    }
+    return false;
+  }
 }

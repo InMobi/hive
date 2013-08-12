@@ -9,8 +9,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -33,9 +32,9 @@ STAGE PLANS:
                 1 {key} {value}
                 2 {key} {value}
               filter predicates:
-                0 {(key < 10.0)}
+                0 {(key < 10)}
                 1 
-                2 {(key < 10.0)}
+                2 {(key < 10)}
               handleSkewJoin: false
               keys:
                 0 [Column[key]]
@@ -47,7 +46,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: (key > 10.0)
+                  expr: (key > 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -55,9 +54,9 @@ STAGE PLANS:
                   1 {key} {value}
                   2 {key} {value}
                 filter predicates:
-                  0 {(key < 10.0)}
+                  0 {(key < 10)}
                   1 
-                  2 {(key < 10.0)}
+                  2 {(key < 10)}
                 handleSkewJoin: false
                 keys:
                   0 [Column[key]]
@@ -65,7 +64,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 2
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src3 
@@ -80,9 +79,9 @@ STAGE PLANS:
                 1 {key} {value}
                 2 {key} {value}
               filter predicates:
-                0 {(key < 10.0)}
+                0 {(key < 10)}
                 1 
-                2 {(key < 10.0)}
+                2 {(key < 10)}
               handleSkewJoin: false
               keys:
                 0 [Column[key]]
@@ -105,48 +104,37 @@ STAGE PLANS:
                       expr: _col9
                       type: string
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                Reduce Output Operator
+                  key expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
+                  sort order: ++++++
+                  tag: -1
+                  value expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -680,8 +668,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -700,7 +687,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: (key > 10.0)
+                  expr: (key > 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -708,7 +695,7 @@ STAGE PLANS:
                   1 {key} {value}
                   2 {key} {value}
                 filter predicates:
-                  0 {(key < 10.0)}
+                  0 {(key < 10)}
                   1 
                   2 
                 handleSkewJoin: false
@@ -722,7 +709,7 @@ STAGE PLANS:
             alias: src3
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -730,7 +717,7 @@ STAGE PLANS:
                   1 {key} {value}
                   2 {key} {value}
                 filter predicates:
-                  0 {(key < 10.0)}
+                  0 {(key < 10)}
                   1 
                   2 
                 handleSkewJoin: false
@@ -740,7 +727,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 0
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src1 
@@ -755,7 +742,7 @@ STAGE PLANS:
                 1 {key} {value}
                 2 {key} {value}
               filter predicates:
-                0 {(key < 10.0)}
+                0 {(key < 10)}
                 1 
                 2 
               handleSkewJoin: false
@@ -780,48 +767,37 @@ STAGE PLANS:
                       expr: _col9
                       type: string
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                Reduce Output Operator
+                  key expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
+                  sort order: ++++++
+                  tag: -1
+                  value expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -1355,8 +1331,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -1375,7 +1350,7 @@ STAGE PLANS:
             alias: src1
             Filter Operator
               predicate:
-                  expr: (key < 10.0)
+                  expr: (key < 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -1384,7 +1359,7 @@ STAGE PLANS:
                   2 {key} {value}
                 filter predicates:
                   0 
-                  1 {(key > 10.0)}
+                  1 {(key > 10)}
                   2 
                 handleSkewJoin: false
                 keys:
@@ -1397,7 +1372,7 @@ STAGE PLANS:
             alias: src3
             Filter Operator
               predicate:
-                  expr: (key < 10.0)
+                  expr: (key < 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -1406,7 +1381,7 @@ STAGE PLANS:
                   2 {key} {value}
                 filter predicates:
                   0 
-                  1 {(key > 10.0)}
+                  1 {(key > 10)}
                   2 
                 handleSkewJoin: false
                 keys:
@@ -1415,7 +1390,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 1
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src2 
@@ -1431,7 +1406,7 @@ STAGE PLANS:
                 2 {key} {value}
               filter predicates:
                 0 
-                1 {(key > 10.0)}
+                1 {(key > 10)}
                 2 
               handleSkewJoin: false
               keys:
@@ -1455,48 +1430,37 @@ STAGE PLANS:
                       expr: _col9
                       type: string
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                Reduce Output Operator
+                  key expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
+                  sort order: ++++++
+                  tag: -1
+                  value expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -2042,8 +2006,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -2062,7 +2025,7 @@ STAGE PLANS:
             alias: src1
             Filter Operator
               predicate:
-                  expr: (key < 10.0)
+                  expr: (key < 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -2071,8 +2034,8 @@ STAGE PLANS:
                   2 {key} {value}
                 filter predicates:
                   0 
-                  1 {(key > 10.0)}
-                  2 {(key < 10.0)}
+                  1 {(key > 10)}
+                  2 {(key < 10)}
                 handleSkewJoin: false
                 keys:
                   0 [Column[key]]
@@ -2089,8 +2052,8 @@ STAGE PLANS:
                 2 {key} {value}
               filter predicates:
                 0 
-                1 {(key > 10.0)}
-                2 {(key < 10.0)}
+                1 {(key > 10)}
+                2 {(key < 10)}
               handleSkewJoin: false
               keys:
                 0 [Column[key]]
@@ -2098,7 +2061,7 @@ STAGE PLANS:
                 2 [Column[key]]
               Position of Big Table: 2
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src3 
@@ -2114,8 +2077,8 @@ STAGE PLANS:
                 2 {key} {value}
               filter predicates:
                 0 
-                1 {(key > 10.0)}
-                2 {(key < 10.0)}
+                1 {(key > 10)}
+                2 {(key < 10)}
               handleSkewJoin: false
               keys:
                 0 [Column[key]]
@@ -2138,48 +2101,37 @@ STAGE PLANS:
                       expr: _col9
                       type: string
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                Reduce Output Operator
+                  key expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
+                  sort order: ++++++
+                  tag: -1
+                  value expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -2725,8 +2677,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -2745,7 +2696,7 @@ STAGE PLANS:
             alias: src1
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -2763,7 +2714,7 @@ STAGE PLANS:
             alias: src3
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -2777,7 +2728,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 1
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src2 
@@ -2785,7 +2736,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: ((key < 10.0) and (key > 10.0))
+                  expr: ((key < 10) and (key > 10))
                   type: boolean
               Map Join Operator
                 condition map:
@@ -2817,48 +2768,37 @@ STAGE PLANS:
                         expr: _col9
                         type: string
                   outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  Reduce Output Operator
+                    key expressions:
+                          expr: _col0
+                          type: string
+                          expr: _col1
+                          type: string
+                          expr: _col2
+                          type: string
+                          expr: _col3
+                          type: string
+                          expr: _col4
+                          type: string
+                          expr: _col5
+                          type: string
+                    sort order: ++++++
+                    tag: -1
+                    value expressions:
+                          expr: _col0
+                          type: string
+                          expr: _col1
+                          type: string
+                          expr: _col2
+                          type: string
+                          expr: _col3
+                          type: string
+                          expr: _col4
+                          type: string
+                          expr: _col5
+                          type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -2892,8 +2832,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -2912,7 +2851,7 @@ STAGE PLANS:
             alias: src1
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -2922,7 +2861,7 @@ STAGE PLANS:
                 filter predicates:
                   0 
                   1 
-                  2 {(key < 10.0)}
+                  2 {(key < 10)}
                 handleSkewJoin: false
                 keys:
                   0 [Column[key]]
@@ -2934,7 +2873,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: ((key < 10.0) and (key > 10.0))
+                  expr: ((key < 10) and (key > 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -2944,7 +2883,7 @@ STAGE PLANS:
                 filter predicates:
                   0 
                   1 
-                  2 {(key < 10.0)}
+                  2 {(key < 10)}
                 handleSkewJoin: false
                 keys:
                   0 [Column[key]]
@@ -2952,7 +2891,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 2
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src3 
@@ -2969,7 +2908,7 @@ STAGE PLANS:
               filter predicates:
                 0 
                 1 
-                2 {(key < 10.0)}
+                2 {(key < 10)}
               handleSkewJoin: false
               keys:
                 0 [Column[key]]
@@ -2992,48 +2931,37 @@ STAGE PLANS:
                       expr: _col9
                       type: string
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                Reduce Output Operator
+                  key expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
+                  sort order: ++++++
+                  tag: -1
+                  value expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -3567,8 +3495,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -3587,7 +3514,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: ((key < 10.0) and (key > 10.0))
+                  expr: ((key < 10) and (key > 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -3595,7 +3522,7 @@ STAGE PLANS:
                   1 {key} {value}
                   2 {key} {value}
                 filter predicates:
-                  0 {(key < 10.0)}
+                  0 {(key < 10)}
                   1 
                   2 
                 handleSkewJoin: false
@@ -3609,7 +3536,7 @@ STAGE PLANS:
             alias: src3
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -3617,7 +3544,7 @@ STAGE PLANS:
                   1 {key} {value}
                   2 {key} {value}
                 filter predicates:
-                  0 {(key < 10.0)}
+                  0 {(key < 10)}
                   1 
                   2 
                 handleSkewJoin: false
@@ -3627,7 +3554,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 0
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src1 
@@ -3642,7 +3569,7 @@ STAGE PLANS:
                 1 {key} {value}
                 2 {key} {value}
               filter predicates:
-                0 {(key < 10.0)}
+                0 {(key < 10)}
                 1 
                 2 
               handleSkewJoin: false
@@ -3667,48 +3594,37 @@ STAGE PLANS:
                       expr: _col9
                       type: string
                 outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                Reduce Output Operator
+                  key expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
+                  sort order: ++++++
+                  tag: -1
+                  value expressions:
+                        expr: _col0
+                        type: string
+                        expr: _col1
+                        type: string
+                        expr: _col2
+                        type: string
+                        expr: _col3
+                        type: string
+                        expr: _col4
+                        type: string
+                        expr: _col5
+                        type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -3742,8 +3658,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -3762,7 +3677,7 @@ STAGE PLANS:
             alias: src1
             Filter Operator
               predicate:
-                  expr: (key < 10.0)
+                  expr: (key < 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -3771,7 +3686,7 @@ STAGE PLANS:
                   2 {key} {value}
                 filter predicates:
                   0 
-                  1 {(key > 10.0)}
+                  1 {(key > 10)}
                   2 
                 handleSkewJoin: false
                 keys:
@@ -3784,7 +3699,7 @@ STAGE PLANS:
             alias: src3
             Filter Operator
               predicate:
-                  expr: (key < 10.0)
+                  expr: (key < 10)
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -3793,7 +3708,7 @@ STAGE PLANS:
                   2 {key} {value}
                 filter predicates:
                   0 
-                  1 {(key > 10.0)}
+                  1 {(key > 10)}
                   2 
                 handleSkewJoin: false
                 keys:
@@ -3802,7 +3717,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 1
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src2 
@@ -3810,7 +3725,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: (key < 10.0)
+                  expr: (key < 10)
                   type: boolean
               Map Join Operator
                 condition map:
@@ -3822,7 +3737,7 @@ STAGE PLANS:
                   2 {key} {value}
                 filter predicates:
                   0 
-                  1 {(key > 10.0)}
+                  1 {(key > 10)}
                   2 
                 handleSkewJoin: false
                 keys:
@@ -3846,48 +3761,37 @@ STAGE PLANS:
                         expr: _col9
                         type: string
                   outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  Reduce Output Operator
+                    key expressions:
+                          expr: _col0
+                          type: string
+                          expr: _col1
+                          type: string
+                          expr: _col2
+                          type: string
+                          expr: _col3
+                          type: string
+                          expr: _col4
+                          type: string
+                          expr: _col5
+                          type: string
+                    sort order: ++++++
+                    tag: -1
+                    value expressions:
+                          expr: _col0
+                          type: string
+                          expr: _col1
+                          type: string
+                          expr: _col2
+                          type: string
+                          expr: _col3
+                          type: string
+                          expr: _col4
+                          type: string
+                          expr: _col5
+                          type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator
@@ -3943,8 +3847,7 @@ ABSTRACT SYNTAX TREE:
 
 STAGE DEPENDENCIES:
   Stage-6 is a root stage
-  Stage-5 depends on stages: Stage-6
-  Stage-2 depends on stages: Stage-5
+  Stage-2 depends on stages: Stage-6
   Stage-0 is a root stage
 
 STAGE PLANS:
@@ -3963,7 +3866,7 @@ STAGE PLANS:
             alias: src1
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -3981,7 +3884,7 @@ STAGE PLANS:
             alias: src3
             Filter Operator
               predicate:
-                  expr: ((key > 10.0) and (key < 10.0))
+                  expr: ((key > 10) and (key < 10))
                   type: boolean
               HashTable Sink Operator
                 condition expressions:
@@ -3995,7 +3898,7 @@ STAGE PLANS:
                   2 [Column[key]]
                 Position of Big Table: 1
 
-  Stage: Stage-5
+  Stage: Stage-2
     Map Reduce
       Alias -> Map Operator Tree:
         src2 
@@ -4003,7 +3906,7 @@ STAGE PLANS:
             alias: src2
             Filter Operator
               predicate:
-                  expr: ((key < 10.0) and (key > 10.0))
+                  expr: ((key < 10) and (key > 10))
                   type: boolean
               Map Join Operator
                 condition map:
@@ -4035,48 +3938,37 @@ STAGE PLANS:
                         expr: _col9
                         type: string
                   outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  Reduce Output Operator
+                    key expressions:
+                          expr: _col0
+                          type: string
+                          expr: _col1
+                          type: string
+                          expr: _col2
+                          type: string
+                          expr: _col3
+                          type: string
+                          expr: _col4
+                          type: string
+                          expr: _col5
+                          type: string
+                    sort order: ++++++
+                    tag: -1
+                    value expressions:
+                          expr: _col0
+                          type: string
+                          expr: _col1
+                          type: string
+                          expr: _col2
+                          type: string
+                          expr: _col3
+                          type: string
+                          expr: _col4
+                          type: string
+                          expr: _col5
+                          type: string
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-#### A masked pattern was here ####
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
-              sort order: ++++++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: string
-                    expr: _col3
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
       Reduce Operator Tree:
         Extract
           File Output Operator

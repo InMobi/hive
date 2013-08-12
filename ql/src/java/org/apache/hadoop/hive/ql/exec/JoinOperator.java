@@ -76,10 +76,6 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
       // get alias
       alias = (byte) tag;
 
-      if ((lastAlias == null) || (!lastAlias.equals(alias))) {
-        nextSz = joinEmitInterval;
-      }
-
       ArrayList<Object> nr = getFilteredValue(alias, row);
 
       if (handleSkewJoin) {
@@ -87,7 +83,7 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
       }
 
       // number of rows for the key in the given table
-      int sz = storage[alias].size();
+      long sz = storage[alias].size();
       StructObjectInspector soi = (StructObjectInspector) inputObjInspectors[tag];
       StructField sf = soi.getStructFieldRef(Utilities.ReduceField.KEY
           .toString());

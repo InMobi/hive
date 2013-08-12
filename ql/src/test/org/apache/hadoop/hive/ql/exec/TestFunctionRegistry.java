@@ -18,20 +18,21 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import java.util.List;
-import java.util.LinkedList;
 import java.lang.reflect.Method;
+import java.util.LinkedList;
+import java.util.List;
 
+import junit.framework.Assert;
 import junit.framework.TestCase;
 
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritable;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.IntWritable;
 
 public class TestFunctionRegistry extends TestCase {
 
@@ -41,10 +42,11 @@ public class TestFunctionRegistry extends TestCase {
     public void one(IntWritable x, HiveDecimalWritable y) {}
     public void one(IntWritable x, DoubleWritable y) {}
     public void one(IntWritable x, IntWritable y) {}
+    public void mismatch(DateWritable x, HiveDecimalWritable y) {}
     public void mismatch(TimestampWritable x, HiveDecimalWritable y) {}
     public void mismatch(BytesWritable x, DoubleWritable y) {}
   }
-  
+
   @Override
   protected void setUp() {
   }
@@ -58,17 +60,18 @@ public class TestFunctionRegistry extends TestCase {
     implicit(TypeInfoFactory.floatTypeInfo, TypeInfoFactory.decimalTypeInfo, true);
     implicit(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.decimalTypeInfo, true);
     implicit(TypeInfoFactory.stringTypeInfo, TypeInfoFactory.decimalTypeInfo, true);
+    implicit(TypeInfoFactory.dateTypeInfo, TypeInfoFactory.decimalTypeInfo, false);
     implicit(TypeInfoFactory.timestampTypeInfo, TypeInfoFactory.decimalTypeInfo, false);
   }
 
-  private void verify(Class udf, String name, TypeInfo ta, TypeInfo tb, 
+  private void verify(Class udf, String name, TypeInfo ta, TypeInfo tb,
                       Class a, Class b, boolean throwException) {
     List<TypeInfo> args = new LinkedList<TypeInfo>();
     args.add(ta);
     args.add(tb);
 
     Method result = null;
-    
+
     try {
       result = FunctionRegistry.getMethodInternal(udf, name, false, args);
     } catch (UDFArgumentException e) {
@@ -116,13 +119,13 @@ public class TestFunctionRegistry extends TestCase {
   }
 
   public void testCommonClass() {
-    common(TypeInfoFactory.intTypeInfo, TypeInfoFactory.decimalTypeInfo, 
+    common(TypeInfoFactory.intTypeInfo, TypeInfoFactory.decimalTypeInfo,
            TypeInfoFactory.decimalTypeInfo);
-    common(TypeInfoFactory.stringTypeInfo, TypeInfoFactory.decimalTypeInfo, 
+    common(TypeInfoFactory.stringTypeInfo, TypeInfoFactory.decimalTypeInfo,
            TypeInfoFactory.stringTypeInfo);
-    common(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.decimalTypeInfo, 
+    common(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.decimalTypeInfo,
            TypeInfoFactory.decimalTypeInfo);
-    common(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.stringTypeInfo, 
+    common(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.stringTypeInfo,
            TypeInfoFactory.stringTypeInfo);
   }
 
@@ -131,17 +134,37 @@ public class TestFunctionRegistry extends TestCase {
   }
 
   public void testCommonClassComparison() {
-    comparison(TypeInfoFactory.intTypeInfo, TypeInfoFactory.decimalTypeInfo, 
+    comparison(TypeInfoFactory.intTypeInfo, TypeInfoFactory.decimalTypeInfo,
                TypeInfoFactory.decimalTypeInfo);
-    comparison(TypeInfoFactory.stringTypeInfo, TypeInfoFactory.decimalTypeInfo, 
+    comparison(TypeInfoFactory.stringTypeInfo, TypeInfoFactory.decimalTypeInfo,
                TypeInfoFactory.decimalTypeInfo);
-    comparison(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.decimalTypeInfo, 
+    comparison(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.decimalTypeInfo,
                TypeInfoFactory.decimalTypeInfo);
-    comparison(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.stringTypeInfo, 
+    comparison(TypeInfoFactory.doubleTypeInfo, TypeInfoFactory.stringTypeInfo,
                TypeInfoFactory.doubleTypeInfo);
   }
 
   @Override
   protected void tearDown() {
+  }
+
+  public void testIsRankingFunction() {
+    Assert.assertTrue(FunctionRegistry.isRankingFunction("rank"));
+    Assert.assertTrue(FunctionRegistry.isRankingFunction("dense_rank"));
+    Assert.assertTrue(FunctionRegistry.isRankingFunction("percent_rank"));
+    Assert.assertTrue(FunctionRegistry.isRankingFunction("cume_dist"));
+    Assert.assertFalse(FunctionRegistry.isRankingFunction("min"));
+  }
+
+  public void testImpliesOrder() {
+    Assert.assertTrue(FunctionRegistry.impliesOrder("rank"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("dense_rank"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("percent_rank"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("cume_dist"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("first_value"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("last_value"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("lead"));
+    Assert.assertTrue(FunctionRegistry.impliesOrder("lag"));
+    Assert.assertFalse(FunctionRegistry.impliesOrder("min"));
   }
 }
