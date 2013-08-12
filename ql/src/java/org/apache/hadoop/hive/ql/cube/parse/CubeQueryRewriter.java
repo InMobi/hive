@@ -10,7 +10,6 @@ import org.apache.hadoop.hive.ql.parse.ParseDriver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.mortbay.log.Log;
 
 public class CubeQueryRewriter {
   private final Configuration conf;
@@ -56,9 +55,7 @@ public class CubeQueryRewriter {
   private void rewrite(List<ContextRewriter> rewriters, CubeQueryContext ctx)
       throws SemanticException {
     for (ContextRewriter rewriter : rewriters) {
-      Log.info("candidate tables before rewriter" + rewriter.getClass().getSimpleName() + " are " + ctx.getCandidateFactTables());
       rewriter.rewriteContext(ctx);
-      Log.info("candidate tables after rewriter" + rewriter.getClass().getSimpleName() + " are " + ctx.getCandidateFactTables());
     }
   }
 }
