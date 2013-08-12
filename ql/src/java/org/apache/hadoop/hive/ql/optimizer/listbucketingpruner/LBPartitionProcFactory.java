@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hive.ql.optimizer.listbucketingpruner;
 
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.FilterOperator;
@@ -54,7 +56,7 @@ public class LBPartitionProcFactory extends PrunerOperatorFactory {
 
       //Run partition pruner to get partitions
       ParseContext parseCtx = owc.getParseContext();
-      PrunedPartitionList prunedPartList;
+      List<PrunedPartitionList> prunedPartList;
       try {
         String alias = (String) parseCtx.getTopOps().keySet().toArray()[0];
         prunedPartList = PartitionPruner.prune(top, parseCtx, alias);

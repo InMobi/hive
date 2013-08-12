@@ -135,11 +135,20 @@ public class PartitionPruner implements Transform {
    * Get the partition list for the TS operator that satisfies the partition pruner
    * condition.
    */
-  public static PrunedPartitionList prune(TableScanOperator ts, ParseContext parseCtx,
+  public static List<PrunedPartitionList> prune(TableScanOperator ts, ParseContext parseCtx,
       String alias) throws HiveException {
-    return prune(parseCtx.getTopToTable().get(ts),
-        parseCtx.getOpToPartPruner().get(ts), parseCtx.getConf(), alias,
-        ts.getConf().getVirtualCols(), parseCtx.getPrunedPartitions());
+    List<PrunedPartitionList> partsList =
+        parseCtx.getOpToPartList().get(ts);
+    if (partsList == null) {
+      partsList = new ArrayList<PrunedPartitionList>();
+      for (Table tab : parseCtx.getTopToTables().get(ts)) {
+        partsList.add(prune(tab,
+            parseCtx.getOpToPartPruner().get(ts), parseCtx.getConf(), alias,
+            ts.getConf().getVirtualCols(), parseCtx.getPrunedPartitions())
+            );
+      }
+    }
+    return partsList;
   }
 
   /**

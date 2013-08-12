@@ -127,6 +127,9 @@ public class SimpleFetchOptimizer implements Transform {
       return null;
     }
 
+    if (qb.getMetaData().getAliasToTables().get(alias).size() != 1) {
+      return null;
+    }
     Table table = qb.getMetaData().getAliasToTable().get(alias);
     if (table == null) {
       return null;
@@ -141,7 +144,7 @@ public class SimpleFetchOptimizer implements Transform {
       bypassFilter = PartitionPruner.onlyContainsPartnCols(table, pruner);
     }
     if (aggressive || bypassFilter) {
-      PrunedPartitionList pruned = pctx.getPrunedPartitions(alias, ts);
+      PrunedPartitionList pruned = pctx.getPrunedPartitions(alias, ts).get(0);
       if (aggressive || pruned.getUnknownPartns().isEmpty()) {
         bypassFilter &= pruned.getUnknownPartns().isEmpty();
         return checkOperators(new FetchData(pruned, splitSample), ts, aggressive, bypassFilter);

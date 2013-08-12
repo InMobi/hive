@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod.UpdatePeriodComparator;
@@ -18,7 +19,7 @@ import org.apache.hadoop.util.StringUtils;
 
 public final class CubeFactTable extends AbstractCubeTable {
   private final String cubeName;
-  private final Map<String, List<UpdatePeriod>> storageUpdatePeriods;
+  private final Map<String, Set<UpdatePeriod>> storageUpdatePeriods;
 
   public CubeFactTable(Table hiveTable) {
     super(hiveTable);
@@ -29,21 +30,21 @@ public final class CubeFactTable extends AbstractCubeTable {
 
   public CubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
-      Map<String, List<UpdatePeriod>> storageUpdatePeriods) {
+      Map<String, Set<UpdatePeriod>> storageUpdatePeriods) {
     this(cubeName, factName, columns, storageUpdatePeriods, 0L,
         new HashMap<String, String>());
   }
 
   public CubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
-      Map<String, List<UpdatePeriod>> storageUpdatePeriods, double weight) {
+      Map<String, Set<UpdatePeriod>> storageUpdatePeriods, double weight) {
     this(cubeName, factName, columns, storageUpdatePeriods, weight,
         new HashMap<String, String>());
   }
 
   public CubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
-      Map<String, List<UpdatePeriod>> storageUpdatePeriods,
+      Map<String, Set<UpdatePeriod>> storageUpdatePeriods,
       double weight,
       Map<String, String> properties) {
     super(factName, columns, properties, weight);
@@ -61,28 +62,28 @@ public final class CubeFactTable extends AbstractCubeTable {
 
   public static void addUpdatePeriodProperies(String name,
       Map<String, String> props,
-      Map<String, List<UpdatePeriod>> updatePeriods) {
+      Map<String, Set<UpdatePeriod>> updatePeriods) {
     if (updatePeriods != null) {
       props.put(MetastoreUtil.getFactStorageListKey(name),
           MetastoreUtil.getStr(updatePeriods.keySet()));
-      for (Map.Entry<String, List<UpdatePeriod>> entry : updatePeriods.entrySet()) {
+      for (Map.Entry<String, Set<UpdatePeriod>> entry : updatePeriods.entrySet()) {
         props.put(MetastoreUtil.getFactUpdatePeriodKey(name, entry.getKey()),
             MetastoreUtil.getNamedStr(entry.getValue()));
       }
     }
   }
 
-  public static Map<String, List<UpdatePeriod>> getUpdatePeriods(String name,
+  public static Map<String, Set<UpdatePeriod>> getUpdatePeriods(String name,
       Map<String, String> props) {
-    Map<String, List<UpdatePeriod>> storageUpdatePeriods = new HashMap<String,
-        List<UpdatePeriod>>();
+    Map<String, Set<UpdatePeriod>> storageUpdatePeriods = new HashMap<String,
+        Set<UpdatePeriod>>();
     String storagesStr = props.get(MetastoreUtil.getFactStorageListKey(name));
     String[] storages = storagesStr.split(",");
     for (String storage : storages) {
       String updatePeriodStr = props.get(MetastoreUtil.getFactUpdatePeriodKey(
           name, storage));
       String[] periods = updatePeriodStr.split(",");
-      List<UpdatePeriod> updatePeriods = new ArrayList<UpdatePeriod>();
+      Set<UpdatePeriod> updatePeriods = new TreeSet<UpdatePeriod>();
       for (String period : periods) {
         updatePeriods.add(UpdatePeriod.valueOf(period));
       }
@@ -91,7 +92,7 @@ public final class CubeFactTable extends AbstractCubeTable {
     return storageUpdatePeriods;
   }
 
-  public Map<String, List<UpdatePeriod>> getUpdatePeriods() {
+  public Map<String, Set<UpdatePeriod>> getUpdatePeriods() {
     return storageUpdatePeriods;
   }
 

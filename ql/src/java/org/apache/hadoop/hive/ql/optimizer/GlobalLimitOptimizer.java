@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,6 +30,7 @@ import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.parse.GlobalLimitCtx;
@@ -62,7 +66,7 @@ public class GlobalLimitOptimizer implements Transform {
     GlobalLimitCtx globalLimitCtx = pctx.getGlobalLimitCtx();
     Map<TableScanOperator, ExprNodeDesc> opToPartPruner = pctx.getOpToPartPruner();
     Map<String, SplitSample> nameToSplitSample = pctx.getNameToSplitSample();
-    Map<TableScanOperator, Table> topToTable = pctx.getTopToTable();
+    Map<TableScanOperator, List<Table>> topToTable = pctx.getTopToTables();
 
     QB qb = pctx.getQB();
     HiveConf conf = pctx.getConf();
@@ -93,18 +97,25 @@ public class GlobalLimitOptimizer implements Transform {
       // query qualify for the optimization
       if (tempGlobalLimit != null && tempGlobalLimit != 0) {
         TableScanOperator ts = (TableScanOperator) topOps.values().toArray()[0];
-        Table tab = topToTable.get(ts);
+        List<Table> tabs = topToTable.get(ts);
 
-        if (!tab.isPartitioned()) {
+        if (tabs.size() == 1 && (!tabs.get(0).isPartitioned())) {
           if (qbParseInfo.getDestToWhereExpr().isEmpty()) {
             globalLimitCtx.enableOpt(tempGlobalLimit);
           }
         } else {
           // check if the pruner only contains partition columns
-          if (PartitionPruner.onlyContainsPartnCols(tab,
-              opToPartPruner.get(ts))) {
+          boolean containsOnlyPartCols = true;
+          for (Table tab : tabs) {
+            if (!PartitionPruner.onlyContainsPartnCols(tab,
+                opToPartPruner.get(ts))) {
+              containsOnlyPartCols = false;
+              break;
+            }
+          }
 
-            PrunedPartitionList partsList;
+          if (containsOnlyPartCols) {
+            List<PrunedPartitionList> partsList;
             try {
               String alias = (String) topOps.keySet().toArray()[0];
               partsList = PartitionPruner.prune(ts, pctx, alias);
@@ -114,10 +125,14 @@ public class GlobalLimitOptimizer implements Transform {
               LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
               throw new SemanticException(e.getMessage(), e);
             }
+            Set<Partition> unknownParts = new HashSet<Partition>();
+            for (PrunedPartitionList ppl : partsList) {
+              unknownParts.addAll(ppl.getUnknownPartns());
+            }
 
             // If there is any unknown partition, create a map-reduce job for
             // the filter to prune correctly
-            if ((partsList.getUnknownPartns().size() == 0)) {
+            if ((unknownParts.size() == 0)) {
               globalLimitCtx.enableOpt(tempGlobalLimit);
             }
           }

@@ -243,8 +243,6 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
     int pos,
     List<Order> sortColumnsFirstTable) throws SemanticException {
     String alias = aliases[pos];
-    Map<TableScanOperator, Table> topToTable = this.pGraphContext
-      .getTopToTable();
 
     /*
      * Consider a query like:
@@ -307,16 +305,21 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
       return false;
     }
 
-    Table tbl = topToTable.get(tso);
-    if (tbl.isPartitioned()) {
-      PrunedPartitionList prunedParts;
+    List<Table> tbls = this.pGraphContext
+        .getTopToTables().get(tso);
+    if (tbls.size() > 1 || tbls.get(0).isPartitioned()) {
+      List<PrunedPartitionList> prunedParts = null;
       try {
-          prunedParts = pGraphContext.getPrunedPartitions(alias, tso);
+        prunedParts = pGraphContext.getPrunedPartitions(alias, tso);
       } catch (HiveException e) {
         LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
         throw new SemanticException(e.getMessage(), e);
       }
-      List<Partition> partitions = prunedParts.getNotDeniedPartns();
+      List<Partition> partitions = new ArrayList<Partition>();
+      for (PrunedPartitionList ppl : prunedParts) {
+        partitions.addAll(ppl.getNotDeniedPartns());
+      }
+
       // Populate the names and order of columns for the first partition of the
       // first table
       if ((pos == 0) && (partitions != null) && (!partitions.isEmpty())) {
@@ -324,7 +327,7 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
         sortColumnsFirstTable.addAll(firstPartition.getSortCols());
       }
 
-      for (Partition partition : prunedParts.getNotDeniedPartns()) {
+      for (Partition partition : partitions) {
         if (!checkSortColsAndJoinCols(partition.getSortCols(),
           joinCols,
           sortColumnsFirstTable)) {
@@ -336,10 +339,10 @@ abstract public class AbstractSMBJoinProc extends AbstractBucketJoinProc impleme
 
     // Populate the names and order of columns for the first table
     if (pos == 0) {
-      sortColumnsFirstTable.addAll(tbl.getSortCols());
+      sortColumnsFirstTable.addAll(tbls.get(0).getSortCols());
     }
 
-    return checkSortColsAndJoinCols(tbl.getSortCols(),
+    return checkSortColsAndJoinCols(tbls.get(0).getSortCols(),
       joinCols,
       sortColumnsFirstTable);
   }

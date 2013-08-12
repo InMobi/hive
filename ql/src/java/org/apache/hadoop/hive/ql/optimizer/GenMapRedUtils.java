@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.GenMRProcContext.GenMRUnionCtx;
 import org.apache.hadoop.hive.ql.optimizer.GenMRProcContext.GenMapRedCtx;
 import org.apache.hadoop.hive.ql.optimizer.listbucketingpruner.ListBucketingPruner;
@@ -438,7 +440,7 @@ public final class GenMapRedUtils {
    */
   public static void setTaskPlan(String alias_id,
       Operator<? extends OperatorDesc> topOp, Task<?> task, boolean local,
-      GenMRProcContext opProcCtx, PrunedPartitionList pList) throws SemanticException {
+      GenMRProcContext opProcCtx, List<PrunedPartitionList> pList) throws SemanticException {
     MapWork plan = ((MapredWork) task.getWork()).getMapWork();
     ParseContext parseCtx = opProcCtx.getParseCtx();
     Set<ReadEntity> inputs = opProcCtx.getInputs();
@@ -448,15 +450,13 @@ public final class GenMapRedUtils {
 
     Path tblDir = null;
     TableDesc tblDesc = null;
-
-    PrunedPartitionList partsList = pList;
+    List<PrunedPartitionList> partsList = pList;
 
     plan.setNameToSplitSample(parseCtx.getNameToSplitSample());
 
     if (partsList == null) {
       try {
-        TableScanOperator tsOp = (TableScanOperator) topOp;
-        partsList = PartitionPruner.prune(tsOp, parseCtx, alias_id);
+        partsList = PartitionPruner.prune((TableScanOperator) topOp, parseCtx, alias_id);
       } catch (SemanticException e) {
         throw e;
       } catch (HiveException e) {
@@ -466,12 +466,14 @@ public final class GenMapRedUtils {
     }
 
     // Generate the map work for this alias_id
-    Set<Partition> parts = null;
+    Set<Partition> parts = new LinkedHashSet<Partition>();
     // pass both confirmed and unknown partitions through the map-reduce
     // framework
 
-    parts = partsList.getConfirmedPartns();
-    parts.addAll(partsList.getUnknownPartns());
+    for (PrunedPartitionList pl : partsList) {
+      parts.addAll(pl.getConfirmedPartns());
+      parts.addAll(pl.getUnknownPartns());
+    }
     PartitionDesc aliasPartnDesc = null;
     try {
       if (!parts.isEmpty()) {
@@ -485,7 +487,7 @@ public final class GenMapRedUtils {
     // The table does not have any partitions
     if (aliasPartnDesc == null) {
       aliasPartnDesc = new PartitionDesc(Utilities.getTableDesc(parseCtx
-          .getTopToTable().get(topOp)), null);
+          .getTopToTables().get(topOp).get(0)), null);
 
     }
 
@@ -536,8 +538,9 @@ public final class GenMapRedUtils {
 
     // The table should also be considered a part of inputs, even if the table is a
     // partitioned table and whether any partition is selected or not
-    PlanUtils.addInput(inputs,
-        new ReadEntity(parseCtx.getTopToTable().get(topOp), parentViewInfo));
+    for (Table tbl : parseCtx.getTopToTables().get(topOp)) {
+      PlanUtils.addInput(inputs, new ReadEntity(tbl, parentViewInfo));
+    }
 
     for (Partition part : parts) {
       if (part.getTable().isPartitioned()) {
@@ -689,7 +692,7 @@ public final class GenMapRedUtils {
       assert localPlan.getAliasToFetchWork().get(alias_id) == null;
       localPlan.getAliasToWork().put(alias_id, topOp);
       if (tblDir == null) {
-        tblDesc = Utilities.getTableDesc(partsList.getSourceTable());
+        tblDesc = Utilities.getTableDesc(partsList.get(0).getSourceTable());
         localPlan.getAliasToFetchWork().put(
             alias_id,
             new FetchWork(FetchWork.convertPathToStringArray(partDir), partDesc, tblDesc));

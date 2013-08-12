@@ -67,7 +67,7 @@ public class ParseContext {
   private QB qb;
   private ASTNode ast;
   private HashMap<TableScanOperator, ExprNodeDesc> opToPartPruner;
-  private HashMap<TableScanOperator, PrunedPartitionList> opToPartList;
+  private HashMap<TableScanOperator, List<PrunedPartitionList>> opToPartList;
   private HashMap<TableScanOperator, sampleDesc> opToSamplePruner;
   private Map<TableScanOperator, Map<String, ExprNodeDesc>> opToPartToSkewedPruner;
   private HashMap<String, Operator<? extends OperatorDesc>> topOps;
@@ -76,7 +76,7 @@ public class ParseContext {
   private Map<JoinOperator, QBJoinTree> joinContext;
   private Map<MapJoinOperator, QBJoinTree> mapJoinContext;
   private Map<SMBMapJoinOperator, QBJoinTree> smbMapJoinContext;
-  private HashMap<TableScanOperator, Table> topToTable;
+  private HashMap<TableScanOperator, List<Table>> topToTables;
   private Map<FileSinkOperator, Table> fsopToTable;
   private List<ReduceSinkOperator> reduceSinkOperatorsAddedByEnforceBucketingSorting;
   private HashMap<TableScanOperator, Map<String, String>> topToProps;
@@ -164,13 +164,13 @@ public class ParseContext {
       QB qb,
       ASTNode ast,
       HashMap<TableScanOperator, ExprNodeDesc> opToPartPruner,
-      HashMap<TableScanOperator, PrunedPartitionList> opToPartList,
+      HashMap<TableScanOperator, List<PrunedPartitionList>> opToPartList,
       HashMap<String, Operator<? extends OperatorDesc>> topOps,
       HashMap<String, Operator<? extends OperatorDesc>> topSelOps,
       LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext> opParseCtx,
       Map<JoinOperator, QBJoinTree> joinContext,
       Map<SMBMapJoinOperator, QBJoinTree> smbMapJoinContext,
-      HashMap<TableScanOperator, Table> topToTable,
+      HashMap<TableScanOperator, List<Table>> topToTable,
       HashMap<TableScanOperator, Map<String, String>> topToProps,
       Map<FileSinkOperator, Table> fsopToTable,
       List<LoadTableDesc> loadTableWork, List<LoadFileDesc> loadFileWork,
@@ -193,7 +193,7 @@ public class ParseContext {
     this.opToPartList = opToPartList;
     this.joinContext = joinContext;
     this.smbMapJoinContext = smbMapJoinContext;
-    this.topToTable = topToTable;
+    this.topToTables = topToTable;
     this.fsopToTable = fsopToTable;
     this.topToProps = topToProps;
     this.loadFileWork = loadFileWork;
@@ -297,27 +297,36 @@ public class ParseContext {
     this.opToPartPruner = opToPartPruner;
   }
 
-  public HashMap<TableScanOperator, PrunedPartitionList> getOpToPartList() {
+  public HashMap<TableScanOperator, List<PrunedPartitionList>> getOpToPartList() {
     return opToPartList;
   }
 
-  public void setOpToPartList(HashMap<TableScanOperator, PrunedPartitionList> opToPartList) {
+  public void setOpToPartList(HashMap<TableScanOperator, List<PrunedPartitionList>> opToPartList) {
     this.opToPartList = opToPartList;
   }
 
   /**
    * @return the topToTable
    */
-  public HashMap<TableScanOperator, Table> getTopToTable() {
-    return topToTable;
+  public HashMap<TableScanOperator, List<Table>> getTopToTables() {
+    return topToTables;
   }
 
+
   /**
-   * @param topToTable
-   *          the topToTable to set
+   *
+   * @return topToTable
    */
-  public void setTopToTable(HashMap<TableScanOperator, Table> topToTable) {
-    this.topToTable = topToTable;
+  public HashMap<TableScanOperator, Table> getTopToTable() {
+    HashMap<TableScanOperator, Table> topTblMap = new HashMap<TableScanOperator, Table>();
+    for (Map.Entry<TableScanOperator, List<Table>> entry : topToTables.entrySet()) {
+      topTblMap.put(entry.getKey(), entry.getValue().get(0));
+    }
+    return topTblMap;
+  }
+
+  public void setTopToTables(HashMap<TableScanOperator, List<Table>> topToTable) {
+    this.topToTables = topToTable;
   }
 
   public Map<FileSinkOperator, Table> getFsopToTable() {
@@ -636,9 +645,10 @@ public class ParseContext {
     this.fetchTask = fetchTask;
   }
 
-  public PrunedPartitionList getPrunedPartitions(String alias, TableScanOperator ts)
+  public List<PrunedPartitionList> getPrunedPartitions(String alias,
+      TableScanOperator ts)
       throws HiveException {
-    PrunedPartitionList partsList = opToPartList.get(ts);
+    List<PrunedPartitionList> partsList = opToPartList.get(ts);
     if (partsList == null) {
       partsList = PartitionPruner.prune(ts, this, alias);
       opToPartList.put(ts, partsList);

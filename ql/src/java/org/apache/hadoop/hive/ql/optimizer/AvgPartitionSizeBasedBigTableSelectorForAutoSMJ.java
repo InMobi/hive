@@ -62,18 +62,24 @@ public class AvgPartitionSizeBasedBigTableSelectorForAutoSMJ
         }
         int numPartitions = 1; // in case the sizes match, preference is
                                // given to the table with fewer partitions
-        Table table = parseCtx.getTopToTable().get(topOp);
+        List<Table> tables = parseCtx.getTopToTables().get(topOp);
         long averageSize = 0;
 
-        if (!table.isPartitioned()) {
-          averageSize = getSize(conf, table);
+        if (tables.size() == 1 && !tables.get(0).isPartitioned()) {
+          averageSize = getSize(conf, tables.get(0));
         }
         else {
           // For partitioned tables, get the size of all the partitions
-          PrunedPartitionList partsList = PartitionPruner.prune(topOp, parseCtx, null);
-          numPartitions = partsList.getNotDeniedPartns().size();
+          List<PrunedPartitionList> prunedParts =
+              PartitionPruner.prune(topOp, parseCtx, null);
+
+          List<Partition> partitions = new ArrayList<Partition>();
+          for (PrunedPartitionList ppl : prunedParts) {
+            partitions.addAll(ppl.getNotDeniedPartns());
+          }
+          numPartitions = partitions.size();
           long totalSize = 0;
-          for (Partition part : partsList.getNotDeniedPartns()) {
+          for (Partition part : partitions) {
             totalSize += getSize(conf, part);
           }
           averageSize = numPartitions == 0 ? 0 : totalSize/numPartitions;

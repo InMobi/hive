@@ -776,7 +776,7 @@ public final class OpProcFactory {
     HiveConf hiveConf) {
 
     TableScanDesc tableScanDesc = tableScanOp.getConf();
-    Table tbl = owi.getParseContext().getTopToTable().get(tableScanOp);
+    Table tbl = owi.getParseContext().getTopToTables().get(tableScanOp).get(0);
     if (HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTINDEXFILTER)) {
       // attach the original predicate to the table scan operator for index
       // optimizations that require the pushed predicate before pcr & later

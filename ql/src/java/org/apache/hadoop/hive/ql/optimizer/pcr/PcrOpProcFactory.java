@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.ql.optimizer.pcr;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 import org.apache.commons.logging.Log;
@@ -101,7 +102,7 @@ public final class PcrOpProcFactory {
 
 
       ParseContext pctx = owc.getParseContext();
-      PrunedPartitionList prunedPartList;
+      List<PrunedPartitionList> prunedPartList;
       try {
         String alias = (String) owc.getParseContext().getTopOps().keySet().toArray()[0];
         prunedPartList = pctx.getPrunedPartitions(alias, top);
@@ -116,23 +117,25 @@ public final class PcrOpProcFactory {
       String alias = top.getConf().getAlias();
 
       ArrayList<Partition> partitions = new ArrayList<Partition>();
-      if (prunedPartList == null) {
+      if (prunedPartList == null || prunedPartList.isEmpty()) {
         return null;
       }
 
-      for (Partition p : prunedPartList.getConfirmedPartns()) {
-        if (!p.getTable().isPartitioned()) {
-          return null;
+      for (PrunedPartitionList ppl : prunedPartList) {
+        for (Partition p : ppl.getConfirmedPartns()) {
+          if (!p.getTable().isPartitioned()) {
+            return null;
+          }
         }
-      }
-      for (Partition p : prunedPartList.getUnknownPartns()) {
-        if (!p.getTable().isPartitioned()) {
-          return null;
+        for (Partition p : ppl.getUnknownPartns()) {
+          if (!p.getTable().isPartitioned()) {
+            return null;
+          }
         }
-      }
 
-      partitions.addAll(prunedPartList.getConfirmedPartns());
-      partitions.addAll(prunedPartList.getUnknownPartns());
+        partitions.addAll(ppl.getConfirmedPartns());
+        partitions.addAll(ppl.getUnknownPartns());
+      }
 
       PcrExprProcFactory.NodeInfoWrapper wrapper = PcrExprProcFactory.walkExprTree(
           alias, partitions, top.getConf().getVirtualCols(), predicate);

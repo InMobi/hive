@@ -52,16 +52,21 @@ implements BigTableSelectorForAutoSMJ {
         if (topOp == null) {
           return -1;
         }
-        Table table = parseCtx.getTopToTable().get(topOp);
+        List<Table> tables = parseCtx.getTopToTables().get(topOp);
         long currentSize = 0;
 
-        if (!table.isPartitioned()) {
-          currentSize = getSize(conf, table);
+        if (tables.size() == 1 && !tables.get(0).isPartitioned()) {
+          currentSize = getSize(conf, tables.get(0));
         }
         else {
           // For partitioned tables, get the size of all the partitions
-          PrunedPartitionList partsList = PartitionPruner.prune(topOp, parseCtx, null);
-          for (Partition part : partsList.getNotDeniedPartns()) {
+          List<PrunedPartitionList> prunedParts =
+              PartitionPruner.prune(topOp, parseCtx, null);
+          List<Partition> partitions = new ArrayList<Partition>();
+          for (PrunedPartitionList ppl : prunedParts) {
+            partitions.addAll(ppl.getNotDeniedPartns());
+          }
+          for (Partition part : partitions) {
             currentSize += getSize(conf, part);
           }
         }

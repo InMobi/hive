@@ -76,7 +76,7 @@ public final class IndexUtils {
     Hive hive = Hive.get(pctx.getConf());
     Set<Partition> queryPartitions = null;
     // make sure each partition exists on the index table
-    PrunedPartitionList queryPartitionList = pctx.getOpToPartList().get(tableScan);
+    PrunedPartitionList queryPartitionList = pctx.getOpToPartList().get(tableScan).get(0);
     if(queryPartitionList.getConfirmedPartns() != null
         && !queryPartitionList.getConfirmedPartns().isEmpty()){
       queryPartitions = queryPartitionList.getConfirmedPartns();

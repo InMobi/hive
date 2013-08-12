@@ -167,12 +167,17 @@ public class RewriteGBUsingIndex implements Transform {
      * if the optimization can be applied. If yes, we add the name of the top table to
      * the tsOpToProcess to apply rewrite later on.
      * */
-      Map<TableScanOperator, Table> topToTable = parseContext.getTopToTable();
-      Iterator<TableScanOperator> topOpItr = topToTable.keySet().iterator();
+      Map<TableScanOperator, List<Table>> topToTables = parseContext.getTopToTables();
+      Iterator<TableScanOperator> topOpItr = topToTables.keySet().iterator();
       while(topOpItr.hasNext()){
 
         TableScanOperator topOp = topOpItr.next();
-        Table table = topToTable.get(topOp);
+        if (topToTables.get(topOp).size() > 1) {
+          LOG.debug("Multiple tables for table scan, skipping " +
+            getName() + " optimization");
+          return false;
+        }
+        Table table = topToTables.get(topOp).get(0);
         baseTableName = table.getTableName();
         Map<Table, List<Index>> indexes = getIndexesForRewrite();
         if(indexes == null){
@@ -282,12 +287,14 @@ public class RewriteGBUsingIndex implements Transform {
    * @return
    */
   boolean ifQueryHasMultipleTables(){
-    Map<TableScanOperator, Table> topToTable = parseContext.getTopToTable();
-    Iterator<Table> valuesItr = topToTable.values().iterator();
+    Map<TableScanOperator, List<Table>> topToTables = parseContext.getTopToTables();
+    Iterator<List<Table>> valuesItr = topToTables.values().iterator();
     Set<String> tableNameSet = new HashSet<String>();
     while(valuesItr.hasNext()){
-      Table table = valuesItr.next();
-      tableNameSet.add(table.getTableName());
+      List<Table> tables = valuesItr.next();
+      for (Table table : tables) {
+        tableNameSet.add(table.getTableName());
+      }
     }
     if(tableNameSet.size() > 1){
       LOG.debug("Query has more than one table " +

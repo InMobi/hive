@@ -178,6 +178,9 @@ tableSource
 @after { gParent.msgs.pop(); }
     : tabname=tableName (props=tableProperties)? (ts=tableSample)? (KW_AS? alias=Identifier)?
     -> ^(TOK_TABREF $tabname $props? $ts? $alias?)
+    |
+    tabnamelist=tableNameList (props=tableProperties)? (ts=tableSample)? (KW_AS? alias=Identifier)
+    -> ^(TOK_TABREF $tabnamelist $props? $ts? $alias)
     ;
 
 tableName
@@ -189,6 +192,13 @@ tableName
     |
     tab=identifier
     -> ^(TOK_TABNAME $tab)
+    ;
+
+tableNameList
+@init { gParent.msgs.push("table name list"); }
+@after { gParent.msgs.pop(); }
+    :
+    tableName (COMMA tableName)* -> ^(TOK_TABNAMELIST tableName+)
     ;
 
 viewName

@@ -98,8 +98,8 @@ public class TestCubeMetastoreClient {
     cubeDimensions.add(new BaseDimension(new FieldSchema("dim1", "string",
         "basedim")));
     cubeDimensions.add(new ReferencedDimension(
-            new FieldSchema("dim2", "string", "ref dim"),
-            new TableReference("testdim2", "id")));
+        new FieldSchema("dim2", "string", "ref dim"),
+        new TableReference("testdim2", "id")));
 
     List<TableReference> multiRefs = new ArrayList<TableReference>();
     multiRefs.add(new TableReference("testdim2", "id"));
@@ -111,7 +111,7 @@ public class TestCubeMetastoreClient {
 
 
     cubeDimensions.add(new InlineDimension(
-            new FieldSchema("region", "string", "region dim"), regions));
+        new FieldSchema("region", "string", "region dim"), regions));
     cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
 
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
@@ -156,11 +156,11 @@ public class TestCubeMetastoreClient {
     // add one dimension of the cube
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
 
-    Map<String, List<UpdatePeriod>> updatePeriods =
-        new HashMap<String, List<UpdatePeriod>>();
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
-    List<UpdatePeriod> updates  = new ArrayList<UpdatePeriod>();
+    Map<String, Set<UpdatePeriod>> updatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods =
+        new HashMap<Storage, Set<UpdatePeriod>>();
+    Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
     Storage hdfsStorage = new HDFSStorage("C1",
@@ -184,14 +184,10 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
     // Assert for storage tables
-    for (Map.Entry<Storage, List<UpdatePeriod>> entry :
-      storageAggregatePeriods.entrySet()) {
-      List<UpdatePeriod> updatePeriodsList = entry.getValue();
-      for (UpdatePeriod period : updatePeriodsList) {
-        String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, entry.getKey().getPrefix());
-        Assert.assertTrue(client.tableExists(storageTableName));
-      }
+    for (Storage entry : storageAggregatePeriods.keySet()) {
+      String storageTableName = MetastoreUtil.getFactStorageTableName(
+          factName, entry.getPrefix());
+      Assert.assertTrue(client.tableExists(storageTableName));
     }
 
     Map<String, Date> timeParts = new HashMap<String, Date>();
@@ -214,11 +210,11 @@ public class TestCubeMetastoreClient {
     // add one dimension of the cube
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
 
-    Map<String, List<UpdatePeriod>> updatePeriods =
-        new HashMap<String, List<UpdatePeriod>>();
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
-    List<UpdatePeriod> updates  = new ArrayList<UpdatePeriod>();
+    Map<String, Set<UpdatePeriod>> updatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods =
+        new HashMap<Storage, Set<UpdatePeriod>>();
+    Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
     FieldSchema testDtPart = new FieldSchema("mydate", "string", "date part");
@@ -244,14 +240,10 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
     // Assert for storage tables
-    for (Map.Entry<Storage, List<UpdatePeriod>> entry :
-      storageAggregatePeriods.entrySet()) {
-      List<UpdatePeriod> updatePeriodsList = entry.getValue();
-      for (UpdatePeriod period : updatePeriodsList) {
-        String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, entry.getKey().getPrefix());
-        Assert.assertTrue(client.tableExists(storageTableName));
-      }
+    for (Storage entry : storageAggregatePeriods.keySet()) {
+      String storageTableName = MetastoreUtil.getFactStorageTableName(
+          factName, entry.getPrefix());
+      Assert.assertTrue(client.tableExists(storageTableName));
     }
 
     Calendar cal = new GregorianCalendar();
@@ -279,11 +271,11 @@ public class TestCubeMetastoreClient {
     // add one dimension of the cube
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
 
-    Map<String, List<UpdatePeriod>> updatePeriods =
-        new HashMap<String, List<UpdatePeriod>>();
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
-    List<UpdatePeriod> updates  = new ArrayList<UpdatePeriod>();
+    Map<String, Set<UpdatePeriod>> updatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods =
+        new HashMap<Storage, Set<UpdatePeriod>>();
+    Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
     Storage hdfsStorage = new HDFSStorage("C1",
@@ -307,14 +299,10 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
     // Assert for storage tables
-    for (Map.Entry<Storage, List<UpdatePeriod>> entry :
-      storageAggregatePeriods.entrySet()) {
-      List<UpdatePeriod> updatePeriodsList = entry.getValue();
-      for (UpdatePeriod period : updatePeriodsList) {
-        String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, entry.getKey().getPrefix());
-        Assert.assertTrue(client.tableExists(storageTableName));
-      }
+    for (Storage entry : storageAggregatePeriods.keySet()) {
+      String storageTableName = MetastoreUtil.getFactStorageTableName(
+          factName, entry.getPrefix());
+      Assert.assertTrue(client.tableExists(storageTableName));
     }
 
     // test partition
@@ -343,11 +331,11 @@ public class TestCubeMetastoreClient {
     List<FieldSchema> factPartColumns = new ArrayList<FieldSchema>();
     factPartColumns.add(new FieldSchema("region","string", "region part"));
 
-    Map<String, List<UpdatePeriod>> updatePeriods =
-        new HashMap<String, List<UpdatePeriod>>();
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
-    List<UpdatePeriod> updates  = new ArrayList<UpdatePeriod>();
+    Map<String, Set<UpdatePeriod>> updatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods =
+        new HashMap<Storage, Set<UpdatePeriod>>();
+    Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
     Storage hdfsStorageWithParts = new HDFSStorage("C1",
@@ -370,14 +358,10 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeFactWithParts.equals(cubeFact2));
 
     // Assert for storage tables
-    for (Map.Entry<Storage, List<UpdatePeriod>> entry :
-      storageAggregatePeriods.entrySet()) {
-      List<UpdatePeriod> updatePeriodsList = entry.getValue();
-      for (UpdatePeriod period : updatePeriodsList) {
-        String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factNameWithPart, entry.getKey().getPrefix());
-        Assert.assertTrue(client.tableExists(storageTableName));
-      }
+    for (Storage entry : storageAggregatePeriods.keySet()) {
+      String storageTableName = MetastoreUtil.getFactStorageTableName(
+          factNameWithPart, entry.getPrefix());
+      Assert.assertTrue(client.tableExists(storageTableName));
     }
 
     Map<String, String> partSpec = new HashMap<String, String>();
@@ -409,11 +393,11 @@ public class TestCubeMetastoreClient {
     List<FieldSchema> factPartColumns = new ArrayList<FieldSchema>();
     factPartColumns.add(new FieldSchema("region","string", "region part"));
 
-    Map<String, List<UpdatePeriod>> updatePeriods =
-        new HashMap<String, List<UpdatePeriod>>();
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
-    List<UpdatePeriod> updates  = new ArrayList<UpdatePeriod>();
+    Map<String, Set<UpdatePeriod>> updatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods =
+        new HashMap<Storage, Set<UpdatePeriod>>();
+    Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
     FieldSchema testDtPart = new FieldSchema("mydate", "string", "date part");
@@ -438,14 +422,10 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeFactWithParts.equals(cubeFact2));
 
     // Assert for storage tables
-    for (Map.Entry<Storage, List<UpdatePeriod>> entry :
-      storageAggregatePeriods.entrySet()) {
-      List<UpdatePeriod> updatePeriodsList = entry.getValue();
-      for (UpdatePeriod period : updatePeriodsList) {
-        String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factNameWithPart, entry.getKey().getPrefix());
-        Assert.assertTrue(client.tableExists(storageTableName));
-      }
+    for (Storage entry :storageAggregatePeriods.keySet()) {
+      String storageTableName = MetastoreUtil.getFactStorageTableName(
+          factNameWithPart, entry.getPrefix());
+      Assert.assertTrue(client.tableExists(storageTableName));
     }
 
     Calendar cal = new GregorianCalendar();
@@ -482,11 +462,11 @@ public class TestCubeMetastoreClient {
     List<FieldSchema> factPartColumns = new ArrayList<FieldSchema>();
     factPartColumns.add(new FieldSchema("region","string", "region part"));
 
-    Map<String, List<UpdatePeriod>> updatePeriods =
-        new HashMap<String, List<UpdatePeriod>>();
-    Map<Storage, List<UpdatePeriod>> storageAggregatePeriods =
-        new HashMap<Storage, List<UpdatePeriod>>();
-    List<UpdatePeriod> updates  = new ArrayList<UpdatePeriod>();
+    Map<String, Set<UpdatePeriod>> updatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    Map<Storage, Set<UpdatePeriod>> storageAggregatePeriods =
+        new HashMap<Storage, Set<UpdatePeriod>>();
+    Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
     Storage hdfsStorageWithParts = new HDFSStorage("C1",
@@ -516,14 +496,10 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeFactWithTwoStorages.equals(cubeFact2));
 
     // Assert for storage tables
-    for (Map.Entry<Storage, List<UpdatePeriod>> entry :
-      storageAggregatePeriods.entrySet()) {
-      List<UpdatePeriod> updatePeriodsList = entry.getValue();
-      for (UpdatePeriod period : updatePeriodsList) {
-        String storageTableName = MetastoreUtil.getFactStorageTableName(
-            factName, entry.getKey().getPrefix());
-        Assert.assertTrue(client.tableExists(storageTableName));
-      }
+    for (Storage entry : storageAggregatePeriods.keySet()) {
+      String storageTableName = MetastoreUtil.getFactStorageTableName(
+          factName, entry.getPrefix());
+      Assert.assertTrue(client.tableExists(storageTableName));
     }
 
     Map<String, String> partSpec = new HashMap<String, String>();

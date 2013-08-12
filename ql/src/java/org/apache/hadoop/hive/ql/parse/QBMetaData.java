@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
@@ -41,7 +43,7 @@ public class QBMetaData {
   public static final int DEST_REDUCE = 4;
   public static final int DEST_LOCAL_FILE = 5;
 
-  private final HashMap<String, Table> aliasToTable;
+  private final HashMap<String, List<Table>> aliasToTable;
   private final HashMap<String, Table> nameToDestTable;
   private final HashMap<String, Partition> nameToDestPartition;
   private final HashMap<String, String> nameToDestFile;
@@ -53,7 +55,7 @@ public class QBMetaData {
   private static final Log LOG = LogFactory.getLog(QBMetaData.class.getName());
 
   public QBMetaData() {
-    aliasToTable = new HashMap<String, Table>();
+    aliasToTable = new HashMap<String, List<Table>>();
     nameToDestTable = new HashMap<String, Table>();
     nameToDestPartition = new HashMap<String, Partition>();
     nameToDestFile = new HashMap<String, String>();
@@ -69,15 +71,32 @@ public class QBMetaData {
   // the aliases.
 
   public HashMap<String, Table> getAliasToTable() {
+    HashMap<String, Table> aliasTblMap = new HashMap<String, Table>();
+    for (Map.Entry<String, List<Table>> entry : aliasToTable.entrySet()) {
+      aliasTblMap.put(entry.getKey(), entry.getValue().get(0));
+    }
+    return aliasTblMap;
+  }
+
+  public HashMap<String, List<Table>> getAliasToTables() {
     return aliasToTable;
   }
 
   public Table getTableForAlias(String alias) {
+    return getTablesForAlias(alias).get(0);
+  }
+
+  public List<Table> getTablesForAlias(String alias) {
     return aliasToTable.get(alias.toLowerCase());
   }
 
   public void setSrcForAlias(String alias, Table tab) {
-    aliasToTable.put(alias, tab);
+    List<Table> tables = aliasToTable.get(alias);
+    if (tables == null) {
+      tables = new ArrayList<Table>();
+      aliasToTable.put(alias, tables);
+    }
+    tables.add(tab);
   }
 
   public void setDestForAlias(String alias, Table tab) {
@@ -113,6 +132,10 @@ public class QBMetaData {
   }
 
   public Table getSrcForAlias(String alias) {
+    return getSrcsForAlias(alias).get(0);
+  }
+
+  public List<Table> getSrcsForAlias(String alias) {
     return aliasToTable.get(alias.toLowerCase());
   }
 

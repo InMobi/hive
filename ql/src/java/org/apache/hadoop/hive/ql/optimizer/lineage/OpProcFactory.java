@@ -136,12 +136,15 @@ public class OpProcFactory {
 
       // Table scan operator.
       TableScanOperator top = (TableScanOperator)nd;
-      org.apache.hadoop.hive.ql.metadata.Table t = pctx.getTopToTable().get(top);
-      Table tab = t.getTTable();
+      List<org.apache.hadoop.hive.ql.metadata.Table> tables = pctx.getTopToTables().get(top);
+      List<Table> tTabs = new ArrayList<Table>();
+      for (org.apache.hadoop.hive.ql.metadata.Table t : tables) {
+        tTabs.add(t.getTTable());
+      }
 
       // Generate the mappings
       RowSchema rs = top.getSchema();
-      List<FieldSchema> cols = t.getAllCols();
+      List<FieldSchema> cols = tables.get(0).getAllCols();
       Map<String, FieldSchema> fieldSchemaMap = new HashMap<String, FieldSchema>();
       for(FieldSchema col : cols) {
         fieldSchemaMap.put(col.getName(), col);
@@ -156,7 +159,7 @@ public class OpProcFactory {
 
       TableAliasInfo tai = new TableAliasInfo();
       tai.setAlias(top.getConf().getAlias());
-      tai.setTable(tab);
+      tai.setTables(tTabs);
       for(ColumnInfo ci : rs.getSignature()) {
         // Create a dependency
         Dependency dep = new Dependency();

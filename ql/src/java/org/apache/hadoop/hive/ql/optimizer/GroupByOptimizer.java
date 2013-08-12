@@ -306,8 +306,8 @@ public class GroupByOptimizer implements Transform {
       // Create a mapping from the group by columns to the table columns
       Map<String, String> tableColsMapping = new HashMap<String, String>();
       Set<String> constantCols = new HashSet<String>();
-      Table table = pGraphContext.getTopToTable().get(currOp);
-      for (FieldSchema col : table.getAllCols()) {
+      List<Table> tables = pGraphContext.getTopToTables().get(currOp);
+      for (FieldSchema col : tables.get(0).getAllCols()) {
         tableColsMapping.put(col.getName(), col.getName());
       }
 
@@ -383,21 +383,25 @@ public class GroupByOptimizer implements Transform {
         }
       }
 
-      if (!table.isPartitioned()) {
-        List<String> sortCols = Utilities.getColumnNamesFromSortCols(table.getSortCols());
-        List<String> bucketCols = table.getBucketCols();
+      if (tables.size() == 1 && (!tables.get(0).isPartitioned())) {
+        List<String> sortCols = Utilities.getColumnNamesFromSortCols(
+            tables.get(0).getSortCols());
+        List<String> bucketCols = tables.get(0).getBucketCols();
         return matchBucketSortCols(groupByCols, bucketCols, sortCols);
       } else {
-        PrunedPartitionList partsList;
+        List<PrunedPartitionList> partsList = null;
         try {
-          partsList = pGraphContext.getPrunedPartitions(table.getTableName(), tableScanOp);
+          partsList = pGraphContext.getPrunedPartitions(
+              tables.get(0).getTableName(), tableScanOp);
         } catch (HiveException e) {
           LOG.error(StringUtils.stringifyException(e));
           throw new SemanticException(e.getMessage(), e);
         }
 
-        List<Partition> notDeniedPartns = partsList.getNotDeniedPartns();
-
+        List<Partition> notDeniedPartns = new ArrayList<Partition>();
+        for (PrunedPartitionList ppl : partsList) {
+          notDeniedPartns.addAll(ppl.getNotDeniedPartns());
+        }
         GroupByOptimizerSortMatch currentMatch =
             notDeniedPartns.isEmpty() ? GroupByOptimizerSortMatch.NO_MATCH :
                 notDeniedPartns.size() > 1 ? GroupByOptimizerSortMatch.PARTIAL_MATCH :

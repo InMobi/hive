@@ -457,8 +457,8 @@ public class BucketingSortingReduceSinkOptimizer implements Transform {
           // nothing to be done for filters - the output schema does not change.
           if (op instanceof TableScanOperator) {
             assert !useBucketSortPositions;
-            TableScanOperator ts = (TableScanOperator) op;
-            Table srcTable = pGraphContext.getTopToTable().get(ts);
+            List<Table> srcTables = pGraphContext.getTopToTables().get(op);
+            Table srcTable = srcTables.get(0);
 
             // Find the positions of the bucketed columns in the table corresponding
             // to the select list.
@@ -496,9 +496,15 @@ public class BucketingSortingReduceSinkOptimizer implements Transform {
               newSortPositions.add(sortPos);
             }
 
-            if (srcTable.isPartitioned()) {
-              PrunedPartitionList prunedParts = pGraphContext.getOpToPartList().get(ts);
-              List<Partition> partitions = prunedParts.getNotDeniedPartns();
+            if (srcTables.size() > 1 || srcTable.isPartitioned()) {
+              List<PrunedPartitionList> prunedParts = pGraphContext.getOpToPartList().get(op);
+              List<Partition> partitions = null;
+              if (prunedParts != null) {
+                partitions = new ArrayList<Partition>();
+                for (PrunedPartitionList ppl : prunedParts) {
+                  partitions.addAll(ppl.getNotDeniedPartns());
+                }
+              }
 
               // Support for dynamic partitions can be added later
               // The following is not optimized:
