@@ -441,6 +441,7 @@ public final class GenMapRedUtils {
   public static void setTaskPlan(String alias_id,
       Operator<? extends OperatorDesc> topOp, Task<?> task, boolean local,
       GenMRProcContext opProcCtx, List<PrunedPartitionList> pList) throws SemanticException {
+    MapWork plan = ((MapredWork) task.getWork()).getMapWork();
     ParseContext parseCtx = opProcCtx.getParseCtx();
     Set<ReadEntity> inputs = opProcCtx.getInputs();
 
