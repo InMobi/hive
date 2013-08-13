@@ -5,7 +5,6 @@ import static org.apache.hadoop.hive.serde.serdeConstants.ESCAPE_CHAR;
 import static org.apache.hadoop.hive.serde.serdeConstants.FIELD_DELIM;
 import static org.apache.hadoop.hive.serde.serdeConstants.LINE_DELIM;
 import static org.apache.hadoop.hive.serde.serdeConstants.MAPKEY_DELIM;
-import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_FORMAT;
 
 import java.util.List;
 import java.util.Map;
@@ -119,7 +118,6 @@ public class HDFSStorage extends Storage {
   public void setSD(StorageDescriptor sd) {
     if (fieldDelimiter != null) {
       serdeParameters.put(FIELD_DELIM, fieldDelimiter);
-      serdeParameters.put(SERIALIZATION_FORMAT, fieldDelimiter);
     }
     if (escapeChar != null) {
       serdeParameters.put(ESCAPE_CHAR, escapeChar);
@@ -131,7 +129,7 @@ public class HDFSStorage extends Storage {
       serdeParameters.put(MAPKEY_DELIM, mapKeyDelimiter);
     }
 
-    if (serdeParameters != null) {
+    if (lineDelimiter != null) {
       serdeParameters.put(LINE_DELIM, lineDelimiter);
     }
 
