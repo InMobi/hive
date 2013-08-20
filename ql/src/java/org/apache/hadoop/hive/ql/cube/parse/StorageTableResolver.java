@@ -92,7 +92,10 @@ public class StorageTableResolver implements ContextRewriter {
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
     client = cubeql.getMetastoreClient();
-    timePartitionColumn = cubeql.getTimeDimension();
+    if (!cubeql.getTimeRanges().isEmpty()) {
+      timePartitionColumn = cubeql.getTimeRanges().get(0).getPartitionColumn();
+    }
+
     if (!cubeql.getCandidateFactTables().isEmpty()) {
       // resolve storage table names
       resolveFactStorageTableNames(cubeql);
@@ -210,8 +213,9 @@ public class StorageTableResolver implements ContextRewriter {
 
   private void resolveFactStoragePartitions(CubeQueryContext cubeql)
       throws SemanticException {
-    Date fromDate = cubeql.getFromDate();
-    Date toDate = cubeql.getToDate();
+    TimeRange range = cubeql.getTimeRanges().get(0);
+    Date fromDate = range.getFromDate();
+    Date toDate = range.getToDate();
 
     // Find candidate tables wrt supported storages
     for (Iterator<CubeFactTable> i =
@@ -243,10 +247,11 @@ public class StorageTableResolver implements ContextRewriter {
           parts.addAll(partitionColMap.get(p));
           storagTablesMap.put(p, entry.getKey());
         }
+
         LOG.info("For fact:" + fact + " updatePeriod:" + entry.getValue()
             + " Parts:" + parts + " storageTable:" + entry.getKey());
         storageTableToWhereClause.put(entry.getKey(), getWherePartClause(
-            cubeql.getTimeDimension(),
+            range.getPartitionColumn(),
             cubeql.getAliasForTabName(fact.getCubeName()), parts));
       }
       Set<String> storageTables = new LinkedHashSet<String>();

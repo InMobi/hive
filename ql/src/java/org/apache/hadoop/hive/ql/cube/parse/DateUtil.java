@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateUtils;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -101,7 +102,7 @@ public class DateUtil {
 
   private static Date resolveRelativeDate(String str, Date now)
       throws HiveException {
-    if (!(str == null || str.isEmpty())) {
+    if (StringUtils.isBlank(str)) {
       throw new HiveException("date value cannot be null or empty:" + str);
     }
     // Get rid of whitespace

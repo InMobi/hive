@@ -184,18 +184,8 @@ public class JoinResolver implements ContextRewriter {
             if (metastore.isDimensionTable(destTableName)) {
               // Cube -> Dimension reference
               CubeDimensionTable relatedDim = metastore.getDimensionTable(destTableName);
+              addLinks(refDim.getName(), cube, destColumnName, relatedDim, graph);
               
-              TableRelationship rel = new TableRelationship(refDim.getName(), cube, 
-                  destColumnName, relatedDim);
-              
-              Set<TableRelationship> edges = graph.get(relatedDim);
-              
-              if (edges == null) {
-                edges = new LinkedHashSet<TableRelationship>();
-                graph.put(relatedDim, edges);
-              }
-              edges.add(rel);
-             
               // build graph for the related dim
               buildDimGraph(relatedDim, graph);
             } else if (metastore.isFactTable(destTableName)) {
@@ -224,13 +214,7 @@ public class JoinResolver implements ContextRewriter {
             
             if (metastore.isDimensionTable(destTab)) {
               CubeDimensionTable relTab = metastore.getDimensionTable(destTab);
-              TableRelationship rel = new TableRelationship(colName, tab, destCol, relTab);
-              Set<TableRelationship> edges = graph.get(relTab);
-              if (edges == null) {
-                edges = new LinkedHashSet<TableRelationship>();
-                graph.put(relTab, edges);
-              }
-              edges.add(rel);
+              addLinks(colName, tab, destCol, relTab, graph);
               // recurse down to build graph for the referenced dim
               buildDimGraph(relTab, graph);
             } else {
@@ -242,10 +226,38 @@ public class JoinResolver implements ContextRewriter {
       }
     }
     
+    private void addLinks(String col1, AbstractCubeTable tab1, String col2, AbstractCubeTable tab2,
+        Map<AbstractCubeTable, Set<TableRelationship>> graph) {
+      
+      TableRelationship rel1 = new TableRelationship(col1, tab1, col2, tab2);
+      TableRelationship rel2 = new TableRelationship(col2, tab2, col1, tab1);
+      
+      Set<TableRelationship> inEdges = graph.get(tab2);
+      if (inEdges == null) {
+        inEdges = new LinkedHashSet<TableRelationship>();
+        graph.put(tab2, inEdges);
+      }
+      inEdges.add(rel1);
+      
+      Set<TableRelationship> outEdges = graph.get(tab1);
+      if (outEdges == null) {
+        outEdges = new LinkedHashSet<TableRelationship>();
+        graph.put(tab1, outEdges);
+      }
+      
+      outEdges.add(rel2);
+      
+    }
+    
+    
     // This returns the first path found between the dimTable and the target
     private boolean findJoinChain(CubeDimensionTable dimTable, AbstractCubeTable target, 
         Map<AbstractCubeTable, Set<TableRelationship>> graph,
-        List<TableRelationship> chain) {
+        List<TableRelationship> chain,
+        Set<AbstractCubeTable> visited) 
+    {
+      // Mark node as visited
+      visited.add(dimTable);
       
       Set<TableRelationship> edges = graph.get(dimTable);
       if (edges == null || edges.isEmpty()) {
@@ -253,6 +265,10 @@ public class JoinResolver implements ContextRewriter {
       }
       boolean foundPath = false;
       for (TableRelationship edge : edges) {
+        if (visited.contains(edge.fromTable)) {
+          continue;
+        }
+        
         if (edge.fromTable.equals(target)) {
           chain.add(edge);
           // Search successful
@@ -260,14 +276,14 @@ public class JoinResolver implements ContextRewriter {
           break;
         } else if (edge.fromTable instanceof CubeDimensionTable) {
           List<TableRelationship> tmpChain = new ArrayList<TableRelationship>();
-          if (findJoinChain((CubeDimensionTable) edge.fromTable, target, graph, tmpChain)) {
+          if (findJoinChain((CubeDimensionTable) edge.fromTable, target, 
+              graph, tmpChain, visited)) {
             // This dim eventually leads to the cube
             chain.add(edge);
             chain.addAll(tmpChain);
             foundPath = true;
             break;
           }
-
         } // else - this edge doesn't lead to the target, try next one
       }
       
@@ -284,9 +300,11 @@ public class JoinResolver implements ContextRewriter {
     public boolean findJoinChain(CubeDimensionTable joinee, AbstractCubeTable target,
         List<TableRelationship> chain) {
       if (target instanceof Cube) {
-        return findJoinChain(joinee, target, cubeToGraph.get(target), chain);
+        return findJoinChain(joinee, target, cubeToGraph.get(target), chain, 
+            new HashSet<AbstractCubeTable>());
       } else if (target instanceof CubeDimensionTable) {
-        return findJoinChain(joinee, target, dimOnlySubGraph, chain);
+        return findJoinChain(joinee, target, dimOnlySubGraph, chain,
+            new HashSet<AbstractCubeTable>());
       } else {
         return false;
       }
