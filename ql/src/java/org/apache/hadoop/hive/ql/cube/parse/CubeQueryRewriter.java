@@ -13,8 +13,8 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class CubeQueryRewriter {
   private final Configuration conf;
-  private final List<ContextRewriter> rewriters =
-      new ArrayList<ContextRewriter>();
+  private final List<ContextRewriter> rewriters = new ArrayList<ContextRewriter>();
+
   public CubeQueryRewriter(Configuration conf) {
     this.conf = conf;
     setupRewriters();
@@ -46,6 +46,9 @@ public class CubeQueryRewriter {
 
   CubeQueryContext rewrite(String command)
       throws ParseException,SemanticException {
+    if (command != null) {
+      command = command.replace("\n", "");
+    }
     ParseDriver pd = new ParseDriver();
     ASTNode tree = pd.parse(command, null);
     tree = ParseUtils.findRootNonNullToken(tree);

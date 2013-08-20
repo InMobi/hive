@@ -24,7 +24,6 @@ public class CubeSemanticAnalyzer extends SemanticAnalyzer {
 
   private void setupRules() {
     validationRules.add(new CheckTableNames(conf));
-    validationRules.add(new CheckDateRange(conf));
     validationRules.add(new CheckColumnMapping(conf));
   }
 

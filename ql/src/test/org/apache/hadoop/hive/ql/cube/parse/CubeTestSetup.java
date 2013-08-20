@@ -1,15 +1,10 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import static org.junit.Assert.*;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -33,6 +28,8 @@ import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ParseException;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.TextInputFormat;
 
 /*
@@ -54,16 +51,26 @@ import org.apache.hadoop.mapred.TextInputFormat;
 
 public class CubeTestSetup {
 
+  public static final String cubeName = "testcube";
+  public static String HOUR_FMT = "yyyy-MM-dd HH";
+  public static final SimpleDateFormat HOUR_PARSER = new SimpleDateFormat(
+    HOUR_FMT);
+  public static String MONTH_FMT = "yyyy-MM";
+  public static final SimpleDateFormat MONTH_PARSER = new SimpleDateFormat(
+    MONTH_FMT);
   private Cube cube;
   private Set<CubeMeasure> cubeMeasures;
   private Set<CubeDimension> cubeDimensions;
   public static final String TEST_CUBE_NAME= "testCube";
   public static Date now;
   public static Date twodaysBack;
+  public static String twoDaysRange;
   public static Date twoMonthsBack;
+  public static String twoMonthsRangeUptoMonth;
+  public static String twoMonthsRangeUptoHours;
   private static boolean zerothHour;
 
-  static {
+  public static void init () {
     Calendar cal = Calendar.getInstance();
     now = cal.getTime();
     zerothHour = (cal.get(Calendar.HOUR_OF_DAY) == 0);
@@ -75,10 +82,241 @@ public class CubeTestSetup {
     cal.add(Calendar.MONTH, -2);
     twoMonthsBack = cal.getTime();
     System.out.println("Test twoMonthsBack:" + twoMonthsBack);
+
+    twoDaysRange = "time_range_in('dt', '" + getDateUptoHours(
+      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+    twoMonthsRangeUptoMonth = "time_range_in('dt', '" +
+      getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
+    twoMonthsRangeUptoHours = "time_range_in('dt', '" +
+      getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
+  }
+
+  private static boolean inited;
+
+  public CubeTestSetup() {
+    if (!inited) {
+      init();
+      inited = true;
+    }
   }
 
   public static boolean isZerothHour() {
     return zerothHour;
+  }
+
+  public static String getDateUptoHours(Date dt) {
+    return HOUR_PARSER.format(dt);
+  }
+
+  public static String getDateUptoMonth(Date dt) {
+    return MONTH_PARSER.format(dt);
+  }
+
+  public static String getExpectedQuery(String cubeName, String selExpr,
+                                 String whereExpr, String postWhereExpr,
+                                 Map<String, String> storageTableToWhereClause) {
+    StringBuilder expected = new StringBuilder();
+    int numTabs = storageTableToWhereClause.size();
+    assertEquals(1, numTabs);
+    for (Map.Entry<String, String> entry : storageTableToWhereClause.entrySet())
+    {
+      String storageTable = entry.getKey();
+      expected.append(selExpr);
+      expected.append(storageTable);
+      expected.append(" ");
+      expected.append(cubeName);
+      expected.append(" WHERE ");
+      expected.append("(");
+      if (whereExpr != null) {
+        expected.append(whereExpr);
+        expected.append(" AND ");
+      }
+      expected.append(entry.getValue());
+      expected.append(")");
+      if (postWhereExpr != null) {
+        expected.append(postWhereExpr);
+      }
+    }
+    return expected.toString();
+  }
+
+  public static String getExpectedQuery(String cubeName, String selExpr,
+                                 String joinExpr, String whereExpr, String postWhereExpr,
+                                 List<String> joinWhereConds,
+                                 Map<String, String> storageTableToWhereClause) {
+    StringBuilder expected = new StringBuilder();
+    int numTabs = storageTableToWhereClause.size();
+    assertEquals(1, numTabs);
+    for (Map.Entry<String, String> entry : storageTableToWhereClause.entrySet())
+    {
+      String storageTable = entry.getKey();
+      expected.append(selExpr);
+      expected.append(storageTable);
+      expected.append(" ");
+      expected.append(cubeName);
+      expected.append(joinExpr);
+      expected.append(" WHERE ");
+      expected.append("(");
+      if (whereExpr != null) {
+        expected.append(whereExpr);
+        expected.append(" AND ");
+      }
+      expected.append(entry.getValue());
+      if (joinWhereConds != null) {
+        for (String joinEntry : joinWhereConds) {
+          expected.append(" AND ");
+          expected.append(joinEntry);
+        }
+      }
+      expected.append(")");
+      if (postWhereExpr != null) {
+        expected.append(postWhereExpr);
+      }
+    }
+    return expected.toString();
+  }
+
+  public static Map<String, String> getWhereForDailyAndHourly2days(String cubeName,
+                                                             String... storageTables) {
+    return getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "dt", storageTables);
+  }
+
+  public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(String cubeName,
+                                                                        String timedDimension, String... storageTables) {
+    Map<String, String> storageTableToWhereClause =
+      new LinkedHashMap<String, String>();
+    List<String> parts = new ArrayList<String>();
+    Date dayStart;
+    if (!CubeTestSetup.isZerothHour()) {
+      addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
+        DateUtil.getCeilDate(twodaysBack, UpdatePeriod.DAILY));
+      addParts(parts, UpdatePeriod.HOURLY,
+        DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
+        DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+      dayStart = DateUtil.getCeilDate(
+        twodaysBack, UpdatePeriod.DAILY);
+    } else {
+      dayStart = twodaysBack;
+    }
+    addParts(parts, UpdatePeriod.DAILY, dayStart,
+      DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
+    storageTableToWhereClause.put(StringUtils.join(storageTables, ","),
+      StorageTableResolver.getWherePartClause(timedDimension, cubeName, parts));
+    return storageTableToWhereClause;
+  }
+
+  public static Map<String, String> getWhereForMonthlyDailyAndHourly2months(
+    String... storageTables) {
+    Map<String, String> storageTableToWhereClause =
+      new LinkedHashMap<String, String>();
+    List<String> parts = new ArrayList<String>();
+    Date dayStart = twoMonthsBack;
+    Date monthStart = twoMonthsBack;
+    boolean hourlyPartsAvailable = false;
+    if (!CubeTestSetup.isZerothHour()) {
+      addParts(parts, UpdatePeriod.HOURLY, twoMonthsBack,
+        DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.DAILY));
+      addParts(parts, UpdatePeriod.HOURLY,
+        DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
+        DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+      dayStart = DateUtil.getCeilDate(
+        twoMonthsBack, UpdatePeriod.DAILY);
+      monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
+      hourlyPartsAvailable = true;
+    }
+    Calendar cal = new GregorianCalendar();
+    cal.setTime(dayStart);
+    boolean dailyPartsAvailable = false;
+    if (cal.get(Calendar.DAY_OF_MONTH) != 1) {
+      addParts(parts, UpdatePeriod.DAILY, dayStart,
+        DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
+      monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
+      dailyPartsAvailable = true;
+    }
+    addParts(parts, UpdatePeriod.DAILY,
+      DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY),
+      DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
+    addParts(parts, UpdatePeriod.MONTHLY,
+      monthStart,
+      DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
+    StringBuilder tables = new StringBuilder();
+    if (storageTables.length > 1) {
+      if (hourlyPartsAvailable) {
+        tables.append(storageTables[0]);
+        tables.append(",");
+      }
+      if (dailyPartsAvailable) {
+        tables.append(storageTables[1]);
+        tables.append(",");
+      }
+      tables.append(storageTables[2]);
+    } else {
+      tables.append(storageTables[0]);
+    }
+    storageTableToWhereClause.put(tables.toString(),
+      StorageTableResolver.getWherePartClause("dt", cubeName, parts));
+    return storageTableToWhereClause;
+  }
+
+  public static Map<String, String> getWhereForMonthly2months(String monthlyTable) {
+    Map<String, String> storageTableToWhereClause =
+      new LinkedHashMap<String, String>();
+    List<String> parts = new ArrayList<String>();
+    addParts(parts, UpdatePeriod.MONTHLY,
+      twoMonthsBack,
+      DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
+    storageTableToWhereClause.put(monthlyTable,
+      StorageTableResolver.getWherePartClause("dt", cubeName, parts));
+    return storageTableToWhereClause;
+  }
+
+  public static Map<String, String> getWhereForHourly2days(String hourlyTable) {
+    Map<String, String> storageTableToWhereClause =
+      new LinkedHashMap<String, String>();
+    List<String> parts = new ArrayList<String>();
+    addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
+      DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+    storageTableToWhereClause.put(hourlyTable,
+      StorageTableResolver.getWherePartClause("dt", cubeName, parts));
+    return storageTableToWhereClause;
+  }
+
+  public static void addParts(List<String> partitions, UpdatePeriod updatePeriod,
+                        Date from, Date to) {
+    String fmt = updatePeriod.format();
+    Calendar cal = Calendar.getInstance();
+    cal.setTime(from);
+    Date dt = cal.getTime();
+    while (dt.before(to)) {
+      String part = new SimpleDateFormat(fmt).format(dt);
+      cal.add(updatePeriod.calendarField(), 1);
+      partitions.add(part);
+      dt = cal.getTime();
+    }
+  }
+
+  public static String rewrite(CubeQueryRewriter driver, String query)
+    throws SemanticException, ParseException {
+    CubeQueryContext rewrittenQuery = driver.rewrite(query);
+    return rewrittenQuery.toHQL();
+  }
+
+  public static String getExpectedQuery(String dimName, String selExpr, String postWhereExpr,
+                          String storageTable, boolean hasPart) {
+    StringBuilder expected = new StringBuilder();
+    expected.append(selExpr);
+    expected.append(storageTable);
+    expected.append(" ");
+    expected.append(dimName);
+    if (hasPart) {
+      expected.append(" WHERE ");
+      expected.append(StorageTableResolver.getWherePartClause("dt",
+        dimName, Storage.getPartitionsForLatest()));
+    }
+    if (postWhereExpr != null) {
+      expected.append(postWhereExpr);
+    }
+    return expected.toString();
   }
 
   private void createCube(CubeMetastoreClient client) throws HiveException {

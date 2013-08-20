@@ -59,10 +59,7 @@ public class CubeQueryContext {
   private String clauseName = null;
   private final HiveConf conf;
 
-  private String fromDateRaw;
-  private String toDateRaw;
-  private Date timeFrom;
-  private Date timeTo;
+  private List<TimeRange> timeRanges;
 
   // metadata
   private Cube cube;
@@ -136,7 +133,6 @@ public class CubeQueryContext {
   private ASTNode orderByAST;
   private ASTNode groupByAST;
   private CubeMetastoreClient client;
-  private String timeDim;
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -144,6 +140,7 @@ public class CubeQueryContext {
     this.qb = qb;
     this.conf = conf;
     this.clauseName = getClause();
+    this.timeRanges = new ArrayList<TimeRange>();
     try {
       client = CubeMetastoreClient.getInstance(conf);
     } catch (HiveException e) {
@@ -258,59 +255,74 @@ public class CubeQueryContext {
     if (whereTree == null || whereTree.getChildCount() < 1) {
       throw new SemanticException("No filter specified");
     }
-    ASTNode timenode = null;
-    if (TOK_FUNCTION == whereTree.getChild(0).getType()) {
-      // expect only time range
-      timenode = HQLParser.findNodeByPath(whereTree, TOK_FUNCTION);
-    } else if (KW_AND == whereTree.getChild(0).getType()) {
-      // expect time condition as the right sibling of KW_AND
-      ASTNode and = (ASTNode) whereTree.getChild(0);
+    searchTimeRanges(whereTree);
+  }
 
-      for (int i = 0; i < and.getChildCount(); i++) {
-        ASTNode child = (ASTNode) and.getChild(i);
-
-        if (TOK_FUNCTION == child.getToken().getType()) {
-          ASTNode fname = HQLParser.findNodeByPath(child, Identifier);
-          if (fname != null && TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
-            timenode = child;
-            break;
-          }
-        }
-
+  private void searchTimeRanges(ASTNode root) throws SemanticException {
+    if (root == null) {
+      return;
+    } else if (root.getToken().getType() == TOK_FUNCTION) {
+      ASTNode fname = HQLParser.findNodeByPath(root, Identifier);
+      if (fname != null && TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
+        processTimeRangeFunction(root, null);
       }
-
+    } else {
+      for (int i = 0; i < root.getChildCount(); i++) {
+        ASTNode child = (ASTNode) root.getChild(i);
+        searchTimeRanges(child);
+      }
     }
+  }
 
-    if (timenode == null) {
-      throw new SemanticException("Unable to get time range");
-    }
+  private void processTimeRangeFunction(ASTNode timenode, TimeRange parent) throws SemanticException {
+    TimeRange.TimeRangeBuilder builder = TimeRange.getBuilder();
+    int startPos = timenode.getCharPositionInLine();
+    builder.astNode(timenode);
 
     String timeDimName = PlanUtils.stripQuotes(timenode.getChild(1).getText());
     if (cube.getTimedDimensions().contains(timeDimName)) {
-      timeDim = timeDimName;
+      builder.partitionColumn(timeDimName);
     } else {
       throw new SemanticException(timeDimName + " is not a time dimension");
     }
 
-
-    fromDateRaw = PlanUtils.stripQuotes(timenode.getChild(2).getText());
-    if (timenode.getChildCount() > 2) {
-      toDateRaw = PlanUtils.stripQuotes(timenode.getChild(3).getText());
+    String fromDateRaw = PlanUtils.stripQuotes(timenode.getChild(2).getText());
+    String toDateRaw = null;
+    if (timenode.getChildCount() > 3) {
+      ASTNode toDateNode = (ASTNode) timenode.getChild(3);
+      if (toDateNode != null) {
+        toDateRaw = PlanUtils.stripQuotes(timenode.getChild(3).getText());
+      }
     }
-    Date now = new Date();
 
+    Date now = new Date();
     try {
-      timeFrom = DateUtil.resolveDate(fromDateRaw, now);
-      timeTo = DateUtil.resolveDate(toDateRaw, now);
+      builder.fromDate(DateUtil.resolveDate(fromDateRaw, now));
+      if (StringUtils.isNotBlank(toDateRaw)) {
+        builder.toDate(DateUtil.resolveDate(toDateRaw, now));
+      } else {
+        builder.toDate(now);
+      }
     } catch (HiveException e) {
       throw new SemanticException(e);
     }
 
-    assert timeDim != null && timeFrom != null && timeTo != null;
+    TimeRange range = builder.build();
+    range.validate();
 
-    if (timeFrom.after(timeTo)) {
-      throw new SemanticException("From date: " + fromDateRaw
-          + " is after to date:" + toDateRaw);
+    if (parent != null) {
+      parent.setChild(range);
+    } else {
+      timeRanges.add(range);
+    }
+
+    // check if last argument is another time range function
+    ASTNode lastChild = (ASTNode) timenode.getChild(timenode.getChildCount() - 1);
+    if (lastChild.getToken().getType() == TOK_FUNCTION) {
+      ASTNode fname = HQLParser.findNodeByPath(lastChild, Identifier);
+      if (fname != null && TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
+        processTimeRangeFunction(lastChild, range);
+      }
     }
   }
 
@@ -556,24 +568,9 @@ public class CubeQueryContext {
     }
   }
 
-  public String getFromDateRaw() {
-    return fromDateRaw;
-  }
 
   public Cube getCube() {
     return cube;
-  }
-
-  public String getToDateRaw() {
-    return toDateRaw;
-  }
-
-  public Date getFromDate() {
-    return timeFrom;
-  }
-
-  public Date getToDate() {
-    return timeTo;
   }
 
   public QB getQB() {
@@ -1252,10 +1249,6 @@ public class CubeQueryContext {
     }
   }
 
-  public String getTimeDimension() {
-    return timeDim;
-  }
-
   public void setJoinsResolvedAutomatically(boolean flag) {
     this.joinsResolvedAutomatically = flag;
   }
@@ -1270,5 +1263,9 @@ public class CubeQueryContext {
 
   public String getAutoResolvedJoinChain() {
     return this.autoResolvedJoinClause;
+  }
+
+  public List<TimeRange> getTimeRanges() {
+    return timeRanges;
   }
 }
