@@ -144,8 +144,7 @@ public class PartitionPruner implements Transform {
       for (Table tab : parseCtx.getTopToTables().get(ts)) {
         partsList.add(prune(tab,
             parseCtx.getOpToPartPruner().get(ts), parseCtx.getConf(), alias,
-            ts.getConf().getVirtualCols(), parseCtx.getPrunedPartitions())
-            );
+            ts.getConf().getVirtualCols(), parseCtx.getPrunedPartitions()));
       }
     }
     return partsList;
