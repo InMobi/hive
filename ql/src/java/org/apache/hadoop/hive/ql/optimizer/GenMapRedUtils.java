@@ -469,10 +469,8 @@ public final class GenMapRedUtils {
     Set<Partition> parts = new LinkedHashSet<Partition>();
     // pass both confirmed and unknown partitions through the map-reduce
     // framework
-
     for (PrunedPartitionList pl : partsList) {
-      parts.addAll(pl.getConfirmedPartns());
-      parts.addAll(pl.getUnknownPartns());
+      parts.addAll(pl.getPartitions());
     }
     PartitionDesc aliasPartnDesc = null;
     try {

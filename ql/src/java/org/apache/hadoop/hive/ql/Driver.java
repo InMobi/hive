@@ -631,8 +631,7 @@ public class Driver implements CommandProcessor {
                   parseCtx, alias_id);
               Set<Partition> parts = new HashSet<Partition>();
               for (PrunedPartitionList ppl : partsList) {
-                parts.addAll(ppl.getConfirmedPartns());
-                parts.addAll(ppl.getUnknownPartns());
+                parts.addAll(ppl.getPartitions());
               }
               for (Partition part : parts) {
                 List<String> existingCols = part2Cols.get(part);

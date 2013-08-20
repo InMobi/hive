@@ -16,33 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hive.ql.exec.persistence;
-
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
+package org.apache.hadoop.hive.ql.history;
 
 /**
- * Map Join Object used for both key.
+ * Proxy handler for HiveHistory to do nothing
+ * Used when HiveHistory is disabled.
  */
-public abstract class AbstractMapJoinKey implements Externalizable {
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
-  protected static int metadataTag = -1;
+public class HiveHistoryProxyHandler implements InvocationHandler {
 
-  public AbstractMapJoinKey() {
+  public static HiveHistory getNoOpHiveHistoryProxy() {
+    return (HiveHistory)Proxy.newProxyInstance(HiveHistory.class.getClassLoader(),
+        new Class<?>[] {HiveHistory.class},
+        new HiveHistoryProxyHandler());
   }
 
   @Override
-  public abstract boolean equals(Object o);
-
-  @Override
-  public abstract int hashCode();
-
-  public abstract void readExternal(ObjectInput in) throws IOException, ClassNotFoundException;
-
-  public abstract void writeExternal(ObjectOutput out) throws IOException;
-
-  public abstract boolean hasAnyNulls(boolean[] nullsafes);
+  public Object invoke(Object arg0, final Method method, final Object[] args){
+    //do nothing
+    return null;
+  }
 
 }
+

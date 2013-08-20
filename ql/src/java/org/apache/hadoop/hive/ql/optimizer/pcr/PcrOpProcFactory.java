@@ -122,19 +122,12 @@ public final class PcrOpProcFactory {
       }
 
       for (PrunedPartitionList ppl : prunedPartList) {
-        for (Partition p : ppl.getConfirmedPartns()) {
+        for (Partition p : ppl.getPartitions()) {
           if (!p.getTable().isPartitioned()) {
             return null;
           }
         }
-        for (Partition p : ppl.getUnknownPartns()) {
-          if (!p.getTable().isPartitioned()) {
-            return null;
-          }
-        }
-
-        partitions.addAll(ppl.getConfirmedPartns());
-        partitions.addAll(ppl.getUnknownPartns());
+        partitions.addAll(ppl.getPartitions());
       }
 
       PcrExprProcFactory.NodeInfoWrapper wrapper = PcrExprProcFactory.walkExprTree(

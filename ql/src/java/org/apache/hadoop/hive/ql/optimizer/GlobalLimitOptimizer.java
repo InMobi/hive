@@ -125,14 +125,17 @@ public class GlobalLimitOptimizer implements Transform {
               LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
               throw new SemanticException(e.getMessage(), e);
             }
-            Set<Partition> unknownParts = new HashSet<Partition>();
+            boolean hasUnknownPartitions = false;
             for (PrunedPartitionList ppl : partsList) {
-              unknownParts.addAll(ppl.getUnknownPartns());
+              if (ppl.hasUnknownPartitions()) {
+                hasUnknownPartitions = true;
+                break;
+              }
             }
 
             // If there is any unknown partition, create a map-reduce job for
             // the filter to prune correctly
-            if ((unknownParts.size() == 0)) {
+            if (!hasUnknownPartitions) {
               globalLimitCtx.enableOpt(tempGlobalLimit);
             }
           }

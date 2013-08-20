@@ -64,8 +64,7 @@ public class ListBucketingPruner implements Transform {
     if (partsList != null) {
       Set<Partition> parts = new LinkedHashSet<Partition>();
       for (PrunedPartitionList ppl : partsList) {
-        parts.addAll(ppl.getConfirmedPartns());
-        parts.addAll(ppl.getUnknownPartns());
+        parts.addAll(ppl.getPartitions());
       }
       if ((parts != null) && (parts.size() > 0)) {
         for (Partition part : parts) {

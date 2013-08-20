@@ -15,35 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hive.ql.exec;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+package org.apache.hadoop.hive.ql.exec.persistence;
+
+import java.util.Collections;
 import java.util.Map;
 
-import org.apache.hadoop.hive.ql.exec.HashTableSinkOperator.HashTableSinkObjectCtx;
+public abstract class AbstractMapJoinTableContainer implements MapJoinTableContainer {
+  private final Map<String, String> metaData;
 
-public class MapJoinMetaData {
-  transient Map<Integer, HashTableSinkObjectCtx> mapMetadata =
-      new HashMap<Integer, HashTableSinkObjectCtx>();
-  static ArrayList<Object> list = new ArrayList<Object>();
-
-  public MapJoinMetaData(){
-
+  protected AbstractMapJoinTableContainer(Map<String, String> metaData) {
+    this.metaData = metaData;
   }
-  public void put(Integer key, HashTableSinkObjectCtx value){
-    mapMetadata.put(key, value);
+  @Override
+  public Map<String, String> getMetaData() {
+    return Collections.unmodifiableMap(metaData);
   }
-  public HashTableSinkObjectCtx get(Integer key){
-    return mapMetadata.get(key);
-  }
-
-  public void clear(){
-    mapMetadata.clear();
-  }
-
-  public static ArrayList<Object> getList(){
-    list.clear();
-    return list;
+  
+  protected void putMetaData(String key, String value) {
+    metaData.put(key, value);
   }
 }
