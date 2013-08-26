@@ -2,7 +2,6 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.KW_AND;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ALLCOLREF;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
@@ -33,7 +32,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
-import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.ASTNodeVisitor;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.TreeNode;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -59,7 +57,7 @@ public class CubeQueryContext {
   private String clauseName = null;
   private final HiveConf conf;
 
-  private List<TimeRange> timeRanges;
+  private final List<TimeRange> timeRanges;
 
   // metadata
   private Cube cube;
@@ -108,9 +106,8 @@ public class CubeQueryContext {
   // storage specific
   protected final Set<CubeFactTable> candidateFactTables =
       new HashSet<CubeFactTable>();
-  protected final Map<CubeFactTable, Map<UpdatePeriod, List<String>>>
-  factPartitionMap =
-  new HashMap<CubeFactTable, Map<UpdatePeriod, List<String>>>();
+  // Map from fact to number of partitions
+  protected final Map<CubeFactTable, Integer> factPartitionMap = new HashMap<CubeFactTable, Integer>();
   private final Map<CubeFactTable, Set<String>> factStorageMap =
       new HashMap<CubeFactTable, Set<String>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
@@ -761,13 +758,12 @@ public class CubeQueryContext {
   }
 
   public
-  Map<CubeFactTable, Map<UpdatePeriod, List<String>>> getFactPartitionMap() {
+  Map<CubeFactTable, Integer> getFactPartitionMap() {
     return factPartitionMap;
   }
 
-  public void setFactPartitionMap(Map<CubeFactTable,
-      Map<UpdatePeriod, List<String>>> factPartitionMap) {
-    this.factPartitionMap.putAll(factPartitionMap);
+  public void setFactPartitionMap(Map<CubeFactTable, Integer> factPartMap) {
+    this.factPartitionMap.putAll(factPartMap);
   }
 
   private final String baseQueryFormat = "SELECT %s FROM %s";
@@ -1085,6 +1081,7 @@ public class CubeQueryContext {
     ASTNode tree;
     try {
       LOG.info("HQL:" + hql);
+      System.out.println("Rewritten HQL:" + hql);
       tree = pd.parse(hql, ctx);
     } catch (ParseException e) {
       throw new SemanticException(e);

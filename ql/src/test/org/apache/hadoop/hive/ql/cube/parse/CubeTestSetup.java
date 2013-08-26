@@ -1,8 +1,19 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
+import static org.junit.Assert.assertEquals;
+
 import java.text.SimpleDateFormat;
-import java.util.*;
-import static org.junit.Assert.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -29,7 +40,6 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.TextInputFormat;
 
 /*
@@ -764,8 +774,8 @@ public class CubeTestSetup {
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage2.addToPartCols(new FieldSchema("pt", "string", "p time"));
-    hdfsStorage2.addToPartCols(new FieldSchema("et", "string", "p time"));
-    hdfsStorage2.addToPartCols(new FieldSchema("it", "string", "p time"));
+    hdfsStorage2.addToPartCols(new FieldSchema("it", "string", "i time"));
+    hdfsStorage2.addToPartCols(new FieldSchema("et", "string", "e time"));
     storages.add(hdfsStorage2);
     storageUpdatePeriods.put(hdfsStorage2.getName(), updates);
 
@@ -777,6 +787,7 @@ public class CubeTestSetup {
     CubeFactTable fact1 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageUpdatePeriods, 10L, properties);
     client.createCubeTable(fact1, storages);
+    createPIEParts(client, fact1, hdfsStorage2);
 
     // create summary2 - same schema, different valid columns
     factName = "summary2";
@@ -791,8 +802,8 @@ public class CubeTestSetup {
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage2.addToPartCols(new FieldSchema("pt", "string", "p time"));
-    hdfsStorage2.addToPartCols(new FieldSchema("et", "string", "p time"));
-    hdfsStorage2.addToPartCols(new FieldSchema("it", "string", "p time"));
+    hdfsStorage2.addToPartCols(new FieldSchema("it", "string", "i time"));
+    hdfsStorage2.addToPartCols(new FieldSchema("et", "string", "e time"));
     storages.add(hdfsStorage2);
     storageUpdatePeriods.put(hdfsStorage2.getName(), updates);
     properties = new HashMap<String, String>();
@@ -802,6 +813,7 @@ public class CubeTestSetup {
     CubeFactTable fact2 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageUpdatePeriods, 20L, properties);
     client.createCubeTable(fact2, storages);
+    createPIEParts(client, fact2, hdfsStorage2);
 
     factName = "summary3";
     storages = new HashSet<Storage>();
@@ -815,8 +827,8 @@ public class CubeTestSetup {
         TextInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage2.addToPartCols(new FieldSchema("pt", "string", "p time"));
-    hdfsStorage2.addToPartCols(new FieldSchema("et", "string", "p time"));
-    hdfsStorage2.addToPartCols(new FieldSchema("it", "string", "p time"));
+    hdfsStorage2.addToPartCols(new FieldSchema("it", "string", "i time"));
+    hdfsStorage2.addToPartCols(new FieldSchema("et", "string", "e time"));
     storages.add(hdfsStorage2);
     storageUpdatePeriods.put(hdfsStorage2.getName(), updates);
     properties = new HashMap<String, String>();
@@ -826,9 +838,91 @@ public class CubeTestSetup {
     CubeFactTable fact3 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageUpdatePeriods, 30L, properties);
     client.createCubeTable(fact3, storages);
+    createPIEParts(client, fact3, hdfsStorage2);
   }
 
-  public static void  printQueryAST(String query, String label) throws ParseException {
+  private void createPIEParts(CubeMetastoreClient client, CubeFactTable fact,
+      Storage hdfsStorage) throws HiveException {
+    // Add partitions in PIE storage
+    Calendar pcal = Calendar.getInstance();
+    pcal.setTime(twodaysBack);
+    pcal.set(Calendar.HOUR, 0);
+    Calendar ical = Calendar.getInstance();
+    ical.setTime(twodaysBack);
+    ical.set(Calendar.HOUR, 0);
+    // pt=day1 and it=day1
+    // pt=day2-hour[0-3] it = day1-hour[20-23]
+    // pt=day2 and it=day1
+    // pt=day2-hour[4-23] it = day2-hour[0-19]
+    // pt=day2 and it=day2
+    // pt=day3-hour[0-3] it = day2-hour[20-23]
+    // pt=day3-hour[4-23] it = day3-hour[0-19]
+    for (int p = 1; p <= 3; p++) {
+      Date ptime = pcal.getTime();
+      Date itime = ical.getTime();
+      System.out.println("ptime :" + ptime + "itime:" + itime);
+      Map<String, Date> timeParts = new HashMap<String, Date>();
+      if (p == 1) { // day1
+        System.out.println("ptime :" + ptime + "itime:" + itime);
+        timeParts.put("pt", ptime);
+        timeParts.put("it", itime);
+        timeParts.put("et", itime);
+        client.addPartition(fact, hdfsStorage,
+            UpdatePeriod.DAILY, timeParts);
+        pcal.add(Calendar.DAY_OF_MONTH, 1);
+        ical.add(Calendar.HOUR_OF_DAY, 20);
+      } else if (p == 2) { // day2
+        // pt=day2-hour[0-3] it = day1-hour[20-23]
+        // pt=day2 and it=day1
+        // pt=day2-hour[4-23] it = day2-hour[0-19]
+        // pt=day2 and it=day2
+        System.out.println("ptime :" + ptime + "itime:" + itime);
+        ptime = pcal.getTime();
+        itime = ical.getTime();
+        timeParts.put("pt", ptime);
+        timeParts.put("it", itime);
+        timeParts.put("et", itime);
+        // pt=day2 and it=day1
+        client.addPartition(fact, hdfsStorage,
+            UpdatePeriod.DAILY, timeParts);
+        // pt=day2-hour[0-3] it = day1-hour[20-23]
+        // pt=day2-hour[4-23] it = day2-hour[0-19]
+        for (int i = 0; i < 24; i++) {
+          ptime = pcal.getTime();
+          itime = ical.getTime();
+          timeParts.put("pt", ptime);
+          timeParts.put("it", itime);
+          timeParts.put("et", itime);
+          client.addPartition(fact, hdfsStorage,
+              UpdatePeriod.HOURLY, timeParts);
+          pcal.add(Calendar.HOUR_OF_DAY, 1);
+          ical.add(Calendar.HOUR_OF_DAY, 1);
+        }
+        // pt=day2 and it=day2
+        client.addPartition(fact, hdfsStorage,
+            UpdatePeriod.DAILY, timeParts);
+      }
+      else if (p == 3) { // day3
+        // pt=day3-hour[0-3] it = day2-hour[20-23]
+        // pt=day3-hour[4-23] it = day3-hour[0-19]
+        System.out.println("ptime :" + ptime + "itime:" + itime);
+        for (int i = 0; i < 24; i++) {
+          ptime = pcal.getTime();
+          itime = ical.getTime();
+          timeParts.put("pt", ptime);
+          timeParts.put("it", itime);
+          timeParts.put("et", itime);
+          client.addPartition(fact, hdfsStorage,
+              UpdatePeriod.HOURLY, timeParts);
+          pcal.add(Calendar.HOUR_OF_DAY, 1);
+          ical.add(Calendar.HOUR_OF_DAY, 1);
+        }
+      }
+    }
+  }
+
+  public static void  printQueryAST(String query, String label)
+      throws ParseException {
     System.out.println("--" + label + "--AST--");
     System.out.println("--query- " + query);
     HQLParser.printAST(HQLParser.parseHQL(query));

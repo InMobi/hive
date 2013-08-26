@@ -1,18 +1,32 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.cube.metadata.Storage;
-import org.apache.hadoop.hive.ql.parse.ParseException;
-import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.junit.*;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getExpectedQuery;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2days;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2daysWithTimeDim;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForHourly2days;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForMonthly2months;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForMonthlyDailyAndHourly2months;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.now;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoMonthsRangeUptoHours;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoMonthsRangeUptoMonth;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twodaysBack;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.*;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.cube.metadata.Storage;
+import org.apache.hadoop.hive.ql.parse.ParseException;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class TestCubeRewriter {
 

@@ -8,7 +8,6 @@ import java.util.Set;
 import junit.framework.Assert;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.junit.Test;
 
 public class TestStorageTableResolver {
@@ -45,192 +44,198 @@ public class TestStorageTableResolver {
 
     Configuration conf = new Configuration();
     // {s1,s2,s3}, {s3}, {s3} -> {s3}
-    Map<UpdatePeriod, Set<String>> answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s123);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s3);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s3);
+    Map<String, Set<String>> answeringTablesMap =
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s123);
+    answeringTablesMap.put("day", s3);
+    answeringTablesMap.put("hour", s3);
     StorageTableResolver str = new StorageTableResolver(conf);
-    Map<String, Set<UpdatePeriod>> result = str
-        .getMinimalAnsweringTables(answeringTablesMap);
+    Map<String, Set<String>> result = new HashMap<String, Set<String>>();
+    boolean mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(1, result.size());
     Assert.assertEquals("S3", result.keySet().iterator().next());
-    Set<UpdatePeriod> coveredPeriods = result.get("S3");
-    Assert.assertEquals(3, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-    Assert.assertTrue(str.enabledMultiTableSelect());
+    Set<String> coveredParts = result.get("S3");
+    Assert.assertEquals(3, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("month"));
+    Assert.assertTrue(coveredParts.contains("day"));
+    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(mts);
 
     // {s1,s2,s3}, {s4}, {s5} - > {s1,s4,s5} or {s2,s4,s5} or {s3,s4,s5}
     answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s123);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s4);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s5);
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s123);
+    answeringTablesMap.put("day", s4);
+    answeringTablesMap.put("hour", s5);
     str = new StorageTableResolver(conf);
-    result = str.getMinimalAnsweringTables(answeringTablesMap);
+    result = new HashMap<String, Set<String>>();
+    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(3, result.size());
     Assert.assertTrue(result.keySet().contains("S4"));
     Assert.assertTrue(result.keySet().contains("S5"));
     Assert.assertTrue(result.keySet().contains("S1") ||
         result.keySet().contains("S2") || result.keySet().contains("S3"));
-    coveredPeriods = result.get("S4");
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
-    coveredPeriods = result.get("S5");
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-    coveredPeriods = result.get("S1");
-    if (coveredPeriods == null) {
-      coveredPeriods = result.get("S2");
+    coveredParts = result.get("S4");
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("day"));
+    coveredParts = result.get("S5");
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("hour"));
+    coveredParts = result.get("S1");
+    if (coveredParts == null) {
+      coveredParts = result.get("S2");
     }
-    if (coveredPeriods == null) {
-      coveredPeriods = result.get("S3");
+    if (coveredParts == null) {
+      coveredParts = result.get("S3");
     }
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-    Assert.assertTrue(str.enabledMultiTableSelect());
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("month"));
+    Assert.assertTrue(mts);
 
     // {s1}, {s2}, {s3} -> {s1,s2,s3}
     answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s1);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s2);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s3);
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s1);
+    answeringTablesMap.put("day", s2);
+    answeringTablesMap.put("hour", s3);
     str = new StorageTableResolver(conf);
-    result = str.getMinimalAnsweringTables(answeringTablesMap);
+    result = new HashMap<String, Set<String>>();
+    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(3, result.size());
     Assert.assertTrue(result.keySet().contains("S1"));
     Assert.assertTrue(result.keySet().contains("S2"));
     Assert.assertTrue(result.keySet().contains("S3"));
-    coveredPeriods = result.get("S1");
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-    coveredPeriods = result.get("S2");
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
-    coveredPeriods = result.get("S3");
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-    Assert.assertTrue(str.enabledMultiTableSelect());
+    coveredParts = result.get("S1");
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("month"));
+    coveredParts = result.get("S2");
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("day"));
+    coveredParts = result.get("S3");
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(mts);
 
     // {s1, s2}, {s2, s3}, {s4} -> {s2,s4}
     answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s12);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s23);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s4);
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s12);
+    answeringTablesMap.put("day", s23);
+    answeringTablesMap.put("hour", s4);
     str = new StorageTableResolver(conf);
-    result = str.getMinimalAnsweringTables(answeringTablesMap);
+    result = new HashMap<String, Set<String>>();
+    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S2"));
     Assert.assertTrue(result.keySet().contains("S4"));
-    coveredPeriods = result.get("S2");
-    Assert.assertEquals(2, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
-    coveredPeriods = result.get("S4");
-    Assert.assertEquals(1, coveredPeriods.size());
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-    Assert.assertTrue(str.enabledMultiTableSelect());
+    coveredParts = result.get("S2");
+    Assert.assertEquals(2, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("month"));
+    Assert.assertTrue(coveredParts.contains("day"));
+    coveredParts = result.get("S4");
+    Assert.assertEquals(1, coveredParts.size());
+    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(mts);
 
     // {s1, s2}, {s2, s4}, {s4} -> {s1,s4} or {s2,s4}
     answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s12);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s24);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s4);
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s12);
+    answeringTablesMap.put("day", s24);
+    answeringTablesMap.put("hour", s4);
     str = new StorageTableResolver(conf);
-    result = str.getMinimalAnsweringTables(answeringTablesMap);
+    result = new HashMap<String, Set<String>>();
+    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S2") || result.keySet().contains("S1"));
     Assert.assertTrue(result.keySet().contains("S4"));
-    coveredPeriods = result.get("S1");
-    if (coveredPeriods == null) {
-      coveredPeriods = result.get("S2");
-      Assert.assertTrue(coveredPeriods.size() >= 1);
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-      if (coveredPeriods.size() == 2) {
-        Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
+    coveredParts = result.get("S1");
+    if (coveredParts == null) {
+      coveredParts = result.get("S2");
+      Assert.assertTrue(coveredParts.size() >= 1);
+      Assert.assertTrue(coveredParts.contains("month"));
+      if (coveredParts.size() == 2) {
+        Assert.assertTrue(coveredParts.contains("day"));
         Assert.assertEquals(1, result.get("S4").size());
       }
-      coveredPeriods = result.get("S4");
-      Assert.assertTrue(coveredPeriods.size() >= 1);
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-      if (coveredPeriods.size() == 2) {
-        Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
+      coveredParts = result.get("S4");
+      Assert.assertTrue(coveredParts.size() >= 1);
+      Assert.assertTrue(coveredParts.contains("hour"));
+      if (coveredParts.size() == 2) {
+        Assert.assertTrue(coveredParts.contains("day"));
         Assert.assertEquals(1, result.get("S2").size());
       }
     } else {
-      Assert.assertEquals(1, coveredPeriods.size());
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-      coveredPeriods = result.get("S4");
-      Assert.assertTrue(coveredPeriods.size() >= 1);
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
+      Assert.assertEquals(1, coveredParts.size());
+      Assert.assertTrue(coveredParts.contains("month"));
+      coveredParts = result.get("S4");
+      Assert.assertTrue(coveredParts.size() >= 1);
+      Assert.assertTrue(coveredParts.contains("hour"));
+      Assert.assertTrue(coveredParts.contains("day"));
     }
-    Assert.assertFalse(str.enabledMultiTableSelect());
+    Assert.assertFalse(mts);
 
     // {s1, s2}, {s2, s3}, {s3,s4} -> {s2,s3}
     answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s12);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s23);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s34);
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s12);
+    answeringTablesMap.put("day", s23);
+    answeringTablesMap.put("hour", s34);
     str = new StorageTableResolver(conf);
-    result = str.getMinimalAnsweringTables(answeringTablesMap);
+    result = new HashMap<String, Set<String>>();
+    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S2"));
     Assert.assertTrue(result.keySet().contains("S3"));
-    coveredPeriods = result.get("S2");
-    Assert.assertTrue(coveredPeriods.size() >= 1);
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
-    if (coveredPeriods.size() == 2) {
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
+    coveredParts = result.get("S2");
+    Assert.assertTrue(coveredParts.size() >= 1);
+    Assert.assertTrue(coveredParts.contains("month"));
+    if (coveredParts.size() == 2) {
+      Assert.assertTrue(coveredParts.contains("day"));
       Assert.assertEquals(1, result.get("S3").size());
     }
-    coveredPeriods = result.get("S3");
-    Assert.assertTrue(coveredPeriods.size() >= 1);
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-    if (coveredPeriods.size() == 2) {
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
+    coveredParts = result.get("S3");
+    Assert.assertTrue(coveredParts.size() >= 1);
+    Assert.assertTrue(coveredParts.contains("hour"));
+    if (coveredParts.size() == 2) {
+      Assert.assertTrue(coveredParts.contains("day"));
       Assert.assertEquals(1, result.get("S2").size());
     }
-    Assert.assertFalse(str.enabledMultiTableSelect());
+    Assert.assertFalse(mts);
 
     // {s1, s2}, {s2}, {s1} -> {s1,s2}
     answeringTablesMap =
-        new HashMap<UpdatePeriod, Set<String>>();
-    answeringTablesMap.put(UpdatePeriod.MONTHLY, s12);
-    answeringTablesMap.put(UpdatePeriod.DAILY, s2);
-    answeringTablesMap.put(UpdatePeriod.HOURLY, s1);
+        new HashMap<String, Set<String>>();
+    answeringTablesMap.put("month", s12);
+    answeringTablesMap.put("day", s2);
+    answeringTablesMap.put("hour", s1);
     str = new StorageTableResolver(conf);
-    result = str.getMinimalAnsweringTables(answeringTablesMap);
+    result = new HashMap<String, Set<String>>();
+    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S1"));
     Assert.assertTrue(result.keySet().contains("S2"));
-    coveredPeriods = result.get("S2");
-    Assert.assertTrue(coveredPeriods.size() >= 1);
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.DAILY));
-    if (coveredPeriods.size() == 2) {
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
+    coveredParts = result.get("S2");
+    Assert.assertTrue(coveredParts.size() >= 1);
+    Assert.assertTrue(coveredParts.contains("day"));
+    if (coveredParts.size() == 2) {
+      Assert.assertTrue(coveredParts.contains("month"));
       Assert.assertEquals(1, result.get("S1").size());
     }
-    coveredPeriods = result.get("S1");
-    Assert.assertTrue(coveredPeriods.size() >= 1);
-    Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.HOURLY));
-    if (coveredPeriods.size() == 2) {
-      Assert.assertTrue(coveredPeriods.contains(UpdatePeriod.MONTHLY));
+    coveredParts = result.get("S1");
+    Assert.assertTrue(coveredParts.size() >= 1);
+    Assert.assertTrue(coveredParts.contains("hour"));
+    if (coveredParts.size() == 2) {
+      Assert.assertTrue(coveredParts.contains("month"));
       Assert.assertEquals(1, result.get("S2").size());
     }
-    Assert.assertFalse(str.enabledMultiTableSelect());
+    Assert.assertFalse(mts);
   }
 }

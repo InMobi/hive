@@ -505,6 +505,14 @@ public class CubeMetastoreClient {
         getTable(storageTableName), filter);
     return !(parts.isEmpty());
   }
+
+  public List<Partition> getPartitionsByFilter(String storageTableName,
+      String filter) throws MetaException, NoSuchObjectException,
+      HiveException, TException {
+    return getClient().getPartitionsByFilter(
+        getTable(storageTableName), filter);
+  }
+
   public boolean partitionExists(String storageTableName,
       UpdatePeriod updatePeriod,
       Date partitionTimestamp)
@@ -833,6 +841,16 @@ public class CubeMetastoreClient {
       throw new HiveException("Could not get all tables", e);
     }
     return factTables;
+  }
+
+  public List<String> getPartColNames(String tableName)
+      throws HiveException {
+    List<String> partColNames = new ArrayList<String>();
+    Table tbl = getTable(tableName);
+    for (FieldSchema f : tbl.getPartCols()) {
+      partColNames.add(f.getName().toLowerCase());
+    }
+    return partColNames;
   }
 
   public boolean partColExists(String tableName, String partCol)
