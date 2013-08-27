@@ -1,17 +1,26 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
 
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getDateUptoHours;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.now;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twodaysBack;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
+
+import java.util.List;
+
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.junit.*;
-
-import java.util.List;
-import static org.junit.Assert.*;
-
-import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.*;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class TestTimeRangeExtractor {
   private CubeMetastoreClient metastore;
@@ -26,7 +35,7 @@ public class TestTimeRangeExtractor {
   @BeforeClass
   public static void setup() throws Exception {
     setup = new CubeTestSetup();
-    setup.createSources(hconf, TestJoinResolver.class.getSimpleName());
+    setup.createSources(hconf, TestTimeRangeExtractor.class.getSimpleName());
   }
 
   @AfterClass

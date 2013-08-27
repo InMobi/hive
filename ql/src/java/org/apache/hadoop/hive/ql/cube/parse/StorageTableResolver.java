@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,7 @@ public class StorageTableResolver implements ContextRewriter {
   private final Map<String, String> storageTableToWhereClause =
       new HashMap<String, String>();
   private final List<String> nonExistingParts = new ArrayList<String>();
-  private boolean defaultMultiTableSelect = true;
+  private boolean enableMultiTableSelect = true;
   private String timePartitionColumn = null;
 
   public StorageTableResolver(Configuration conf) {
@@ -61,7 +62,7 @@ public class StorageTableResolver implements ContextRewriter {
     String str = conf.get(CubeQueryConfUtil.VALID_STORAGE_DIM_TABLES);
     validDimTables = StringUtils.isBlank(str) ? null :
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
-    this.defaultMultiTableSelect = conf.getBoolean(
+    this.enableMultiTableSelect = conf.getBoolean(
         CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
         CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
   }
@@ -258,6 +259,7 @@ public class StorageTableResolver implements ContextRewriter {
       CubeFactTable fact = i.next();
       Map<String, Set<String>> answeringTablesMap =
           new HashMap<String, Set<String>>();
+      Map<UpdatePeriod, Set<String>> updatePeriodPartitionMap = new HashMap<UpdatePeriod, Set<String>>();
       if (!getPartitionColMap(fact, answeringTablesMap, fromDate, toDate) ||
           answeringTablesMap.isEmpty()) {
         LOG.info("Not considering the fact table:" + fact + " as it could not" +
@@ -268,7 +270,7 @@ public class StorageTableResolver implements ContextRewriter {
       factPartMap.put(fact, answeringTablesMap.keySet().size());
 
       // Map from storage to covering parts
-      Map<String, Set<String>> minimalStorageTables = new HashMap<String, Set<String>>();
+      Map<String, Set<String>> minimalStorageTables = new LinkedHashMap<String, Set<String>>();
       boolean enabledMultiTableSelect = getMinimalAnsweringTables(
           answeringTablesMap, minimalStorageTables);
       Set<String> storageTables = new LinkedHashSet<String>();

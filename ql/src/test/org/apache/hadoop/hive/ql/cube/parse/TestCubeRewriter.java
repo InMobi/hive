@@ -310,7 +310,7 @@ public class TestCubeRewriter {
       " where " + twoMonthsRangeUptoHours);
     expected = getExpectedQuery(cubeName,
       "select sum(testcube.msr2) FROM ", null, null,
-      getWhereForMonthlyDailyAndHourly2months("c2_testfact","C1_testfact",
+      getWhereForMonthlyDailyAndHourly2months("c1_testfact","C2_testfact",
         "c3_testFact"));
     compareQueries(expected, hqlQuery);
 

@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -21,7 +22,6 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.BaseDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.ColumnMeasure;
-import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimension;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
@@ -59,6 +59,7 @@ import org.apache.hadoop.mapred.TextInputFormat;
  * CityTable : C1 - SNAPSHOT and C2 - NO snapshot
  */
 
+@SuppressWarnings("deprecation")
 public class CubeTestSetup {
 
   public static final String cubeName = "testcube";
@@ -68,7 +69,6 @@ public class CubeTestSetup {
   public static String MONTH_FMT = "yyyy-MM";
   public static final SimpleDateFormat MONTH_PARSER = new SimpleDateFormat(
     MONTH_FMT);
-  private Cube cube;
   private Set<CubeMeasure> cubeMeasures;
   private Set<CubeDimension> cubeDimensions;
   public static final String TEST_CUBE_NAME= "testCube";
@@ -191,16 +191,17 @@ public class CubeTestSetup {
     return getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "dt", storageTables);
   }
 
-  public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(String cubeName,
-                                                                        String timedDimension, String... storageTables) {
+  public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(
+      String cubeName, String timedDimension, String... storageTables) {
     Map<String, String> storageTableToWhereClause =
       new LinkedHashMap<String, String>();
-    List<String> parts = new ArrayList<String>();
+    List<String> hourlyparts = new ArrayList<String>();
+    List<String> dailyparts = new ArrayList<String>();
     Date dayStart;
     if (!CubeTestSetup.isZerothHour()) {
-      addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
+      addParts(hourlyparts, UpdatePeriod.HOURLY, twodaysBack,
         DateUtil.getCeilDate(twodaysBack, UpdatePeriod.DAILY));
-      addParts(parts, UpdatePeriod.HOURLY,
+      addParts(hourlyparts, UpdatePeriod.HOURLY,
         DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
         DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
       dayStart = DateUtil.getCeilDate(
@@ -208,8 +209,14 @@ public class CubeTestSetup {
     } else {
       dayStart = twodaysBack;
     }
-    addParts(parts, UpdatePeriod.DAILY, dayStart,
+    addParts(dailyparts, UpdatePeriod.DAILY, dayStart,
       DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
+    List<String> parts = new ArrayList<String>();
+    parts.addAll(hourlyparts);
+    parts.addAll(dailyparts);
+    if (storageTables.length == 1) {
+     Collections.sort(parts);
+    }
     storageTableToWhereClause.put(StringUtils.join(storageTables, ","),
       StorageTableResolver.getWherePartClause(timedDimension, cubeName, parts));
     return storageTableToWhereClause;
@@ -219,14 +226,16 @@ public class CubeTestSetup {
     String... storageTables) {
     Map<String, String> storageTableToWhereClause =
       new LinkedHashMap<String, String>();
-    List<String> parts = new ArrayList<String>();
+    List<String> hourlyparts = new ArrayList<String>();
+    List<String> dailyparts = new ArrayList<String>();
+    List<String> monthlyparts = new ArrayList<String>();
     Date dayStart = twoMonthsBack;
     Date monthStart = twoMonthsBack;
     boolean hourlyPartsAvailable = false;
     if (!CubeTestSetup.isZerothHour()) {
-      addParts(parts, UpdatePeriod.HOURLY, twoMonthsBack,
+      addParts(hourlyparts, UpdatePeriod.HOURLY, twoMonthsBack,
         DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.DAILY));
-      addParts(parts, UpdatePeriod.HOURLY,
+      addParts(hourlyparts, UpdatePeriod.HOURLY,
         DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
         DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
       dayStart = DateUtil.getCeilDate(
@@ -238,17 +247,21 @@ public class CubeTestSetup {
     cal.setTime(dayStart);
     boolean dailyPartsAvailable = false;
     if (cal.get(Calendar.DAY_OF_MONTH) != 1) {
-      addParts(parts, UpdatePeriod.DAILY, dayStart,
+      addParts(dailyparts, UpdatePeriod.DAILY, dayStart,
         DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
       monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
       dailyPartsAvailable = true;
     }
-    addParts(parts, UpdatePeriod.DAILY,
+    addParts(dailyparts, UpdatePeriod.DAILY,
       DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY),
       DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
-    addParts(parts, UpdatePeriod.MONTHLY,
+    addParts(monthlyparts, UpdatePeriod.MONTHLY,
       monthStart,
       DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
+    List<String> parts = new ArrayList<String>();
+    parts.addAll(dailyparts);
+    parts.addAll(hourlyparts);
+    parts.addAll(monthlyparts);
     StringBuilder tables = new StringBuilder();
     if (storageTables.length > 1) {
       if (hourlyPartsAvailable) {
@@ -262,6 +275,7 @@ public class CubeTestSetup {
       tables.append(storageTables[2]);
     } else {
       tables.append(storageTables[0]);
+      Collections.sort(parts);
     }
     storageTableToWhereClause.put(tables.toString(),
       StorageTableResolver.getWherePartClause("dt", cubeName, parts));
@@ -380,7 +394,6 @@ public class CubeTestSetup {
         new HashMap<String, String>();
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
         TEST_CUBE_NAME), "dt,pt,it,et");
-    cube = new Cube(TEST_CUBE_NAME, cubeMeasures, cubeDimensions, cubeProperties);
     client.createCube(TEST_CUBE_NAME, cubeMeasures, cubeDimensions, cubeProperties);
   }
 
@@ -860,10 +873,8 @@ public class CubeTestSetup {
     for (int p = 1; p <= 3; p++) {
       Date ptime = pcal.getTime();
       Date itime = ical.getTime();
-      System.out.println("ptime :" + ptime + "itime:" + itime);
       Map<String, Date> timeParts = new HashMap<String, Date>();
       if (p == 1) { // day1
-        System.out.println("ptime :" + ptime + "itime:" + itime);
         timeParts.put("pt", ptime);
         timeParts.put("it", itime);
         timeParts.put("et", itime);
@@ -876,7 +887,6 @@ public class CubeTestSetup {
         // pt=day2 and it=day1
         // pt=day2-hour[4-23] it = day2-hour[0-19]
         // pt=day2 and it=day2
-        System.out.println("ptime :" + ptime + "itime:" + itime);
         ptime = pcal.getTime();
         itime = ical.getTime();
         timeParts.put("pt", ptime);
@@ -905,7 +915,6 @@ public class CubeTestSetup {
       else if (p == 3) { // day3
         // pt=day3-hour[0-3] it = day2-hour[20-23]
         // pt=day3-hour[4-23] it = day3-hour[0-19]
-        System.out.println("ptime :" + ptime + "itime:" + itime);
         for (int i = 0; i < 24; i++) {
           ptime = pcal.getTime();
           itime = ical.getTime();
