@@ -104,12 +104,9 @@ public class CubeQueryContext {
       new HashMap<QBJoinTree, String>();
 
   // storage specific
-  protected final Set<CubeFactTable> candidateFactTables =
-      new HashSet<CubeFactTable>();
+  protected final Set<CandidateFact> candidateFacts =
+      new HashSet<CandidateFact>();
   // Map from fact to number of partitions
-  protected final Map<CubeFactTable, Integer> factPartitionMap = new HashMap<CubeFactTable, Integer>();
-  private final Map<CubeFactTable, Set<String>> factStorageMap =
-      new HashMap<CubeFactTable, Set<String>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
   private final Map<String, String> storageTableToWhereClause =
@@ -130,6 +127,7 @@ public class CubeQueryContext {
   private ASTNode orderByAST;
   private ASTNode groupByAST;
   private CubeMetastoreClient client;
+  private final boolean qlEnabledMultiTableSelect;
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -171,6 +169,11 @@ public class CubeQueryContext {
           clauseName);
     }
     this.joinTree = qb.getParseInfo().getJoinExpr();
+    // read conf
+    qlEnabledMultiTableSelect = conf.getBoolean(
+        CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
+        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
+
     extractMetaTables();
     extractTimeRange();
     extractColumns();
@@ -221,8 +224,10 @@ public class CubeQueryContext {
         throw new SemanticException("Neither cube nor dimensions accessed");
       }
       if (cube != null) {
-        candidateFactTables.addAll(client.getAllFactTables(cube));
-        for (CubeFactTable fact : candidateFactTables) {
+        for (CubeFactTable fact : client.getAllFactTables(cube)) {
+          CandidateFact cfact = new CandidateFact(fact);
+          cfact.enabledMultiTableSelect = qlEnabledMultiTableSelect;
+          candidateFacts.add(cfact);
           cubeTabToCols.put(fact, MetastoreUtil.getColumnNames(fact));
         }
       }
@@ -525,9 +530,9 @@ public class CubeQueryContext {
           cube.getName()));
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
         Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
-      for (Iterator<CubeFactTable> i = candidateFactTables.iterator();
+      for (Iterator<CandidateFact> i = candidateFacts.iterator();
           i.hasNext();) {
-        CubeFactTable fact = i.next();
+        CubeFactTable fact = i.next().fact;
         if (validFactTables != null) {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
             LOG.info("Not considering the fact table:" + fact + " as it is" +
@@ -558,7 +563,7 @@ public class CubeQueryContext {
           }
         }
       }
-      if (candidateFactTables.size() == 0) {
+      if (candidateFacts.size() == 0) {
         throw new SemanticException("No candidate fact table available to" +
             " answer the query");
       }
@@ -574,8 +579,8 @@ public class CubeQueryContext {
     return qb;
   }
 
-  public Set<CubeFactTable> getCandidateFactTables() {
-    return candidateFactTables;
+  public Set<CandidateFact> getCandidateFactTables() {
+    return candidateFacts;
   }
 
   public Set<CubeDimensionTable> getDimensionTables() {
@@ -757,15 +762,6 @@ public class CubeQueryContext {
     return qb.getParseInfo().getDestLimit(getClause());
   }
 
-  public
-  Map<CubeFactTable, Integer> getFactPartitionMap() {
-    return factPartitionMap;
-  }
-
-  public void setFactPartitionMap(Map<CubeFactTable, Integer> factPartMap) {
-    this.factPartitionMap.putAll(factPartMap);
-  }
-
   private final String baseQueryFormat = "SELECT %s FROM %s";
 
   String getQueryFormat() {
@@ -927,13 +923,6 @@ public class CubeQueryContext {
   }
 
   private String toHQL(Set<String> tableNames) throws SemanticException {
-    boolean enableMultiTableSelect = conf.getBoolean(
-        CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
-        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
-    if (tableNames != null && tableNames.size() > 1 && !enableMultiTableSelect) {
-      LOG.info("multi table select is not enabled, writing a union query");
-      return unionQuery();
-    }
     findDimStorageTables();
     String qfmt = getQueryFormat();
     LOG.info("qfmt:" + qfmt);
@@ -948,14 +937,6 @@ public class CubeQueryContext {
     return insertString + baseQuery;
   }
 
-  void setMultiTableSelect(boolean mutliTableSelect) {
-    conf.setBoolean(CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT, mutliTableSelect);
-  }
-
-  boolean getMultiTableSelect() {
-   return conf.getBoolean(CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
-        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
-  }
   void setNonexistingParts(List<String> nonExistingParts) {
     conf.set(CubeQueryConfUtil.NON_EXISTING_PARTITIONS,
         StringUtils.join(nonExistingParts, ','));
@@ -1049,12 +1030,12 @@ public class CubeQueryContext {
   }
 
   public String toHQL() throws SemanticException {
-    CubeFactTable fact = null;
+    CandidateFact fact = null;
     if (hasCubeInQuery()) {
-      if (candidateFactTables.size() > 0) {
-        fact = candidateFactTables.iterator().next();
-        LOG.info("Available candidate facts:" + candidateFactTables +
-            ", picking up " + fact + " for querying");
+      if (candidateFacts.size() > 0) {
+        fact = candidateFacts.iterator().next();
+        LOG.info("Available candidate facts:" + candidateFacts +
+            ", picking up " + fact.fact + " for querying");
       }
     }
     if (fact == null && !hasDimensionInQuery()) {
@@ -1062,14 +1043,17 @@ public class CubeQueryContext {
     }
 
     if (fact != null) {
-      Set<String> storageTables = factStorageMap.get(fact);
-      if (storageTables.isEmpty()) {
+      if (fact.storageTables.isEmpty()) {
         throw new SemanticException("No storage table available for candidate"
             + " fact:" + fact);
       }
       // choosing the first storage table one in the list
-      storageTableToQuery.put(getCube(), storageTables);
-      return toHQL(storageTables);
+      storageTableToQuery.put(getCube(), fact.storageTables);
+      if (fact.storageTables != null && fact.storageTables.size() > 1
+          && !fact.enabledMultiTableSelect) {
+        return unionQuery();
+      }
+      return toHQL(fact.storageTables);
     } else {
       return toHQL(null);
     }
@@ -1087,15 +1071,6 @@ public class CubeQueryContext {
       throw new SemanticException(e);
     }
     return ParseUtils.findRootNonNullToken(tree);
-  }
-
-  public Map<CubeFactTable, Set<String>> getFactStorageMap() {
-    return factStorageMap;
-  }
-
-  public void setFactStorageMap(Map<CubeFactTable, Set<String>> factStorageMap)
-  {
-    this.factStorageMap.putAll(factStorageMap);
   }
 
   public void setDimStorageMap(
@@ -1265,4 +1240,19 @@ public class CubeQueryContext {
   public List<TimeRange> getTimeRanges() {
     return timeRanges;
   }
+
+  static class CandidateFact {
+    CubeFactTable fact;
+    Set<String> storageTables;
+    boolean enabledMultiTableSelect;
+    int numQueriedParts;
+    CandidateFact(CubeFactTable fact) {
+      this.fact = fact;
+    }
+    
+    public String toString() {
+      return fact.toString();
+    }
+  }
+
 }

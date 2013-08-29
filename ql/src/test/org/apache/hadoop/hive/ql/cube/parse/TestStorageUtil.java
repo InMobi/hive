@@ -1,7 +1,9 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -10,7 +12,7 @@ import junit.framework.Assert;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
 
-public class TestStorageTableResolver {
+public class TestStorageUtil {
 
   @Test
   public void testMinimalAnsweringTables() {
@@ -44,33 +46,30 @@ public class TestStorageTableResolver {
 
     Configuration conf = new Configuration();
     // {s1,s2,s3}, {s3}, {s3} -> {s3}
-    Map<String, Set<String>> answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s123);
-    answeringTablesMap.put("day", s3);
-    answeringTablesMap.put("hour", s3);
-    StorageTableResolver str = new StorageTableResolver(conf);
-    Map<String, Set<String>> result = new HashMap<String, Set<String>>();
-    boolean mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    List<FactPartition> answeringParts =
+        new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s123));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s3));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s3));
+    Map<String, Set<FactPartition>> result = new HashMap<String, Set<FactPartition>>();
+    boolean mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(1, result.size());
     Assert.assertEquals("S3", result.keySet().iterator().next());
-    Set<String> coveredParts = result.get("S3");
+    Set<FactPartition> coveredParts = result.get("S3");
     Assert.assertEquals(3, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("month"));
-    Assert.assertTrue(coveredParts.contains("day"));
-    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(contains(coveredParts, "month"));
+    Assert.assertTrue(contains(coveredParts, "day"));
+    Assert.assertTrue(contains(coveredParts, "hour"));
     Assert.assertTrue(mts);
 
     // {s1,s2,s3}, {s4}, {s5} - > {s1,s4,s5} or {s2,s4,s5} or {s3,s4,s5}
-    answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s123);
-    answeringTablesMap.put("day", s4);
-    answeringTablesMap.put("hour", s5);
-    str = new StorageTableResolver(conf);
-    result = new HashMap<String, Set<String>>();
-    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    answeringParts = new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s123));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s4));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s5));
+    result = new HashMap<String, Set<FactPartition>>();
+    mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(3, result.size());
     Assert.assertTrue(result.keySet().contains("S4"));
@@ -79,10 +78,10 @@ public class TestStorageTableResolver {
         result.keySet().contains("S2") || result.keySet().contains("S3"));
     coveredParts = result.get("S4");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("day"));
+    Assert.assertTrue(contains(coveredParts,"day"));
     coveredParts = result.get("S5");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(contains(coveredParts,"hour"));
     coveredParts = result.get("S1");
     if (coveredParts == null) {
       coveredParts = result.get("S2");
@@ -91,18 +90,16 @@ public class TestStorageTableResolver {
       coveredParts = result.get("S3");
     }
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("month"));
+    Assert.assertTrue(contains(coveredParts,"month"));
     Assert.assertTrue(mts);
 
     // {s1}, {s2}, {s3} -> {s1,s2,s3}
-    answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s1);
-    answeringTablesMap.put("day", s2);
-    answeringTablesMap.put("hour", s3);
-    str = new StorageTableResolver(conf);
-    result = new HashMap<String, Set<String>>();
-    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    answeringParts = new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s1));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s2));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s3));
+    result = new HashMap<String, Set<FactPartition>>();
+    mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(3, result.size());
     Assert.assertTrue(result.keySet().contains("S1"));
@@ -110,46 +107,42 @@ public class TestStorageTableResolver {
     Assert.assertTrue(result.keySet().contains("S3"));
     coveredParts = result.get("S1");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("month"));
+    Assert.assertTrue(contains(coveredParts,"month"));
     coveredParts = result.get("S2");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("day"));
+    Assert.assertTrue(contains(coveredParts,"day"));
     coveredParts = result.get("S3");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(contains(coveredParts,"hour"));
     Assert.assertTrue(mts);
 
     // {s1, s2}, {s2, s3}, {s4} -> {s2,s4}
-    answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s12);
-    answeringTablesMap.put("day", s23);
-    answeringTablesMap.put("hour", s4);
-    str = new StorageTableResolver(conf);
-    result = new HashMap<String, Set<String>>();
-    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    answeringParts = new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s23));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s4));
+    result = new HashMap<String, Set<FactPartition>>();
+    mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S2"));
     Assert.assertTrue(result.keySet().contains("S4"));
     coveredParts = result.get("S2");
     Assert.assertEquals(2, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("month"));
-    Assert.assertTrue(coveredParts.contains("day"));
+    Assert.assertTrue(contains(coveredParts,"month"));
+    Assert.assertTrue(contains(coveredParts,"day"));
     coveredParts = result.get("S4");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(contains(coveredParts,"hour"));
     Assert.assertTrue(mts);
 
     // {s1, s2}, {s2, s4}, {s4} -> {s1,s4} or {s2,s4}
-    answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s12);
-    answeringTablesMap.put("day", s24);
-    answeringTablesMap.put("hour", s4);
-    str = new StorageTableResolver(conf);
-    result = new HashMap<String, Set<String>>();
-    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    answeringParts = new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s24));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s4));
+    result = new HashMap<String, Set<FactPartition>>();
+    mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S2") || result.keySet().contains("S1"));
@@ -158,84 +151,89 @@ public class TestStorageTableResolver {
     if (coveredParts == null) {
       coveredParts = result.get("S2");
       Assert.assertTrue(coveredParts.size() >= 1);
-      Assert.assertTrue(coveredParts.contains("month"));
+      Assert.assertTrue(contains(coveredParts,"month"));
       if (coveredParts.size() == 2) {
-        Assert.assertTrue(coveredParts.contains("day"));
+        Assert.assertTrue(contains(coveredParts,"day"));
         Assert.assertEquals(1, result.get("S4").size());
       }
       coveredParts = result.get("S4");
       Assert.assertTrue(coveredParts.size() >= 1);
-      Assert.assertTrue(coveredParts.contains("hour"));
+      Assert.assertTrue(contains(coveredParts,"hour"));
       if (coveredParts.size() == 2) {
-        Assert.assertTrue(coveredParts.contains("day"));
+        Assert.assertTrue(contains(coveredParts,"day"));
         Assert.assertEquals(1, result.get("S2").size());
       }
     } else {
       Assert.assertEquals(1, coveredParts.size());
-      Assert.assertTrue(coveredParts.contains("month"));
+      Assert.assertTrue(contains(coveredParts,"month"));
       coveredParts = result.get("S4");
       Assert.assertTrue(coveredParts.size() >= 1);
-      Assert.assertTrue(coveredParts.contains("hour"));
-      Assert.assertTrue(coveredParts.contains("day"));
+      Assert.assertTrue(contains(coveredParts,"hour"));
+      Assert.assertTrue(contains(coveredParts,"day"));
     }
     Assert.assertFalse(mts);
 
     // {s1, s2}, {s2, s3}, {s3,s4} -> {s2,s3}
-    answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s12);
-    answeringTablesMap.put("day", s23);
-    answeringTablesMap.put("hour", s34);
-    str = new StorageTableResolver(conf);
-    result = new HashMap<String, Set<String>>();
-    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    answeringParts = new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s23));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s34));
+    result = new HashMap<String, Set<FactPartition>>();
+    mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S2"));
     Assert.assertTrue(result.keySet().contains("S3"));
     coveredParts = result.get("S2");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(coveredParts.contains("month"));
+    Assert.assertTrue(contains(coveredParts,"month"));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(coveredParts.contains("day"));
+      Assert.assertTrue(contains(coveredParts,"day"));
       Assert.assertEquals(1, result.get("S3").size());
     }
     coveredParts = result.get("S3");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(contains(coveredParts,"hour"));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(coveredParts.contains("day"));
+      Assert.assertTrue(contains(coveredParts,"day"));
       Assert.assertEquals(1, result.get("S2").size());
     }
     Assert.assertFalse(mts);
 
     // {s1, s2}, {s2}, {s1} -> {s1,s2}
-    answeringTablesMap =
-        new HashMap<String, Set<String>>();
-    answeringTablesMap.put("month", s12);
-    answeringTablesMap.put("day", s2);
-    answeringTablesMap.put("hour", s1);
-    str = new StorageTableResolver(conf);
-    result = new HashMap<String, Set<String>>();
-    mts = str.getMinimalAnsweringTables(answeringTablesMap, result);
+    answeringParts = new ArrayList<FactPartition>();
+    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
+    answeringParts.add(new FactPartition("dt", "day", null, null, s2));
+    answeringParts.add(new FactPartition("dt", "hour", null, null, s1));
+    result = new HashMap<String, Set<FactPartition>>();
+    mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
     Assert.assertEquals(2, result.size());
     Assert.assertTrue(result.keySet().contains("S1"));
     Assert.assertTrue(result.keySet().contains("S2"));
     coveredParts = result.get("S2");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(coveredParts.contains("day"));
+    Assert.assertTrue(contains(coveredParts,"day"));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(coveredParts.contains("month"));
+      Assert.assertTrue(contains(coveredParts,"month"));
       Assert.assertEquals(1, result.get("S1").size());
     }
     coveredParts = result.get("S1");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(coveredParts.contains("hour"));
+    Assert.assertTrue(contains(coveredParts,"hour"));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(coveredParts.contains("month"));
+      Assert.assertTrue(contains(coveredParts,"month"));
       Assert.assertEquals(1, result.get("S2").size());
     }
     Assert.assertFalse(mts);
+  }
+
+  private boolean contains(Set<FactPartition> parts, String partSpec) {
+    for (FactPartition part : parts) {
+      if (part.partSpec.equals(partSpec)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

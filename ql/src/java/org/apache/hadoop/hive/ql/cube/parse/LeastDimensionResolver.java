@@ -8,7 +8,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class LeastDimensionResolver implements ContextRewriter {
@@ -23,18 +23,18 @@ public class LeastDimensionResolver implements ContextRewriter {
       throws SemanticException {
     if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
         .isEmpty()) {
-      Map<CubeFactTable, Integer> dimWeightMap =
-          new HashMap<CubeFactTable, Integer>();
+      Map<CandidateFact, Integer> dimWeightMap =
+          new HashMap<CandidateFact, Integer>();
 
-      for (CubeFactTable fact : cubeql.getCandidateFactTables()) {
+      for (CandidateFact fact : cubeql.getCandidateFactTables()) {
         dimWeightMap.put(fact, getDimensionWeight(cubeql, fact));
       }
 
       int minWeight = Collections.min(dimWeightMap.values());
 
-      for (Iterator<CubeFactTable> i =
+      for (Iterator<CandidateFact> i =
           cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CubeFactTable fact = i.next();
+        CandidateFact fact = i.next();
         if (dimWeightMap.get(fact) > minWeight) {
           LOG.info("Removing fact:" + fact +
               " from candidate fact tables as it has more dimension weight:"
@@ -47,7 +47,7 @@ public class LeastDimensionResolver implements ContextRewriter {
   }
 
   private Integer getDimensionWeight(CubeQueryContext cubeql,
-      CubeFactTable fact) {
+      CandidateFact fact) {
     // TODO get the dimension weight associated with the fact wrt query
     return 0;
   }

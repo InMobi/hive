@@ -218,7 +218,7 @@ public class CubeTestSetup {
      Collections.sort(parts);
     }
     storageTableToWhereClause.put(StringUtils.join(storageTables, ","),
-      StorageTableResolver.getWherePartClause(timedDimension, cubeName, parts));
+      StorageUtil.getWherePartClause(timedDimension, cubeName, parts));
     return storageTableToWhereClause;
   }
 
@@ -278,7 +278,7 @@ public class CubeTestSetup {
       Collections.sort(parts);
     }
     storageTableToWhereClause.put(tables.toString(),
-      StorageTableResolver.getWherePartClause("dt", cubeName, parts));
+      StorageUtil.getWherePartClause("dt", cubeName, parts));
     return storageTableToWhereClause;
   }
 
@@ -290,7 +290,7 @@ public class CubeTestSetup {
       twoMonthsBack,
       DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
     storageTableToWhereClause.put(monthlyTable,
-      StorageTableResolver.getWherePartClause("dt", cubeName, parts));
+      StorageUtil.getWherePartClause("dt", cubeName, parts));
     return storageTableToWhereClause;
   }
 
@@ -301,7 +301,7 @@ public class CubeTestSetup {
     addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
       DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
     storageTableToWhereClause.put(hourlyTable,
-      StorageTableResolver.getWherePartClause("dt", cubeName, parts));
+      StorageUtil.getWherePartClause("dt", cubeName, parts));
     return storageTableToWhereClause;
   }
 
@@ -334,7 +334,7 @@ public class CubeTestSetup {
     expected.append(dimName);
     if (hasPart) {
       expected.append(" WHERE ");
-      expected.append(StorageTableResolver.getWherePartClause("dt",
+      expected.append(StorageUtil.getWherePartClause("dt",
         dimName, Storage.getPartitionsForLatest()));
     }
     if (postWhereExpr != null) {

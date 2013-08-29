@@ -46,6 +46,7 @@ public class CubeQueryRewriter {
 
   CubeQueryContext rewrite(String command)
       throws ParseException,SemanticException {
+    System.out.println("Query:" + command);
     if (command != null) {
       command = command.replace("\n", "");
     }

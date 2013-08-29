@@ -8,7 +8,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class LightestFactResolver implements ContextRewriter {
@@ -22,18 +22,18 @@ public class LightestFactResolver implements ContextRewriter {
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
     if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
         .isEmpty()) {
-      Map<CubeFactTable, Double> factWeightMap =
-          new HashMap<CubeFactTable, Double>();
+      Map<CandidateFact, Double> factWeightMap =
+          new HashMap<CandidateFact, Double>();
 
-      for (CubeFactTable fact : cubeql.getCandidateFactTables()) {
-        factWeightMap.put(fact, fact.weight());
+      for (CandidateFact fact : cubeql.getCandidateFactTables()) {
+        factWeightMap.put(fact, fact.fact.weight());
       }
 
       double minWeight = Collections.min(factWeightMap.values());
 
-      for (Iterator<CubeFactTable> i =
+      for (Iterator<CandidateFact> i =
           cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CubeFactTable fact = i.next();
+        CandidateFact fact = i.next();
         if (factWeightMap.get(fact) > minWeight) {
           LOG.info("Not considering fact:" + fact +
               " from candidate fact tables as it has more fact weight:"

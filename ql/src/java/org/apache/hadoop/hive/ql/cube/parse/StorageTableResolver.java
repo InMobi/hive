@@ -4,7 +4,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -25,11 +24,11 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
-import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class StorageTableResolver implements ContextRewriter {
-  public static Log LOG = LogFactory.getLog(
+  private static Log LOG = LogFactory.getLog(
       StorageTableResolver.class.getName());
 
   private final Configuration conf;
@@ -41,17 +40,11 @@ public class StorageTableResolver implements ContextRewriter {
   private final Map<CubeFactTable, Map<UpdatePeriod, Set<String>>>
   validStorageMap =
   new HashMap<CubeFactTable, Map<UpdatePeriod, Set<String>>>();
-  private final Map<CubeFactTable, Integer> factPartMap =
-      new HashMap<CubeFactTable, Integer>();
-  private final Map<CubeFactTable, Set<String>> factStorageMap =
-      new HashMap<CubeFactTable, Set<String>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
   private final Map<String, String> storageTableToWhereClause =
       new HashMap<String, String>();
   private final List<String> nonExistingParts = new ArrayList<String>();
-  private boolean enableMultiTableSelect = true;
-  private String timePartitionColumn = null;
 
   public StorageTableResolver(Configuration conf) {
     this.conf = conf;
@@ -62,9 +55,6 @@ public class StorageTableResolver implements ContextRewriter {
     String str = conf.get(CubeQueryConfUtil.VALID_STORAGE_DIM_TABLES);
     validDimTables = StringUtils.isBlank(str) ? null :
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
-    this.enableMultiTableSelect = conf.getBoolean(
-        CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
-        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
   }
 
   private List<String> getSupportedStorages(Configuration conf) {
@@ -90,17 +80,12 @@ public class StorageTableResolver implements ContextRewriter {
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
     client = cubeql.getMetastoreClient();
-    if (!cubeql.getTimeRanges().isEmpty()) {
-      timePartitionColumn = cubeql.getTimeRanges().get(0).getPartitionColumn();
-    }
 
     if (!cubeql.getCandidateFactTables().isEmpty()) {
       // resolve storage table names
       resolveFactStorageTableNames(cubeql);
       // resolve storage partitions
       resolveFactStoragePartitions(cubeql);
-      cubeql.setFactStorageMap(factStorageMap);
-      cubeql.setFactPartitionMap(factPartMap);
     }
     // resolve dimension tables
     resolveDimStorageTablesAndPartitions(cubeql);
@@ -108,7 +93,6 @@ public class StorageTableResolver implements ContextRewriter {
 
     // set storage to whereclause
     cubeql.setStorageTableToWhereClause(storageTableToWhereClause);
-    cubeql.setMultiTableSelect(enableMultiTableSelect);
     cubeql.setNonexistingParts(nonExistingParts);
   }
 
@@ -131,7 +115,7 @@ public class StorageTableResolver implements ContextRewriter {
           storageTables.add(tableName);
           if (dim.hasStorageSnapshots(storage)) {
             storageTableToWhereClause.put(tableName,
-                getWherePartClause(Storage.getDatePartitionKey(),
+                StorageUtil.getWherePartClause(Storage.getDatePartitionKey(),
                     cubeql.getAliasForTabName(dim.getName()),
                     Storage.getPartitionsForLatest()));
           }
@@ -145,9 +129,9 @@ public class StorageTableResolver implements ContextRewriter {
   //Resolves all the storage table names, which are valid for each updatePeriod
   private void resolveFactStorageTableNames(CubeQueryContext cubeql)
       throws SemanticException {
-    for (Iterator<CubeFactTable> i =
+    for (Iterator<CandidateFact> i =
         cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-      CubeFactTable fact = i.next();
+      CubeFactTable fact = i.next().fact;
       Map<UpdatePeriod, Set<String>> storageTableMap =
           new HashMap<UpdatePeriod, Set<String>>();
       validStorageMap.put(fact, storageTableMap);
@@ -170,16 +154,6 @@ public class StorageTableResolver implements ContextRewriter {
             validFactStorageTables))
             == null) {
           continue;
-        }
-        try {
-          if (!timerangeColsExist(tableName, cubeql.getTimeRanges())) {
-            LOG.info("Skipping storage table " + tableName + " as it is not" +
-                " partitioned by queried timerange columns");
-            continue;
-          }
-        } catch (HiveException e) {
-          LOG.warn("Could not find the table:" + tableName, e);
-          throw new SemanticException("Could not find the table:" + tableName);
         }
         List<String> validUpdatePeriods = CubeQueryConfUtil.getStringList(conf,
             CubeQueryConfUtil.getValidUpdatePeriodsKey(fact.getName(), storage));
@@ -209,28 +183,6 @@ public class StorageTableResolver implements ContextRewriter {
     }
   }
 
-  private boolean timerangeColsExist(String tableName, List<TimeRange> ranges)
-      throws HiveException {
-    for (TimeRange range : ranges) {
-      if (!timerangeColsExist(tableName, range)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private boolean timerangeColsExist(String tableName, TimeRange range)
-      throws HiveException {
-      if (!client.partColExists(tableName, range.getPartitionColumn())) {
-        LOG.info(range.getPartitionColumn() + " does not exist in" + tableName);
-        return false;
-      }
-      if (range.getChild() != null) {
-        return timerangeColsExist(tableName, range.getChild());
-      }
-    return true;
-  }
-
   private Set<UpdatePeriod> getValidUpdatePeriods(CubeFactTable fact) {
     return validStorageMap.get(fact).keySet();
   }
@@ -249,197 +201,177 @@ public class StorageTableResolver implements ContextRewriter {
 
   private void resolveFactStoragePartitions(CubeQueryContext cubeql)
       throws SemanticException {
-    TimeRange range = cubeql.getTimeRanges().get(0);
-    Date fromDate = range.getFromDate();
-    Date toDate = range.getToDate();
-
     // Find candidate tables wrt supported storages
-    for (Iterator<CubeFactTable> i =
+    for (Iterator<CandidateFact> i =
         cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-      CubeFactTable fact = i.next();
-      Map<String, Set<String>> answeringTablesMap =
-          new HashMap<String, Set<String>>();
-      Map<UpdatePeriod, Set<String>> updatePeriodPartitionMap = new HashMap<UpdatePeriod, Set<String>>();
-      if (!getPartitionColMap(fact, answeringTablesMap, fromDate, toDate) ||
-          answeringTablesMap.isEmpty()) {
-        LOG.info("Not considering the fact table:" + fact + " as it could not" +
-            " find partition for given range:" + fromDate + " - " + toDate);
+      CandidateFact cfact = i.next();
+      List<FactPartition> answeringParts = new ArrayList<FactPartition>();
+      boolean considerFact = true;
+      for (TimeRange range : cubeql.getTimeRanges()) {
+        List<FactPartition> rangeParts = getPartitions(cfact.fact, range);
+        if (rangeParts == null || rangeParts.isEmpty()) {
+          LOG.info("The range:" + range + "is not answerable by "+ cfact.fact);
+          considerFact = false;
+          break;
+        }
+        answeringParts.addAll(rangeParts);
+      }
+      if (!considerFact) {
+        LOG.info("Not considering the fact table:" + cfact.fact + " as it could not" +
+            " find partition for given ranges: " + cubeql.getTimeRanges());
         i.remove();
         continue;
       }
-      factPartMap.put(fact, answeringTablesMap.keySet().size());
+      cfact.numQueriedParts = answeringParts.size();
 
       // Map from storage to covering parts
-      Map<String, Set<String>> minimalStorageTables = new LinkedHashMap<String, Set<String>>();
-      boolean enabledMultiTableSelect = getMinimalAnsweringTables(
-          answeringTablesMap, minimalStorageTables);
+      Map<String, Set<FactPartition>> minimalStorageTables =
+          new LinkedHashMap<String, Set<FactPartition>>();
+      boolean enabledMultiTableSelect = StorageUtil.getMinimalAnsweringTables(
+          answeringParts, minimalStorageTables);
       Set<String> storageTables = new LinkedHashSet<String>();
 
-      for (Map.Entry<String, Set<String>> entry : minimalStorageTables
+      for (Map.Entry<String, Set<FactPartition>> entry : minimalStorageTables
           .entrySet()) {
-        List<String> parts = new ArrayList<String>();
-        parts.addAll(entry.getValue());
         storageTables.add(entry.getKey());
 
-        LOG.info("For fact:" + fact
-            + " Parts:" + parts + " storageTable:" + entry.getKey());
-        storageTableToWhereClause.put(entry.getKey(), getWherePartClause(
-            range.getPartitionColumn(),
-            cubeql.getAliasForTabName(fact.getCubeName()), parts));
+        LOG.info("For fact:" + cfact.fact
+            + " Parts:" + entry.getValue() + " storageTable:" + entry.getKey());
+        storageTableToWhereClause.put(entry.getKey(),
+            StorageUtil.getWherePartClause(
+            cubeql.getAliasForTabName(cfact.fact.getCubeName()), entry.getValue()));
       }
-      factStorageMap.put(fact, storageTables);
+      cfact.storageTables = storageTables;
+      // multi table select is already false, do not alter it
+      if (cfact.enabledMultiTableSelect) {
+        cfact.enabledMultiTableSelect = enabledMultiTableSelect;
+      }
     }
   }
 
-  /**
-   * Get minimal set of storages which cover the queried partitions
-   *
-   * @param answeringTablesMap Map from partition to set of answering storage tables
-   * @param Map from storage to covering parts
-   *
-   * @return true if multi table select is enabled, false otherwise
-   */
-  boolean getMinimalAnsweringTables(
-      Map<String, Set<String>> answeringTablesMap,
-      Map<String, Set<String>> minimalAnsweringTables) {
-    // map from storage table to the partitions it covers
-    Map<String, Set<String>> invertedMap =
-        new HashMap<String, Set<String>>();
-    boolean multiTableSelect = true;
-    // invert the answering tables map and put in inverted map
-    for (Map.Entry<String, Set<String>> entry : answeringTablesMap.entrySet()) {
-      for (String table : entry.getValue()) {
-        Set<String> periodsCovered = invertedMap.get(table);
-        if (periodsCovered == null) {
-          periodsCovered = new TreeSet<String>();
-          invertedMap.put(table, periodsCovered);
-        }
-        periodsCovered.add(entry.getKey());
-      }
-    }
-    // there exist only one storage
-    if (invertedMap.size() != 1) {
-      Set<String> queriedParts = answeringTablesMap.keySet();
-      Set<String> remaining = new TreeSet<String>();
-      remaining.addAll(queriedParts);
-      while (!remaining.isEmpty()) {
-        // returns a singleton map
-        Map<String, Set<String>> maxCoveringStorage = getMaxCoveringStorage(
-            invertedMap, remaining);
-        minimalAnsweringTables.putAll(maxCoveringStorage);
-        Set<String> coveringSet = maxCoveringStorage.values().iterator().next();
-        if (enableMultiTableSelect) {
-          if (!coveringSet.containsAll(invertedMap.get(
-              maxCoveringStorage.keySet().iterator().next()))) {
-            LOG.info("Disabling multi table select because the partitions are" +
-                " not mutually exclusive");
-            multiTableSelect = false;
-            enableMultiTableSelect = false;
-          }
-        }
-        remaining.removeAll(coveringSet);
-      }
-    } else {
-      minimalAnsweringTables.putAll(invertedMap);
-    }
-    return multiTableSelect;
-  }
-
-  private Map<String, Set<String>> getMaxCoveringStorage(
-      final Map<String, Set<String>> storageCoveringMap,
-      Set<String> queriedParts) {
-    int coveringcount = 0;
-    int maxCoveringCount = 0;
-    String maxCoveringStorage = null;
-    Set<String> maxCoveringSet = null;
-    for (Map.Entry<String, Set<String>> entry : storageCoveringMap
-        .entrySet()) {
-      Set<String> coveringSet = new TreeSet<String>();
-      coveringSet.addAll(entry.getValue());
-      coveringSet.retainAll(queriedParts);
-      coveringcount = coveringSet.size();
-      if (coveringcount > maxCoveringCount) {
-        maxCoveringCount = coveringcount;
-        maxCoveringStorage = entry.getKey();
-        maxCoveringSet = coveringSet;
-      }
-    }
-    return Collections.singletonMap(maxCoveringStorage, maxCoveringSet);
-  }
-
-  private boolean getPartitionColMap(CubeFactTable fact,
-      Map<String, Set<String>> answeringTablesMap, Date fromDate,
-      Date toDate) throws SemanticException {
-    Set<UpdatePeriod> updatePeriods = getValidUpdatePeriods(fact);
-    LOG.info("Valid update periods for fact" + fact + " are " + updatePeriods);
+  private List<FactPartition> getPartitions(CubeFactTable fact, TimeRange range)
+      throws SemanticException {
     try {
-      return getPartitions(fact, fromDate, toDate,
-          answeringTablesMap,
-          updatePeriods, true);
+      return getPartitions(fact, range, null, getValidUpdatePeriods(fact), true);
     } catch (Exception e) {
       throw new SemanticException(e);
     }
   }
 
+  private List<FactPartition> getPartitions(CubeFactTable fact, TimeRange range,
+      List<FactPartition> containingParts, Set<UpdatePeriod> updatePeriods,
+      boolean addNonExistingParts)
+          throws Exception {
+    List<FactPartition> partitions = new ArrayList<FactPartition>();
+    if (getPartitions(fact, range.getFromDate(), range.getToDate(),
+        range.getPartitionColumn(), containingParts,
+        partitions, updatePeriods, addNonExistingParts)) {
+      System.out.println("Partitions returned:" + partitions);
+      if (range.getChild() != null) {
+        List<FactPartition> rangeParts = new ArrayList<FactPartition>();
+        for (FactPartition part : partitions) {
+          System.out.println("Looking for child partitions in:" + part);
+          List<FactPartition> childContParts = new ArrayList<FactPartition>();
+          if (containingParts != null) {
+            childContParts.addAll(containingParts);
+          }
+          childContParts.add(part);
+          List<FactPartition> childParts = getPartitions(fact,
+              range.getChild(), childContParts,
+              updatePeriods, addNonExistingParts);
+          if (childParts != null) {
+            rangeParts.addAll(childParts);
+          }
+        }
+        return rangeParts;
+      } else {
+        // This is the final range in nested range
+        // return the partitions to to-be queried partitions
+        return partitions;
+      }
+    } else {
+      return null;
+    }
+  }
+
   private boolean getPartitions(CubeFactTable fact, Date fromDate, Date toDate,
-      Map<String, Set<String>> answeringTablesMap,
-      Set<UpdatePeriod> updatePeriods, boolean addNonExistingParts)
+      String partCol, List<FactPartition> containingParts,
+      List<FactPartition> partitions,
+      Set<UpdatePeriod> updatePeriods,  boolean addNonExistingParts)
           throws Exception {
     LOG.info("getPartitions for " + fact + " from fromDate:" + fromDate
         + " toDate:" + toDate);
     if (fromDate.equals(toDate) || fromDate.after(toDate)) {
       return true;
     }
+    UpdatePeriod interval;
+    Set<String> storageTbls = new LinkedHashSet<String>();
+    if (containingParts != null) {
+      interval = containingParts.get(containingParts.size() - 1).period;
+      storageTbls.addAll(containingParts.get(containingParts.size() - 1).storageTables);
+    } else {
+      interval = CubeFactTable.maxIntervalInRange(fromDate, toDate,
+          updatePeriods);
+      if (interval == null) {
+        return false;
+      }
+      LOG.info("Max interval for " + fact + " is:" + interval);
+      storageTbls.addAll(validStorageMap.get(fact).get(interval));
+    }
 
-    UpdatePeriod interval = CubeFactTable.maxIntervalInRange(fromDate, toDate,
-        updatePeriods);
-    LOG.info("Max interval for " + fact + " is:" + interval);
-    if (interval == null) {
+    Iterator<String> it = storageTbls.iterator();
+    while (it.hasNext()) {
+      String storageTableName = it.next();
+      if (!client.partColExists(storageTableName, partCol)) {
+        LOG.info(partCol + " does not exist in" + storageTableName);
+        it.remove();
+      }
+    }
+
+    if (storageTbls.isEmpty()) {
       return false;
     }
 
     Date ceilFromDate = DateUtil.getCeilDate(fromDate, interval);
     Date floorToDate = DateUtil.getFloorDate(toDate, interval);
-    Set<String> storageTbls = validStorageMap.get(fact).get(interval);
 
     // add partitions from ceilFrom to floorTo
     String fmt = interval.format();
     Calendar cal = Calendar.getInstance();
     cal.setTime(ceilFromDate);
-    List<String> partitions = new ArrayList<String>();
     Date dt = cal.getTime();
     while (dt.compareTo(floorToDate) < 0) {
-      Set<String> answeringTables = new LinkedHashSet<String>();
-      String part = new SimpleDateFormat(fmt).format(cal.getTime());
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
+      FactPartition part = new FactPartition(partCol,
+          new SimpleDateFormat(fmt).format(dt), interval, containingParts);
       for (String storageTableName : storageTbls) {
-        String filter = timePartitionColumn + "='" + part + "'";
-        if (client.partitionExistsByFilter(storageTableName, filter)) {
+        if (client.partitionExistsByFilter(storageTableName, part.getFilter(
+            null))) {
           if (!foundPart) {
             LOG.info("Adding existing partition" + part);
             partitions.add(part);
             foundPart = true;
           }
-          answeringTables.add(storageTableName);
+          part.storageTables.add(storageTableName);
         } else {
           LOG.info("Partition " + part + " does not exist on " + storageTableName);
         }
       }
-      if (!foundPart) {
+      if (!foundPart && containingParts == null) {
         LOG.info("Partition:" + part + " does not exist in any storage table");
         Set<UpdatePeriod> newset = new TreeSet<UpdatePeriod>();
         newset.addAll(updatePeriods);
         newset.remove(interval);
-        if (!getPartitions(fact, dt, cal.getTime(), answeringTablesMap, newset,
-            false)) {
+        if (!getPartitions(fact, dt, cal.getTime(), partCol, null, partitions,
+            newset, false)) {
           if (!failOnPartialData && addNonExistingParts) {
             LOG.info("Adding non existing partition" + part);
             partitions.add(part);
-            nonExistingParts.add(part);
+            nonExistingParts.add(part.partSpec);
             foundPart = true;
             // add all storage tables as the answering tables
-            answeringTables.addAll(storageTbls);
+            part.storageTables.addAll(storageTbls);
           } else {
             LOG.info("No finer granual partitions exist for" + part);
             return false;
@@ -449,44 +381,15 @@ public class StorageTableResolver implements ContextRewriter {
         }
       }
       dt = cal.getTime();
-      Set<String> tables = answeringTablesMap.get(part);
-      if (tables == null) {
-        tables = new LinkedHashSet<String>();
-        answeringTablesMap.put(part, tables);
-      }
-      LOG.info("Adding storagetables" + answeringTables + " for fact:" + fact
-          + "for part:"+ part);
-      tables.addAll(answeringTables);
     }
-    return (getPartitions(fact, fromDate, ceilFromDate,
-        answeringTablesMap, updatePeriods, addNonExistingParts) &&
-        getPartitions(fact, floorToDate, toDate,
-            answeringTablesMap, updatePeriods, addNonExistingParts));
-  }
-
-  public static String getWherePartClause(String timeDimName,
-      String tableName, List<String> parts) {
-    if (parts.size() == 0) {
-      return "";
+    if (containingParts == null) {
+      return
+        (getPartitions(fact, fromDate, ceilFromDate, partCol, null, partitions,
+           updatePeriods, addNonExistingParts) &&
+         getPartitions(fact, floorToDate, toDate, partCol, null, partitions,
+           updatePeriods, addNonExistingParts));
+    } else {
+      return true;
     }
-    StringBuilder partStr = new StringBuilder();
-    for (int i = 0; i < parts.size() - 1; i++) {
-      partStr.append(tableName);
-      partStr.append(".");
-      partStr.append(timeDimName);
-      partStr.append(" = '");
-      partStr.append(parts.get(i));
-      partStr.append("'");
-      partStr.append(" OR ");
-    }
-
-    // add the last partition
-    partStr.append(tableName);
-    partStr.append(".");
-    partStr.append(timeDimName);
-    partStr.append(" = '");
-    partStr.append(parts.get(parts.size() - 1));
-    partStr.append("'");
-    return partStr.toString();
   }
 }

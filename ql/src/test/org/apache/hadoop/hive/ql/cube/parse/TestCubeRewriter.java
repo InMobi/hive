@@ -287,7 +287,6 @@ public class TestCubeRewriter {
     hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange);
     System.out.println("Union hql query:" + hqlQuery);
-    Assert.assertFalse(rewrittenQuery.getMultiTableSelect());
 
     //TODO: uncomment the following once union query
     // rewriting has been done
@@ -325,7 +324,6 @@ public class TestCubeRewriter {
     hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoMonthsRangeUptoHours);
     System.out.println("union query:" + hqlQuery);
-    Assert.assertFalse(rewrittenQuery.getMultiTableSelect());
     //TODO: uncomment the following once union query
     // rewriting has been done
     //expected = getExpectedQuery(cubeName,
@@ -342,7 +340,7 @@ public class TestCubeRewriter {
       + " join citytable on testCube.cityid = citytable.id"
       + " where " + twoDaysRange);
     List<String> joinWhereConds = new ArrayList<String>();
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "citytable", Storage.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select sum(testcube.msr2)" +
       " FROM ", " INNER JOIN c1_citytable citytable ON" +
@@ -358,9 +356,9 @@ public class TestCubeRewriter {
       + " right outer join ziptable on citytable.zipcode = ziptable.code"
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "citytable", Storage.getPartitionsForLatest()));
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "ziptable", Storage.getPartitionsForLatest()));
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
@@ -380,9 +378,9 @@ public class TestCubeRewriter {
       + " right outer join ziptable ZT on CT.zipcode = ZT.code"
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "ct", Storage.getPartitionsForLatest()));
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "zt", Storage.getPartitionsForLatest()));
     expected = getExpectedQuery("tc", "select st.name," +
       " sum(tc.msr2) FROM ", " INNER JOIN c1_citytable ct ON" +
@@ -435,7 +433,7 @@ public class TestCubeRewriter {
       " testCube join citytable on testCube.cityid = citytable.id where " +
       twoDaysRange);
     List<String> joinWhereConds = new ArrayList<String>();
-    joinWhereConds.add(StorageTableResolver.getWherePartClause("dt",
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "citytable", Storage.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select citytable.name," +
       " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
@@ -864,6 +862,41 @@ public class TestCubeRewriter {
   }
 
   @Test
+  public void testCubeQueryWithNestedRanges() throws Exception {
+    String twoDaysNestedRange = "time_range_in('pt', '" + getDateUptoHours(
+        twodaysBack) + "','" + getDateUptoHours(now) +
+        "',time_range_in('it', '" + getDateUptoHours(
+      twodaysBack) + "','" + getDateUptoHours(now) + "'))";
+
+    String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
+      " msr2 from testCube" +
+      " where " + twoDaysNestedRange);
+    String expected = getExpectedQuery(cubeName,
+      "select testcube.dim1, avg(testcube.msr1), sum(testcube.msr2) FROM ",
+      null, " group by testcube.dim1",
+      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary1"));
+    compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select dim1, dim2, COUNT(msr1)," +
+      " SUM(msr2), msr3 from testCube" +
+      " where " + twoDaysNestedRange);
+    expected = getExpectedQuery(cubeName,
+      "select testcube.dim1, testcube,dim2, count(testcube.msr1)," +
+        " sum(testcube.msr2), max(testcube.msr3) FROM ", null,
+      " group by testcube.dim1, testcube.dim2",
+      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary2"));
+    compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select dim1, dim2, cityid, SUM(msr1)," +
+      " SUM(msr2), msr3 from testCube" +
+      " where " + twoDaysNestedRange);
+    expected = getExpectedQuery(cubeName,
+      "select testcube.dim1, testcube,dim2, testcube.cityid," +
+        " sum(testcube.msr1), sum(testcube.msr2), max(testcube.msr3) FROM ",
+      null, " group by testcube.dim1, testcube.dim2, testcube.cityid",
+      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary3"));
+    compareQueries(expected, hqlQuery);
+  }
+
+  @Test
   public void testDistinctColWithoutAlias() throws Exception {
     String hqlQuery = rewrite(driver, "select DISTINCT name, stateid" +
       " from citytable");
@@ -891,11 +924,13 @@ public class TestCubeRewriter {
     String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where "
       + twoDaysRange;
     String hql = rewrite(driver, query);
+    System.out.println("auto join HQL:" + hql);
 
     //Test 2  Dim only query
     String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where "
       + twoDaysRange;
     hql = rewrite(driver, dimOnlyQuery);
+    System.out.println("auto join HQL:" + hql);
 
     //Test 3 Dim only query should throw error
     String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where "

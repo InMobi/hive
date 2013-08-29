@@ -461,6 +461,7 @@ public class CubeMetastoreClient {
 
   private void addPartition(String storageTableName, Storage storage,
       Map<String, String> partSpec, boolean makeLatest) throws HiveException {
+    System.out.println("Adding partition:" + partSpec);
     storage.addPartition(storageTableName, partSpec, config, makeLatest);
   }
 
