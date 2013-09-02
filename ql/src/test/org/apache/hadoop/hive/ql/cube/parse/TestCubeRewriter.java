@@ -863,6 +863,29 @@ public class TestCubeRewriter {
   }
 
   @Test
+  public void testCubeQueryTimedDimensionFilter() throws Exception {
+    String twoDaysITRange = "time_range_in('it', '" + getDateUptoHours(
+      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+    String twoDaysPTRange = "time_range_in('pt', '" + getDateUptoHours(
+        twodaysBack) + "','" + getDateUptoHours(now) + "')";
+
+    String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
+      " msr2 from testCube" +
+      " where (" + twoDaysITRange + " OR it == 'default') AND dim1 > 1000");
+    String expected = getExpectedQuery(cubeName,
+      "select testcube.dim1, avg(testcube.msr1), sum(testcube.msr2) FROM ",
+      null, "or (( testcube.it ) == 'default')) and ((testcube.dim1) > 1000)"
+      + " group by testcube.dim1",
+      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary1"));
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
+      " msr2 from testCube where (" + twoDaysITRange +
+      " OR (" + twoDaysPTRange + "( and it == 'default')) AND dim1 > 1000");
+    //compareQueries(expected, hqlQuery);
+  }
+
+  @Test
   public void testFactsWithTimedDimensionWithProcessTimeCol() throws Exception {
     String twoDaysITRange = "time_range_in('it', '" + getDateUptoHours(
       twodaysBack) + "','" + getDateUptoHours(now) + "')";

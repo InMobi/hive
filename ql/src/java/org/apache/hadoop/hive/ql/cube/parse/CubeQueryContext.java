@@ -532,18 +532,20 @@ public class CubeQueryContext {
         List<String> validFactCols = fact.getValidColumns();
 
         for (String col : cubeColumnsQueried) {
-          if (!factCols.contains(col.toLowerCase())) {
-            LOG.info("Not considering the fact table:" + fact +
-                " as column " + col + " is not available");
-            i.remove();
-            break;
-          } else {
-            if (validFactCols != null) {
-              if (!validFactCols.contains(col.toLowerCase())) {
-                LOG.info("Not considering the fact table:" + fact +
-                    " as column " + col + " is not valid");
-                i.remove();
-                break;
+          if (!timedDimensions.contains(col)) {
+            if(!factCols.contains(col.toLowerCase())) {
+              LOG.info("Not considering the fact table:" + fact +
+                  " as column " + col + " is not available");
+              i.remove();
+              break;
+            } else {
+              if (validFactCols != null) {
+                if (!validFactCols.contains(col.toLowerCase())) {
+                  LOG.info("Not considering the fact table:" + fact +
+                      " as column " + col + " is not valid");
+                  i.remove();
+                  break;
+                }
               }
             }
           }
