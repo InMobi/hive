@@ -278,7 +278,6 @@ public class CubeQueryContext {
 
   private void processTimeRangeFunction(ASTNode timenode, TimeRange parent) throws SemanticException {
     TimeRange.TimeRangeBuilder builder = TimeRange.getBuilder();
-    int startPos = timenode.getCharPositionInLine();
     builder.astNode(timenode);
 
     String timeDimName = PlanUtils.stripQuotes(timenode.getChild(1).getText());
@@ -312,20 +311,7 @@ public class CubeQueryContext {
     TimeRange range = builder.build();
     range.validate();
 
-    if (parent != null) {
-      parent.setChild(range);
-    } else {
-      timeRanges.add(range);
-    }
-
-    // check if last argument is another time range function
-    ASTNode lastChild = (ASTNode) timenode.getChild(timenode.getChildCount() - 1);
-    if (lastChild.getToken().getType() == TOK_FUNCTION) {
-      ASTNode fname = HQLParser.findNodeByPath(lastChild, Identifier);
-      if (fname != null && TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
-        processTimeRangeFunction(lastChild, range);
-      }
-    }
+    timeRanges.add(range);
   }
 
   private void extractColumns() throws SemanticException {
@@ -1249,7 +1235,8 @@ public class CubeQueryContext {
     CandidateFact(CubeFactTable fact) {
       this.fact = fact;
     }
-    
+
+    @Override
     public String toString() {
       return fact.toString();
     }

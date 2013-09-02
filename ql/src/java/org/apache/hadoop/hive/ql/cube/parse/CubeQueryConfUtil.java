@@ -25,6 +25,8 @@ public class CubeQueryConfUtil {
       "cube.query.nonexisting.partitions";
   public static final String ENABLE_MULTI_TABLE_SELECT =
       "cube.query.enable.multi.table.select";
+  public static final String PROCESS_TIME_PART_COL = "cube.query.process.time" +
+      ".partition.column";
 
   public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
 

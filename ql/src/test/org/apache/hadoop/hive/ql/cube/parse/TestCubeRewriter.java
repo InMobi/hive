@@ -14,6 +14,7 @@ import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twodaysBack;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -840,8 +841,7 @@ public class TestCubeRewriter {
       "select testcube.dim1, avg(testcube.msr1), sum(testcube.msr2) FROM ",
       null, " group by testcube.dim1",
       getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary1"));
-    //TODO compare queries
-    //compareQueries(expected, hqlQuery);
+    compareQueries(expected, hqlQuery);
     hqlQuery = rewrite(driver, "select dim1, dim2, COUNT(msr1)," +
       " SUM(msr2), msr3 from testCube" +
       " where " + twoDaysITRange);
@@ -850,8 +850,7 @@ public class TestCubeRewriter {
         " sum(testcube.msr2), max(testcube.msr3) FROM ", null,
       " group by testcube.dim1, testcube.dim2",
       getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary2"));
-    //TODO compare queries
-    //compareQueries(expected, hqlQuery);
+    compareQueries(expected, hqlQuery);
     hqlQuery = rewrite(driver, "select dim1, dim2, cityid, SUM(msr1)," +
       " SUM(msr2), msr3 from testCube" +
       " where " + twoDaysITRange);
@@ -860,43 +859,63 @@ public class TestCubeRewriter {
         " sum(testcube.msr1), sum(testcube.msr2), max(testcube.msr3) FROM ",
       null, " group by testcube.dim1, testcube.dim2, testcube.cityid",
       getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary3"));
+    compareQueries(expected, hqlQuery);
+  }
+
+  @Test
+  public void testFactsWithTimedDimensionWithProcessTimeCol() throws Exception {
+    String twoDaysITRange = "time_range_in('it', '" + getDateUptoHours(
+      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+
+    conf.set(CubeQueryConfUtil.PROCESS_TIME_PART_COL, "pt");
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
+      " msr2 from testCube" +
+      " where " + twoDaysITRange);
+    System.out.println("Query With process time col:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select dim1, dim2, COUNT(msr1)," +
+      " SUM(msr2), msr3 from testCube" +
+      " where " + twoDaysITRange);
+    System.out.println("Query With process time col:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select dim1, dim2, cityid, SUM(msr1)," +
+      " SUM(msr2), msr3 from testCube" +
+      " where " + twoDaysITRange);
+    System.out.println("Query With process time col:" + hqlQuery);
     //TODO compare queries
     //compareQueries(expected, hqlQuery);
   }
 
-  //@Test
-  public void testCubeQueryWithNestedRanges() throws Exception {
-    String twoDaysNestedRange = "time_range_in('pt', '" + getDateUptoHours(
-        twodaysBack) + "','" + getDateUptoHours(now) +
-        "',time_range_in('it', '" + getDateUptoHours(
-      twodaysBack) + "','" + getDateUptoHours(now) + "'))";
-
+  @Test
+  public void testCubeQueryWithMultipleRanges() throws Exception {
+    Calendar cal = Calendar.getInstance();
+    cal.add(Calendar.DAY_OF_MONTH, -4);
+    Date end = cal.getTime();
+    cal.add(Calendar.DAY_OF_MONTH, -2);
+    Date start = cal.getTime();
+    String twoDaysRangeBefore4days = "time_range_in('dt', '" + getDateUptoHours(
+        start) + "','" + getDateUptoHours(end) + "')";
     String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
       " msr2 from testCube" +
-      " where " + twoDaysNestedRange);
-    String expected = getExpectedQuery(cubeName,
-      "select testcube.dim1, avg(testcube.msr1), sum(testcube.msr2) FROM ",
-      null, " group by testcube.dim1",
-      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary1"));
-    compareQueries(expected, hqlQuery);
+      " where " + twoDaysRange + " OR " + twoDaysRangeBefore4days);
+    System.out.println("Query multiple ranges:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
     hqlQuery = rewrite(driver, "select dim1, dim2, COUNT(msr1)," +
       " SUM(msr2), msr3 from testCube" +
-      " where " + twoDaysNestedRange);
-    expected = getExpectedQuery(cubeName,
-      "select testcube.dim1, testcube,dim2, count(testcube.msr1)," +
-        " sum(testcube.msr2), max(testcube.msr3) FROM ", null,
-      " group by testcube.dim1, testcube.dim2",
-      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary2"));
-    compareQueries(expected, hqlQuery);
+      " where " + twoDaysRange + " OR " + twoDaysRangeBefore4days);
+    System.out.println("Query multiple ranges:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
     hqlQuery = rewrite(driver, "select dim1, dim2, cityid, SUM(msr1)," +
       " SUM(msr2), msr3 from testCube" +
-      " where " + twoDaysNestedRange);
-    expected = getExpectedQuery(cubeName,
-      "select testcube.dim1, testcube,dim2, testcube.cityid," +
-        " sum(testcube.msr1), sum(testcube.msr2), max(testcube.msr3) FROM ",
-      null, " group by testcube.dim1, testcube.dim2, testcube.cityid",
-      getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "it", "C2_summary3"));
-    compareQueries(expected, hqlQuery);
+      " where " + twoDaysRange + " OR " + twoDaysRangeBefore4days);
+    System.out.println("Query multiple ranges:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
   }
 
   @Test

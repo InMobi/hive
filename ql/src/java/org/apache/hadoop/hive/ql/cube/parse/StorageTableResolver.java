@@ -47,6 +47,7 @@ public class StorageTableResolver implements ContextRewriter {
   private final Map<String, String> storageTableToWhereClause =
       new HashMap<String, String>();
   private final List<String> nonExistingParts = new ArrayList<String>();
+  private String processTimePartCol = null;
 
   public StorageTableResolver(Configuration conf) {
     this.conf = conf;
@@ -57,6 +58,7 @@ public class StorageTableResolver implements ContextRewriter {
     String str = conf.get(CubeQueryConfUtil.VALID_STORAGE_DIM_TABLES);
     validDimTables = StringUtils.isBlank(str) ? null :
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
+    this.processTimePartCol = conf.get(CubeQueryConfUtil.PROCESS_TIME_PART_COL);
   }
 
   private List<String> getSupportedStorages(Configuration conf) {
@@ -370,70 +372,69 @@ public class StorageTableResolver implements ContextRewriter {
           } else {
             LOG.info("Finer granual partitions added for " + part);
           }
-        } else {
-          String processTimePartCol = "pt";
+        } else if (processTimePartCol != null) {
           LOG.info("Looking for look ahead process time partitions for "+ part);
           if (!partCol.equals(processTimePartCol)) {
             if (!(updatePeriods.first().equals(interval))) {
-            // see if this is the part of the last-n look ahead partitions
-            if ((numIters - i) <= lookAheadNumParts) {
-              LOG.info("Looking for look ahead process time partitions for "+ part);
-              // check if finer partitions are required
-              // final partitions are required if no partitions from look-ahead
-              // process time are present
-              Calendar processCal = Calendar.getInstance();
-              processCal.setTime(cal.getTime());
-              Date start =  processCal.getTime();
-              processCal.add(interval.calendarField(), lookAheadNumParts);
-              Date end = processCal.getTime();
-              Calendar temp = Calendar.getInstance();
-              temp.setTime(start);
-              while (temp.getTime().compareTo(end) < 0) {
-                Date pdt = temp.getTime();
-                String lPart = pformat.format(pdt);
-                temp.add(interval.calendarField(), 1);
-                Boolean foundLookAheadParts = false;
-                for (Map.Entry<String, List<Partition>> entry : metaParts.entrySet()) {
-                  for (Partition mpart :entry.getValue()) {
-                    if (mpart.getValues().get(0).contains(lPart)) {
-                      LOG.info("Founr lPart in " + mpart + " in table:" + entry.getKey());
-                      foundLookAheadParts = true;
-                      break;
-                    }
-                  }
-                }
-                if (!foundLookAheadParts) {
-                  LOG.info("Looked ahead process time partition " + lPart + " is not found");
-                  TreeSet<UpdatePeriod> newset = new TreeSet<UpdatePeriod>();
-                  newset.addAll(updatePeriods);
-                  newset.remove(interval);
-                  LOG.info("newset of update periods:" + newset);
-                  if (!newset.isEmpty()) {
-                    // Get partitions for look ahead process time
-                    List<FactPartition> processTimeParts = new ArrayList<FactPartition>();
-                    LOG.info("Looking for process time partitions between " + pdt + " and " + temp.getTime());
-                    getPartitions(fact, pdt, temp.getTime(),
-                        processTimePartCol, null, processTimeParts,
-                        newset, false);
-                    if (!processTimeParts.isEmpty()) {
-                      for (FactPartition pPart : processTimeParts) {
-                        LOG.info("Looking for finer partitions in pPart" + pPart);
-                        if (!getPartitions(fact, dt, cal.getTime(), partCol, pPart,
-                            partitions, newset, false)) {
-                          LOG.info("No partitions found in look ahead range");
-                        }
+              // see if this is the part of the last-n look ahead partitions
+              if ((numIters - i) <= lookAheadNumParts) {
+                LOG.info("Looking for look ahead process time partitions for "+ part);
+                // check if finer partitions are required
+                // final partitions are required if no partitions from look-ahead
+                // process time are present
+                Calendar processCal = Calendar.getInstance();
+                processCal.setTime(cal.getTime());
+                Date start =  processCal.getTime();
+                processCal.add(interval.calendarField(), lookAheadNumParts);
+                Date end = processCal.getTime();
+                Calendar temp = Calendar.getInstance();
+                temp.setTime(start);
+                while (temp.getTime().compareTo(end) < 0) {
+                  Date pdt = temp.getTime();
+                  String lPart = pformat.format(pdt);
+                  temp.add(interval.calendarField(), 1);
+                  Boolean foundLookAheadParts = false;
+                  for (Map.Entry<String, List<Partition>> entry : metaParts.entrySet()) {
+                    for (Partition mpart :entry.getValue()) {
+                      if (mpart.getValues().get(0).contains(lPart)) {
+                        LOG.info("Founr lPart in " + mpart + " in table:" + entry.getKey());
+                        foundLookAheadParts = true;
+                        break;
                       }
-                    } else {
-                      LOG.info("No look ahead partitions found");
                     }
                   }
-                } else {
-                  LOG.info("Finer parts not required for look-ahead partition :" + part);
+                  if (!foundLookAheadParts) {
+                    LOG.info("Looked ahead process time partition " + lPart + " is not found");
+                    TreeSet<UpdatePeriod> newset = new TreeSet<UpdatePeriod>();
+                    newset.addAll(updatePeriods);
+                    newset.remove(interval);
+                    LOG.info("newset of update periods:" + newset);
+                    if (!newset.isEmpty()) {
+                      // Get partitions for look ahead process time
+                      List<FactPartition> processTimeParts = new ArrayList<FactPartition>();
+                      LOG.info("Looking for process time partitions between " + pdt + " and " + temp.getTime());
+                      getPartitions(fact, pdt, temp.getTime(),
+                          processTimePartCol, null, processTimeParts,
+                          newset, false);
+                      if (!processTimeParts.isEmpty()) {
+                        for (FactPartition pPart : processTimeParts) {
+                          LOG.info("Looking for finer partitions in pPart" + pPart);
+                          if (!getPartitions(fact, dt, cal.getTime(), partCol, pPart,
+                              partitions, newset, false)) {
+                            LOG.info("No partitions found in look ahead range");
+                          }
+                        }
+                      } else {
+                        LOG.info("No look ahead partitions found");
+                      }
+                    }
+                  } else {
+                    LOG.info("Finer parts not required for look-ahead partition :" + part);
+                  }
                 }
+              } else {
+                LOG.info("Not a look ahead partition");
               }
-            } else {
-              LOG.info("Not a look ahead partition");
-            }
             } else {
               LOG.info("Update period is the least update period");
             }

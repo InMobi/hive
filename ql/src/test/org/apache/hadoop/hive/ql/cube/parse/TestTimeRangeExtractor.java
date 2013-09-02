@@ -6,13 +6,11 @@ import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.now;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twodaysBack;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -23,11 +21,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestTimeRangeExtractor {
-  private CubeMetastoreClient metastore;
   private static CubeTestSetup setup;
   private static HiveConf hconf = new HiveConf(TestTimeRangeExtractor.class);
   private CubeQueryRewriter driver;
-  private CubeQueryContext cubeql;
   private String dateNow;
   private String dateTwoDaysBack;
 
@@ -45,7 +41,6 @@ public class TestTimeRangeExtractor {
 
   @Before
   public void setupInstance() throws Exception {
-    this.metastore = CubeMetastoreClient.getInstance(hconf);
     driver = new CubeQueryRewriter(hconf);
     dateTwoDaysBack = getDateUptoHours(twodaysBack);
     dateNow = getDateUptoHours(now);
@@ -115,12 +110,11 @@ public class TestTimeRangeExtractor {
     String dateTwoDaysBack = getDateUptoHours(twodaysBack);
     String dateNow = getDateUptoHours(now);
     // time range within time range
-    String q3 = "SELECT cityid, testCube.msr3 FROM testCube where cityid=1 AND  (time_range_in('dt', '" + dateTwoDaysBack
-      + "','" +dateNow+ "',  "
-      // Another time range inside the above function
-      + " time_range_in('dt', '" + dateTwoDaysBack + "', '" +  dateNow + "'))" +
+    String q3 = "SELECT cityid, testCube.msr3 FROM testCube where cityid=1 AND"
+      + "  (time_range_in('dt', '" + dateTwoDaysBack
+      + "','" +dateNow+ "')  "
       // Time range as sibling of the first time range
-      " AND " + " time_range_in('dt', '" + dateTwoDaysBack + "', '" +  dateNow + "'))";
+      + " OR " + " time_range_in('dt', '" + dateTwoDaysBack + "', '" +  dateNow + "'))";
     CubeQueryContext cubeql = driver.rewrite(q3);
     String hql = cubeql.toHQL();
 
@@ -129,19 +123,13 @@ public class TestTimeRangeExtractor {
 
     TimeRange first = ranges.get(0);
     assertNotNull(first);
-    assertNotNull(first.getChild());
     assertEquals(dateTwoDaysBack, getDateUptoHours(first.getFromDate()));
     assertEquals(dateNow, getDateUptoHours(first.getToDate()));
-
-    TimeRange firstChild = first.getChild();
-    assertNull(firstChild.getChild());
-    assertEquals("dt", firstChild.getPartitionColumn());
 
     TimeRange second = ranges.get(1);
     assertNotNull(second);
     assertEquals("dt", second.getPartitionColumn());
     assertEquals(dateTwoDaysBack, getDateUptoHours(second.getFromDate()));
     assertEquals(dateNow, getDateUptoHours(second.getToDate()));
-    assertNull(second.getChild());
   }
 }

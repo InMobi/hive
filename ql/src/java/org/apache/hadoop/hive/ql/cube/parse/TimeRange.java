@@ -1,16 +1,15 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
 
+import java.util.Date;
+
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-
-import java.util.Date;
 
 public class TimeRange {
   private String partitionColumn;
   private Date toDate;
   private Date fromDate;
-  private TimeRange child;
   private ASTNode astNode;
 
   public static class TimeRangeBuilder {
@@ -53,10 +52,6 @@ public class TimeRange {
 
   }
 
-  public void setChild(TimeRange child) {
-    this.child = child;
-  }
-
   public String getPartitionColumn() {
     return partitionColumn;
   }
@@ -67,10 +62,6 @@ public class TimeRange {
 
   public Date getToDate() {
     return toDate;
-  }
-
-  public TimeRange getChild() {
-    return child;
   }
 
   public void validate() throws SemanticException {
