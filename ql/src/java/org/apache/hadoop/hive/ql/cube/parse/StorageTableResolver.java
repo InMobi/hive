@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.commons.lang.StringUtils;
@@ -25,6 +26,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
+import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class StorageTableResolver implements ContextRewriter {
@@ -133,7 +135,7 @@ public class StorageTableResolver implements ContextRewriter {
         cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
       CubeFactTable fact = i.next().fact;
       Map<UpdatePeriod, Set<String>> storageTableMap =
-          new HashMap<UpdatePeriod, Set<String>>();
+          new TreeMap<UpdatePeriod, Set<String>>();
       validStorageMap.put(fact, storageTableMap);
       String str = conf.get(CubeQueryConfUtil.getValidStorageTablesKey(
           fact.getName()));
@@ -183,8 +185,10 @@ public class StorageTableResolver implements ContextRewriter {
     }
   }
 
-  private Set<UpdatePeriod> getValidUpdatePeriods(CubeFactTable fact) {
-    return validStorageMap.get(fact).keySet();
+  private TreeSet<UpdatePeriod> getValidUpdatePeriods(CubeFactTable fact) {
+    TreeSet<UpdatePeriod> set = new TreeSet<UpdatePeriod>();
+    set.addAll(validStorageMap.get(fact).keySet());
+    return set;
   }
 
   String getStorageTableName(CubeFactTable fact, String storage,
@@ -239,7 +243,7 @@ public class StorageTableResolver implements ContextRewriter {
             + " Parts:" + entry.getValue() + " storageTable:" + entry.getKey());
         storageTableToWhereClause.put(entry.getKey(),
             StorageUtil.getWherePartClause(
-            cubeql.getAliasForTabName(cfact.fact.getCubeName()), entry.getValue()));
+                cubeql.getAliasForTabName(cfact.fact.getCubeName()), entry.getValue()));
       }
       cfact.storageTables = storageTables;
       // multi table select is already false, do not alter it
@@ -252,72 +256,44 @@ public class StorageTableResolver implements ContextRewriter {
   private List<FactPartition> getPartitions(CubeFactTable fact, TimeRange range)
       throws SemanticException {
     try {
-      return getPartitions(fact, range, null, getValidUpdatePeriods(fact), true);
+      return getPartitions(fact, range, getValidUpdatePeriods(fact), true);
     } catch (Exception e) {
       throw new SemanticException(e);
     }
   }
 
   private List<FactPartition> getPartitions(CubeFactTable fact, TimeRange range,
-      List<FactPartition> containingParts, Set<UpdatePeriod> updatePeriods,
+      TreeSet<UpdatePeriod> updatePeriods,
       boolean addNonExistingParts)
           throws Exception {
     List<FactPartition> partitions = new ArrayList<FactPartition>();
     if (getPartitions(fact, range.getFromDate(), range.getToDate(),
-        range.getPartitionColumn(), containingParts,
+        range.getPartitionColumn(), null,
         partitions, updatePeriods, addNonExistingParts)) {
-      System.out.println("Partitions returned:" + partitions);
-      if (range.getChild() != null) {
-        List<FactPartition> rangeParts = new ArrayList<FactPartition>();
-        for (FactPartition part : partitions) {
-          System.out.println("Looking for child partitions in:" + part);
-          List<FactPartition> childContParts = new ArrayList<FactPartition>();
-          if (containingParts != null) {
-            childContParts.addAll(containingParts);
-          }
-          childContParts.add(part);
-          List<FactPartition> childParts = getPartitions(fact,
-              range.getChild(), childContParts,
-              updatePeriods, addNonExistingParts);
-          if (childParts != null) {
-            rangeParts.addAll(childParts);
-          }
-        }
-        return rangeParts;
-      } else {
-        // This is the final range in nested range
-        // return the partitions to to-be queried partitions
-        return partitions;
-      }
+      return partitions;
     } else {
       return null;
     }
   }
 
   private boolean getPartitions(CubeFactTable fact, Date fromDate, Date toDate,
-      String partCol, List<FactPartition> containingParts,
+      String partCol, FactPartition containingPart,
       List<FactPartition> partitions,
-      Set<UpdatePeriod> updatePeriods,  boolean addNonExistingParts)
+      TreeSet<UpdatePeriod> updatePeriods,  boolean addNonExistingParts)
           throws Exception {
     LOG.info("getPartitions for " + fact + " from fromDate:" + fromDate
         + " toDate:" + toDate);
     if (fromDate.equals(toDate) || fromDate.after(toDate)) {
       return true;
     }
-    UpdatePeriod interval;
-    Set<String> storageTbls = new LinkedHashSet<String>();
-    if (containingParts != null) {
-      interval = containingParts.get(containingParts.size() - 1).period;
-      storageTbls.addAll(containingParts.get(containingParts.size() - 1).storageTables);
-    } else {
-      interval = CubeFactTable.maxIntervalInRange(fromDate, toDate,
-          updatePeriods);
-      if (interval == null) {
-        return false;
-      }
-      LOG.info("Max interval for " + fact + " is:" + interval);
-      storageTbls.addAll(validStorageMap.get(fact).get(interval));
+    UpdatePeriod interval = CubeFactTable.maxIntervalInRange(fromDate, toDate,
+        updatePeriods);
+    if (interval == null) {
+      return false;
     }
+    LOG.info("Max interval for " + fact + " is:" + interval);
+    Set<String> storageTbls = new LinkedHashSet<String>();
+    storageTbls.addAll(validStorageMap.get(fact).get(interval));
 
     Iterator<String> it = storageTbls.iterator();
     while (it.hasNext()) {
@@ -325,6 +301,13 @@ public class StorageTableResolver implements ContextRewriter {
       if (!client.partColExists(storageTableName, partCol)) {
         LOG.info(partCol + " does not exist in" + storageTableName);
         it.remove();
+        continue;
+      }
+      if (containingPart != null) {
+        if (!client.partColExists(storageTableName, containingPart.partCol)) {
+          LOG.info(partCol + " does not exist in" + storageTableName);
+          it.remove();
+        }
       }
     }
 
@@ -340,14 +323,21 @@ public class StorageTableResolver implements ContextRewriter {
     Calendar cal = Calendar.getInstance();
     cal.setTime(ceilFromDate);
     Date dt = cal.getTime();
+    long numIters = DateUtil.getTimeDiff(ceilFromDate, floorToDate, interval);
+    int i = 1;
+    int lookAheadNumParts = 1;
     while (dt.compareTo(floorToDate) < 0) {
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
+      SimpleDateFormat pformat = new SimpleDateFormat(fmt);
       FactPartition part = new FactPartition(partCol,
-          new SimpleDateFormat(fmt).format(dt), interval, containingParts);
+          pformat.format(dt), interval, containingPart);
+      Map<String, List<Partition>> metaParts = new HashMap<String, List<Partition>>();
       for (String storageTableName : storageTbls) {
-        if (client.partitionExistsByFilter(storageTableName, part.getFilter(
-            null))) {
+        List<Partition> sParts = client.getPartitionsByFilter(
+            storageTableName, part.getFilter(null));
+        metaParts.put(storageTableName, sParts);
+        if (!sParts.isEmpty()) {
           if (!foundPart) {
             LOG.info("Adding existing partition" + part);
             partitions.add(part);
@@ -358,36 +348,109 @@ public class StorageTableResolver implements ContextRewriter {
           LOG.info("Partition " + part + " does not exist on " + storageTableName);
         }
       }
-      if (!foundPart && containingParts == null) {
-        LOG.info("Partition:" + part + " does not exist in any storage table");
-        Set<UpdatePeriod> newset = new TreeSet<UpdatePeriod>();
-        newset.addAll(updatePeriods);
-        newset.remove(interval);
-        if (!getPartitions(fact, dt, cal.getTime(), partCol, null, partitions,
-            newset, false)) {
-          if (!failOnPartialData && addNonExistingParts) {
-            LOG.info("Adding non existing partition" + part);
-            partitions.add(part);
-            nonExistingParts.add(part.partSpec);
-            foundPart = true;
-            // add all storage tables as the answering tables
-            part.storageTables.addAll(storageTbls);
+      if (containingPart == null) {
+        if (!foundPart) {
+          LOG.info("Partition:" + part + " does not exist in any storage table");
+          TreeSet<UpdatePeriod> newset = new TreeSet<UpdatePeriod>();
+          newset.addAll(updatePeriods);
+          newset.remove(interval);
+          if (!getPartitions(fact, dt, cal.getTime(), partCol, null, partitions,
+              newset, false)) {
+            if (!failOnPartialData && addNonExistingParts) {
+              LOG.info("Adding non existing partition" + part);
+              partitions.add(part);
+              nonExistingParts.add(part.partSpec);
+              foundPart = true;
+              // add all storage tables as the answering tables
+              part.storageTables.addAll(storageTbls);
+            } else {
+              LOG.info("No finer granual partitions exist for" + part);
+              return false;
+            }
           } else {
-            LOG.info("No finer granual partitions exist for" + part);
-            return false;
+            LOG.info("Finer granual partitions added for " + part);
           }
         } else {
-          LOG.info("Finer granual partitions added for " + part);
+          String processTimePartCol = "pt";
+          LOG.info("Looking for look ahead process time partitions for "+ part);
+          if (!partCol.equals(processTimePartCol)) {
+            if (!(updatePeriods.first().equals(interval))) {
+            // see if this is the part of the last-n look ahead partitions
+            if ((numIters - i) <= lookAheadNumParts) {
+              LOG.info("Looking for look ahead process time partitions for "+ part);
+              // check if finer partitions are required
+              // final partitions are required if no partitions from look-ahead
+              // process time are present
+              Calendar processCal = Calendar.getInstance();
+              processCal.setTime(cal.getTime());
+              Date start =  processCal.getTime();
+              processCal.add(interval.calendarField(), lookAheadNumParts);
+              Date end = processCal.getTime();
+              Calendar temp = Calendar.getInstance();
+              temp.setTime(start);
+              while (temp.getTime().compareTo(end) < 0) {
+                Date pdt = temp.getTime();
+                String lPart = pformat.format(pdt);
+                temp.add(interval.calendarField(), 1);
+                Boolean foundLookAheadParts = false;
+                for (Map.Entry<String, List<Partition>> entry : metaParts.entrySet()) {
+                  for (Partition mpart :entry.getValue()) {
+                    if (mpart.getValues().get(0).contains(lPart)) {
+                      LOG.info("Founr lPart in " + mpart + " in table:" + entry.getKey());
+                      foundLookAheadParts = true;
+                      break;
+                    }
+                  }
+                }
+                if (!foundLookAheadParts) {
+                  LOG.info("Looked ahead process time partition " + lPart + " is not found");
+                  TreeSet<UpdatePeriod> newset = new TreeSet<UpdatePeriod>();
+                  newset.addAll(updatePeriods);
+                  newset.remove(interval);
+                  LOG.info("newset of update periods:" + newset);
+                  if (!newset.isEmpty()) {
+                    // Get partitions for look ahead process time
+                    List<FactPartition> processTimeParts = new ArrayList<FactPartition>();
+                    LOG.info("Looking for process time partitions between " + pdt + " and " + temp.getTime());
+                    getPartitions(fact, pdt, temp.getTime(),
+                        processTimePartCol, null, processTimeParts,
+                        newset, false);
+                    if (!processTimeParts.isEmpty()) {
+                      for (FactPartition pPart : processTimeParts) {
+                        LOG.info("Looking for finer partitions in pPart" + pPart);
+                        if (!getPartitions(fact, dt, cal.getTime(), partCol, pPart,
+                            partitions, newset, false)) {
+                          LOG.info("No partitions found in look ahead range");
+                        }
+                      }
+                    } else {
+                      LOG.info("No look ahead partitions found");
+                    }
+                  }
+                } else {
+                  LOG.info("Finer parts not required for look-ahead partition :" + part);
+                }
+              }
+            } else {
+              LOG.info("Not a look ahead partition");
+            }
+            } else {
+              LOG.info("Update period is the least update period");
+            }
+          } else {
+            LOG.info("part column is process time col");
+          }
         }
       }
       dt = cal.getTime();
+      i++;
     }
-    if (containingParts == null) {
+    if (containingPart == null) {
       return
-        (getPartitions(fact, fromDate, ceilFromDate, partCol, null, partitions,
-           updatePeriods, addNonExistingParts) &&
-         getPartitions(fact, floorToDate, toDate, partCol, null, partitions,
-           updatePeriods, addNonExistingParts));
+          (getPartitions(fact, fromDate, ceilFromDate, partCol, null, partitions,
+              updatePeriods, addNonExistingParts) &&
+              getPartitions(fact, floorToDate, toDate, partCol, null, partitions,
+                  updatePeriods, addNonExistingParts));
     } else {
       return true;
     }

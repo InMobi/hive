@@ -354,4 +354,27 @@ public class DateUtil {
 
     return dayDiff / 7;
   }
+
+  static long getTimeDiff(Date from, Date to, UpdatePeriod interval) {
+    long diff = to.getTime() - from.getTime();
+    switch (interval) {
+    case SECONDLY : return diff/1000;
+    case MINUTELY : return diff/(1000 * 60);
+    case HOURLY : return diff/(1000 * 60 * 60);
+    case DAILY : return diff/(1000 * 60 * 60 * 24);
+    case WEEKLY :
+      //return diff/(1000 * 60 * 60 * 24 * 7);
+      return getWeeksBetween(from, to);
+    case MONTHLY :
+      //return (long) (diff/(60 * 60 * 1000 * 24 * 30.41666666));
+      return getMonthsBetween(from, to);
+    case QUARTERLY :
+      return getQuartersBetween(from, to);
+    case YEARLY :
+      //return (diff/(60 * 60 * 1000 * 24 * 365));
+      return getYearsBetween(from, to);
+    default :  return -1;
+    }
+  }
+
 }
