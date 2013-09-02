@@ -49,9 +49,13 @@ import org.apache.hadoop.util.StringUtils;
 public abstract class Task<T extends Serializable> implements Serializable, Node {
 
   private static final long serialVersionUID = 1L;
+  protected transient TaskState taskState;
   public transient HashMap<String, Long> taskCounters;
   public transient TaskHandle taskHandle;
-  protected transient TaskState taskState;
+  protected transient boolean started;
+  protected transient boolean initialized;
+  protected transient boolean isdone;
+  protected transient boolean queued;
   protected transient HiveConf conf;
   protected transient Hive db;
   protected transient LogHelper console;
@@ -113,7 +117,10 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   private Throwable exception;
 
   public Task() {
-    taskState = TaskState.UNKNOWN_STATE;
+    isdone = false;
+    started = false;
+    initialized = false;
+    queued = false;
     this.taskCounters = new HashMap<String, Long>();
     taskTag = Task.NO_TAG;
   }
@@ -124,6 +131,8 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public void initialize(HiveConf conf, QueryPlan queryPlan, DriverContext driverContext) {
     this.queryPlan = queryPlan;
+    isdone = false;
+    started = false;
     setInitialized();
     this.conf = conf;
 
@@ -300,50 +309,36 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     }
   }
 
-  protected void setTaskState(TaskState state) {
-    synchronized(taskState) {
-      taskState = state;
-    }
-  }
-
   public void setStarted() {
-    setTaskState(TaskState.RUNNING_STATE);
+    this.started = true;
   }
 
   public boolean started() {
-    synchronized (taskState) {
-      return taskState == TaskState.RUNNING_STATE;
-    }
+    return started;
   }
 
   public boolean done() {
-    synchronized (taskState) {
-      return taskState == TaskState.FINISHED_STATE;
-    }
+    return isdone;
   }
 
   public void setDone() {
-    setTaskState(TaskState.FINISHED_STATE);
+    isdone = true;
   }
 
   public void setQueued() {
-    setTaskState(TaskState.QUEUED_STATE);
+    queued = true;
   }
 
   public boolean getQueued() {
-    synchronized (taskState) {
-      return taskState == TaskState.QUEUED_STATE;
-    }
+    return queued;
   }
 
   public void setInitialized() {
-    setTaskState(TaskState.INITIALIZED_STATE);
+    initialized = true;
   }
 
   public boolean getInitialized() {
-    synchronized (taskState) {
-      return taskState == TaskState.INITIALIZED_STATE;
-    }
+    return initialized;
   }
 
   public boolean isRunnable() {
@@ -382,9 +377,23 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   }
 
   public TaskState getTaskState() {
-    synchronized(taskState) {
-      return taskState;
+    if (done())  {
+      return TaskState.FINISHED_STATE;
     }
+
+    if (started()) {
+      return TaskState.RUNNING_STATE;
+    }
+
+    if (getInitialized()) {
+      return TaskState.INITIALIZED_STATE;
+    }
+
+    if (getQueued()) {
+      return TaskState.QUEUED_STATE;
+    }
+
+    return TaskState.UNKNOWN_STATE;
   }
 
   public boolean isMapRedTask() {

@@ -362,33 +362,25 @@ public class MapRedTask extends ExecDriver implements Serializable {
   @Override
   public boolean mapStarted() {
     boolean b = super.mapStarted();
-    synchronized (taskState) {
-      return runningViaChild ? taskState == TaskState.FINISHED_STATE : b;
-    }
+    return runningViaChild ? isdone : b;
   }
 
   @Override
   public boolean reduceStarted() {
     boolean b = super.reduceStarted();
-    synchronized (taskState) {
-      return runningViaChild ? taskState == TaskState.FINISHED_STATE : b;
-    }
+    return runningViaChild ? isdone : b;
   }
 
   @Override
   public boolean mapDone() {
     boolean b = super.mapDone();
-    synchronized (taskState) {
-      return runningViaChild ? taskState == TaskState.FINISHED_STATE : b;
-    }
+    return runningViaChild ? isdone : b;
   }
 
   @Override
   public boolean reduceDone() {
     boolean b = super.reduceDone();
-    synchronized (taskState) {
-      return runningViaChild ? taskState == TaskState.FINISHED_STATE : b;
-    }
+    return runningViaChild ? isdone : b;
   }
 
   /**
