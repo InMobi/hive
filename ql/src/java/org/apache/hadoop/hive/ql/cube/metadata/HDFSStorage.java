@@ -15,6 +15,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.mortbay.log.Log;
 
@@ -181,6 +182,11 @@ public class HDFSStorage extends Storage {
         storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
     if (makeLatest) {
       // symlink this partition to latest
+      Partition part = client.getPartition(storageTbl,  getLatestPartSpec(), false);
+      if (part != null) {
+        client.dropPartition(storageTbl.getTableName(),
+            getPartitionsForLatest(), false);
+      }
       client.createPartition(storageTbl, getLatestPartSpec(),
           location, getTableParameters(), inputFormat, outputFormat, -1,
           storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
