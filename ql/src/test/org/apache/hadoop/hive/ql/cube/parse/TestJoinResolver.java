@@ -85,19 +85,30 @@ public class TestJoinResolver {
     CubeDimensionTable cityTable = metastore.getDimensionTable("citytable");
     assertTrue(schemaGraph.findJoinChain(cityTable, cube, chain));
     System.out.println("City -> cube chain: " + chain);
+    assertEquals(1, chain.size());
     
     // find chains between dimensions
     chain.clear();
     CubeDimensionTable stateTable = metastore.getDimensionTable("statetable");
     assertTrue(schemaGraph.findJoinChain(stateTable, cityTable, chain));
-    assertTrue(schemaGraph.findJoinChain(cityTable, stateTable, chain));
     System.out.println("Dim chain state -> city : " + chain);
-    
+    assertEquals(1, chain.size());
+
+    chain.clear();
+    assertTrue(schemaGraph.findJoinChain(cityTable, stateTable, chain));
+    System.out.println("Dim chain city -> state: " + chain);
+    assertEquals(1, chain.size());
+
     chain.clear();
     CubeDimensionTable dim2 = metastore.getDimensionTable("testdim2");
     assertTrue(schemaGraph.findJoinChain(testDim4, dim2, chain));
-    assertTrue(schemaGraph.findJoinChain(dim2, testDim4, chain));
     System.out.println("Dim chain testdim4 -> testdim2 : " + chain);
+    assertEquals(2, chain.size());
+
+    chain.clear();
+    assertTrue(schemaGraph.findJoinChain(dim2, testDim4, chain));
+    assertEquals(2, chain.size());
+    System.out.println("Dim chain testdim2 -> testdim4 : " + chain);
     
     chain.clear();
     boolean foundchain = schemaGraph.findJoinChain(testDim4, cityTable, chain);

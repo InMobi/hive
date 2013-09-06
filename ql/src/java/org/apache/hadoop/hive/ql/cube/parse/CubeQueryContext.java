@@ -1254,6 +1254,10 @@ public class CubeQueryContext {
     return timeRanges;
   }
 
+  public HiveConf getHiveConf() {
+    return conf;
+  }
+
   static class CandidateFact {
     final CubeFactTable fact;
     Set<String> storageTables;
