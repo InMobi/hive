@@ -151,6 +151,28 @@ public class CubeTestSetup {
   }
 
   public static String getExpectedQuery(String cubeName, String selExpr,
+      String whereExpr, String postWhereExpr,
+      String rangeWhere, String storageTable) {
+    StringBuilder expected = new StringBuilder();
+      expected.append(selExpr);
+      expected.append(storageTable);
+      expected.append(" ");
+      expected.append(cubeName);
+      expected.append(" WHERE ");
+      expected.append("(");
+      if (whereExpr != null) {
+        expected.append(whereExpr);
+        expected.append(" AND ");
+      }
+      expected.append(rangeWhere);
+      expected.append(")");
+      if (postWhereExpr != null) {
+        expected.append(postWhereExpr);
+      }
+    return expected.toString();
+  }
+
+  public static String getExpectedQuery(String cubeName, String selExpr,
                                  String joinExpr, String whereExpr, String postWhereExpr,
                                  List<String> joinWhereConds,
                                  Map<String, String> storageTableToWhereClause) {
@@ -193,33 +215,45 @@ public class CubeTestSetup {
 
   public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(
       String cubeName, String timedDimension, String... storageTables) {
+    return getWhereForDailyAndHourly2daysWithTimeDim(cubeName, timedDimension,
+        twodaysBack, now, storageTables);
+  }
+
+  public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(
+      String cubeName, String timedDimension, Date from, Date to, String... storageTables) {
     Map<String, String> storageTableToWhereClause =
       new LinkedHashMap<String, String>();
+    String whereClause = getWhereForDailyAndHourly2daysWithTimeDim(cubeName,
+        timedDimension, from,
+        to);
+    storageTableToWhereClause.put(StringUtils.join(storageTables, ","),
+        whereClause);
+    return storageTableToWhereClause;
+  }
+
+  public static String getWhereForDailyAndHourly2daysWithTimeDim(
+      String cubeName, String timedDimension, Date from, Date to) {
     List<String> hourlyparts = new ArrayList<String>();
     List<String> dailyparts = new ArrayList<String>();
     Date dayStart;
     if (!CubeTestSetup.isZerothHour()) {
-      addParts(hourlyparts, UpdatePeriod.HOURLY, twodaysBack,
-        DateUtil.getCeilDate(twodaysBack, UpdatePeriod.DAILY));
+      addParts(hourlyparts, UpdatePeriod.HOURLY, from,
+        DateUtil.getCeilDate(from, UpdatePeriod.DAILY));
       addParts(hourlyparts, UpdatePeriod.HOURLY,
-        DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
-        DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+        DateUtil.getFloorDate(to, UpdatePeriod.DAILY),
+        DateUtil.getFloorDate(to, UpdatePeriod.HOURLY));
       dayStart = DateUtil.getCeilDate(
-        twodaysBack, UpdatePeriod.DAILY);
+          from, UpdatePeriod.DAILY);
     } else {
-      dayStart = twodaysBack;
+      dayStart = from;
     }
     addParts(dailyparts, UpdatePeriod.DAILY, dayStart,
-      DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
+      DateUtil.getFloorDate(to, UpdatePeriod.DAILY));
     List<String> parts = new ArrayList<String>();
     parts.addAll(hourlyparts);
     parts.addAll(dailyparts);
-    if (storageTables.length == 1) {
-     Collections.sort(parts);
-    }
-    storageTableToWhereClause.put(StringUtils.join(storageTables, ","),
-      StorageUtil.getWherePartClause(timedDimension, cubeName, parts));
-    return storageTableToWhereClause;
+    Collections.sort(parts);
+    return  StorageUtil.getWherePartClause(timedDimension, cubeName, parts);
   }
 
   public static Map<String, String> getWhereForMonthlyDailyAndHourly2months(
@@ -275,8 +309,8 @@ public class CubeTestSetup {
       tables.append(storageTables[2]);
     } else {
       tables.append(storageTables[0]);
-      Collections.sort(parts);
     }
+    Collections.sort(parts);
     storageTableToWhereClause.put(tables.toString(),
       StorageUtil.getWherePartClause("dt", cubeName, parts));
     return storageTableToWhereClause;

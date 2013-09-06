@@ -42,12 +42,12 @@ public class StorageUtil {
   }
 
   public static String getWherePartClause(String tableName,
-      Set<FactPartition> parts) {
-    if (parts.size() == 0) {
+      Set<FactPartition> rangeParts) {
+    if (rangeParts.size() == 0) {
       return "";
     }
     StringBuilder partStr = new StringBuilder();
-    Iterator<FactPartition> it = parts.iterator();
+    Iterator<FactPartition> it = rangeParts.iterator();
     while (it.hasNext()) {
       partStr.append(" ( ");
       partStr.append(it.next().getFilter(tableName));
@@ -132,5 +132,20 @@ public class StorageUtil {
       }
     }
     return Collections.singletonMap(maxCoveringStorage, maxCoveringSet);
+  }
+
+  public static String appenWherePartClause(String existingClause,
+      String tableName,
+      FactPartition part) {
+    StringBuilder partStr = new StringBuilder();
+    if (existingClause != null) {
+      partStr.append(existingClause);
+      partStr.append(" OR ");
+    }
+    partStr.append(" ( ");
+    partStr.append(part.getFilter(tableName));
+    partStr.append(" ) ");
+
+    return null;
   }
 }

@@ -44,7 +44,7 @@ public class StorageTableResolver implements ContextRewriter {
   new HashMap<CubeFactTable, Map<UpdatePeriod, Set<String>>>();
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
-  private final Map<String, String> storageTableToWhereClause =
+  private final Map<String, String> dimStorageTableToWhereClause =
       new HashMap<String, String>();
   private final List<String> nonExistingParts = new ArrayList<String>();
   private String processTimePartCol = null;
@@ -96,7 +96,7 @@ public class StorageTableResolver implements ContextRewriter {
     cubeql.setDimStorageMap(dimStorageMap);
 
     // set storage to whereclause
-    cubeql.setStorageTableToWhereClause(storageTableToWhereClause);
+    cubeql.setStorageTableToWhereClause(dimStorageTableToWhereClause);
     cubeql.setNonexistingParts(nonExistingParts);
   }
 
@@ -118,7 +118,7 @@ public class StorageTableResolver implements ContextRewriter {
           }
           storageTables.add(tableName);
           if (dim.hasStorageSnapshots(storage)) {
-            storageTableToWhereClause.put(tableName,
+            dimStorageTableToWhereClause.put(tableName,
                 StorageUtil.getWherePartClause(Storage.getDatePartitionKey(),
                     cubeql.getAliasForTabName(dim.getName()),
                     Storage.getPartitionsForLatest()));
@@ -212,50 +212,40 @@ public class StorageTableResolver implements ContextRewriter {
         cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
       CandidateFact cfact = i.next();
       List<FactPartition> answeringParts = new ArrayList<FactPartition>();
-      boolean considerFact = true;
       for (TimeRange range : cubeql.getTimeRanges()) {
-        List<FactPartition> rangeParts = getPartitions(cfact.fact, range);
+        Set<FactPartition> rangeParts = getPartitions(cfact.fact, range);
         if (rangeParts == null || rangeParts.isEmpty()) {
-          LOG.info("The range:" + range + "is not answerable by "+ cfact.fact);
-          considerFact = false;
-          break;
+          continue;
         }
+        cfact.numQueriedParts += rangeParts.size();
         answeringParts.addAll(rangeParts);
+        cfact.rangeToWhereClause.put(range, StorageUtil.getWherePartClause(
+            cubeql.getAliasForTabName(cfact.fact.getCubeName()), rangeParts));
       }
-      if (!considerFact) {
-        LOG.info("Not considering the fact table:" + cfact.fact + " as it could not" +
-            " find partition for given ranges: " + cubeql.getTimeRanges());
+      if (cfact.numQueriedParts == 0) {
+        LOG.info("Not considering the fact table:" + cfact.fact + " as it could"
+          + " not find partition for given ranges: " + cubeql.getTimeRanges());
         i.remove();
         continue;
       }
-      cfact.numQueriedParts = answeringParts.size();
-
       // Map from storage to covering parts
       Map<String, Set<FactPartition>> minimalStorageTables =
           new LinkedHashMap<String, Set<FactPartition>>();
       boolean enabledMultiTableSelect = StorageUtil.getMinimalAnsweringTables(
           answeringParts, minimalStorageTables);
       Set<String> storageTables = new LinkedHashSet<String>();
-
-      for (Map.Entry<String, Set<FactPartition>> entry : minimalStorageTables
-          .entrySet()) {
-        storageTables.add(entry.getKey());
-
-        LOG.info("For fact:" + cfact.fact
-            + " Parts:" + entry.getValue() + " storageTable:" + entry.getKey());
-        storageTableToWhereClause.put(entry.getKey(),
-            StorageUtil.getWherePartClause(
-                cubeql.getAliasForTabName(cfact.fact.getCubeName()), entry.getValue()));
-      }
+      storageTables.addAll(minimalStorageTables.keySet());
       cfact.storageTables = storageTables;
       // multi table select is already false, do not alter it
       if (cfact.enabledMultiTableSelect) {
         cfact.enabledMultiTableSelect = enabledMultiTableSelect;
       }
+      LOG.info("Resolved partitions for fact " + cfact + ": " + answeringParts
+        + " storageTables:" + storageTables);
     }
   }
 
-  private List<FactPartition> getPartitions(CubeFactTable fact, TimeRange range)
+  private Set<FactPartition> getPartitions(CubeFactTable fact, TimeRange range)
       throws SemanticException {
     try {
       return getPartitions(fact, range, getValidUpdatePeriods(fact), true);
@@ -264,11 +254,11 @@ public class StorageTableResolver implements ContextRewriter {
     }
   }
 
-  private List<FactPartition> getPartitions(CubeFactTable fact, TimeRange range,
+  private Set<FactPartition> getPartitions(CubeFactTable fact, TimeRange range,
       TreeSet<UpdatePeriod> updatePeriods,
       boolean addNonExistingParts)
           throws Exception {
-    List<FactPartition> partitions = new ArrayList<FactPartition>();
+    Set<FactPartition> partitions = new TreeSet<FactPartition>();
     if (getPartitions(fact, range.getFromDate(), range.getToDate(),
         range.getPartitionColumn(), null,
         partitions, updatePeriods, addNonExistingParts)) {
@@ -280,7 +270,7 @@ public class StorageTableResolver implements ContextRewriter {
 
   private boolean getPartitions(CubeFactTable fact, Date fromDate, Date toDate,
       String partCol, FactPartition containingPart,
-      List<FactPartition> partitions,
+      Set<FactPartition> partitions,
       TreeSet<UpdatePeriod> updatePeriods,  boolean addNonExistingParts)
           throws Exception {
     LOG.info("getPartitions for " + fact + " from fromDate:" + fromDate
@@ -411,7 +401,7 @@ public class StorageTableResolver implements ContextRewriter {
                     LOG.info("newset of update periods:" + newset);
                     if (!newset.isEmpty()) {
                       // Get partitions for look ahead process time
-                      List<FactPartition> processTimeParts = new ArrayList<FactPartition>();
+                      Set<FactPartition> processTimeParts = new TreeSet<FactPartition>();
                       LOG.info("Looking for process time partitions between " + pdt + " and " + temp.getTime());
                       getPartitions(fact, pdt, temp.getTime(),
                           processTimePartCol, null, processTimeParts,

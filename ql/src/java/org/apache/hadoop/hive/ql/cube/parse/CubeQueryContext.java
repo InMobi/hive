@@ -109,7 +109,7 @@ public class CubeQueryContext {
   // Map from fact to number of partitions
   private final Map<CubeDimensionTable, List<String>> dimStorageMap =
       new HashMap<CubeDimensionTable, List<String>>();
-  private final Map<String, String> storageTableToWhereClause =
+  private final Map<String, String> dimStorageTableToWhereClause =
       new HashMap<String, String>();
   private final Map<AbstractCubeTable, Set<String>> storageTableToQuery =
       new HashMap<AbstractCubeTable, Set<String>>();
@@ -792,12 +792,12 @@ public class CubeQueryContext {
     return queryFormat.toString();
   }
 
-  private Object[] getQueryTreeStrings(Set<String> factStorageTables)
+  private Object[] getQueryTreeStrings(CandidateFact fact)
       throws SemanticException {
     List<String> qstrs = new ArrayList<String>();
     qstrs.add(getSelectTree());
     qstrs.add(getFromString());
-    String whereString = genWhereClauseWithPartitions(factStorageTables);
+    String whereString = genWhereClauseWithPartitions(fact);
     if (whereString != null) {
       qstrs.add(whereString);
     }
@@ -910,11 +910,11 @@ public class CubeQueryContext {
     return null;
   }
 
-  private String toHQL(Set<String> tableNames) throws SemanticException {
+  private String toHQL(CandidateFact fact) throws SemanticException {
     findDimStorageTables();
     String qfmt = getQueryFormat();
     LOG.info("qfmt:" + qfmt);
-    String baseQuery = String.format(qfmt, getQueryTreeStrings(tableNames));
+    String baseQuery = String.format(qfmt, getQueryTreeStrings(fact));
     String insertString = "";
     ASTNode destTree = qb.getParseInfo().getDestForClause(clauseName);
     if (destTree != null && ((ASTNode)(destTree.getChild(0)))
@@ -950,7 +950,7 @@ public class CubeQueryContext {
       LOG.debug("Skipping already added where clause for " + dim);
       return;
     }
-    String whereClause = storageTableToWhereClause.get(
+    String whereClause = dimStorageTableToWhereClause.get(
         storageTableToQuery.get(dim).iterator().next());
     if (whereClause != null) {
       appendWhereClause(whereString, whereClause, hasMore);
@@ -964,26 +964,28 @@ public class CubeQueryContext {
     whereWithoutTimerange.append(")");
   }
 
-  private String genWhereClauseWithPartitions(Set<String> factStorageTables) {
+  private String genWhereClauseWithPartitions(CandidateFact fact) {
     String originalWhere = getWhereTree();
-    StringBuilder whereBuf;
+    StringBuilder whereBuf = new StringBuilder();
 
-    if (factStorageTables != null) {
-      // Get Rid of the time range.
-      int timeRangeBegin = originalWhere.indexOf(TIME_RANGE_FUNC);
-      int timeRangeEnd = originalWhere.indexOf(')', timeRangeBegin) + 1;
+    if (fact != null) {
+      // resolve timerange positions and replace it by corresponding where clause
+      String restOfTheWhere = new String(originalWhere);
+      for (TimeRange range : timeRanges) {
+        int timeRangeBegin = restOfTheWhere.indexOf(TIME_RANGE_FUNC);
+        int timeRangeEnd = restOfTheWhere.indexOf(')', timeRangeBegin) + 1;
 
-      whereBuf = new StringBuilder(originalWhere.substring(0, timeRangeBegin));
-      whereBuf.append("(");
-      Iterator<String> it = factStorageTables.iterator();
-      while (it.hasNext()) {
-        whereBuf.append(storageTableToWhereClause.get(it.next()));
-        if (it.hasNext()) {
-          whereBuf.append(" OR ");
+        whereBuf.append(restOfTheWhere.substring(0, timeRangeBegin));
+        String rangeWhere = fact.rangeToWhereClause.get(range);
+        if (!StringUtils.isBlank(rangeWhere)) {
+          whereBuf.append("(");
+          whereBuf.append(rangeWhere);
+          whereBuf.append(")");
         }
+        restOfTheWhere = restOfTheWhere.substring(timeRangeEnd);
       }
-      whereBuf.append(")")
-      .append(originalWhere.substring(timeRangeEnd));
+      whereBuf.append(restOfTheWhere);
+
     } else {
       if (originalWhere != null) {
         whereBuf = new StringBuilder(originalWhere);
@@ -996,7 +998,7 @@ public class CubeQueryContext {
     Iterator<CubeDimensionTable> it = dimensions.iterator();
     if (it.hasNext()) {
       CubeDimensionTable dim = it.next();
-      appendWhereClause(dim, whereBuf, factStorageTables != null);
+      appendWhereClause(dim, whereBuf, fact != null);
       while (it.hasNext()) {
         dim = it.next();
         appendWhereClause(dim, whereBuf, true);
@@ -1041,7 +1043,7 @@ public class CubeQueryContext {
           && !fact.enabledMultiTableSelect) {
         return unionQuery();
       }
-      return toHQL(fact.storageTables);
+      return toHQL(fact);
     } else {
       return toHQL(null);
     }
@@ -1070,16 +1072,12 @@ public class CubeQueryContext {
     return this.dimStorageMap;
   }
 
-  public Map<String, String> getStorageTableToWhereClause() {
-    return storageTableToWhereClause;
-  }
-
   public void setStorageTableToWhereClause(Map<String, String> whereClauseMap) {
-    storageTableToWhereClause.putAll(whereClauseMap);
+    dimStorageTableToWhereClause.putAll(whereClauseMap);
   }
 
   public boolean hasPartitions() {
-    return !storageTableToWhereClause.isEmpty();
+    return !dimStorageTableToWhereClause.isEmpty();
   }
 
   public Map<String, List<String>> getTblToColumns() {
@@ -1230,10 +1228,11 @@ public class CubeQueryContext {
   }
 
   static class CandidateFact {
-    CubeFactTable fact;
+    final CubeFactTable fact;
     Set<String> storageTables;
     boolean enabledMultiTableSelect;
-    int numQueriedParts;
+    int numQueriedParts = 0;
+    final Map<TimeRange, String> rangeToWhereClause = new HashMap<TimeRange, String>();
     CandidateFact(CubeFactTable fact) {
       this.fact = fact;
     }
