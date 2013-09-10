@@ -30,7 +30,6 @@ public class TestJoinResolver {
   public static void setup() throws Exception {
     setup = new CubeTestSetup();
     setup.createSources(hconf, TestJoinResolver.class.getSimpleName());
-    hconf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, false);
   }
 
   @AfterClass
@@ -44,6 +43,7 @@ public class TestJoinResolver {
     dateTwoDaysBack = getDateUptoHours(twodaysBack);
     dateNow = getDateUptoHours(now);
     this.metastore = CubeMetastoreClient.getInstance(hconf);
+    hconf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, false);
   }
 
   @After
@@ -161,5 +161,21 @@ public class TestJoinResolver {
       fail("dim only query should throw error");
     } catch (SemanticException exc) {
     }
+  }
+
+  @Test
+  public void testPartialJoinResolver() throws Exception {
+    String query = "SELECT citytable.name, testDim4.name, msr2 " +
+      "FROM testCube join citytable ON citytable.name = 'FOOBAR'" +
+      " join testDim4 on testDim4.name='TESTDIM4NAME'" +
+      " WHERE " + twoDaysRange;
+    CubeQueryContext rewrittenQuery = driver.rewrite(query);
+    String hql = rewrittenQuery.toHQL();
+    String resolvedClause = rewrittenQuery.getAutoResolvedJoinChain();
+    System.out.println("@@resolved join chain " + resolvedClause);
+    assertEquals("join citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' ))  " +
+      "join testdim2 on testcube.dim2 = testdim2.id  join testdim3 on testdim2.testdim3id = testdim3.id  " +
+      "join testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' ))",
+      resolvedClause.trim());
   }
 }

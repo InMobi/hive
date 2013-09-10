@@ -382,8 +382,7 @@ public class JoinResolver implements ContextRewriter {
         target = getMetastoreClient().getDimensionTable(targetDimTable);
       }
     }
-
-    searchDimensionTables(cubeql.getQB().getParseInfo().getJoinExpr());
+    searchDimensionTables(joinClause);
     if (target == null) {
       LOG.warn("Can't resolve joins for null target");
       return;
@@ -435,15 +434,15 @@ public class JoinResolver implements ContextRewriter {
   }
 
   private void setTarget(ASTNode node) throws HiveException {
-      String targetTableName =
-        HQLParser.getString(HQLParser.findNodeByPath(node, TOK_TABNAME, Identifier));
-      if (getMetastoreClient().isDimensionTable(targetTableName)) {
-        target = getMetastoreClient().getDimensionTable(targetTableName);
-      } else if (getMetastoreClient().isCube(targetTableName)) {
-        target = getMetastoreClient().getCube(targetTableName);
-      } else {
-        throw new SemanticException("Target table is neither dimension nor cube: " + targetTableName);
-      }
+    String targetTableName =
+      HQLParser.getString(HQLParser.findNodeByPath(node, TOK_TABNAME, Identifier));
+    if (getMetastoreClient().isDimensionTable(targetTableName)) {
+      target = getMetastoreClient().getDimensionTable(targetTableName);
+    } else if (getMetastoreClient().isCube(targetTableName)) {
+      target = getMetastoreClient().getCube(targetTableName);
+    } else {
+      throw new SemanticException("Target table is neither dimension nor cube: " + targetTableName);
+    }
   }
 
   private void searchDimensionTables(ASTNode node) throws HiveException {
@@ -459,23 +458,19 @@ public class JoinResolver implements ContextRewriter {
       String tableName = HQLParser.getString(HQLParser.findNodeByPath(right,
         TOK_TABNAME, Identifier));
 
-      try {
-        CubeDimensionTable dimensionTable = getMetastoreClient().getDimensionTable(tableName);
-        String joinCond = "";
-        if (node.getChildCount() > 2) {
-          // User has specified a join condition for filter pushdown.
-          joinCond = HQLParser.getString((ASTNode) node.getChild(2));
-        }
-        partialJoinConditions.put(dimensionTable, joinCond);
-      } catch (HiveException e) {
-        throw new SemanticException(e);
+      CubeDimensionTable dimensionTable = getMetastoreClient().getDimensionTable(tableName);
+      String joinCond = "";
+      if (node.getChildCount() > 2) {
+        // User has specified a join condition for filter pushdown.
+        joinCond = HQLParser.getString((ASTNode) node.getChild(2));
       }
+      partialJoinConditions.put(dimensionTable, joinCond);
 
       if (isJoinToken(left)) {
         searchDimensionTables(left);
       } else {
-        if (node.getToken().getType() == TOK_TABREF) {
-          setTarget(node);
+        if (left.getToken().getType() == TOK_TABREF) {
+          setTarget(left);
         }
       }
     } else if (node.getToken().getType() == TOK_TABREF) {
