@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.Cube;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeColumn;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
@@ -178,6 +179,7 @@ public class CubeQueryContext {
     extractTimeRange();
     extractColumns();
     extractTabAliasForCol();
+    doColLifeValidation();
     findCandidateFactTables();
   }
 
@@ -504,6 +506,30 @@ public class CubeQueryContext {
       if (columnToTabAlias.get(col.toLowerCase()) == null) {
         throw new SemanticException("Could not find the table containing" +
             " column:" + col);
+      }
+    }
+  }
+
+  private void doColLifeValidation() throws SemanticException {
+    for (String col : cubeColumnsQueried) {
+      CubeColumn column = cube.getColumnByName(col);
+      for (TimeRange range : timeRanges) {
+        if (column == null) {
+          if (!cube.getTimedDimensions().contains(col)) {
+            throw new SemanticException("Not a cube column:" + col);
+          }
+        }
+        if ((column.getStartTime() != null &&
+            column.getStartTime().after(range.getFromDate())) ||
+            (column.getEndTime() != null &&
+            column.getEndTime().before(range.getToDate()))) {
+          throw new SemanticException("Column " + col + " is not available" +
+            " in the specified range:" + range + ", available" +
+            (column.getStartTime() == null ? "" :
+              " from:" + column.getStartTime())
+            + (column.getEndTime() == null ? "" :
+              " upto:" + column.getEndTime()));
+        }
       }
     }
   }

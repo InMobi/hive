@@ -60,10 +60,18 @@ public final class Cube extends AbstractCubeTable {
 
     dimMap = new HashMap<String, CubeDimension>();
     for (CubeDimension dim : dimensions) {
-      dimMap.put(dim.getName().toLowerCase(), dim);
+      addAllDimsToMap(dim);
     }
   }
 
+  private void addAllDimsToMap(CubeDimension dim) {
+    dimMap.put(dim.getName().toLowerCase(), dim);
+    if (dim instanceof HierarchicalDimension) {
+      for (CubeDimension d : ((HierarchicalDimension)dim).getHierarchy()) {
+        addAllDimsToMap(d);
+      }
+    }
+  }
   public Set<CubeMeasure> getMeasures() {
     return measures;
   }
@@ -217,5 +225,13 @@ public final class Cube extends AbstractCubeTable {
 
   public CubeMeasure getMeasureByName(String measure) {
     return measureMap.get(measure == null ? measure : measure.toLowerCase());
+  }
+
+  public CubeColumn getColumnByName(String column) {
+    CubeColumn cubeCol = (CubeColumn)getMeasureByName(column);
+    if (cubeCol == null) {
+      cubeCol = (CubeColumn)getDimensionByName(column);
+    }
+    return cubeCol;
   }
 }

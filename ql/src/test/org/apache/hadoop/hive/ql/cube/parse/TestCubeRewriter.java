@@ -122,6 +122,18 @@ public class TestCubeRewriter {
       "select sum(testcube.msr2) FROM ", null, null,
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
+
+    // Query with column life not in the range
+    Throwable th = null;
+    try {
+      hqlQuery = rewrite(driver, "cube select SUM(newmeasure) from testCube" +
+        " where " + twoDaysRange);
+    } catch (Exception e) {
+      th = e;
+      e.printStackTrace();
+    }
+    Assert.assertNotNull(th);
+    Assert.assertTrue(th instanceof SemanticException);
   }
 
   @Test

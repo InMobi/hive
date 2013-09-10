@@ -400,6 +400,8 @@ public class CubeTestSetup {
         "measure without a default aggregate"),
         null, null, null
         ));
+    cubeMeasures.add(new ColumnMeasure(new FieldSchema("newmeasure", "bigint",
+        "measure available  from now"), null, null, null, now, null, 100.0));
 
     cubeDimensions = new HashSet<CubeDimension>();
     List<CubeDimension> locationHierarchy = new ArrayList<CubeDimension>();
