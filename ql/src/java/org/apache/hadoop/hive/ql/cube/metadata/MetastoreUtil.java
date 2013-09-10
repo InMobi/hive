@@ -68,6 +68,28 @@ public class MetastoreUtil implements MetastoreConstants {
     return StringUtils.join(toks, ',');
   }
 
+  //////////////////////////
+  // Column properties //
+  //////////////////////////
+  public static String getColumnKeyPrefix(String colName) {
+    return COL_PFX + colName.toLowerCase();
+  }
+
+  public static String getCubeColStartTimePropertyKey(String colName) {
+    return getColumnKeyPrefix(colName) + START_TIME_SFX;
+  }
+
+  public static String getCubeColEndTimePropertyKey(String colName) {
+    return getColumnKeyPrefix(colName) + END_TIME_SFX;
+  }
+
+  public static String getCubeColCostPropertyKey(String colName) {
+    return getColumnKeyPrefix(colName) + COST_SFX;
+  }
+
+  //////////////////////////
+  // Dimension properties //
+  //////////////////////////
   public static String getInlineDimensionSizeKey(String name) {
     return getDimensionKeyPrefix(name) + INLINE_SIZE_SFX;
   }

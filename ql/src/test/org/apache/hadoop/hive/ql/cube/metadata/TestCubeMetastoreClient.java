@@ -79,6 +79,20 @@ public class TestCubeMetastoreClient {
     cubeMeasures.add(new ExprMeasure(new FieldSchema("msr6", "bigint",
         "sixth measure"),
         "(msr1 + msr2)/ msr4", "", "SUM", "RS"));
+    cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrstarttime", "int",
+        "measure with start time"), null, null, null, now, null, null));
+    cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrendtime", "float",
+        "measure with end time"), null, "SUM", "RS", now, now, null));
+    cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrcost", "double",
+        "measure with cost"), null, "MAX", null, now, now, 100.0));
+    cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrcost2", "bigint",
+        "measure with cost"), null, "MAX", null, null, null, 100.0));
+    cubeMeasures.add(new ExprMeasure(new FieldSchema("msr5start", "double",
+        "expr measure with start and end times"),
+        "avg(msr1 + msr2)", null, null, null, now, now, 100.0));
+    cubeMeasures.add(new ExprMeasure(new FieldSchema("msrexpr", "bigint",
+        "expr measure with all fields"),
+        "(msr1 + msr2)/ msr4", "", "SUM", "RS", now, now, 100.0));
 
     cubeDimensions = new HashSet<CubeDimension>();
     List<CubeDimension> locationHierarchy = new ArrayList<CubeDimension>();
@@ -93,7 +107,6 @@ public class TestCubeMetastoreClient {
     List<String> regions = Arrays.asList("APAC", "EMEA", "USA");
     locationHierarchy.add(new InlineDimension(new FieldSchema("regionname",
         "string", "region"), regions));
-
     cubeDimensions.add(new HierarchicalDimension("location", locationHierarchy));
     cubeDimensions.add(new BaseDimension(new FieldSchema("dim1", "string",
         "basedim")));
@@ -101,17 +114,49 @@ public class TestCubeMetastoreClient {
         new FieldSchema("dim2", "string", "ref dim"),
         new TableReference("testdim2", "id")));
 
+    List<CubeDimension> locationHierarchyWithStartTime = new ArrayList<CubeDimension>();
+    locationHierarchyWithStartTime.add(new ReferencedDimension(
+        new FieldSchema("zipcode2","int", "zip"),
+        new TableReference("ziptable", "zipcode"), now, now, 100.0));
+    locationHierarchyWithStartTime.add(new ReferencedDimension(
+        new FieldSchema("cityid2", "int", "city"),
+        new TableReference("citytable", "id"), now, null, null));
+    locationHierarchyWithStartTime.add(new ReferencedDimension(
+        new FieldSchema("stateid2", "int", "state"),
+        new TableReference("statetable", "id"), now, null, 100.0));
+    locationHierarchyWithStartTime.add(
+        new ReferencedDimension(new FieldSchema("countryid2", "int", "country"),
+        new TableReference("countrytable", "id"),
+        null, null, null));
+    locationHierarchyWithStartTime.add(new InlineDimension(
+        new FieldSchema("regionname2","string", "region"), regions));
+
+    cubeDimensions.add(new HierarchicalDimension("location2",
+        locationHierarchyWithStartTime));
+    cubeDimensions.add(new BaseDimension(new FieldSchema("dim1startTime", "string",
+        "basedim"), now, null, 100.0));
+    cubeDimensions.add(new ReferencedDimension(
+        new FieldSchema("dim2start", "string", "ref dim"),
+        new TableReference("testdim2", "id"), now, now, 100.0));
+
     List<TableReference> multiRefs = new ArrayList<TableReference>();
     multiRefs.add(new TableReference("testdim2", "id"));
     multiRefs.add(new TableReference("testdim3", "id"));
     multiRefs.add(new TableReference("testdim4", "id"));
 
     cubeDimensions.add(
-        new ReferencedDimension(new FieldSchema("dim3", "string", "multi ref dim"), multiRefs));
+        new ReferencedDimension(new FieldSchema("dim3", "string",
+            "multi ref dim"), multiRefs));
+    cubeDimensions.add(
+        new ReferencedDimension(new FieldSchema("dim3start", "string",
+            "multi ref dim"), multiRefs, now, null, 100.0));
 
 
     cubeDimensions.add(new InlineDimension(
         new FieldSchema("region", "string", "region dim"), regions));
+    cubeDimensions.add(new InlineDimension(
+        new FieldSchema("regionstart", "string", "region dim"), now,
+        null, 100.0, regions));
     cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
 
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(

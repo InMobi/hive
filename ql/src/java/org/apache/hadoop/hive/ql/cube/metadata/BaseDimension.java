@@ -1,5 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
+import java.util.Date;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -8,7 +9,12 @@ public class BaseDimension extends CubeDimension {
   private final String type;
 
   public BaseDimension(FieldSchema column) {
-    super(column.getName());
+    this(column, null, null, null);
+  }
+
+  public BaseDimension(FieldSchema column, Date startTime, Date endTime,
+      Double cost) {
+    super(column.getName(), startTime, endTime, cost);
     this.type = column.getType();
     assert (type != null);
   }
@@ -30,7 +36,7 @@ public class BaseDimension extends CubeDimension {
    * @param props
    */
   public BaseDimension(String name, Map<String, String> props) {
-    super(name);
+    super(name, props);
     this.type = getDimType(name, props);
   }
 
@@ -65,7 +71,7 @@ public class BaseDimension extends CubeDimension {
 
   @Override
   public String toString() {
-    String str = getName() + ":" + getType();
+    String str = super.toString() + ":" + getType();
     return str;
   }
 }

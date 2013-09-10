@@ -1,10 +1,11 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
+import java.util.Date;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-public abstract class CubeMeasure implements Named {
+public abstract class CubeMeasure extends CubeColumn {
   private final String formatString;
   private final String aggregate;
   private final String unit;
@@ -12,6 +13,12 @@ public abstract class CubeMeasure implements Named {
 
   protected CubeMeasure(FieldSchema column, String formatString,
       String aggregate, String unit) {
+    this(column, formatString, aggregate, unit, null, null, null);
+  }
+
+  protected CubeMeasure(FieldSchema column, String formatString,
+      String aggregate, String unit, Date startTime, Date endTime, Double cost){
+    super(column.getName(), startTime, endTime, cost);
     this.column = column;
     assert (column != null);
     assert (column.getName() != null);
@@ -22,6 +29,7 @@ public abstract class CubeMeasure implements Named {
   }
 
   protected CubeMeasure(String name, Map<String, String> props) {
+    super(name, props);
     this.column = new FieldSchema(name,
         props.get(MetastoreUtil.getMeasureTypePropertyKey(name)), "");
     this.formatString = props.get(MetastoreUtil.getMeasureFormatPropertyKey(name));
@@ -45,6 +53,7 @@ public abstract class CubeMeasure implements Named {
     return column;
   }
 
+  @Override
   public String getName() {
     return column.getName();
   }
@@ -55,7 +64,7 @@ public abstract class CubeMeasure implements Named {
 
   @Override
   public String toString() {
-    String str = getName() + ":" + getType();
+    String str = super.toString() + ":" + getType();
     if (unit != null) {
       str += ",unit:" + unit;
     }
@@ -70,13 +79,7 @@ public abstract class CubeMeasure implements Named {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    }
-    if (obj == null) {
-      return false;
-    }
-    if (getClass() != obj.getClass()) {
+    if (!super.equals(obj)) {
       return false;
     }
     CubeMeasure other = (CubeMeasure) obj;
@@ -115,9 +118,7 @@ public abstract class CubeMeasure implements Named {
   @Override
   public int hashCode() {
     final int prime = 31;
-    int result = 1;
-    result = prime * result + ((getName() == null) ? 0 :
-        getName().toLowerCase().hashCode());
+    int result = super.hashCode();
     result = prime * result + ((getType() == null) ? 0 :
         getType().toLowerCase().hashCode());
     result = prime * result + ((unit == null) ? 0 :
@@ -129,7 +130,9 @@ public abstract class CubeMeasure implements Named {
     return result;
   }
 
+  @Override
   public void addProperties(Map<String, String> props) {
+    super.addProperties(props);
     props.put(MetastoreUtil.getMeasureClassPropertyKey(getName()),
         getClass().getName());
     props.put(MetastoreUtil.getMeasureTypePropertyKey(getName()), getType());

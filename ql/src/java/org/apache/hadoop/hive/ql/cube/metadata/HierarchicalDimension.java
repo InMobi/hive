@@ -37,7 +37,7 @@ public class HierarchicalDimension extends CubeDimension {
   }
 
   public HierarchicalDimension(String name, Map<String, String> props) {
-    super(name);
+    super(name, props);
     this.hierarchy = getHiearachy(name, props);
   }
 

@@ -18,7 +18,11 @@ public interface MetastoreConstants {
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
 
   // column constants
+  public static final String COL_PFX = "cube.col.";
   public static final String TYPE_SFX = ".type";
+  public static final String START_TIME_SFX = ".starttime";
+  public static final String END_TIME_SFX = ".endtime";
+  public static final String COST_SFX = ".cost";
 
   // measure constants
   public static final String MEASURE_KEY_PFX = "cube.measure.";

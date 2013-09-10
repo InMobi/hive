@@ -1,6 +1,7 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -11,7 +12,12 @@ public class InlineDimension extends BaseDimension {
   private final List<String> values;
 
   public InlineDimension(FieldSchema column, List<String> values) {
-    super(column);
+    this(column, null, null, null, values);
+  }
+
+  public InlineDimension(FieldSchema column, Date startTime, Date endTime,
+      Double cost, List<String> values) {
+    super(column, startTime, endTime, cost);
     this.values = values;
   }
 

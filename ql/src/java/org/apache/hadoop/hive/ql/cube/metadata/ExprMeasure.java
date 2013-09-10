@@ -1,5 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
+import java.util.Date;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -9,7 +10,12 @@ public final class ExprMeasure extends CubeMeasure {
 
   public ExprMeasure(FieldSchema column, String expr, String formatString,
       String aggregate, String unit) {
-    super(column, formatString, aggregate, unit);
+    this(column, expr, formatString, aggregate, unit, null, null, null);
+  }
+
+  public ExprMeasure(FieldSchema column, String expr, String formatString,
+      String aggregate, String unit, Date startTime, Date endTime, Double cost) {
+    super(column, formatString, aggregate, unit, startTime, endTime, cost);
     this.expr = expr;
     assert (expr != null);
   }
