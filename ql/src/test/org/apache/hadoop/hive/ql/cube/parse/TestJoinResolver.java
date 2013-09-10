@@ -1,9 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
@@ -12,24 +9,28 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.SchemaGraph;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
-import org.junit.AfterClass;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.junit.*;
 
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.*;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
 import static org.junit.Assert.*;
-
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 public class TestJoinResolver {
   
   private  static CubeTestSetup setup;
-  private  static HiveConf hconf = new HiveConf(TestJoinResolver.class);;
+  private  static HiveConf hconf = new HiveConf(TestJoinResolver.class);
+  private CubeQueryRewriter driver;
+  private String dateTwoDaysBack;
+  private String dateNow;
+  private CubeMetastoreClient metastore;
 
 
   @BeforeClass
   public static void setup() throws Exception {
     setup = new CubeTestSetup();
     setup.createSources(hconf, TestJoinResolver.class.getSimpleName());
+    hconf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, false);
   }
 
   @AfterClass
@@ -37,15 +38,18 @@ public class TestJoinResolver {
     //setup.dropSources(hconf);
   }
 
-  private CubeMetastoreClient metastore;
-
-  
   @Before
   public void setupInstance() throws Exception {
+    driver = new CubeQueryRewriter(hconf);
+    dateTwoDaysBack = getDateUptoHours(twodaysBack);
+    dateNow = getDateUptoHours(now);
     this.metastore = CubeMetastoreClient.getInstance(hconf);
   }
-  
-  
+
+  @After
+  public void closeInstance() throws  Exception {
+  }
+
   // testBuildGraph - graph correctness
   @Test 
   public void testBuildGraph() throws Exception {
@@ -121,6 +125,31 @@ public class TestJoinResolver {
     System.out.println("--Graph-Nodes=" + graph.size());
     for (AbstractCubeTable tab : graph.keySet()) {
       System.out.println(tab.getName() + "::" + graph.get(tab));
+    }
+  }
+
+  @Test
+  public void testAutoJoinResolver() throws Exception {
+    //Test 1 Cube + dim
+    String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where "
+      + twoDaysRange;
+    String hql = rewrite(driver, query);
+    System.out.println("auto join HQL:" + hql);
+
+    //Test 2  Dim only query
+    String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where "
+      + twoDaysRange;
+    hql = rewrite(driver, dimOnlyQuery);
+    System.out.println("auto join HQL:" + hql);
+
+    //Test 3 Dim only query should throw error
+    String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where "
+      + twoDaysRange;
+    try {
+      hql = rewrite(driver, errDimOnlyQuery);
+      Assert.assertTrue("dim only query should throw error", false);
+    } catch (SemanticException exc) {
+      Assert.assertTrue(true);
     }
   }
 }

@@ -41,6 +41,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
+  public static final String DISABLE_AUTO_JOINS = "hive.cube.disable.auto.join";
   
   /*
    * An edge in the schema graph
@@ -341,10 +342,9 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
-  public void resolveJoins(CubeQueryContext cubeql) throws SemanticException {
+  public void resolveJoins(CubeQueryContext cubeql) throws HiveException {
     QB cubeQB = cubeql.getQB();
-    boolean joinResolverDisabled = cubeql.getHiveConf().getBoolean("hive.cube.disable.auto.join", false);
-
+    boolean joinResolverDisabled = cubeql.getHiveConf().getBoolean(DISABLE_AUTO_JOINS, false);
     if (joinResolverDisabled) {
       if (cubeQB.getParseInfo().getJoinExpr() != null) {
         cubeQB.setQbJoinTree(genJoinTree(cubeQB, cubeQB.getParseInfo().getJoinExpr(), cubeql));
@@ -354,33 +354,44 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
-  protected SchemaGraph getSchemaGraph() throws SemanticException {
+  protected SchemaGraph getSchemaGraph() throws HiveException {
     SchemaGraph graph;
-    try {
-      graph = new SchemaGraph(getMetastoreClient());
-      graph.buildSchemaGraph();
-      return graph;
-    } catch (HiveException e) {
-      throw new SemanticException(e);
-    }
+    graph = new SchemaGraph(getMetastoreClient());
+    graph.buildSchemaGraph();
+    return graph;
   }
   /**
    * Resolve joins automatically for the given query.
    * @param cubeql
    * @throws SemanticException
    */
-  public void autoResolveJoins(CubeQueryContext cubeql) throws SemanticException {
+  public void autoResolveJoins(CubeQueryContext cubeql) throws HiveException {
     // Check if this query needs a join -
     // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
     // dimensions
     
     Set<CubeDimensionTable> autoJoinDims = cubeql.getAutoJoinDimensions();
     // Add dimensions specified in the partial join tree
-    searchDimensionTables(cubeql.getQB().getParseInfo().getJoinExpr());
-    if (target == null) {
-      throw new SemanticException("Could not find join target");
+    ASTNode joinClause = cubeql.getQB().getParseInfo().getJoinExpr();
+    if (joinClause == null) {
+      // Only cube in the query
+      if (cubeql.hasCubeInQuery()) {
+        target = cubeql.getCube();
+      } else {
+        String targetDimAlias = cubeql.getQB().getTabAliases().iterator().next();
+        String targetDimTable = cubeql.getQB().getTabNameForAlias(targetDimAlias);
+        if (targetDimTable == null) {
+          System.out.println("Null table for alias " + targetDimAlias);
+        }
+        target = getMetastoreClient().getDimensionTable(targetDimTable);
+      }
     }
 
+    searchDimensionTables(cubeql.getQB().getParseInfo().getJoinExpr());
+    if (target == null) {
+      System.out.println("Can't resolve joins for null target");
+      return;
+    }
     boolean hasDimensions = (autoJoinDims != null && !autoJoinDims.isEmpty()) || !partialJoinConditions.isEmpty();
     // Query has a cube and at least one dimension
     boolean cubeAndDimQuery = cubeql.hasCubeInQuery() && hasDimensions;
@@ -422,12 +433,24 @@ public class JoinResolver implements ContextRewriter {
     
     if (joinsResolved) {
       cubeql.setJoinsResolvedAutomatically(joinsResolved);
-      String joinClause = getMergedJoinClause(joinChain);
-      cubeql.setAutoResolvedJoinClause(joinClause);
+      String resolvedJoinClause = getMergedJoinClause(joinChain);
+      cubeql.setAutoResolvedJoinClause(resolvedJoinClause);
     }
   }
 
-  private void searchDimensionTables(ASTNode node) throws SemanticException {
+  private void setTarget(ASTNode node) throws HiveException {
+      String targetTableName =
+        HQLParser.getString(HQLParser.findNodeByPath(node, TOK_TABNAME, Identifier));
+      if (getMetastoreClient().isDimensionTable(targetTableName)) {
+        target = getMetastoreClient().getDimensionTable(targetTableName);
+      } else if (getMetastoreClient().isCube(targetTableName)) {
+        target = getMetastoreClient().getCube(targetTableName);
+      } else {
+        throw new SemanticException("Target table is neither dimension nor cube: " + targetTableName);
+      }
+  }
+
+  private void searchDimensionTables(ASTNode node) throws HiveException {
     if (node == null) {
       return;
     }
@@ -456,21 +479,11 @@ public class JoinResolver implements ContextRewriter {
         searchDimensionTables(left);
       } else {
         if (node.getToken().getType() == TOK_TABREF) {
-          try {
-            String targetTableName =
-              HQLParser.getString(HQLParser.findNodeByPath(left, TOK_TABNAME, Identifier));
-            if (getMetastoreClient().isDimensionTable(targetTableName)) {
-              target = getMetastoreClient().getDimensionTable(targetTableName);
-            } else if (getMetastoreClient().isCube(targetTableName)) {
-              target = getMetastoreClient().getCube(targetTableName);
-            } else {
-              throw new SemanticException("Target table is neither dimension nor cube: " + targetTableName);
-            }
-          } catch (HiveException exc) {
-            throw new SemanticException(exc);
-          }
+          setTarget(node);
         }
       }
+    } else if (node.getToken().getType() == TOK_TABREF) {
+       setTarget(node);
     }
 
   }
