@@ -518,6 +518,7 @@ public class CubeQueryContext {
           if (!cube.getTimedDimensions().contains(col)) {
             throw new SemanticException("Not a cube column:" + col);
           }
+          continue;
         }
         if ((column.getStartTime() != null &&
             column.getStartTime().after(range.getFromDate())) ||
