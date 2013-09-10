@@ -178,4 +178,24 @@ public class TestJoinResolver {
       "join testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' ))",
       resolvedClause.trim());
   }
+
+  @Test
+  public void testJoinNotRequired() throws Exception {
+    String query = "SELECT msr2 FROM testCube WHERE " + twoDaysRange;
+    CubeQueryContext ctx = driver.rewrite(query);
+    String hql = ctx.toHQL();
+    String joinClause = ctx.getAutoResolvedJoinChain();
+    System.out.println("@Resolved join clause " + joinClause);
+    assertTrue(joinClause == null || joinClause.isEmpty());
+  }
+
+  @Test
+  public void testJoinWithoutCondition() throws Exception {
+    String query = "SELECT citytable.name, msr2 FROM testCube WHERE " + twoDaysRange;
+    CubeQueryContext ctx = driver.rewrite(query);
+    String hql = ctx.toHQL();
+    String joinClause = ctx.getAutoResolvedJoinChain();
+    System.out.println("@Resolved join clause " + joinClause);
+    assertEquals("join citytable on testcube.cityid = citytable.id", joinClause.trim());
+  }
 }
