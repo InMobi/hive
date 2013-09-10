@@ -258,11 +258,9 @@ public class JoinResolver implements ContextRewriter {
         List<TableRelationship> chain,
         Set<AbstractCubeTable> visited) 
     {
-      System.out.println("## Search " + dimTable + " tgt=" + target.getName());
       // Mark node as visited
       visited.add(dimTable);
-      System.out.println("visited " + dimTable.getName());
-      
+
       Set<TableRelationship> edges = graph.get(dimTable);
       if (edges == null || edges.isEmpty()) {
         return false;
@@ -270,12 +268,10 @@ public class JoinResolver implements ContextRewriter {
       boolean foundPath = false;
       for (TableRelationship edge : edges) {
         if (visited.contains(edge.fromTable)) {
-          System.out.println("Skip edge - " + edge + " visited=" + visited);
           continue;
         }
         
         if (edge.fromTable.equals(target)) {
-          System.out.println("TARGET " + edge);
           chain.add(edge);
           // Search successful
           foundPath = true;
@@ -381,7 +377,7 @@ public class JoinResolver implements ContextRewriter {
         String targetDimAlias = cubeql.getQB().getTabAliases().iterator().next();
         String targetDimTable = cubeql.getQB().getTabNameForAlias(targetDimAlias);
         if (targetDimTable == null) {
-          System.out.println("Null table for alias " + targetDimAlias);
+          LOG.warn("Null table for alias " + targetDimAlias);
         }
         target = getMetastoreClient().getDimensionTable(targetDimTable);
       }
@@ -389,7 +385,7 @@ public class JoinResolver implements ContextRewriter {
 
     searchDimensionTables(cubeql.getQB().getParseInfo().getJoinExpr());
     if (target == null) {
-      System.out.println("Can't resolve joins for null target");
+      LOG.warn("Can't resolve joins for null target");
       return;
     }
     boolean hasDimensions = (autoJoinDims != null && !autoJoinDims.isEmpty()) || !partialJoinConditions.isEmpty();
