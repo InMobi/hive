@@ -1,9 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
@@ -12,18 +9,21 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.SchemaGraph;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
-import org.junit.AfterClass;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.junit.*;
 
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.*;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
 import static org.junit.Assert.*;
-
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 public class TestJoinResolver {
   
   private  static CubeTestSetup setup;
-  private  static HiveConf hconf = new HiveConf(TestJoinResolver.class);;
+  private  static HiveConf hconf = new HiveConf(TestJoinResolver.class);
+  private CubeQueryRewriter driver;
+  private String dateTwoDaysBack;
+  private String dateNow;
+  private CubeMetastoreClient metastore;
 
 
   @BeforeClass
@@ -37,15 +37,19 @@ public class TestJoinResolver {
     //setup.dropSources(hconf);
   }
 
-  private CubeMetastoreClient metastore;
-
-  
   @Before
   public void setupInstance() throws Exception {
+    driver = new CubeQueryRewriter(hconf);
+    dateTwoDaysBack = getDateUptoHours(twodaysBack);
+    dateNow = getDateUptoHours(now);
     this.metastore = CubeMetastoreClient.getInstance(hconf);
+    hconf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, false);
   }
-  
-  
+
+  @After
+  public void closeInstance() throws  Exception {
+  }
+
   // testBuildGraph - graph correctness
   @Test 
   public void testBuildGraph() throws Exception {
@@ -85,19 +89,30 @@ public class TestJoinResolver {
     CubeDimensionTable cityTable = metastore.getDimensionTable("citytable");
     assertTrue(schemaGraph.findJoinChain(cityTable, cube, chain));
     System.out.println("City -> cube chain: " + chain);
+    assertEquals(1, chain.size());
     
     // find chains between dimensions
     chain.clear();
     CubeDimensionTable stateTable = metastore.getDimensionTable("statetable");
     assertTrue(schemaGraph.findJoinChain(stateTable, cityTable, chain));
-    assertTrue(schemaGraph.findJoinChain(cityTable, stateTable, chain));
     System.out.println("Dim chain state -> city : " + chain);
-    
+    assertEquals(1, chain.size());
+
+    chain.clear();
+    assertTrue(schemaGraph.findJoinChain(cityTable, stateTable, chain));
+    System.out.println("Dim chain city -> state: " + chain);
+    assertEquals(1, chain.size());
+
     chain.clear();
     CubeDimensionTable dim2 = metastore.getDimensionTable("testdim2");
     assertTrue(schemaGraph.findJoinChain(testDim4, dim2, chain));
-    assertTrue(schemaGraph.findJoinChain(dim2, testDim4, chain));
     System.out.println("Dim chain testdim4 -> testdim2 : " + chain);
+    assertEquals(2, chain.size());
+
+    chain.clear();
+    assertTrue(schemaGraph.findJoinChain(dim2, testDim4, chain));
+    assertEquals(2, chain.size());
+    System.out.println("Dim chain testdim2 -> testdim4 : " + chain);
     
     chain.clear();
     boolean foundchain = schemaGraph.findJoinChain(testDim4, cityTable, chain);
@@ -111,5 +126,93 @@ public class TestJoinResolver {
     for (AbstractCubeTable tab : graph.keySet()) {
       System.out.println(tab.getName() + "::" + graph.get(tab));
     }
+  }
+
+  @Test
+  public void testAutoJoinResolver() throws Exception {
+    //Test 1 Cube + dim
+    String query = "select citytable.name, testDim2.name, testDim4.name, msr2 from testCube where "
+      + twoDaysRange;
+    CubeQueryContext rewrittenQuery = driver.rewrite(query);
+    String hql = rewrittenQuery.toHQL();
+    System.out.println("auto join HQL:" + hql);
+    assertEquals("join citytable on testcube.cityid = citytable.id  " +
+      "join testdim2 on testcube.dim2 = testdim2.id  " +
+      "join testdim3 on testdim2.testdim3id = testdim3.id  " +
+      "join testdim4 on testdim3.testdim4id = testdim4.id",
+      rewrittenQuery.getAutoResolvedJoinChain().trim()
+      );
+
+    //Test 2  Dim only query
+    String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where "
+      + twoDaysRange;
+    rewrittenQuery = driver.rewrite(dimOnlyQuery);
+    hql = rewrittenQuery.toHQL();
+    System.out.println("auto join HQL:" + hql);
+    assertEquals("join testdim3 on testdim2.testdim3id = testdim3.id" +
+      "  join testdim4 on testdim3.testdim4id = testdim4.id",
+      rewrittenQuery.getAutoResolvedJoinChain().trim());
+
+    //Test 3 Dim only query should throw error
+    String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where "
+      + twoDaysRange;
+    try {
+      hql = rewrite(driver, errDimOnlyQuery);
+      fail("dim only query should throw error");
+    } catch (SemanticException exc) {
+    }
+  }
+
+  @Test
+  public void testPartialJoinResolver() throws Exception {
+    String query = "SELECT citytable.name, testDim4.name, msr2 " +
+      "FROM testCube join citytable ON citytable.name = 'FOOBAR'" +
+      " join testDim4 on testDim4.name='TESTDIM4NAME'" +
+      " WHERE " + twoDaysRange;
+    CubeQueryContext rewrittenQuery = driver.rewrite(query);
+    String hql = rewrittenQuery.toHQL();
+    String resolvedClause = rewrittenQuery.getAutoResolvedJoinChain();
+    System.out.println("@@resolved join chain " + resolvedClause);
+    assertEquals("join citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' ))  " +
+      "join testdim2 on testcube.dim2 = testdim2.id  join testdim3 on testdim2.testdim3id = testdim3.id  " +
+      "join testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' ))",
+      resolvedClause.trim());
+  }
+
+  @Test
+  public void testJoinNotRequired() throws Exception {
+    String query = "SELECT msr2 FROM testCube WHERE " + twoDaysRange;
+    CubeQueryContext ctx = driver.rewrite(query);
+    String hql = ctx.toHQL();
+    String joinClause = ctx.getAutoResolvedJoinChain();
+    System.out.println("@Resolved join clause " + joinClause);
+    assertTrue(joinClause == null || joinClause.isEmpty());
+  }
+
+  @Test
+  public void testJoinWithoutCondition() throws Exception {
+    String query = "SELECT citytable.name, msr2 FROM testCube WHERE " + twoDaysRange;
+    CubeQueryContext ctx = driver.rewrite(query);
+    String hql = ctx.toHQL();
+    String joinClause = ctx.getAutoResolvedJoinChain();
+    System.out.println("@Resolved join clause " + joinClause);
+    assertEquals("join citytable on testcube.cityid = citytable.id", joinClause.trim());
+  }
+
+  @Test
+  public void testJoinTypeConf() throws Exception {
+    hconf.set(JoinResolver.JOIN_TYPE_KEY, "LEFTOUTER");
+    String query = "select citytable.name, msr2 FROM testCube WHERE " + twoDaysRange;
+    CubeQueryContext ctx = driver.rewrite(query);
+    String hql = ctx.toHQL();
+    System.out.println("@@Resolved join clause - " + ctx.getAutoResolvedJoinChain());
+    assertEquals("left outer join citytable on testcube.cityid = citytable.id",
+      ctx.getAutoResolvedJoinChain().trim());
+
+    hconf.set(JoinResolver.JOIN_TYPE_KEY, "FULLOUTER");
+    ctx = driver.rewrite(query);
+    System.out.println("@@Resolved join clause - "+ ctx.getAutoResolvedJoinChain());
+    assertEquals("full outer join citytable on testcube.cityid = citytable.id",
+      ctx.getAutoResolvedJoinChain().trim());
   }
 }
