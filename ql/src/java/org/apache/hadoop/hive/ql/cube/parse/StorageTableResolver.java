@@ -48,6 +48,7 @@ public class StorageTableResolver implements ContextRewriter {
       new HashMap<String, String>();
   private final List<String> nonExistingParts = new ArrayList<String>();
   private String processTimePartCol = null;
+  private final UpdatePeriod maxInterval;
 
   public StorageTableResolver(Configuration conf) {
     this.conf = conf;
@@ -59,6 +60,12 @@ public class StorageTableResolver implements ContextRewriter {
     validDimTables = StringUtils.isBlank(str) ? null :
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
     this.processTimePartCol = conf.get(CubeQueryConfUtil.PROCESS_TIME_PART_COL);
+    String maxIntervalStr = conf.get(CubeQueryConfUtil.QUERY_MAX_INTERVAL);
+    if (maxIntervalStr != null) {
+      this.maxInterval = UpdatePeriod.valueOf(maxIntervalStr);
+    } else {
+      this.maxInterval = null;
+    }
   }
 
   private List<String> getSupportedStorages(Configuration conf) {
@@ -163,6 +170,11 @@ public class StorageTableResolver implements ContextRewriter {
             CubeQueryConfUtil.getValidUpdatePeriodsKey(fact.getName(), storage));
 
         for (UpdatePeriod updatePeriod : entry.getValue()) {
+          if (maxInterval != null && updatePeriod.compareTo(maxInterval) > 0) {
+            LOG.info("Skipping update period " + updatePeriod + " for fact"
+                     + fact);
+            continue;
+          }
           if (validUpdatePeriods != null && !validUpdatePeriods
               .contains(updatePeriod.name().toLowerCase())) {
             LOG.info("Skipping update period " + updatePeriod + " for fact"

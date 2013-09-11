@@ -267,6 +267,17 @@ public class TestCubeRewriter {
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
       null, null, getWhereForHourly2days("c2_testfact"));
     compareQueries(expected, hqlQuery);
+
+    // max interval test
+    conf = new Configuration();
+    conf.set(CubeQueryConfUtil.QUERY_MAX_INTERVAL, "HOURLY");
+    conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1,C2");
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
+      " where " + twoDaysRange);
+    expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
+      null, null, getWhereForHourly2days("c2_testfact"));
+    compareQueries(expected, hqlQuery);
   }
 
   @Test

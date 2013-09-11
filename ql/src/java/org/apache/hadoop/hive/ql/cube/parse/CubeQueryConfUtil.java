@@ -29,6 +29,7 @@ public class CubeQueryConfUtil {
       ".partition.column";
 
   public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
+  public static final String QUERY_MAX_INTERVAL = "cube.query.max.interval";
 
   private static String getValidKeyCubePFX(String cubeName) {
     return VALID_PFX + cubeName.toLowerCase();
