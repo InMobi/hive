@@ -42,7 +42,8 @@ public class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
   public static final String DISABLE_AUTO_JOINS = "hive.cube.disable.auto.join";
-  
+  public static final String JOIN_TYPE_KEY = "hive.cube.join.type";
+
   /*
    * An edge in the schema graph
    */
@@ -316,6 +317,7 @@ public class JoinResolver implements ContextRewriter {
   private CubeMetastoreClient metastore;
   private Map<AbstractCubeTable, String> partialJoinConditions;
   private AbstractCubeTable target;
+  private HiveConf conf;
 
   public JoinResolver(Configuration conf) {
     partialJoinConditions = new HashMap<AbstractCubeTable, String>();
@@ -332,6 +334,7 @@ public class JoinResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
     try {
+      conf = cubeql.getHiveConf();
       resolveJoins(cubeql);
     } catch (HiveException e) {
       throw new SemanticException(e);
@@ -340,7 +343,7 @@ public class JoinResolver implements ContextRewriter {
 
   public void resolveJoins(CubeQueryContext cubeql) throws HiveException {
     QB cubeQB = cubeql.getQB();
-    boolean joinResolverDisabled = cubeql.getHiveConf().getBoolean(DISABLE_AUTO_JOINS, false);
+    boolean joinResolverDisabled = conf.getBoolean(DISABLE_AUTO_JOINS, false);
     if (joinResolverDisabled) {
       if (cubeQB.getParseInfo().getJoinExpr() != null) {
         cubeQB.setQbJoinTree(genJoinTree(cubeQB, cubeQB.getParseInfo().getJoinExpr(), cubeql));
@@ -486,11 +489,39 @@ public class JoinResolver implements ContextRewriter {
     }
     
     Set<String> clauses = new LinkedHashSet<String>();
-    
+
+    String joinTypeCfg = conf.get(JOIN_TYPE_KEY);
+    String joinType = "";
+
+    if (StringUtils.isNotBlank(joinTypeCfg)) {
+      JoinType type = JoinType.valueOf(joinTypeCfg.toUpperCase());
+      switch (type) {
+        case FULLOUTER:
+          joinType = "full outer";
+          break;
+        case INNER:
+          joinType = "inner";
+          break;
+        case LEFTOUTER:
+          joinType = "left outer";
+          break;
+        case LEFTSEMI:
+          joinType = "left semi";
+          break;
+        case UNIQUE:
+          joinType = "unique";
+          break;
+        case RIGHTOUTER:
+          joinType = "right outer";
+          break;
+      }
+    }
+
     for (List<TableRelationship> chain : joinChains.values()) {
       for (TableRelationship rel : chain) {
-        StringBuilder clause = new StringBuilder(" join ");
-        clause.append(rel.toTable.getName())
+        StringBuilder clause = new StringBuilder(joinType)
+        .append(" join ")
+        .append(rel.toTable.getName())
         .append(" on ")
         .append(rel.fromTable.getName()).append(".").append(rel.fromColumn)
         .append(" = ").append(rel.toTable.getName()).append(".").append(rel.toColumn);

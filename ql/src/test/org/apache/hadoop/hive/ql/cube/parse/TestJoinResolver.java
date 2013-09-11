@@ -198,4 +198,21 @@ public class TestJoinResolver {
     System.out.println("@Resolved join clause " + joinClause);
     assertEquals("join citytable on testcube.cityid = citytable.id", joinClause.trim());
   }
+
+  @Test
+  public void testJoinTypeConf() throws Exception {
+    hconf.set(JoinResolver.JOIN_TYPE_KEY, "LEFTOUTER");
+    String query = "select citytable.name, msr2 FROM testCube WHERE " + twoDaysRange;
+    CubeQueryContext ctx = driver.rewrite(query);
+    String hql = ctx.toHQL();
+    System.out.println("@@Resolved join clause - " + ctx.getAutoResolvedJoinChain());
+    assertEquals("left outer join citytable on testcube.cityid = citytable.id",
+      ctx.getAutoResolvedJoinChain().trim());
+
+    hconf.set(JoinResolver.JOIN_TYPE_KEY, "FULLOUTER");
+    ctx = driver.rewrite(query);
+    System.out.println("@@Resolved join clause - "+ ctx.getAutoResolvedJoinChain());
+    assertEquals("full outer join citytable on testcube.cityid = citytable.id",
+      ctx.getAutoResolvedJoinChain().trim());
+  }
 }
