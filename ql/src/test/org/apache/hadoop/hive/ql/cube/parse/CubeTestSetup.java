@@ -528,7 +528,7 @@ public class CubeTestSetup {
 
     // create cube fact
     client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
-        storageAggregatePeriods, 0L, null);
+        storageAggregatePeriods, 10L, null);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
     Calendar cal = Calendar.getInstance();

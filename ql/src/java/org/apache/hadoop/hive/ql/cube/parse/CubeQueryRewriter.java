@@ -1,10 +1,12 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.ParseDriver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
@@ -14,9 +16,17 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class CubeQueryRewriter {
   private final Configuration conf;
   private final List<ContextRewriter> rewriters = new ArrayList<ContextRewriter>();
+  private final HiveConf hconf;
+  private final Context ctx;
 
-  public CubeQueryRewriter(Configuration conf) {
+  public CubeQueryRewriter(Configuration conf) throws SemanticException {
     this.conf = conf;
+    hconf = new HiveConf(conf, HiveConf.class);
+    try {
+      ctx = new Context(hconf);
+    } catch (IOException e) {
+      throw new SemanticException("Error creating ql context", e);
+    }
     setupRewriters();
   }
 
@@ -36,9 +46,8 @@ public class CubeQueryRewriter {
   }
 
   public CubeQueryContext rewrite(ASTNode astnode) throws SemanticException {
-    CubeSemanticAnalyzer analyzer = new CubeSemanticAnalyzer(
-        new HiveConf(conf, HiveConf.class));
-    analyzer.analyzeInternal(astnode);
+    CubeSemanticAnalyzer analyzer = new CubeSemanticAnalyzer(hconf);
+    analyzer.analyze(astnode, ctx);
     CubeQueryContext ctx = analyzer.getQueryContext();
     rewrite(rewriters, ctx);
     return ctx;
@@ -60,5 +69,9 @@ public class CubeQueryRewriter {
     for (ContextRewriter rewriter : rewriters) {
       rewriter.rewriteContext(ctx);
     }
+  }
+
+  Context getQLContext() {
+    return ctx;
   }
 }
