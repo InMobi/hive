@@ -20,6 +20,7 @@ package org.apache.hive.service.cli.operation;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hadoop.hive.ql.CommandNeedRetryException;
 import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.TaskStatus;
+import org.apache.hadoop.hive.ql.exec.ExplainTask;
+import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.parse.VariableSubstitution;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -68,13 +71,15 @@ public class SQLOperation extends ExecuteStatementOperation {
   private TableSchema resultSchema = null;
   private Schema mResultSchema = null;
   private SerDe serde = null;
-  private boolean runAsync;
-  private Future<?> backgroundHandle;
-  private SessionState sessionState;
 
-  public SQLOperation(HiveSession parentSession, String statement, Map<String, String> confOverlay) {
+  private final boolean runAsync;
+  private Future<?> backgroundHandle;
+
+  public SQLOperation(HiveSession parentSession, String statement, Map<String,
+      String> confOverlay, boolean runInBackground) {
     // TODO: call setRemoteUser in ExecuteStatementOperation or higher.
     super(parentSession, statement, confOverlay);
+    this.runAsync = runInBackground;
   }
 
 
@@ -82,6 +87,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   }
 
   private void runInternal() throws HiveSQLException {
+    setState(OperationState.RUNNING);
     String statement_trimmed = statement.trim();
     String[] tokens = statement_trimmed.split("\\s");
     String cmd_1 = statement_trimmed.substring(tokens[0].length()).trim();
@@ -106,15 +112,27 @@ public class SQLOperation extends ExecuteStatementOperation {
       }
 
       mResultSchema = driver.getSchema();
-      if (mResultSchema != null && mResultSchema.isSetFieldSchemas()) {
+
+      // hasResultSet should be true only if the query has a FetchTask
+      // "explain" is an exception for now
+      if(driver.getPlan().getFetchTask() != null) {
+        //Schema has to be set
+        if (mResultSchema == null || !mResultSchema.isSetFieldSchemas()) {
+          throw new HiveSQLException("Error running query: Schema and FieldSchema " +
+              "should be set when query plan has a FetchTask");
+        }
         resultSchema = new TableSchema(mResultSchema);
         setHasResultSet(true);
       } else {
         setHasResultSet(false);
       }
-      // Check if we are closed or cancelled already
-      if (getState() != OperationState.CLOSED && getState() != OperationState.CANCELED) {
-        setState(OperationState.FINISHED);
+      // Set hasResultSet true if the plan has ExplainTask
+      // TODO explain should use a FetchTask for reading
+      for (Task<? extends Serializable> task: driver.getPlan().getRootTasks()) {
+        if (task.getClass() == ExplainTask.class) {
+          setHasResultSet(true);
+          break;
+        }
       }
     } catch (HiveSQLException e) {
       setState(OperationState.ERROR);
@@ -126,24 +144,28 @@ public class SQLOperation extends ExecuteStatementOperation {
   }
   @Override
   public void run() throws HiveSQLException {
-    setState(OperationState.RUNNING);
+    setState(OperationState.PENDING);
     if (!shouldRunAsync()) {
       runInternal();
     } else {
-      Runnable backgroundTask = new Runnable() {
+      Runnable backgroundOperation = new Runnable() {
+        SessionState ss = SessionState.get();
         @Override
         public void run() {
-          SessionState.start(sessionState);
+          SessionState.start(ss);
           try {
             runInternal();
           } catch (HiveSQLException e) {
-            e.printStackTrace();
+            LOG.error("Error: ", e);
+            // TODO: Return a more detailed error to the client,
+            // currently the async thread only writes to the log and sets the OperationState
           }
         }
       };
       try {
-        this.backgroundHandle =
-          getParentSession().getSessionManager().submitBackgroundTask(backgroundTask);
+        // This submit blocks if no background threads are available to run this operation
+        backgroundHandle =
+          getParentSession().getSessionManager().submitBackgroundOperation(backgroundOperation);
       } catch (RejectedExecutionException rejected) {
         setState(OperationState.ERROR);
         throw new HiveSQLException(rejected);
@@ -154,8 +176,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   private void cleanup(OperationState state) throws HiveSQLException {
     setState(state);
     if (shouldRunAsync()) {
-      if (backgroundHandle != null && !backgroundHandle.isDone()
-          && !backgroundHandle.isCancelled()) {
+      if (backgroundHandle != null) {
         backgroundHandle.cancel(true);
       }
     }
@@ -164,9 +185,9 @@ public class SQLOperation extends ExecuteStatementOperation {
       driver.destroy();
     }
 
-    SessionState session = SessionState.get();
-    if (session.getTmpOutputFile() != null) {
-      session.getTmpOutputFile().delete();
+    SessionState ss = SessionState.get();
+    if (ss.getTmpOutputFile() != null) {
+      ss.getTmpOutputFile().delete();
     }
   }
 
@@ -311,18 +332,10 @@ public class SQLOperation extends ExecuteStatementOperation {
   }
 
 
-  public void setRunAsync(boolean runInBackground) {
-    this.runAsync = runInBackground;
-  }
-
   private boolean shouldRunAsync() {
     return runAsync;
   }
 
-
-  public void setSessionState(SessionState sessionState) {
-    this.sessionState = sessionState;
-  }
 
   @Override
   public String getTaskStatus() throws HiveSQLException {

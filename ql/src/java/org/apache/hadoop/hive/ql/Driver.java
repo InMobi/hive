@@ -40,8 +40,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Schema;
@@ -58,6 +58,7 @@ import org.apache.hadoop.hive.ql.history.HiveHistory.Keys;
 import org.apache.hadoop.hive.ql.hooks.ExecuteWithHookContext;
 import org.apache.hadoop.hive.ql.hooks.Hook;
 import org.apache.hadoop.hive.ql.hooks.HookContext;
+import org.apache.hadoop.hive.ql.hooks.HookUtils;
 import org.apache.hadoop.hive.ql.hooks.PostExecute;
 import org.apache.hadoop.hive.ql.hooks.PreExecute;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
@@ -82,8 +83,8 @@ import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatter;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
-import org.apache.hadoop.hive.ql.parse.AbstractSemanticAnalyzerHook;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
+import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHook;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHookContext;
 import org.apache.hadoop.hive.ql.parse.HiveSemanticAnalyzerHookContextImpl;
 import org.apache.hadoop.hive.ql.parse.ImportSemanticAnalyzer;
@@ -420,25 +421,28 @@ public class Driver implements CommandProcessor {
       ctx.setCmd(command);
       ctx.setHDFSCleanup(true);
 
+      perfLogger.PerfLogBegin(LOG, PerfLogger.PARSE);
       ParseDriver pd = new ParseDriver();
       ASTNode tree = pd.parse(command, ctx);
       tree = ParseUtils.findRootNonNullToken(tree);
+      perfLogger.PerfLogEnd(LOG, PerfLogger.PARSE);
 
+      perfLogger.PerfLogBegin(LOG, PerfLogger.ANALYZE);
       BaseSemanticAnalyzer sem = SemanticAnalyzerFactory.get(conf, tree);
-      List<AbstractSemanticAnalyzerHook> saHooks =
+      List<HiveSemanticAnalyzerHook> saHooks =
           getHooks(HiveConf.ConfVars.SEMANTIC_ANALYZER_HOOK,
-                   AbstractSemanticAnalyzerHook.class);
+              HiveSemanticAnalyzerHook.class);
 
       // Do semantic analysis and plan generation
       if (saHooks != null) {
         HiveSemanticAnalyzerHookContext hookCtx = new HiveSemanticAnalyzerHookContextImpl();
         hookCtx.setConf(conf);
-        for (AbstractSemanticAnalyzerHook hook : saHooks) {
+        for (HiveSemanticAnalyzerHook hook : saHooks) {
           tree = hook.preAnalyze(hookCtx, tree);
         }
         sem.analyze(tree, ctx);
         hookCtx.update(sem);
-        for (AbstractSemanticAnalyzerHook hook : saHooks) {
+        for (HiveSemanticAnalyzerHook hook : saHooks) {
           hook.postAnalyze(hookCtx, sem.getRootTasks());
         }
       } else {
@@ -449,6 +453,7 @@ public class Driver implements CommandProcessor {
 
       // validate the plan
       sem.validate();
+      perfLogger.PerfLogEnd(LOG, PerfLogger.ANALYZE);
 
       plan = new QueryPlan(command, sem, perfLogger.getStartTime(PerfLogger.DRIVER_RUN));
 
@@ -537,14 +542,14 @@ public class Driver implements CommandProcessor {
       if (op.equals(HiveOperation.CREATETABLE_AS_SELECT)
           || op.equals(HiveOperation.CREATETABLE)) {
         ss.getAuthorizer().authorize(
-            db.getDatabase(db.getCurrentDatabase()), null,
+            db.getDatabase(SessionState.get().getCurrentDatabase()), null,
             HiveOperation.CREATETABLE_AS_SELECT.getOutputRequiredPrivileges());
       } else {
         if (op.equals(HiveOperation.IMPORT)) {
           ImportSemanticAnalyzer isa = (ImportSemanticAnalyzer) sem;
           if (!isa.existsTable()) {
             ss.getAuthorizer().authorize(
-                db.getDatabase(db.getCurrentDatabase()), null,
+                db.getDatabase(SessionState.get().getCurrentDatabase()), null,
                 HiveOperation.CREATETABLE_AS_SELECT.getOutputRequiredPrivileges());
           }
         }
@@ -831,14 +836,13 @@ public class Driver implements CommandProcessor {
                                plan.getQueryStr());
 
       // Lock the database also
-      try {
-        Hive db = Hive.get(conf);
-        lockObjects.add(new HiveLockObj(
-                                        new HiveLockObject(db.getCurrentDatabase(), lockData),
-                                        HiveLockMode.SHARED));
-      } catch (HiveException e) {
-        throw new SemanticException(e.getMessage());
-      }
+      String currentDb = SessionState.get().getCurrentDatabase();
+      lockObjects.add(
+          new HiveLockObj(
+              new HiveLockObject(currentDb, lockData),
+              HiveLockMode.SHARED
+              )
+          );
 
       List<HiveLock> hiveLocks = ctx.getHiveLockMgr().lock(lockObjects, false);
 
@@ -954,7 +958,8 @@ public class Driver implements CommandProcessor {
     // Get all the driver run hooks and pre-execute them.
     List<HiveDriverRunHook> driverRunHooks;
     try {
-      driverRunHooks = getHooks(HiveConf.ConfVars.HIVE_DRIVER_RUN_HOOKS, HiveDriverRunHook.class);
+      driverRunHooks = getHooks(HiveConf.ConfVars.HIVE_DRIVER_RUN_HOOKS,
+          HiveDriverRunHook.class);
       for (HiveDriverRunHook driverRunHook : driverRunHooks) {
           driverRunHook.preDriverRun(hookContext);
       }
@@ -1069,19 +1074,14 @@ public class Driver implements CommandProcessor {
 
   /**
    * Returns a set of hooks specified in a configuration variable.
-   *
    * See getHooks(HiveConf.ConfVars hookConfVar, Class<T> clazz)
-   * @param hookConfVar
-   * @return
-   * @throws Exception
    */
   private List<Hook> getHooks(HiveConf.ConfVars hookConfVar) throws Exception {
     return getHooks(hookConfVar, Hook.class);
   }
 
   /**
-   * Returns the hooks specified in a configuration variable.  The hooks are returned in a list in
-   * the order they were specified in the configuration variable.
+   * Returns the hooks specified in a configuration variable.
    *
    * @param hookConfVar The configuration variable specifying a comma separated list of the hook
    *                    class names.
@@ -1090,34 +1090,14 @@ public class Driver implements CommandProcessor {
    *                    they are listed in the value of hookConfVar
    * @throws Exception
    */
-  private <T extends Hook> List<T> getHooks(HiveConf.ConfVars hookConfVar, Class<T> clazz)
-      throws Exception {
-
-    List<T> hooks = new ArrayList<T>();
-    String csHooks = conf.getVar(hookConfVar);
-    if (csHooks == null) {
-      return hooks;
+  private <T extends Hook> List<T> getHooks(ConfVars hookConfVar,
+      Class<T> clazz) throws Exception {
+    try {
+      return HookUtils.getHooks(conf, hookConfVar, clazz);
+    } catch (ClassNotFoundException e) {
+      console.printError(hookConfVar.varname + " Class not found:" + e.getMessage());
+      throw e;
     }
-
-    csHooks = csHooks.trim();
-    if (csHooks.equals("")) {
-      return hooks;
-    }
-
-    String[] hookClasses = csHooks.split(",");
-
-    for (String hookClass : hookClasses) {
-      try {
-        T hook =
-            (T) Class.forName(hookClass.trim(), true, JavaUtils.getClassLoader()).newInstance();
-        hooks.add(hook);
-      } catch (ClassNotFoundException e) {
-        console.printError(hookConfVar.varname + " Class not found:" + e.getMessage());
-        throw e;
-      }
-    }
-
-    return hooks;
   }
 
   public int execute() throws CommandNeedRetryException {
@@ -1207,11 +1187,13 @@ public class Driver implements CommandProcessor {
       }
 
       perfLogger.PerfLogEnd(LOG, PerfLogger.TIME_TO_SUBMIT);
+      perfLogger.PerfLogBegin(LOG, PerfLogger.RUN_TASKS);
       // Loop while you either have tasks running, or tasks queued up
       while (running.size() != 0 || runnable.peek() != null) {
         // Launch upto maxthreads tasks
         while (runnable.peek() != null && running.size() < maxthreads) {
           Task<? extends Serializable> tsk = runnable.remove();
+          perfLogger.PerfLogBegin(LOG, PerfLogger.TASK + tsk.getName() + "." + tsk.getId());
           launchTask(tsk, queryId, noName, running, jobname, jobs, driverCxt);
         }
 
@@ -1219,6 +1201,7 @@ public class Driver implements CommandProcessor {
         TaskResult tskRes = pollTasks(running.keySet());
         TaskRunner tskRun = running.remove(tskRes);
         Task<? extends Serializable> tsk = tskRun.getTask();
+        perfLogger.PerfLogEnd(LOG, PerfLogger.TASK + tsk.getName() + "." + tsk.getId());
         hookContext.addCompleteTask(tskRun);
 
         int exitVal = tskRes.getExitVal();
@@ -1282,6 +1265,7 @@ public class Driver implements CommandProcessor {
           }
         }
       }
+      perfLogger.PerfLogEnd(LOG, PerfLogger.RUN_TASKS);
 
       // in case we decided to run everything in local mode, restore the
       // the jobtracker setting to its initial value

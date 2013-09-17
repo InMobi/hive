@@ -174,14 +174,21 @@ public class HiveSessionImpl implements HiveSession {
   public OperationHandle executeStatement(String statement, Map<String, String> confOverlay,
       boolean runAsync)
       throws HiveSQLException {
+    return executeStatementInternal(statement, confOverlay, false);
+  }
+
+  public OperationHandle executeStatementAsync(String statement, Map<String, String> confOverlay)
+      throws HiveSQLException {
+    return executeStatementInternal(statement, confOverlay, true);
+  }
+
+  private OperationHandle executeStatementInternal(String statement, Map<String, String> confOverlay,
+      boolean runAsync)
+      throws HiveSQLException {
     acquire();
     try {
       ExecuteStatementOperation operation = getOperationManager()
-          .newExecuteStatementOperation(getSession(), statement, confOverlay);
-      if (operation instanceof SQLOperation) {
-        ((SQLOperation) operation).setRunAsync(runAsync);
-        ((SQLOperation) operation).setSessionState(SessionState.get());
-      }
+          .newExecuteStatementOperation(getSession(), statement, confOverlay, runAsync);
       operation.run();
       OperationHandle opHandle = operation.getHandle();
       opHandleSet.add(opHandle);
@@ -394,7 +401,7 @@ public class HiveSessionImpl implements HiveSession {
   public String getQueryPlan(String statement, Map<String, String> params)
       throws HiveSQLException {
     ExecuteStatementOperation operation = getOperationManager()
-        .newExecuteStatementOperation(getSession(), statement, params);
+        .newExecuteStatementOperation(getSession(), statement, params, false);
 
     if (operation instanceof SQLOperation) {
       SQLOperation sqlOperation = (SQLOperation) operation;

@@ -10,6 +10,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.SchemaGraph;
 import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.junit.*;
 
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.*;
@@ -28,6 +29,7 @@ public class TestJoinResolver {
 
   @BeforeClass
   public static void setup() throws Exception {
+    SessionState.start(hconf);
     setup = new CubeTestSetup();
     setup.createSources(hconf, TestJoinResolver.class.getSimpleName());
   }

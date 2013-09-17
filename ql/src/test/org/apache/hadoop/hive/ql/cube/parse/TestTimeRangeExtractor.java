@@ -14,6 +14,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -30,6 +31,7 @@ public class TestTimeRangeExtractor {
 
   @BeforeClass
   public static void setup() throws Exception {
+    SessionState.start(hconf);
     setup = new CubeTestSetup();
     setup.createSources(hconf, TestTimeRangeExtractor.class.getSimpleName());
   }

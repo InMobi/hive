@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.mapred.TextInputFormat;
 
 /*
@@ -785,7 +786,7 @@ public class CubeTestSetup {
 
   public void dropSources(HiveConf conf) throws Exception {
     Hive metastore = Hive.get(conf);
-    metastore.dropDatabase(metastore.getCurrentDatabase(), true, true, true);
+    metastore.dropDatabase(SessionState.get().getCurrentDatabase(), true, true, true);
   }
 
   private void createCubeFactsWithValidColumns(CubeMetastoreClient client)
