@@ -144,7 +144,8 @@ public class CLIService extends CompositeService implements ICLIService {
   }
 
   /* (non-Javadoc)
-   * @see org.apache.hive.service.cli.ICLIService#executeStatement(org.apache.hive.service.cli.SessionHandle, java.lang.String, java.util.Map)
+   * @see org.apache.hive.service.cli.ICLIService#executeStatement(org.apache.hive.service.cli.SessionHandle,
+   *  java.lang.String, java.util.Map)
    */
   @Override
   public OperationHandle executeStatement(SessionHandle sessionHandle, String statement,
@@ -156,11 +157,15 @@ public class CLIService extends CompositeService implements ICLIService {
     return opHandle;
   }
 
+  /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.ICLIService#executeStatementAsync(org.apache.hive.service.cli.SessionHandle,
+   *  java.lang.String, java.util.Map)
+   */
   @Override
   public OperationHandle executeStatementAsync(SessionHandle sessionHandle, String statement,
       Map<String, String> confOverlay) throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
-        .executeStatement(statement, confOverlay, true);
+        .executeStatementAsync(statement, confOverlay);
     LOG.info(sessionHandle + ": executeStatementAsync()");
     return opHandle;
   }

@@ -123,9 +123,27 @@ public class ThriftCLIServiceClient extends CLIServiceClient {
   public OperationHandle executeStatement(SessionHandle sessionHandle, String statement,
       Map<String, String> confOverlay)
           throws HiveSQLException {
+    return executeStatementInternal(sessionHandle, statement, confOverlay, false);
+  }
+
+  /* (non-Javadoc)
+   * @see org.apache.hive.service.cli.ICLIService#executeStatementAsync(org.apache.hive.service.cli.SessionHandle, java.lang.String, java.util.Map)
+   */
+  @Override
+  public OperationHandle executeStatementAsync(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay)
+          throws HiveSQLException {
+    return executeStatementInternal(sessionHandle, statement, confOverlay, true);
+  }
+
+  private OperationHandle executeStatementInternal(SessionHandle sessionHandle, String statement,
+      Map<String, String> confOverlay, boolean isAsync)
+          throws HiveSQLException {
     try {
-      TExecuteStatementReq req = new TExecuteStatementReq(sessionHandle.toTSessionHandle(), statement);
+      TExecuteStatementReq req =
+          new TExecuteStatementReq(sessionHandle.toTSessionHandle(), statement);
       req.setConfOverlay(confOverlay);
+      req.setRunAsync(isAsync);
       TExecuteStatementResp resp = cliService.ExecuteStatement(req);
       checkStatus(resp.getStatus());
       return new OperationHandle(resp.getOperationHandle());
@@ -390,20 +408,4 @@ public class ThriftCLIServiceClient extends CLIServiceClient {
     }
   }
 
-  @Override
-  public OperationHandle executeStatementAsync(SessionHandle sessionHandle, String statement,
-      Map<String, String> confOverlay) throws HiveSQLException {
-    try {
-      TExecuteStatementAsyncReq req =
-          new TExecuteStatementAsyncReq(sessionHandle.toTSessionHandle(), statement);
-      req.setConfOverlay(confOverlay);
-      TExecuteStatementAsyncResp resp = cliService.ExecuteStatementAsync(req);
-      checkStatus(resp.getStatus());
-      return new OperationHandle(resp.getOperationHandle());
-    } catch (HiveSQLException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new HiveSQLException(e);
-    }
-  }
 }

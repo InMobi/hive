@@ -19,6 +19,7 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.thrift.TException;
 
 /**
@@ -66,11 +67,11 @@ public class CubeMetastoreClient {
   }
 
   public void setCurrentDatabase(String currentDatabase) {
-    metastore.setCurrentDatabase(currentDatabase);
+    SessionState.get().setCurrentDatabase(currentDatabase);
   }
 
   public String getCurrentDatabase() {
-    return metastore.getCurrentDatabase();
+    return SessionState.get().getCurrentDatabase();
   }
 
   private StorageDescriptor createStorageHiveTable(String tableName,

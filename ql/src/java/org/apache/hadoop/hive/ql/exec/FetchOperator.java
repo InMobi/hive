@@ -75,7 +75,7 @@ public class FetchOperator implements Serializable {
 
   private boolean isNativeTable;
   private FetchWork work;
-  private Operator<?> operator;    // operator tree for processing row further (option)
+  protected Operator<?> operator;    // operator tree for processing row further (option)
   private int splitNum;
   private PartitionDesc currPart;
   private TableDesc currTbl;
@@ -390,7 +390,7 @@ public class FetchOperator implements Serializable {
 
       splitNum = 0;
       serde = partDesc.getDeserializerClass().newInstance();
-      serde.initialize(job, partDesc.getProperties());
+      serde.initialize(job, partDesc.getOverlayedProperties());
 
       if (currTbl != null) {
         tblSerde = serde;
@@ -410,7 +410,7 @@ public class FetchOperator implements Serializable {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Creating fetchTask with deserializer typeinfo: "
             + serde.getObjectInspector().getTypeName());
-        LOG.debug("deserializer properties: " + partDesc.getProperties());
+        LOG.debug("deserializer properties: " + partDesc.getOverlayedProperties());
       }
 
       if (currPart != null) {
@@ -489,6 +489,8 @@ public class FetchOperator implements Serializable {
     InspectableObject row = getNextRow();
     if (row != null) {
       pushRow(row);
+    } else {
+      operator.flush();
     }
     return row != null;
   }
@@ -623,7 +625,7 @@ public class FetchOperator implements Serializable {
       for (PartitionDesc listPart : listParts) {
         partition = listPart;
         Deserializer partSerde = listPart.getDeserializerClass().newInstance();
-        partSerde.initialize(job, listPart.getProperties());
+        partSerde.initialize(job, listPart.getOverlayedProperties());
 
         partitionedTableOI = ObjectInspectorConverters.getConvertedOI(
             partSerde.getObjectInspector(), tableOI);
