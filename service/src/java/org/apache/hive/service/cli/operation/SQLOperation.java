@@ -141,6 +141,7 @@ public class SQLOperation extends ExecuteStatementOperation {
       setState(OperationState.ERROR);
       throw new HiveSQLException("Error running query: " + e.toString(), e);
     }
+    setState(OperationState.FINISHED);
   }
   @Override
   public void run() throws HiveSQLException {

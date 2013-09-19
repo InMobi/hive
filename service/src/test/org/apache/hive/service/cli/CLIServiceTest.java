@@ -147,8 +147,8 @@ public abstract class CLIServiceTest {
     OperationHandle ophandle = client.executeStatement(sessionHandle, select, confOverlay);
 
     // expect query to be completed now
-    //assertEquals("Query should be finished",
-    //    OperationState.FINISHED, client.getOperationStatus(ophandle).getState());
+    assertEquals("Query should be finished",
+        OperationState.FINISHED, client.getOperationStatus(ophandle).getState());
   }
 
   @Test
