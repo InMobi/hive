@@ -237,7 +237,7 @@ public class SQLOperation extends ExecuteStatementOperation {
           fieldOI = fieldRef.getFieldObjectInspector();
           deserializedFields[i] = convertLazyToJava(soi.getStructFieldData(rowObj, fieldRef), fieldOI);
         }
-        rowSet.addRow(resultSchema, deserializedFields);
+        rowSet.addRow(getResultSetSchema(), deserializedFields);
       }
       return rowSet;
     } catch (IOException e) {
