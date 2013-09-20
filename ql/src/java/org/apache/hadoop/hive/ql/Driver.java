@@ -1476,6 +1476,9 @@ public class Driver implements CommandProcessor {
       return ft.fetch(res);
     }
 
+    if (ctx == null) {
+      return false;
+    }
     if (resStream == null) {
       resStream = ctx.getStream();
     }

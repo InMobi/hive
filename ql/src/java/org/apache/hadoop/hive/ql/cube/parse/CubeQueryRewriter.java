@@ -71,7 +71,7 @@ public class CubeQueryRewriter {
     }
   }
 
-  Context getQLContext() {
+  public Context getQLContext() {
     return ctx;
   }
 }

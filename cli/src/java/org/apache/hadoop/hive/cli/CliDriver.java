@@ -328,19 +328,21 @@ public class CliDriver {
    * @param out Printstream which to send output to
    */
   private void printHeader(Driver qp, PrintStream out) {
-    List<FieldSchema> fieldSchemas = qp.getSchema().getFieldSchemas();
-    if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_CLI_PRINT_HEADER)
+    if (qp.getSchema() != null) {
+      List<FieldSchema> fieldSchemas = qp.getSchema().getFieldSchemas();
+      if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_CLI_PRINT_HEADER)
           && fieldSchemas != null) {
-      // Print the column names
-      boolean first_col = true;
-      for (FieldSchema fs : fieldSchemas) {
-        if (!first_col) {
-          out.print('\t');
+        // Print the column names
+        boolean first_col = true;
+        for (FieldSchema fs : fieldSchemas) {
+          if (!first_col) {
+            out.print('\t');
+          }
+          out.print(fs.getName());
+          first_col = false;
         }
-        out.print(fs.getName());
-        first_col = false;
+        out.println();
       }
-      out.println();
     }
   }
 
