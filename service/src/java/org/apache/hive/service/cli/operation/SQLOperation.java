@@ -175,7 +175,6 @@ public class SQLOperation extends ExecuteStatementOperation {
   }
 
   private void cleanup(OperationState state) throws HiveSQLException {
-    setState(state);
     if (shouldRunAsync()) {
       if (backgroundHandle != null) {
         backgroundHandle.cancel(true);
@@ -190,6 +189,7 @@ public class SQLOperation extends ExecuteStatementOperation {
     if (ss.getTmpOutputFile() != null) {
       ss.getTmpOutputFile().delete();
     }
+    setState(state);
   }
 
   @Override
