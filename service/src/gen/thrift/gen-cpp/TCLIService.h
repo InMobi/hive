@@ -19,7 +19,6 @@ class TCLIServiceIf {
   virtual void CloseSession(TCloseSessionResp& _return, const TCloseSessionReq& req) = 0;
   virtual void GetInfo(TGetInfoResp& _return, const TGetInfoReq& req) = 0;
   virtual void ExecuteStatement(TExecuteStatementResp& _return, const TExecuteStatementReq& req) = 0;
-  virtual void ExecuteStatementAsync(TExecuteStatementAsyncResp& _return, const TExecuteStatementAsyncReq& req) = 0;
   virtual void GetTypeInfo(TGetTypeInfoResp& _return, const TGetTypeInfoReq& req) = 0;
   virtual void GetCatalogs(TGetCatalogsResp& _return, const TGetCatalogsReq& req) = 0;
   virtual void GetSchemas(TGetSchemasResp& _return, const TGetSchemasReq& req) = 0;
@@ -72,9 +71,6 @@ class TCLIServiceNull : virtual public TCLIServiceIf {
     return;
   }
   void ExecuteStatement(TExecuteStatementResp& /* _return */, const TExecuteStatementReq& /* req */) {
-    return;
-  }
-  void ExecuteStatementAsync(TExecuteStatementAsyncResp& /* _return */, const TExecuteStatementAsyncReq& /* req */) {
     return;
   }
   void GetTypeInfo(TGetTypeInfoResp& /* _return */, const TGetTypeInfoReq& /* req */) {
@@ -545,114 +541,6 @@ class TCLIService_ExecuteStatement_presult {
   TExecuteStatementResp* success;
 
   _TCLIService_ExecuteStatement_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
-typedef struct _TCLIService_ExecuteStatementAsync_args__isset {
-  _TCLIService_ExecuteStatementAsync_args__isset() : req(false) {}
-  bool req;
-} _TCLIService_ExecuteStatementAsync_args__isset;
-
-class TCLIService_ExecuteStatementAsync_args {
- public:
-
-  TCLIService_ExecuteStatementAsync_args() {
-  }
-
-  virtual ~TCLIService_ExecuteStatementAsync_args() throw() {}
-
-  TExecuteStatementAsyncReq req;
-
-  _TCLIService_ExecuteStatementAsync_args__isset __isset;
-
-  void __set_req(const TExecuteStatementAsyncReq& val) {
-    req = val;
-  }
-
-  bool operator == (const TCLIService_ExecuteStatementAsync_args & rhs) const
-  {
-    if (!(req == rhs.req))
-      return false;
-    return true;
-  }
-  bool operator != (const TCLIService_ExecuteStatementAsync_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const TCLIService_ExecuteStatementAsync_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class TCLIService_ExecuteStatementAsync_pargs {
- public:
-
-
-  virtual ~TCLIService_ExecuteStatementAsync_pargs() throw() {}
-
-  const TExecuteStatementAsyncReq* req;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _TCLIService_ExecuteStatementAsync_result__isset {
-  _TCLIService_ExecuteStatementAsync_result__isset() : success(false) {}
-  bool success;
-} _TCLIService_ExecuteStatementAsync_result__isset;
-
-class TCLIService_ExecuteStatementAsync_result {
- public:
-
-  TCLIService_ExecuteStatementAsync_result() {
-  }
-
-  virtual ~TCLIService_ExecuteStatementAsync_result() throw() {}
-
-  TExecuteStatementAsyncResp success;
-
-  _TCLIService_ExecuteStatementAsync_result__isset __isset;
-
-  void __set_success(const TExecuteStatementAsyncResp& val) {
-    success = val;
-  }
-
-  bool operator == (const TCLIService_ExecuteStatementAsync_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const TCLIService_ExecuteStatementAsync_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const TCLIService_ExecuteStatementAsync_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _TCLIService_ExecuteStatementAsync_presult__isset {
-  _TCLIService_ExecuteStatementAsync_presult__isset() : success(false) {}
-  bool success;
-} _TCLIService_ExecuteStatementAsync_presult__isset;
-
-class TCLIService_ExecuteStatementAsync_presult {
- public:
-
-
-  virtual ~TCLIService_ExecuteStatementAsync_presult() throw() {}
-
-  TExecuteStatementAsyncResp* success;
-
-  _TCLIService_ExecuteStatementAsync_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -2094,9 +1982,6 @@ class TCLIServiceClient : virtual public TCLIServiceIf {
   void ExecuteStatement(TExecuteStatementResp& _return, const TExecuteStatementReq& req);
   void send_ExecuteStatement(const TExecuteStatementReq& req);
   void recv_ExecuteStatement(TExecuteStatementResp& _return);
-  void ExecuteStatementAsync(TExecuteStatementAsyncResp& _return, const TExecuteStatementAsyncReq& req);
-  void send_ExecuteStatementAsync(const TExecuteStatementAsyncReq& req);
-  void recv_ExecuteStatementAsync(TExecuteStatementAsyncResp& _return);
   void GetTypeInfo(TGetTypeInfoResp& _return, const TGetTypeInfoReq& req);
   void send_GetTypeInfo(const TGetTypeInfoReq& req);
   void recv_GetTypeInfo(TGetTypeInfoResp& _return);
@@ -2155,7 +2040,6 @@ class TCLIServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_CloseSession(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetInfo(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ExecuteStatement(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_ExecuteStatementAsync(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetTypeInfo(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetCatalogs(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetSchemas(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -2176,7 +2060,6 @@ class TCLIServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["CloseSession"] = &TCLIServiceProcessor::process_CloseSession;
     processMap_["GetInfo"] = &TCLIServiceProcessor::process_GetInfo;
     processMap_["ExecuteStatement"] = &TCLIServiceProcessor::process_ExecuteStatement;
-    processMap_["ExecuteStatementAsync"] = &TCLIServiceProcessor::process_ExecuteStatementAsync;
     processMap_["GetTypeInfo"] = &TCLIServiceProcessor::process_GetTypeInfo;
     processMap_["GetCatalogs"] = &TCLIServiceProcessor::process_GetCatalogs;
     processMap_["GetSchemas"] = &TCLIServiceProcessor::process_GetSchemas;
@@ -2255,16 +2138,6 @@ class TCLIServiceMultiface : virtual public TCLIServiceIf {
       ifaces_[i]->ExecuteStatement(_return, req);
     }
     ifaces_[i]->ExecuteStatement(_return, req);
-    return;
-  }
-
-  void ExecuteStatementAsync(TExecuteStatementAsyncResp& _return, const TExecuteStatementAsyncReq& req) {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->ExecuteStatementAsync(_return, req);
-    }
-    ifaces_[i]->ExecuteStatementAsync(_return, req);
     return;
   }
 

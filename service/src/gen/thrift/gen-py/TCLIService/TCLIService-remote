@@ -27,7 +27,6 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  TCloseSessionResp CloseSession(TCloseSessionReq req)'
   print '  TGetInfoResp GetInfo(TGetInfoReq req)'
   print '  TExecuteStatementResp ExecuteStatement(TExecuteStatementReq req)'
-  print '  TExecuteStatementAsyncResp ExecuteStatementAsync(TExecuteStatementAsyncReq req)'
   print '  TGetTypeInfoResp GetTypeInfo(TGetTypeInfoReq req)'
   print '  TGetCatalogsResp GetCatalogs(TGetCatalogsReq req)'
   print '  TGetSchemasResp GetSchemas(TGetSchemasReq req)'
@@ -115,12 +114,6 @@ elif cmd == 'ExecuteStatement':
     print 'ExecuteStatement requires 1 args'
     sys.exit(1)
   pp.pprint(client.ExecuteStatement(eval(args[0]),))
-
-elif cmd == 'ExecuteStatementAsync':
-  if len(args) != 1:
-    print 'ExecuteStatementAsync requires 1 args'
-    sys.exit(1)
-  pp.pprint(client.ExecuteStatementAsync(eval(args[0]),))
 
 elif cmd == 'GetTypeInfo':
   if len(args) != 1:

@@ -46,13 +46,6 @@ class Iface:
     """
     pass
 
-  def ExecuteStatementAsync(self, req):
-    """
-    Parameters:
-     - req
-    """
-    pass
-
   def GetTypeInfo(self, req):
     """
     Parameters:
@@ -271,36 +264,6 @@ class Client(Iface):
     if result.success is not None:
       return result.success
     raise TApplicationException(TApplicationException.MISSING_RESULT, "ExecuteStatement failed: unknown result");
-
-  def ExecuteStatementAsync(self, req):
-    """
-    Parameters:
-     - req
-    """
-    self.send_ExecuteStatementAsync(req)
-    return self.recv_ExecuteStatementAsync()
-
-  def send_ExecuteStatementAsync(self, req):
-    self._oprot.writeMessageBegin('ExecuteStatementAsync', TMessageType.CALL, self._seqid)
-    args = ExecuteStatementAsync_args()
-    args.req = req
-    args.write(self._oprot)
-    self._oprot.writeMessageEnd()
-    self._oprot.trans.flush()
-
-  def recv_ExecuteStatementAsync(self, ):
-    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
-    if mtype == TMessageType.EXCEPTION:
-      x = TApplicationException()
-      x.read(self._iprot)
-      self._iprot.readMessageEnd()
-      raise x
-    result = ExecuteStatementAsync_result()
-    result.read(self._iprot)
-    self._iprot.readMessageEnd()
-    if result.success is not None:
-      return result.success
-    raise TApplicationException(TApplicationException.MISSING_RESULT, "ExecuteStatementAsync failed: unknown result");
 
   def GetTypeInfo(self, req):
     """
@@ -701,7 +664,6 @@ class Processor(Iface, TProcessor):
     self._processMap["CloseSession"] = Processor.process_CloseSession
     self._processMap["GetInfo"] = Processor.process_GetInfo
     self._processMap["ExecuteStatement"] = Processor.process_ExecuteStatement
-    self._processMap["ExecuteStatementAsync"] = Processor.process_ExecuteStatementAsync
     self._processMap["GetTypeInfo"] = Processor.process_GetTypeInfo
     self._processMap["GetCatalogs"] = Processor.process_GetCatalogs
     self._processMap["GetSchemas"] = Processor.process_GetSchemas
@@ -771,17 +733,6 @@ class Processor(Iface, TProcessor):
     result = ExecuteStatement_result()
     result.success = self._handler.ExecuteStatement(args.req)
     oprot.writeMessageBegin("ExecuteStatement", TMessageType.REPLY, seqid)
-    result.write(oprot)
-    oprot.writeMessageEnd()
-    oprot.trans.flush()
-
-  def process_ExecuteStatementAsync(self, seqid, iprot, oprot):
-    args = ExecuteStatementAsync_args()
-    args.read(iprot)
-    iprot.readMessageEnd()
-    result = ExecuteStatementAsync_result()
-    result.success = self._handler.ExecuteStatementAsync(args.req)
-    oprot.writeMessageBegin("ExecuteStatementAsync", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -1394,127 +1345,6 @@ class ExecuteStatement_result:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('ExecuteStatement_result')
-    if self.success is not None:
-      oprot.writeFieldBegin('success', TType.STRUCT, 0)
-      self.success.write(oprot)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-
-  def validate(self):
-    return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class ExecuteStatementAsync_args:
-  """
-  Attributes:
-   - req
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.STRUCT, 'req', (TExecuteStatementAsyncReq, TExecuteStatementAsyncReq.thrift_spec), None, ), # 1
-  )
-
-  def __init__(self, req=None,):
-    self.req = req
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.STRUCT:
-          self.req = TExecuteStatementAsyncReq()
-          self.req.read(iprot)
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('ExecuteStatementAsync_args')
-    if self.req is not None:
-      oprot.writeFieldBegin('req', TType.STRUCT, 1)
-      self.req.write(oprot)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-
-  def validate(self):
-    return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class ExecuteStatementAsync_result:
-  """
-  Attributes:
-   - success
-  """
-
-  thrift_spec = (
-    (0, TType.STRUCT, 'success', (TExecuteStatementAsyncResp, TExecuteStatementAsyncResp.thrift_spec), None, ), # 0
-  )
-
-  def __init__(self, success=None,):
-    self.success = success
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 0:
-        if ftype == TType.STRUCT:
-          self.success = TExecuteStatementAsyncResp()
-          self.success.read(iprot)
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('ExecuteStatementAsync_result')
     if self.success is not None:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)

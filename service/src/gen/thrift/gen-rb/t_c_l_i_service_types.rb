@@ -944,47 +944,6 @@ class TExecuteStatementResp
   ::Thrift::Struct.generate_accessors self
 end
 
-class TExecuteStatementAsyncReq
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  SESSIONHANDLE = 1
-  STATEMENT = 2
-  CONFOVERLAY = 3
-
-  FIELDS = {
-    SESSIONHANDLE => {:type => ::Thrift::Types::STRUCT, :name => 'sessionHandle', :class => ::TSessionHandle},
-    STATEMENT => {:type => ::Thrift::Types::STRING, :name => 'statement'},
-    CONFOVERLAY => {:type => ::Thrift::Types::MAP, :name => 'confOverlay', :key => {:type => ::Thrift::Types::STRING}, :value => {:type => ::Thrift::Types::STRING}, :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field sessionHandle is unset!') unless @sessionHandle
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field statement is unset!') unless @statement
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class TExecuteStatementAsyncResp
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  STATUS = 1
-  OPERATIONHANDLE = 2
-
-  FIELDS = {
-    STATUS => {:type => ::Thrift::Types::STRUCT, :name => 'status', :class => ::TStatus},
-    OPERATIONHANDLE => {:type => ::Thrift::Types::STRUCT, :name => 'operationHandle', :class => ::TOperationHandle, :optional => true}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field status is unset!') unless @status
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
 class TGetTypeInfoReq
   include ::Thrift::Struct, ::Thrift::Struct_Union
   SESSIONHANDLE = 1

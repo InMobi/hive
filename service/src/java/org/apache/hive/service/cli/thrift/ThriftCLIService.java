@@ -29,7 +29,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.ql.plan.api.Query;
 import org.apache.hive.service.AbstractService;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.CLIService;
@@ -38,7 +37,6 @@ import org.apache.hive.service.cli.GetInfoType;
 import org.apache.hive.service.cli.GetInfoValue;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationHandle;
-import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.OperationStatus;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.SessionHandle;
@@ -206,26 +204,6 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       OperationHandle operationHandle = runAsync ?
           cliService.executeStatementAsync(sessionHandle, statement, confOverlay)
               : cliService.executeStatement(sessionHandle, statement, confOverlay);
-      resp.setOperationHandle(operationHandle.toTOperationHandle());
-      resp.setStatus(OK_STATUS);
-    } catch (Exception e) {
-      e.printStackTrace();
-      resp.setStatus(HiveSQLException.toTStatus(e));
-    }
-    return resp;
-  }
-  
-  
-  @Override
-  public TExecuteStatementAsyncResp ExecuteStatementAsync(TExecuteStatementAsyncReq req) 
-      throws TException {
-    TExecuteStatementAsyncResp resp = new TExecuteStatementAsyncResp();
-    try {
-      SessionHandle sessionHandle = new SessionHandle(req.getSessionHandle());
-      String statement = req.getStatement();
-      Map<String, String> confOverlay = req.getConfOverlay();
-      OperationHandle operationHandle =
-          cliService.executeStatementAsync(sessionHandle, statement, confOverlay);
       resp.setOperationHandle(operationHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {

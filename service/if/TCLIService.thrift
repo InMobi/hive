@@ -1010,8 +1010,6 @@ service TCLIService {
   TGetInfoResp GetInfo(1:TGetInfoReq req);
 
   TExecuteStatementResp ExecuteStatement(1:TExecuteStatementReq req);
-  
-  TExecuteStatementAsyncResp ExecuteStatementAsync(1:TExecuteStatementAsyncReq req);
 
   TGetTypeInfoResp GetTypeInfo(1:TGetTypeInfoReq req);
 

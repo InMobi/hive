@@ -3234,181 +3234,6 @@ class TExecuteStatementResp:
   def __ne__(self, other):
     return not (self == other)
 
-class TExecuteStatementAsyncReq:
-  """
-  Attributes:
-   - sessionHandle
-   - statement
-   - confOverlay
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.STRUCT, 'sessionHandle', (TSessionHandle, TSessionHandle.thrift_spec), None, ), # 1
-    (2, TType.STRING, 'statement', None, None, ), # 2
-    (3, TType.MAP, 'confOverlay', (TType.STRING,None,TType.STRING,None), None, ), # 3
-  )
-
-  def __init__(self, sessionHandle=None, statement=None, confOverlay=None,):
-    self.sessionHandle = sessionHandle
-    self.statement = statement
-    self.confOverlay = confOverlay
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.STRUCT:
-          self.sessionHandle = TSessionHandle()
-          self.sessionHandle.read(iprot)
-        else:
-          iprot.skip(ftype)
-      elif fid == 2:
-        if ftype == TType.STRING:
-          self.statement = iprot.readString();
-        else:
-          iprot.skip(ftype)
-      elif fid == 3:
-        if ftype == TType.MAP:
-          self.confOverlay = {}
-          (_ktype137, _vtype138, _size136 ) = iprot.readMapBegin() 
-          for _i140 in xrange(_size136):
-            _key141 = iprot.readString();
-            _val142 = iprot.readString();
-            self.confOverlay[_key141] = _val142
-          iprot.readMapEnd()
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('TExecuteStatementAsyncReq')
-    if self.sessionHandle is not None:
-      oprot.writeFieldBegin('sessionHandle', TType.STRUCT, 1)
-      self.sessionHandle.write(oprot)
-      oprot.writeFieldEnd()
-    if self.statement is not None:
-      oprot.writeFieldBegin('statement', TType.STRING, 2)
-      oprot.writeString(self.statement)
-      oprot.writeFieldEnd()
-    if self.confOverlay is not None:
-      oprot.writeFieldBegin('confOverlay', TType.MAP, 3)
-      oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.confOverlay))
-      for kiter143,viter144 in self.confOverlay.items():
-        oprot.writeString(kiter143)
-        oprot.writeString(viter144)
-      oprot.writeMapEnd()
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-
-  def validate(self):
-    if self.sessionHandle is None:
-      raise TProtocol.TProtocolException(message='Required field sessionHandle is unset!')
-    if self.statement is None:
-      raise TProtocol.TProtocolException(message='Required field statement is unset!')
-    return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class TExecuteStatementAsyncResp:
-  """
-  Attributes:
-   - status
-   - operationHandle
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.STRUCT, 'status', (TStatus, TStatus.thrift_spec), None, ), # 1
-    (2, TType.STRUCT, 'operationHandle', (TOperationHandle, TOperationHandle.thrift_spec), None, ), # 2
-  )
-
-  def __init__(self, status=None, operationHandle=None,):
-    self.status = status
-    self.operationHandle = operationHandle
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.STRUCT:
-          self.status = TStatus()
-          self.status.read(iprot)
-        else:
-          iprot.skip(ftype)
-      elif fid == 2:
-        if ftype == TType.STRUCT:
-          self.operationHandle = TOperationHandle()
-          self.operationHandle.read(iprot)
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('TExecuteStatementAsyncResp')
-    if self.status is not None:
-      oprot.writeFieldBegin('status', TType.STRUCT, 1)
-      self.status.write(oprot)
-      oprot.writeFieldEnd()
-    if self.operationHandle is not None:
-      oprot.writeFieldBegin('operationHandle', TType.STRUCT, 2)
-      self.operationHandle.write(oprot)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-
-  def validate(self):
-    if self.status is None:
-      raise TProtocol.TProtocolException(message='Required field status is unset!')
-    return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
 class TGetTypeInfoReq:
   """
   Attributes:
@@ -3909,10 +3734,10 @@ class TGetTablesReq:
       elif fid == 5:
         if ftype == TType.LIST:
           self.tableTypes = []
-          (_etype148, _size145) = iprot.readListBegin()
-          for _i149 in xrange(_size145):
-            _elem150 = iprot.readString();
-            self.tableTypes.append(_elem150)
+          (_etype139, _size136) = iprot.readListBegin()
+          for _i140 in xrange(_size136):
+            _elem141 = iprot.readString();
+            self.tableTypes.append(_elem141)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -3945,8 +3770,8 @@ class TGetTablesReq:
     if self.tableTypes is not None:
       oprot.writeFieldBegin('tableTypes', TType.LIST, 5)
       oprot.writeListBegin(TType.STRING, len(self.tableTypes))
-      for iter151 in self.tableTypes:
-        oprot.writeString(iter151)
+      for iter142 in self.tableTypes:
+        oprot.writeString(iter142)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -5311,11 +5136,11 @@ class TGetQueryPlanReq:
       elif fid == 3:
         if ftype == TType.MAP:
           self.confOverlay = {}
-          (_ktype153, _vtype154, _size152 ) = iprot.readMapBegin() 
-          for _i156 in xrange(_size152):
-            _key157 = iprot.readString();
-            _val158 = iprot.readString();
-            self.confOverlay[_key157] = _val158
+          (_ktype144, _vtype145, _size143 ) = iprot.readMapBegin() 
+          for _i147 in xrange(_size143):
+            _key148 = iprot.readString();
+            _val149 = iprot.readString();
+            self.confOverlay[_key148] = _val149
           iprot.readMapEnd()
         else:
           iprot.skip(ftype)
@@ -5340,9 +5165,9 @@ class TGetQueryPlanReq:
     if self.confOverlay is not None:
       oprot.writeFieldBegin('confOverlay', TType.MAP, 3)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.confOverlay))
-      for kiter159,viter160 in self.confOverlay.items():
-        oprot.writeString(kiter159)
-        oprot.writeString(viter160)
+      for kiter150,viter151 in self.confOverlay.items():
+        oprot.writeString(kiter150)
+        oprot.writeString(viter151)
       oprot.writeMapEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()

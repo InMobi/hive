@@ -71,21 +71,6 @@ module TCLIService
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'ExecuteStatement failed: unknown result')
     end
 
-    def ExecuteStatementAsync(req)
-      send_ExecuteStatementAsync(req)
-      return recv_ExecuteStatementAsync()
-    end
-
-    def send_ExecuteStatementAsync(req)
-      send_message('ExecuteStatementAsync', ExecuteStatementAsync_args, :req => req)
-    end
-
-    def recv_ExecuteStatementAsync()
-      result = receive_message(ExecuteStatementAsync_result)
-      return result.success unless result.success.nil?
-      raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'ExecuteStatementAsync failed: unknown result')
-    end
-
     def GetTypeInfo(req)
       send_GetTypeInfo(req)
       return recv_GetTypeInfo()
@@ -314,13 +299,6 @@ module TCLIService
       write_result(result, oprot, 'ExecuteStatement', seqid)
     end
 
-    def process_ExecuteStatementAsync(seqid, iprot, oprot)
-      args = read_args(iprot, ExecuteStatementAsync_args)
-      result = ExecuteStatementAsync_result.new()
-      result.success = @handler.ExecuteStatementAsync(args.req)
-      write_result(result, oprot, 'ExecuteStatementAsync', seqid)
-    end
-
     def process_GetTypeInfo(seqid, iprot, oprot)
       args = read_args(iprot, GetTypeInfo_args)
       result = GetTypeInfo_result.new()
@@ -534,38 +512,6 @@ module TCLIService
 
     FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TExecuteStatementResp}
-    }
-
-    def struct_fields; FIELDS; end
-
-    def validate
-    end
-
-    ::Thrift::Struct.generate_accessors self
-  end
-
-  class ExecuteStatementAsync_args
-    include ::Thrift::Struct, ::Thrift::Struct_Union
-    REQ = 1
-
-    FIELDS = {
-      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::TExecuteStatementAsyncReq}
-    }
-
-    def struct_fields; FIELDS; end
-
-    def validate
-    end
-
-    ::Thrift::Struct.generate_accessors self
-  end
-
-  class ExecuteStatementAsync_result
-    include ::Thrift::Struct, ::Thrift::Struct_Union
-    SUCCESS = 0
-
-    FIELDS = {
-      SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TExecuteStatementAsyncResp}
     }
 
     def struct_fields; FIELDS; end
