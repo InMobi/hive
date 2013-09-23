@@ -172,7 +172,7 @@ public class StorageTableResolver implements ContextRewriter {
         for (UpdatePeriod updatePeriod : entry.getValue()) {
           if (maxInterval != null && updatePeriod.compareTo(maxInterval) > 0) {
             LOG.info("Skipping update period " + updatePeriod + " for fact"
-                     + fact);
+                + fact);
             continue;
           }
           if (validUpdatePeriods != null && !validUpdatePeriods
@@ -236,7 +236,7 @@ public class StorageTableResolver implements ContextRewriter {
       }
       if (cfact.numQueriedParts == 0) {
         LOG.info("Not considering the fact table:" + cfact.fact + " as it could"
-          + " not find partition for given ranges: " + cubeql.getTimeRanges());
+            + " not find partition for given ranges: " + cubeql.getTimeRanges());
         i.remove();
         continue;
       }
@@ -253,7 +253,7 @@ public class StorageTableResolver implements ContextRewriter {
         cfact.enabledMultiTableSelect = enabledMultiTableSelect;
       }
       LOG.info("Resolved partitions for fact " + cfact + ": " + answeringParts
-        + " storageTables:" + storageTables);
+          + " storageTables:" + storageTables);
     }
   }
 
@@ -330,6 +330,7 @@ public class StorageTableResolver implements ContextRewriter {
     long numIters = DateUtil.getTimeDiff(ceilFromDate, floorToDate, interval);
     int i = 1;
     int lookAheadNumParts = 1;
+    boolean leastInterval = updatePeriods.first().equals(interval);
     while (dt.compareTo(floorToDate) < 0) {
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
@@ -338,10 +339,17 @@ public class StorageTableResolver implements ContextRewriter {
           pformat.format(dt), interval, containingPart);
       Map<String, List<Partition>> metaParts = new HashMap<String, List<Partition>>();
       for (String storageTableName : storageTbls) {
-        List<Partition> sParts = client.getPartitionsByFilter(
-            storageTableName, part.getFilter(null));
-        metaParts.put(storageTableName, sParts);
-        if (!sParts.isEmpty()) {
+        int numParts;
+        if (leastInterval) {
+          numParts = client.getNumPartitionsByFilter(
+              storageTableName, part.getFilter(null));
+        } else {
+          List<Partition> sParts = client.getPartitionsByFilter(
+              storageTableName, part.getFilter(null));
+          metaParts.put(storageTableName, sParts);
+          numParts = sParts.size();
+        }
+        if (numParts > 0) {
           if (!foundPart) {
             LOG.info("Adding existing partition" + part);
             partitions.add(part);
@@ -377,7 +385,7 @@ public class StorageTableResolver implements ContextRewriter {
         } else if (processTimePartCol != null) {
           LOG.info("Looking for look ahead process time partitions for "+ part);
           if (!partCol.equals(processTimePartCol)) {
-            if (!(updatePeriods.first().equals(interval))) {
+            if (!leastInterval) {
               // see if this is the part of the last-n look ahead partitions
               if ((numIters - i) <= lookAheadNumParts) {
                 LOG.info("Looking for look ahead process time partitions for "+ part);

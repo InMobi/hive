@@ -514,6 +514,13 @@ public class CubeMetastoreClient {
         getTable(storageTableName), filter);
   }
 
+  public int getNumPartitionsByFilter(String storageTableName,
+      String filter) throws MetaException, NoSuchObjectException,
+      HiveException, TException {
+    return getClient().getNumPartitionsByFilter(
+        getTable(storageTableName), filter);
+  }
+
   public boolean partitionExists(String storageTableName,
       UpdatePeriod updatePeriod,
       Date partitionTimestamp)

@@ -33,7 +33,6 @@ import javax.jdo.Query;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -43,12 +42,12 @@ import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree;
-import org.apache.hadoop.hive.metastore.parser.FilterParser;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.LeafNode;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.LogicalOperator;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.Operator;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.TreeNode;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.TreeVisitor;
+import org.apache.hadoop.hive.metastore.parser.FilterParser;
 
 /**
  * This class contains the optimizations for MetaStore that rely on direct SQL access to
@@ -96,6 +95,15 @@ class MetaStoreDirectSql {
     String sqlFilter = (parser == null) ? null
         : PartitionFilterGenerator.generateSqlFilter(table, parser.tree, params, joins);
     return getPartitionsViaSqlFilterInternal(table.getDbName(), table.getTableName(),
+        isViewTable(table), sqlFilter, params, joins, max);
+  }
+
+  public int getNumPartitionsViaSqlFilter(Table table, FilterParser parser,
+      Integer max) throws MetaException {
+    List<String> params = new ArrayList<String>(), joins = new ArrayList<String>();
+    String sqlFilter = (parser == null) ? null
+        : PartitionFilterGenerator.generateSqlFilter(table, parser.tree, params, joins);
+    return getNumPartitionsViaSqlFilterInternal(table.getDbName(), table.getTableName(),
         isViewTable(table), sqlFilter, params, joins, max);
   }
 
@@ -458,6 +466,46 @@ class MetaStoreDirectSql {
       }});
 
     return orderedResult;
+  }
+
+  private int getNumPartitionsViaSqlFilterInternal(String dbName, String tblName,
+      Boolean isView, String sqlFilter, List<String> paramsForFilter,
+      List<String> joinsForFilter, Integer max) throws MetaException {
+    boolean doTrace = LOG.isDebugEnabled();
+    dbName = dbName.toLowerCase();
+    tblName = tblName.toLowerCase();
+
+    // Get all simple fields for partitions and related objects, which we can map one-on-one.
+    // We will do this in 2 queries to use different existing indices for each one.
+    // We do not get table and DB name, assuming they are the same as we are using to filter.
+    // TODO: We might want to tune the indexes instead. With current ones MySQL performs
+    // poorly, esp. with 'order by' w/o index on large tables, even if the number of actual
+    // results is small (query that returns 8 out of 32k partitions can go 4sec. to 0sec. by
+    // just adding a PART_ID IN (...) filter that doesn't alter the results to it, probably
+    // causing it to not sort the entire table due to not knowing how selective the filter is.
+    String queryText =
+        "select PARTITIONS.PART_ID from PARTITIONS"
+      + "  inner join TBLS on PARTITIONS.TBL_ID = TBLS.TBL_ID "
+      + "  inner join DBS on TBLS.DB_ID = DBS.DB_ID "
+      + join(joinsForFilter, ' ') + " where TBLS.TBL_NAME = ? and DBS.NAME = ?"
+      + ((sqlFilter == null) ? "" : " " + sqlFilter);
+    Object[] params = new Object[paramsForFilter.size() + 2];
+    params[0] = tblName;
+    params[1] = dbName;
+    for (int i = 0; i < paramsForFilter.size(); ++i) {
+      params[i + 2] = paramsForFilter.get(i);
+    }
+
+    long start = doTrace ? System.nanoTime() : 0;
+    Query query = pm.newQuery("javax.jdo.query.SQL", queryText);
+    if (max != null) {
+      query.setRange(0, max.shortValue());
+    }
+    @SuppressWarnings("unchecked")
+    List<Object> sqlResult = (List<Object>)query.executeWithArray(params);
+    long queryTime = doTrace ? System.nanoTime() : 0;
+    timingTrace(doTrace, queryText, start, queryTime);
+    return sqlResult.size();
   }
 
   private void timingTrace(boolean doTrace, String queryText, long start, long queryTime) {

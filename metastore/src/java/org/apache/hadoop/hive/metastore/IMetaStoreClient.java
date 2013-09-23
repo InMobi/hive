@@ -428,6 +428,23 @@ public interface IMetaStoreClient {
          NoSuchObjectException, TException;
 
   /**
+   * Get number of partitions matching specified filter
+   * @param db_name the database name
+   * @param tbl_name the table name
+   * @param filter the filter string,
+   *    for example "part1 = \"p1_abc\" and part2 <= "\p2_test\"". Filtering can
+   *    be done only on string partition keys.
+   * @param max_parts the maximum number of partitions to return,
+   *    all partitions are returned if -1 is passed
+   * @return number of partitions
+   * @throws MetaException
+   * @throws NoSuchObjectException
+   * @throws TException
+   */
+  public int getNumPartitionsByFilter(String dbName, String tableName,
+      String filter, short s) throws MetaException, NoSuchObjectException, TException;
+
+  /**
    * @param dbName
    * @param tableName
    * @param s
@@ -986,6 +1003,5 @@ public interface IMetaStoreClient {
    * @throws TException
    */
   public void cancelDelegationToken(String tokenStrForm) throws MetaException, TException;
-
 
 }

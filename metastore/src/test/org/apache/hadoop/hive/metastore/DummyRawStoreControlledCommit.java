@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hive.metastore;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configurable;
@@ -297,6 +297,12 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
+  public int getNumPartitionsByFilter(String dbName, String tblName,
+      String filter, short maxParts) throws MetaException, NoSuchObjectException {
+    return objectStore.getNumPartitionsByFilter(dbName, tblName, filter, maxParts);
+  }
+
+  @Override
   public List<Partition> getPartitionsByNames(String dbName, String tblName,
       List<String> partNames) throws MetaException, NoSuchObjectException {
     return objectStore.getPartitionsByNames(dbName, tblName, partNames);
@@ -532,11 +538,11 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   public boolean addToken(String tokenIdentifier, String delegationToken) {
     return false;
   }
- 
+
   public boolean removeToken(String tokenIdentifier) {
     return false;
   }
- 
+
   public String getToken(String tokenIdentifier) {
     return "";
   }

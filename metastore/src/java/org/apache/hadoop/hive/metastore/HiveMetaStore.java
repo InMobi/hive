@@ -3311,6 +3311,25 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       return ret;
     }
 
+    @Override
+    public int get_num_partitions_by_filter(final String dbName,
+        final String tblName, final String filter, final short maxParts)
+        throws MetaException, NoSuchObjectException, TException {
+      startTableFunction("get_num_partitions_by_filter", dbName, tblName);
+
+      int ret = -1;
+      Exception ex = null;
+      try {
+        ret = getMS().getNumPartitionsByFilter(dbName, tblName, filter, maxParts);
+      } catch (Exception e) {
+        ex = e;
+        rethrowException(e);
+      } finally {
+        endFunction("get_num_partitions_by_filter", ret != -1, ex, tblName);
+      }
+      return ret;
+    }
+
     private void rethrowException(Exception e)
         throws MetaException, NoSuchObjectException, TException {
       // TODO: Both of these are TException, why do we need these separate clauses?

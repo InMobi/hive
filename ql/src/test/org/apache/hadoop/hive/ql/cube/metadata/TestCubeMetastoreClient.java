@@ -20,6 +20,7 @@ import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -44,6 +45,7 @@ public class TestCubeMetastoreClient {
 
   @BeforeClass
   public static void setup() throws HiveException, AlreadyExistsException {
+    SessionState.start(conf);
     client =  CubeMetastoreClient.getInstance(conf);
     now = new Date();
     Database database = new Database();

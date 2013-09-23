@@ -1789,6 +1789,60 @@ public class ObjectStore implements RawStore, Configurable {
     return getPartitionsByFilterInternal(dbName, tblName, filter, maxParts, true, true);
   }
 
+  @Override
+  public int getNumPartitionsByFilter(String dbName, String tblName,
+      String filter, short maxParts) throws MetaException, NoSuchObjectException {
+    return getNumPartitionsByFilterInternal(dbName, tblName, filter, maxParts,
+        true, true);
+  }
+
+  protected int getNumPartitionsByFilterInternal(String dbName, String tblName,
+      String filter, short maxParts, boolean allowSql, boolean allowJdo)
+      throws MetaException, NoSuchObjectException {
+    assert allowSql || allowJdo;
+    boolean doTrace = LOG.isDebugEnabled();
+    boolean doUseDirectSql = canUseDirectSql(allowSql);
+    dbName = dbName.toLowerCase();
+    tblName = tblName.toLowerCase();
+    FilterParser parser = null;
+    if (filter != null && filter.length() != 0) {
+      LOG.debug("Filter specified is " + filter);
+      parser = getFilterParser(filter);
+    }
+
+    int count = -1;
+    boolean success = false;
+    try {
+      long start = doTrace ? System.nanoTime() : 0;
+      openTransaction();
+      MTable mtable = ensureGetMTable(dbName, tblName);
+      if (doUseDirectSql) {
+        try {
+          Table table = convertToTable(mtable);
+          Integer max = (maxParts < 0) ? null : (int)maxParts;
+          count = directSql.getNumPartitionsViaSqlFilter(table, parser, max);
+        } catch (Exception ex) {
+          handleDirectSqlError(allowJdo, ex);
+          doUseDirectSql = false;
+          start = doTrace ? System.nanoTime() : 0;
+          mtable = ensureGetMTable(dbName, tblName); // detached on rollback, get again
+        }
+      }
+      if (!doUseDirectSql) {
+        count = listMPartitionsByFilterNoTxn(
+            mtable, dbName, tblName, parser, maxParts).size();
+      }
+      success = commitTransaction();
+      LOG.info(count + " num partitions retrieved using " + (doUseDirectSql ? "SQL" : "ORM")
+          + (doTrace ? (" in " + ((System.nanoTime() - start) / 1000000.0) + "ms") : ""));
+      return count;
+    } finally {
+      if (!success) {
+        rollbackTransaction();
+      }
+    }
+  }
+
   protected List<Partition> getPartitionsByFilterInternal(String dbName, String tblName,
       String filter, short maxParts, boolean allowSql, boolean allowJdo)
       throws MetaException, NoSuchObjectException {
