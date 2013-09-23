@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 
 public class CubeQueryConfUtil {
   public static final String STORAGE_TABLES_SFX = ".storagetables";
@@ -25,12 +26,17 @@ public class CubeQueryConfUtil {
       "cube.query.nonexisting.partitions";
   public static final String ENABLE_MULTI_TABLE_SELECT =
       "cube.query.enable.multi.table.select";
+  public static final String QUERY_MAX_INTERVAL = "cube.query.max.interval";
   public static final String PROCESS_TIME_PART_COL = "cube.query.process.time" +
       ".partition.column";
+  public static final String LOOK_AHEAD_PT_PARTS_PFX = "cube.query.lookahead.ptparts.forinterval.";
 
   public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
-  public static final String QUERY_MAX_INTERVAL = "cube.query.max.interval";
+  public static final int DEFAULT_LOOK_AHEAD_PT_PARTS = 1;
 
+  public static String getLookAheadPTPartsKey(UpdatePeriod interval) {
+    return LOOK_AHEAD_PT_PARTS_PFX + interval.name().toLowerCase();
+  }
   private static String getValidKeyCubePFX(String cubeName) {
     return VALID_PFX + cubeName.toLowerCase();
   }

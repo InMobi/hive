@@ -329,7 +329,9 @@ public class StorageTableResolver implements ContextRewriter {
     Date dt = cal.getTime();
     long numIters = DateUtil.getTimeDiff(ceilFromDate, floorToDate, interval);
     int i = 1;
-    int lookAheadNumParts = 1;
+    int lookAheadNumParts = conf.getInt(
+        CubeQueryConfUtil.getLookAheadPTPartsKey(interval),
+        CubeQueryConfUtil.DEFAULT_LOOK_AHEAD_PT_PARTS);
     boolean leastInterval = updatePeriods.first().equals(interval);
     while (dt.compareTo(floorToDate) < 0) {
       cal.add(interval.calendarField(), 1);

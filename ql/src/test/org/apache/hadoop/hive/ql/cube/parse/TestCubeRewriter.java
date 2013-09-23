@@ -21,6 +21,7 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
+import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -955,6 +956,26 @@ public class TestCubeRewriter {
     conf.set(CubeQueryConfUtil.PROCESS_TIME_PART_COL, "pt");
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
+      " msr2 from testCube" +
+      " where " + twoDaysITRange);
+    System.out.println("Query With process time col:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select dim1, dim2, COUNT(msr1)," +
+      " SUM(msr2), msr3 from testCube" +
+      " where " + twoDaysITRange);
+    System.out.println("Query With process time col:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select dim1, dim2, cityid, SUM(msr1)," +
+      " SUM(msr2), msr3 from testCube" +
+      " where " + twoDaysITRange);
+    System.out.println("Query With process time col:" + hqlQuery);
+    //TODO compare queries
+    //compareQueries(expected, hqlQuery);
+    conf.setInt(CubeQueryConfUtil.getLookAheadPTPartsKey(UpdatePeriod.DAILY), 3);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
       " msr2 from testCube" +
       " where " + twoDaysITRange);
     System.out.println("Query With process time col:" + hqlQuery);
