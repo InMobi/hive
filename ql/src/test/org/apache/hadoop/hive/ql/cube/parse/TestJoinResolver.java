@@ -204,6 +204,8 @@ public class TestJoinResolver {
   @Test
   public void testJoinTypeConf() throws Exception {
     hconf.set(JoinResolver.JOIN_TYPE_KEY, "LEFTOUTER");
+    System.out.println("@@Set join type to " + hconf.get(JoinResolver.JOIN_TYPE_KEY));
+    driver = new CubeQueryRewriter(hconf);
     String query = "select citytable.name, msr2 FROM testCube WHERE " + twoDaysRange;
     CubeQueryContext ctx = driver.rewrite(query);
     String hql = ctx.toHQL();
@@ -212,6 +214,8 @@ public class TestJoinResolver {
       ctx.getAutoResolvedJoinChain().trim());
 
     hconf.set(JoinResolver.JOIN_TYPE_KEY, "FULLOUTER");
+    System.out.println("@@Set join type to " + hconf.get(JoinResolver.JOIN_TYPE_KEY));
+    driver = new CubeQueryRewriter(hconf);
     ctx = driver.rewrite(query);
     System.out.println("@@Resolved join clause - "+ ctx.getAutoResolvedJoinChain());
     assertEquals("full outer join citytable on testcube.cityid = citytable.id",

@@ -188,11 +188,9 @@ public class JoinResolver implements ContextRewriter {
               // Cube -> Dimension reference
               CubeDimensionTable relatedDim = metastore.getDimensionTable(destTableName);
               addLinks(refDim.getName(), cube, destColumnName, relatedDim, graph);
-              
-              // build graph for the related dim
-              buildDimGraph(relatedDim, graph);
             } else if (metastore.isFactTable(destTableName)) {
-              throw new HiveException("Cube -> Fact references are not supported");
+              throw new HiveException("Dim -> Fact references are not supported: "
+                + dim.getName() + "." + refDim.getName() + "->" + destTableName + "." + destColumnName);
             }
           } // end loop for refs from a dim
         }
@@ -218,8 +216,6 @@ public class JoinResolver implements ContextRewriter {
             if (metastore.isDimensionTable(destTab)) {
               CubeDimensionTable relTab = metastore.getDimensionTable(destTab);
               addLinks(colName, tab, destCol, relTab, graph);
-              // recurse down to build graph for the referenced dim
-              buildDimGraph(relTab, graph);
             } else {
               // not dealing with dim->fact references
               throw new HiveException("Dimension -> Fact references not supported");

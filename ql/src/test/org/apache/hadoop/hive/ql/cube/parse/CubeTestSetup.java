@@ -691,6 +691,61 @@ public class CubeTestSetup {
         dimensionReferences, snapshotDumpPeriods, null);
   }
 
+  private void createCyclicDim1(CubeMetastoreClient client)
+    throws HiveException {
+    String dimName = "cycleDim1";
+
+    List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
+    dimColumns.add(new FieldSchema("id", "int", "code"));
+    dimColumns.add(new FieldSchema("name", "string", "field1"));
+    dimColumns.add(new FieldSchema("cyleDim2Id", "string", "link to cyclic dim 2"));
+
+    Map<String, List<TableReference>> dimensionReferences =
+      new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("cyleDim2Id", Arrays.asList(new TableReference("cycleDim2", "id")));
+
+    Storage hdfsStorage1 = new HDFSStorage("C1",
+      TextInputFormat.class.getCanonicalName(),
+      HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    Storage hdfsStorage2 = new HDFSStorage("C2",
+      TextInputFormat.class.getCanonicalName(),
+      HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    Map<Storage, UpdatePeriod> snapshotDumpPeriods =
+      new HashMap<Storage, UpdatePeriod>();
+    snapshotDumpPeriods.put(hdfsStorage1, UpdatePeriod.HOURLY);
+    snapshotDumpPeriods.put(hdfsStorage2, null);
+
+    client.createCubeDimensionTable(dimName, dimColumns, 0L,
+      dimensionReferences, snapshotDumpPeriods, null);
+  }
+
+  private void createCyclicDim2(CubeMetastoreClient client)
+    throws HiveException {
+    String dimName = "cycleDim2";
+
+    List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
+    dimColumns.add(new FieldSchema("id", "int", "code"));
+    dimColumns.add(new FieldSchema("name", "string", "field1"));
+    dimColumns.add(new FieldSchema("cyleDim1Id", "string", "link to cyclic dim 1"));
+
+    Map<String, List<TableReference>> dimensionReferences =
+      new HashMap<String, List<TableReference>>();
+    dimensionReferences.put("cyleDim1Id", Arrays.asList(new TableReference("cycleDim1", "id")));
+
+    Storage hdfsStorage1 = new HDFSStorage("C1",
+      TextInputFormat.class.getCanonicalName(),
+      HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    Storage hdfsStorage2 = new HDFSStorage("C2",
+      TextInputFormat.class.getCanonicalName(),
+      HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    Map<Storage, UpdatePeriod> snapshotDumpPeriods =
+      new HashMap<Storage, UpdatePeriod>();
+    snapshotDumpPeriods.put(hdfsStorage1, UpdatePeriod.HOURLY);
+    snapshotDumpPeriods.put(hdfsStorage2, null);
+
+    client.createCubeDimensionTable(dimName, dimColumns, 0L,
+      dimensionReferences, snapshotDumpPeriods, null);
+  }
 
   private void createZiptable(CubeMetastoreClient client) throws Exception {
     String dimName = "ziptable";
@@ -776,6 +831,10 @@ public class CubeTestSetup {
     createTestDim2(client);
     createTestDim3(client);
     createTestDim4(client);
+
+    // For join resolver cyclic links in dimension tables
+    createCyclicDim1(client);
+    createCyclicDim2(client);
 
     createCubeFactMonthly(client);
     createZiptable(client);
