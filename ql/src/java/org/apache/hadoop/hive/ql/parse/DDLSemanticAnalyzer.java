@@ -127,6 +127,9 @@ import org.apache.hadoop.hive.ql.security.authorization.PrivilegeRegistry;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.TextInputFormat;
 
@@ -148,6 +151,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     TokenToTypeName.put(HiveParser.TOK_FLOAT, serdeConstants.FLOAT_TYPE_NAME);
     TokenToTypeName.put(HiveParser.TOK_DOUBLE, serdeConstants.DOUBLE_TYPE_NAME);
     TokenToTypeName.put(HiveParser.TOK_STRING, serdeConstants.STRING_TYPE_NAME);
+    TokenToTypeName.put(HiveParser.TOK_VARCHAR, serdeConstants.VARCHAR_TYPE_NAME);
     TokenToTypeName.put(HiveParser.TOK_BINARY, serdeConstants.BINARY_TYPE_NAME);
     TokenToTypeName.put(HiveParser.TOK_DATE, serdeConstants.DATE_TYPE_NAME);
     TokenToTypeName.put(HiveParser.TOK_DATETIME, serdeConstants.DATETIME_TYPE_NAME);
@@ -155,12 +159,27 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     TokenToTypeName.put(HiveParser.TOK_DECIMAL, serdeConstants.DECIMAL_TYPE_NAME);
   }
 
-  public static String getTypeName(int token) throws SemanticException {
+  public static String getTypeName(ASTNode node) throws SemanticException {
+    int token = node.getType();
+    String typeName;
+
     // datetime type isn't currently supported
     if (token == HiveParser.TOK_DATETIME) {
       throw new SemanticException(ErrorMsg.UNSUPPORTED_TYPE.getMsg());
     }
-    return TokenToTypeName.get(token);
+
+    switch (token) {
+    case HiveParser.TOK_VARCHAR:
+      PrimitiveCategory primitiveCategory = PrimitiveCategory.VARCHAR;
+      typeName = TokenToTypeName.get(token);
+      VarcharTypeParams varcharParams = ParseUtils.getVarcharParams(typeName, node);
+      typeName = PrimitiveObjectInspectorUtils.getTypeEntryFromTypeSpecs(
+          primitiveCategory, varcharParams).toString();
+      break;
+    default:
+      typeName = TokenToTypeName.get(token);
+    }
+    return typeName;
   }
 
   static class TablePartition {
@@ -2564,41 +2583,37 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
   private void analyzeAlterTableAddParts(CommonTree ast, boolean expectView)
       throws SemanticException {
 
+    // ^(TOK_ALTERTABLE_ADDPARTS identifier ifNotExists? alterStatementSuffixAddPartitionsElement+)
     String tblName = getUnescapedName((ASTNode)ast.getChild(0));
+    boolean ifNotExists = ast.getChild(1).getType() == HiveParser.TOK_IFNOTEXISTS;
+
     Table tab = getTable(tblName, true);
     boolean isView = tab.isView();
     validateAlterTableType(tab, AlterTableTypes.ADDPARTITION, expectView);
     inputs.add(new ReadEntity(tab));
 
-    // partition name to value
-    List<Map<String, String>> partSpecs = getPartitionSpecs(ast);
-    addTablePartsOutputs(tblName, partSpecs);
-
-    Iterator<Map<String, String>> partIter = partSpecs.iterator();
-
-    String currentLocation = null;
-    Map<String, String> currentPart = null;
-    boolean ifNotExists = false;
     List<AddPartitionDesc> partitionDescs = new ArrayList<AddPartitionDesc>();
 
     int numCh = ast.getChildCount();
-    for (int num = 1; num < numCh; num++) {
-      CommonTree child = (CommonTree) ast.getChild(num);
+    int start = ifNotExists ? 2 : 1;
+
+    String currentLocation = null;
+    Map<String, String> currentPart = null;
+    for (int num = start; num < numCh; num++) {
+      ASTNode child = (ASTNode) ast.getChild(num);
       switch (child.getToken().getType()) {
-      case HiveParser.TOK_IFNOTEXISTS:
-        ifNotExists = true;
-        break;
       case HiveParser.TOK_PARTSPEC:
         if (currentPart != null) {
-          validatePartitionValues(currentPart);
-          AddPartitionDesc addPartitionDesc = new AddPartitionDesc(
-              SessionState.get().getCurrentDatabase(), tblName, currentPart,
+          Partition partition = getPartitionForOutput(tab, currentPart);
+          if (partition == null || !ifNotExists) {
+            AddPartitionDesc addPartitionDesc = new AddPartitionDesc(
+              tab.getDbName(), tblName, currentPart,
               currentLocation, ifNotExists, expectView);
-          partitionDescs.add(addPartitionDesc);
+            partitionDescs.add(addPartitionDesc);
+          }
+          currentLocation = null;
         }
-        // create new partition, set values
-        currentLocation = null;
-        currentPart = partIter.next();
+        currentPart = getPartSpec(child);
         break;
       case HiveParser.TOK_PARTITIONLOCATION:
         // if location specified, set in partition
@@ -2611,11 +2626,18 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
 
     // add the last one
     if (currentPart != null) {
-      validatePartitionValues(currentPart);
-      AddPartitionDesc addPartitionDesc = new AddPartitionDesc(
-          SessionState.get().getCurrentDatabase(), tblName, currentPart,
+      Partition partition = getPartitionForOutput(tab, currentPart);
+      if (partition == null || !ifNotExists) {
+        AddPartitionDesc addPartitionDesc = new AddPartitionDesc(
+          tab.getDbName(), tblName, currentPart,
           currentLocation, ifNotExists, expectView);
-      partitionDescs.add(addPartitionDesc);
+        partitionDescs.add(addPartitionDesc);
+      }
+    }
+
+    if (partitionDescs.isEmpty()) {
+      // nothing to do
+      return;
     }
 
     for (AddPartitionDesc addPartitionDesc : partitionDescs) {
@@ -2673,6 +2695,21 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
       }
       inputs.addAll(driver.getPlan().getInputs());
     }
+  }
+
+  private Partition getPartitionForOutput(Table tab, Map<String, String> currentPart)
+    throws SemanticException {
+    validatePartitionValues(currentPart);
+    try {
+      Partition partition = db.getPartition(tab, currentPart, false);
+      if (partition != null) {
+        outputs.add(new WriteEntity(partition));
+      }
+      return partition;
+    } catch (HiveException e) {
+      LOG.warn("wrong partition spec " + currentPart);
+    }
+    return null;
   }
 
   /**

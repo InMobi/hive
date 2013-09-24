@@ -659,12 +659,25 @@ public class Server {
 
   /**
    * Run a Hive job.
+   * @param execute    SQL statement to run, equivalent to "-e" from hive command line
+   * @param srcFile    name of hive script file to run, equivalent to "-f" from hive
+   *                   command line
+   * @param hiveArgs   additional command line argument passed to the hive command line. 
+   *                   Please check https://cwiki.apache.org/Hive/languagemanual-cli.html
+   *                   for detailed explanation of command line arguments
+   * @param otherFiles additional files to be shipped to the launcher, such as the jars
+   *                   used in "add jar" statement in hive script
+   * @param defines    shortcut for command line arguments "--define"
+   * @param statusdir  where the stderr/stdout of templeton controller job goes
+   * @param callback   callback url when the hive job finishes
    */
   @POST
   @Path("hive")
   @Produces({MediaType.APPLICATION_JSON})
   public EnqueueBean hive(@FormParam("execute") String execute,
               @FormParam("file") String srcFile,
+              @FormParam("arg") List<String> hiveArgs,
+              @FormParam("files") String otherFiles,
               @FormParam("define") List<String> defines,
               @FormParam("statusdir") String statusdir,
               @FormParam("callback") String callback)
@@ -675,17 +688,60 @@ public class Server {
       throw new BadParam("Either execute or file parameter required");
 
     HiveDelegator d = new HiveDelegator(appConf);
-    return d.run(getDoAsUser(), execute, srcFile, defines,
+    return d.run(getDoAsUser(), execute, srcFile, defines, hiveArgs, otherFiles,
       statusdir, callback, getCompletedUrl());
+  }
+
+  /**
+   * Return the status of the jobid.
+   * @deprecated use GET jobs/{jobid} instead.
+   */
+  @Deprecated
+  @GET
+  @Path("queue/{jobid}")
+  @Produces({MediaType.APPLICATION_JSON})
+  public QueueStatusBean showQueueId(@PathParam("jobid") String jobid)
+    throws NotAuthorizedException, BadParam, IOException, InterruptedException {
+    return showJobId(jobid);
+  }
+
+  /**
+   * Kill a job in the queue.
+   * @deprecated use DELETE jobs/{jobid} instead.
+   */
+  @Deprecated
+  @DELETE
+  @Path("queue/{jobid}")
+  @Produces({MediaType.APPLICATION_JSON})
+  public QueueStatusBean deleteQueueId(@PathParam("jobid") String jobid)
+    throws NotAuthorizedException, BadParam, IOException, InterruptedException {
+    return deleteJobId(jobid);
+  }
+
+  /**
+   * Return all the known job ids for this user.
+   * @deprecated use GET jobs instead.
+   */
+  @Deprecated
+  @GET
+  @Path("queue")
+  @Produces({MediaType.APPLICATION_JSON})
+  public List<String> showQueueList(@QueryParam("showall") boolean showall)
+    throws NotAuthorizedException, BadParam, IOException, InterruptedException {
+
+    verifyUser();
+
+    ListDelegator d = new ListDelegator(appConf);
+    return d.run(getDoAsUser(), showall);
   }
 
   /**
    * Return the status of the jobid.
    */
   @GET
-  @Path("queue/{jobid}")
+  @Path("jobs/{jobid}")
   @Produces({MediaType.APPLICATION_JSON})
-  public QueueStatusBean showQueueId(@PathParam("jobid") String jobid)
+  public QueueStatusBean showJobId(@PathParam("jobid") String jobid)
     throws NotAuthorizedException, BadParam, IOException, InterruptedException {
 
     verifyUser();
@@ -699,9 +755,9 @@ public class Server {
    * Kill a job in the queue.
    */
   @DELETE
-  @Path("queue/{jobid}")
+  @Path("jobs/{jobid}")
   @Produces({MediaType.APPLICATION_JSON})
-  public QueueStatusBean deleteQueueId(@PathParam("jobid") String jobid)
+  public QueueStatusBean deleteJobId(@PathParam("jobid") String jobid)
     throws NotAuthorizedException, BadParam, IOException, InterruptedException {
 
     verifyUser();
@@ -715,15 +771,36 @@ public class Server {
    * Return all the known job ids for this user.
    */
   @GET
-  @Path("queue")
+  @Path("jobs")
   @Produces({MediaType.APPLICATION_JSON})
-  public List<String> showQueueList(@QueryParam("showall") boolean showall)
+  public List<JobItemBean> showJobList(@QueryParam("fields") String fields,
+                                       @QueryParam("showall") boolean showall)
     throws NotAuthorizedException, BadParam, IOException, InterruptedException {
 
     verifyUser();
 
-    ListDelegator d = new ListDelegator(appConf);
-    return d.run(getDoAsUser(), showall);
+    boolean showDetails = false;
+    if (fields!=null && !fields.equals("*")) {
+      throw new BadParam("fields value other than * is not supported");
+    }
+    if (fields!=null && fields.equals("*")) {
+      showDetails = true;
+    }
+
+    ListDelegator ld = new ListDelegator(appConf);
+    List<String> list = ld.run(getDoAsUser(), showall);
+    List<JobItemBean> detailList = new ArrayList<JobItemBean>();
+    for (String job : list) {
+      JobItemBean jobItem = new JobItemBean();
+      jobItem.id = job;
+      if (showDetails) {
+        StatusDelegator sd = new StatusDelegator(appConf);
+        QueueStatusBean statusBean = sd.run(getDoAsUser(), job);
+        jobItem.detail = statusBean;
+      }
+      detailList.add(jobItem);
+    }
+    return detailList;
   }
 
   /**

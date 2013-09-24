@@ -15,33 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
-package org.apache.hadoop.hive.ql.udf;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
+import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 
-import org.apache.hadoop.hive.ql.exec.Description;
-import org.apache.hadoop.hive.ql.exec.UDF;
-import org.apache.hadoop.io.Text;
+public interface SettableHiveVarcharObjectInspector extends HiveVarcharObjectInspector {
+  Object set(Object o, HiveVarchar value);
 
-/**
- * UDFLower.
- *
- */
-@Description(name = "lower,lcase",
-    value = "_FUNC_(str) - Returns str with all characters changed to lowercase",
-    extended = "Example:\n"
-    + "  > SELECT _FUNC_('Facebook') FROM src LIMIT 1;\n" + "  'facebook'")
-public class UDFLower extends UDF {
-  private Text t = new Text();
+  Object set(Object o, String value);
 
-  public UDFLower() {
-  }
-
-  public Text evaluate(Text s) {
-    if (s == null) {
-      return null;
-    }
-    t.set(s.toString().toLowerCase());
-    return t;
-  }
+  Object create(HiveVarchar value);
 
 }

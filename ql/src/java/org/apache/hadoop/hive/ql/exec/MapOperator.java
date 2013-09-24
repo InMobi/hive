@@ -310,7 +310,7 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
           tblRawRowObjectInspector =
               (StructObjectInspector) ObjectInspectorConverters.getConvertedOI(
                   partRawRowObjectInspector,
-                  tblDeserializer.getObjectInspector());
+                  tblDeserializer.getObjectInspector(), true);
 
           if (identityConverterTableDesc.contains(tableDesc)) {
             if (!partRawRowObjectInspector.equals(tblRawRowObjectInspector)) {

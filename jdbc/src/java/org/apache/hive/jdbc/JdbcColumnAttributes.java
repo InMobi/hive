@@ -16,33 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hive.ql.udf;
+package org.apache.hive.jdbc;
 
-import org.apache.hadoop.hive.ql.exec.Description;
-import org.apache.hadoop.hive.ql.exec.UDF;
-import org.apache.hadoop.io.Text;
+class JdbcColumnAttributes {
+  public int precision = 0;
+  public int scale = 0;
 
-/**
- * UDFUpper.
- *
- */
-@Description(name = "upper,ucase",
-    value = "_FUNC_(str) - Returns str with all characters changed to uppercase",
-    extended = "Example:\n"
-    + "  > SELECT _FUNC_('Facebook') FROM src LIMIT 1;\n" + "  'FACEBOOK'")
-public class UDFUpper extends UDF {
-
-  Text t = new Text();
-
-  public UDFUpper() {
+  public JdbcColumnAttributes() {
   }
 
-  public Text evaluate(Text s) {
-    if (s == null) {
-      return null;
-    }
-    t.set(s.toString().toUpperCase());
-    return t;
+  public JdbcColumnAttributes(int precision, int scale) {
+    this.precision = precision;
+    this.scale = scale;
   }
-
 }
