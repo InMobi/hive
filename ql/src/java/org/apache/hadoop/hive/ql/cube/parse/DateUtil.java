@@ -53,10 +53,10 @@ public class DateUtil {
   public static String YEAR_FMT = "[0-9]{4}";
   public static String MONTH_FMT = YEAR_FMT + "-[0-9]{2}";
   public static String DAY_FMT = MONTH_FMT + "-[0-9]{2}";
-  public static String HOUR_FMT = DAY_FMT + " [0-9]{2}";
+  public static String HOUR_FMT = DAY_FMT + "-[0-9]{2}";
   public static String MINUTE_FMT = HOUR_FMT + ":[0-9]{2}";
   public static String SECOND_FMT = MINUTE_FMT + ":[0-9]{2}";
-  public static final String ABSDATE_FMT = "yyyy-MM-dd HH:mm:ss,SSS";
+  public static final String ABSDATE_FMT = "yyyy-MM-dd-HH:mm:ss,SSS";
   public static final SimpleDateFormat ABSDATE_PARSER =
       new SimpleDateFormat(ABSDATE_FMT);
 
@@ -66,11 +66,11 @@ public class DateUtil {
 
   public static String getAbsDateFormatString(String str) {
     if (str.matches(YEAR_FMT)) {
-      return str + "-01-01 00:00:00,000";
+      return str + "-01-01-00:00:00,000";
     } else if (str.matches(MONTH_FMT)) {
-      return str + "-01 00:00:00,000";
+      return str + "-01-00:00:00,000";
     } else if (str.matches(DAY_FMT)) {
-      return str + " 00:00:00,000";
+      return str + "-00:00:00,000";
     } else if (str.matches(HOUR_FMT)) {
       return str + ":00:00,000";
     } else if (str.matches(MINUTE_FMT)) {

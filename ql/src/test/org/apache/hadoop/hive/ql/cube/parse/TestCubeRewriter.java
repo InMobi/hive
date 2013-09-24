@@ -12,7 +12,6 @@ import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoMonthsRangeU
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoMonthsRangeUptoMonth;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twodaysBack;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -57,22 +56,6 @@ public class TestCubeRewriter {
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1,C2");
     conf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, true);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
-  }
-
-  public static String HOUR_FMT = "yyyy-MM-dd HH";
-  public static final SimpleDateFormat HOUR_PARSER = new SimpleDateFormat(
-    HOUR_FMT);
-
-  public static String MONTH_FMT = "yyyy-MM";
-  public static final SimpleDateFormat MONTH_PARSER = new SimpleDateFormat(
-    MONTH_FMT);
-
-  public static String getDateUptoHours(Date dt) {
-    return HOUR_PARSER.format(dt);
-  }
-
-  public static String getDateUptoMonth(Date dt) {
-    return MONTH_PARSER.format(dt);
   }
 
   @Test
@@ -857,8 +840,9 @@ public class TestCubeRewriter {
 
   @Test
   public void testFactsWithTimedDimension() throws Exception {
-    String twoDaysITRange = "time_range_in('it', '" + getDateUptoHours(
-      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+    String twoDaysITRange = "time_range_in('it', '" +
+      CubeTestSetup.getDateUptoHours(
+      twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
     String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
       " msr2 from testCube" +
@@ -890,8 +874,9 @@ public class TestCubeRewriter {
 
   @Test
   public void testCubeQueryTimedDimensionFilter() throws Exception {
-    String twoDaysITRange = "time_range_in('it', '" + getDateUptoHours(
-      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+    String twoDaysITRange = "time_range_in('it', '" +
+      CubeTestSetup.getDateUptoHours(
+      twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
     String hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
       " msr2 from testCube" +
@@ -908,8 +893,9 @@ public class TestCubeRewriter {
     Date end = cal.getTime();
     cal.add(Calendar.DAY_OF_MONTH, -2);
     Date start = cal.getTime();
-    String twoDaysRangeBefore4days = "time_range_in('dt', '" + getDateUptoHours(
-        start) + "','" + getDateUptoHours(end) + "')";
+    String twoDaysRangeBefore4days = "time_range_in('dt', '" +
+        CubeTestSetup.getDateUptoHours(
+        start) + "','" + CubeTestSetup.getDateUptoHours(end) + "')";
     hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange + " OR (" + twoDaysRangeBefore4days + " AND dt='default')");
 
@@ -932,8 +918,9 @@ public class TestCubeRewriter {
     expecteddtRangeWhere2, "c2_testfact");
     compareQueries(expected, hqlQuery);
 
-    String twoDaysPTRange = "time_range_in('pt', '" + getDateUptoHours(
-        twodaysBack) + "','" + getDateUptoHours(now) + "')";
+    String twoDaysPTRange = "time_range_in('pt', '" +
+        CubeTestSetup.getDateUptoHours(
+        twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
     hqlQuery = rewrite(driver, "select dim1, AVG(msr1)," +
       " msr2 from testCube where (" + twoDaysITRange +
       " OR (" + twoDaysPTRange + " and it == 'default')) AND dim1 > 1000");
@@ -950,8 +937,9 @@ public class TestCubeRewriter {
 
   @Test
   public void testFactsWithTimedDimensionWithProcessTimeCol() throws Exception {
-    String twoDaysITRange = "time_range_in('it', '" + getDateUptoHours(
-      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+    String twoDaysITRange = "time_range_in('it', '" +
+      CubeTestSetup.getDateUptoHours(
+      twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
     conf.set(CubeQueryConfUtil.PROCESS_TIME_PART_COL, "pt");
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
@@ -1002,8 +990,9 @@ public class TestCubeRewriter {
     Date end = cal.getTime();
     cal.add(Calendar.DAY_OF_MONTH, -2);
     Date start = cal.getTime();
-    String twoDaysRangeBefore4days = "time_range_in('dt', '" + getDateUptoHours(
-        start) + "','" + getDateUptoHours(end) + "')";
+    String twoDaysRangeBefore4days = "time_range_in('dt', '" +
+        CubeTestSetup.getDateUptoHours(
+        start) + "','" + CubeTestSetup.getDateUptoHours(end) + "')";
     String hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoDaysRange + " OR " + twoDaysRangeBefore4days);
 

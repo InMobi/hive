@@ -64,7 +64,7 @@ import org.apache.hadoop.mapred.TextInputFormat;
 public class CubeTestSetup {
 
   public static final String cubeName = "testcube";
-  public static String HOUR_FMT = "yyyy-MM-dd HH";
+  public static String HOUR_FMT = "yyyy-MM-dd-HH";
   public static final SimpleDateFormat HOUR_PARSER = new SimpleDateFormat(
     HOUR_FMT);
   public static String MONTH_FMT = "yyyy-MM";
