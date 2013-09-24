@@ -15,11 +15,6 @@ public abstract class AbstractCubeTable implements Named {
   private final double weight;
 
   protected AbstractCubeTable(String name, List<FieldSchema> columns,
-      Map<String, String> props) {
-    this(name, columns, props, 0L);
-  }
-
-  protected AbstractCubeTable(String name, List<FieldSchema> columns,
       Map<String, String> props, double weight) {
     this.name = name.toLowerCase();
     this.columns = columns;

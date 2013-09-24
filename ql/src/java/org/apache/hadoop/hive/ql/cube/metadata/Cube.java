@@ -32,7 +32,13 @@ public final class Cube extends AbstractCubeTable {
 
   public Cube(String name, Set<CubeMeasure> measures,
       Set<CubeDimension> dimensions, Map<String, String> properties) {
-    super(name, columns, properties);
+    this(name, measures, dimensions, properties, 0L);
+  }
+
+  public Cube(String name, Set<CubeMeasure> measures,
+      Set<CubeDimension> dimensions, Map<String, String> properties,
+      double weight) {
+    super(name, columns, properties, weight);
     this.measures = measures;
     this.dimensions = dimensions;
 
@@ -48,7 +54,6 @@ public final class Cube extends AbstractCubeTable {
 
     addProperties();
   }
-
   public Cube(Table tbl) {
     super(tbl);
     this.measures = getMeasures(getName(), getProperties());
