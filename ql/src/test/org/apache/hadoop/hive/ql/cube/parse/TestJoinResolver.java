@@ -2,6 +2,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.util.*;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.Cube;
@@ -138,22 +139,42 @@ public class TestJoinResolver {
     CubeQueryContext rewrittenQuery = driver.rewrite(query);
     String hql = rewrittenQuery.toHQL();
     System.out.println("auto join HQL:" + hql);
-    assertEquals("join citytable on testcube.cityid = citytable.id  " +
-      "join testdim2 on testcube.dim2 = testdim2.id  " +
-      "join testdim3 on testdim2.testdim3id = testdim3.id  " +
-      "join testdim4 on testdim3.testdim4id = testdim4.id",
-      rewrittenQuery.getAutoResolvedJoinChain().trim()
-      );
+    System.out.println("@@Resolved join chain:[" + rewrittenQuery.getAutoResolvedJoinChain()+ "]");
+    Set<String> expectedClauses = new HashSet<String>();
+    expectedClauses.add("citytable on testcube.cityid = citytable.id");
+    expectedClauses.add("testdim2 on testcube.dim2 = testdim2.id");
+    expectedClauses.add("testdim3 on testdim2.testdim3id = testdim3.id");
+    expectedClauses.add("testdim4 on testdim3.testdim4id = testdim4.id");
+
+    Set<String> actualClauses = new HashSet<String>();
+    for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
+      if (StringUtils.isNotBlank(clause))  {
+        actualClauses.add(clause.trim());
+      }
+    }
+    System.out.println("Expected" + expectedClauses);
+    System.out.println("Actual" + actualClauses);
+    assertEquals(actualClauses, expectedClauses);
 
     //Test 2  Dim only query
+    expectedClauses.clear();
+    actualClauses.clear();
     String dimOnlyQuery = "select testDim2.name, testDim4.name FROM testDim2 where "
       + twoDaysRange;
     rewrittenQuery = driver.rewrite(dimOnlyQuery);
     hql = rewrittenQuery.toHQL();
     System.out.println("auto join HQL:" + hql);
-    assertEquals("join testdim3 on testdim2.testdim3id = testdim3.id" +
-      "  join testdim4 on testdim3.testdim4id = testdim4.id",
-      rewrittenQuery.getAutoResolvedJoinChain().trim());
+    System.out.println("@@Resolved join chain:[" + rewrittenQuery.getAutoResolvedJoinChain()+ "]");
+    expectedClauses.add("testdim3 on testdim2.testdim3id = testdim3.id");
+    expectedClauses.add("testdim4 on testdim3.testdim4id = testdim4.id");
+    for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
+      if (StringUtils.isNotBlank(clause))  {
+        actualClauses.add(clause.trim());
+      }
+    }
+    System.out.println("Expected" + expectedClauses);
+    System.out.println("Actual" + actualClauses);
+    assertEquals(actualClauses, expectedClauses);
 
     //Test 3 Dim only query should throw error
     String errDimOnlyQuery = "select citytable.id, testDim4.name FROM citytable where "
@@ -175,10 +196,21 @@ public class TestJoinResolver {
     String hql = rewrittenQuery.toHQL();
     String resolvedClause = rewrittenQuery.getAutoResolvedJoinChain();
     System.out.println("@@resolved join chain " + resolvedClause);
-    assertEquals("join citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' ))  " +
-      "join testdim2 on testcube.dim2 = testdim2.id  join testdim3 on testdim2.testdim3id = testdim3.id  " +
-      "join testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' ))",
-      resolvedClause.trim());
+    Set<String> expectedClauses = new HashSet<String>();
+    expectedClauses.add("citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')");
+    expectedClauses.add("testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim4.dt = 'latest')");
+    expectedClauses.add("testdim3 on testdim2.testdim3id = testdim3.id");
+    expectedClauses.add("testdim2 on testcube.dim2 = testdim2.id");
+
+    Set<String> actualClauses = new HashSet<String>();
+    for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
+      if (StringUtils.isNotBlank(clause))  {
+        actualClauses.add(clause.trim());
+      }
+    }
+    System.out.println("Expected" + expectedClauses);
+    System.out.println("Actual" + actualClauses);
+    assertEquals(actualClauses, expectedClauses);
   }
 
   @Test

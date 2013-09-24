@@ -1,19 +1,7 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -108,6 +96,8 @@ public class StorageTableResolver implements ContextRewriter {
   }
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql) {
+    Set<CubeDimensionTable> dimsToResolve = new HashSet<CubeDimensionTable>(cubeql.getDimensionTables());
+    dimsToResolve.addAll(cubeql.getAutoJoinDimensions());
     for (CubeDimensionTable dim : cubeql.getDimensionTables()) {
       for (String storage : dim.getStorages()) {
         if (isStorageSupported(storage)) {

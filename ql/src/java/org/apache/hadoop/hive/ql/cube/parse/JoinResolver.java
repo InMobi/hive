@@ -44,6 +44,98 @@ public class JoinResolver implements ContextRewriter {
   public static final String DISABLE_AUTO_JOINS = "hive.cube.disable.auto.join";
   public static final String JOIN_TYPE_KEY = "hive.cube.join.type";
 
+  public static class AutoJoinContext {
+    private final Map<CubeDimensionTable, List<TableRelationship>> joinChain;
+    private final Map<AbstractCubeTable, String> partialJoinConditions;
+
+    public AutoJoinContext(Map<CubeDimensionTable, List<TableRelationship>> joinChain,
+                            Map<AbstractCubeTable, String> partialJoinConditions) {
+      this.joinChain = joinChain;
+      this.partialJoinConditions = partialJoinConditions;
+    }
+
+    public Map<CubeDimensionTable, List<TableRelationship>> getJoinChain() {
+      return joinChain;
+    }
+
+    public Map<AbstractCubeTable, String> getPartialJoinConditions() {
+      return partialJoinConditions;
+    }
+
+    public String getMergedJoinClause(Configuration conf,
+                                      Map<String, String> dimStorageTableToWhereClause,
+                                      Map<AbstractCubeTable, Set<String>> storageTableToQuery) {
+      for (List<TableRelationship> chain : joinChain.values()) {
+        // Need to reverse the chain so that left most table in join comes first
+        Collections.reverse(chain);
+      }
+
+      Set<String> clauses = new LinkedHashSet<String>();
+
+      String joinTypeCfg = conf.get(JOIN_TYPE_KEY);
+      String joinType = "";
+
+      if (StringUtils.isNotBlank(joinTypeCfg)) {
+        JoinType type = JoinType.valueOf(joinTypeCfg.toUpperCase());
+        switch (type) {
+          case FULLOUTER:
+            joinType = "full outer";
+            break;
+          case INNER:
+            joinType = "inner";
+            break;
+          case LEFTOUTER:
+            joinType = "left outer";
+            break;
+          case LEFTSEMI:
+            joinType = "left semi";
+            break;
+          case UNIQUE:
+            joinType = "unique";
+            break;
+          case RIGHTOUTER:
+            joinType = "right outer";
+            break;
+        }
+      }
+
+      for (List<TableRelationship> chain : joinChain.values()) {
+        for (TableRelationship rel : chain) {
+          StringBuilder clause = new StringBuilder(joinType)
+            .append(" join ")
+            .append(rel.toTable.getName())
+            .append(" on ")
+            .append(rel.fromTable.getName()).append(".").append(rel.fromColumn)
+            .append(" = ").append(rel.toTable.getName()).append(".").append(rel.toColumn);
+          // Check if user specified a join clause, if yes, add it
+          String filter = partialJoinConditions.get(rel.toTable);
+
+          if (StringUtils.isNotBlank(filter)) {
+            clause.append(" and (").append(filter).append(")");
+          }
+
+          String whereClause = null;
+          if (dimStorageTableToWhereClause != null && storageTableToQuery != null) {
+            Set<String> queries = storageTableToQuery.get(rel.toTable);
+            if (queries != null) {
+              String storageTableKey = queries.iterator().next();
+              if (StringUtils.isNotBlank(storageTableKey)) {
+                whereClause = dimStorageTableToWhereClause.get(queries.iterator().next());
+              }
+            }
+          }
+
+          if (StringUtils.isNotBlank(whereClause)) {
+            clause.append (" and (").append(whereClause).append(")");
+          }
+          clauses.add(clause.toString());
+        }
+      }
+
+      return StringUtils.join(clauses, " ");
+    }
+
+  }
   /*
    * An edge in the schema graph
    */
@@ -426,9 +518,19 @@ public class JoinResolver implements ContextRewriter {
     }
     
     if (joinsResolved) {
+      for (List<TableRelationship> chain : joinChain.values()) {
+        for (TableRelationship rel : chain) {
+          if (rel.toTable instanceof CubeDimensionTable) {
+            autoJoinDims.add((CubeDimensionTable) rel.toTable);
+          }
+          if (rel.fromTable instanceof  CubeDimensionTable) {
+            autoJoinDims.add((CubeDimensionTable) rel.fromTable);
+          }
+        }
+      }
+      AutoJoinContext joinCtx = new AutoJoinContext(joinChain, partialJoinConditions);
+      cubeql.setAutoJoinCtx(joinCtx);
       cubeql.setJoinsResolvedAutomatically(joinsResolved);
-      String resolvedJoinClause = getMergedJoinClause(joinChain);
-      cubeql.setAutoResolvedJoinClause(resolvedJoinClause);
     }
   }
 
@@ -476,61 +578,6 @@ public class JoinResolver implements ContextRewriter {
        setTarget(node);
     }
 
-  }
-
-  private String getMergedJoinClause(Map<CubeDimensionTable, List<TableRelationship>> joinChains) {
-    for (List<TableRelationship> chain : joinChains.values()) {
-      // Need to reverse the chain so that left most table in join comes first
-      Collections.reverse(chain);
-    }
-    
-    Set<String> clauses = new LinkedHashSet<String>();
-
-    String joinTypeCfg = conf.get(JOIN_TYPE_KEY);
-    String joinType = "";
-
-    if (StringUtils.isNotBlank(joinTypeCfg)) {
-      JoinType type = JoinType.valueOf(joinTypeCfg.toUpperCase());
-      switch (type) {
-        case FULLOUTER:
-          joinType = "full outer";
-          break;
-        case INNER:
-          joinType = "inner";
-          break;
-        case LEFTOUTER:
-          joinType = "left outer";
-          break;
-        case LEFTSEMI:
-          joinType = "left semi";
-          break;
-        case UNIQUE:
-          joinType = "unique";
-          break;
-        case RIGHTOUTER:
-          joinType = "right outer";
-          break;
-      }
-    }
-
-    for (List<TableRelationship> chain : joinChains.values()) {
-      for (TableRelationship rel : chain) {
-        StringBuilder clause = new StringBuilder(joinType)
-        .append(" join ")
-        .append(rel.toTable.getName())
-        .append(" on ")
-        .append(rel.fromTable.getName()).append(".").append(rel.fromColumn)
-        .append(" = ").append(rel.toTable.getName()).append(".").append(rel.toColumn);
-        // Check if user specified a join clause, if yes, add it
-        String filter = partialJoinConditions.get(rel.toTable);
-        if (StringUtils.isNotBlank(filter)) {
-          clause.append(" and (").append(filter).append(")");
-        }
-        clauses.add(clause.toString());
-      }
-    }
-    
-    return StringUtils.join(clauses, " ");
   }
 
   // Recursively find out join conditions
