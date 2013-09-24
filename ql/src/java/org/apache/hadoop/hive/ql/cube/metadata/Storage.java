@@ -75,7 +75,7 @@ public abstract class Storage implements Named {
    * @param parameters
    */
   protected void addToTableParameters(Map<String, String> parameters) {
-    tableParameters.putAll(tableParameters);
+    tableParameters.putAll(parameters);
   }
 
   /**

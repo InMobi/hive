@@ -20,7 +20,7 @@ public class MetastoreUtil implements MetastoreConstants {
     return getStorageTableName(dimName, storagePrefix);
   }
 
-  public static final String getStorageTableName(String virtualTableName,
+  private static final String getStorageTableName(String virtualTableName,
       String storagePrefix) {
     return storagePrefix + virtualTableName;
   }
