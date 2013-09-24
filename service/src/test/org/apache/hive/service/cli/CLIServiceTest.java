@@ -163,10 +163,8 @@ public abstract class CLIServiceTest {
     OperationHandle ophandle;
 
     // Change lock manager, otherwise unit-test doesn't go through
-    String setLockMgr = "SET hive.lock.manager=" +
-        "org.apache.hadoop.hive.ql.lockmgr.EmbeddedLockManager";
-    client.executeStatement(sessionHandle, setLockMgr, confOverlay);
-
+    confOverlay.put("hive.lock.manager", "org.apache.hadoop.hive.ql.lockmgr.EmbeddedLockManager");
+    confOverlay.put("test.conf.setting", "foobar");
     String createTable = "CREATE TABLE TEST_EXEC_ASYNC(ID STRING)";
     client.executeStatementAsync(sessionHandle, createTable, confOverlay);
 

@@ -22,6 +22,7 @@ package org.apache.hive.service.cli.operation;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.service.cli.OperationType;
 import org.apache.hive.service.cli.session.HiveSession;
 
@@ -43,7 +44,12 @@ public abstract class ExecuteStatementOperation extends Operation {
       HiveSession parentSession, String statement, Map<String, String> confOverlay, boolean runAsync) {
     String[] tokens = statement.trim().split("\\s+");
     String command = tokens[0].toLowerCase();
-
+    if (confOverlay != null) {
+      HiveConf conf = parentSession.getHiveConf();
+      for (Map.Entry<String, String> entry : confOverlay.entrySet()) {
+         conf.set(entry.getKey(), entry.getValue());
+      }
+    }
     if ("set".equals(command)) {
       return new SetOperation(parentSession, statement, confOverlay);
     } else if ("dfs".equals(command)) {
