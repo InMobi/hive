@@ -129,6 +129,7 @@ public class CubeQueryContext {
   private ASTNode groupByAST;
   private CubeMetastoreClient client;
   private final boolean qlEnabledMultiTableSelect;
+  private JoinResolver.AutoJoinContext autoJoinCtx;
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -1242,12 +1243,12 @@ public class CubeQueryContext {
     return joinsResolvedAutomatically;
   }
 
-  public void setAutoResolvedJoinClause(String clause) {
-    this.autoResolvedJoinClause = clause;
-  }
-
   public String getAutoResolvedJoinChain() {
-    return this.autoResolvedJoinClause;
+    if (getAutoJoinCtx() != null) {
+      return getAutoJoinCtx().getMergedJoinClause(conf, dimStorageTableToWhereClause, storageTableToQuery);
+    } else {
+      return "";
+    }
   }
 
   public List<TimeRange> getTimeRanges() {
@@ -1256,6 +1257,14 @@ public class CubeQueryContext {
 
   public HiveConf getHiveConf() {
     return conf;
+  }
+
+  public void setAutoJoinCtx(JoinResolver.AutoJoinContext autoJoinCtx) {
+    this.autoJoinCtx = autoJoinCtx;
+  }
+
+  public JoinResolver.AutoJoinContext getAutoJoinCtx() {
+    return autoJoinCtx;
   }
 
   static class CandidateFact {
