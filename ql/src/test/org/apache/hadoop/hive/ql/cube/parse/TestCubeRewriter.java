@@ -308,19 +308,25 @@ public class TestCubeRewriter {
     conf.set(CubeQueryConfUtil.getValidStorageTablesKey("testfact"),
       "");
     conf.set(CubeQueryConfUtil.getValidUpdatePeriodsKey("testfact",
-      "C1"), "DAILY");
+      "C1"), "HOURLY");
     conf.set(CubeQueryConfUtil.getValidUpdatePeriodsKey("testfact",
-      "C2"), "HOURLY");
+      "C2"), "DAILY");
     conf.set(CubeQueryConfUtil.getValidUpdatePeriodsKey("testfact",
       "C3"), "MONTHLY");
 
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
       " where " + twoMonthsRangeUptoHours);
-    expected = getExpectedQuery(cubeName,
-      "select sum(testcube.msr2) FROM ", null, null,
-      getWhereForMonthlyDailyAndHourly2months("c1_testfact","C2_testfact",
-        "c3_testFact"));
+    if (!CubeTestSetup.isZerothHour()) {
+      expected = getExpectedQuery(cubeName,
+        "select sum(testcube.msr2) FROM ", null, null,
+        getWhereForMonthlyDailyAndHourly2months("c2_testfact","C1_testfact",
+          "c3_testFact"));
+    } else {
+      expected = getExpectedQuery(cubeName,
+        "select sum(testcube.msr2) FROM ", null, null,
+        getWhereForMonthlyDailyAndHourly2months("c2_testfact", "c3_testFact"));
+    }
     compareQueries(expected, hqlQuery);
 
     // monthly - c1,c2; daily - c1, hourly -c2
