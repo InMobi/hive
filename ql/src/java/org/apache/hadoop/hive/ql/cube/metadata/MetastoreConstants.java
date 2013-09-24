@@ -41,4 +41,6 @@ public interface MetastoreConstants {
   public static final String CLASS_SFX = ".class";
   public static final String DUMP_PERIOD_SFX = ".dumpperiod";
   public static final String STORAGE_LIST_SFX = ".storages";
+  public static final String METASTORE_NEEDS_REFRESH = "cube.metastore.needs.refresh";
+  public static final String METASTORE_ENABLE_CACHING = "cube.metastore.enable.cache";
 }

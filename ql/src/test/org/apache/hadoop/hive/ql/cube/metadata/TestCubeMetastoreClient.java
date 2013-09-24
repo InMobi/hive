@@ -52,7 +52,7 @@ public class TestCubeMetastoreClient {
     database.setName(TestCubeMetastoreClient.class.getSimpleName());
     Hive.get(conf).createDatabase(database);
     client.setCurrentDatabase(TestCubeMetastoreClient.class.getSimpleName());
-    defineCube();
+    defineCube(cubeName, cubeNameWithProps);
   }
 
   @AfterClass
@@ -62,7 +62,7 @@ public class TestCubeMetastoreClient {
     CubeMetastoreClient.close();
   }
 
-  private static void defineCube() {
+  private static void defineCube(String cubeName, String cubeNameWithProps) {
     cubeMeasures = new HashSet<CubeMeasure>();
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
         "first measure")));
@@ -767,4 +767,30 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(!client.getHiveTable(storageTableName2).isPartitioned());
   }
 
+  @Test
+  public void testCaching() throws HiveException {
+    List<Cube> cubes = client.getAllCubes();
+    Assert.assertEquals(2, cubes.size());
+    defineCube("testcache1", "testcache2");
+    client.createCube("testcache1", cubeMeasures, cubeDimensions);
+    client.createCube("testcache2", cubeMeasures, cubeDimensions, cubeProperties);
+    cubes = client.getAllCubes();
+    Assert.assertEquals(2, cubes.size());
+    client = CubeMetastoreClient.getInstance(conf);
+    cubes = client.getAllCubes();
+    Assert.assertEquals(2, cubes.size());
+    conf.setBoolean(MetastoreConstants.METASTORE_NEEDS_REFRESH, true);
+    client = CubeMetastoreClient.getInstance(conf);
+    cubes = client.getAllCubes();
+    Assert.assertEquals(4, cubes.size());
+    conf.setBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, false);
+    client = CubeMetastoreClient.getInstance(conf);
+    cubes = client.getAllCubes();
+    Assert.assertEquals(4, cubes.size());
+    defineCube("testcache3", "testcache4");
+    client.createCube("testcache3", cubeMeasures, cubeDimensions);
+    client.createCube("testcache4", cubeMeasures, cubeDimensions, cubeProperties);
+    cubes = client.getAllCubes();
+    Assert.assertEquals(6, cubes.size());
+  }
 }

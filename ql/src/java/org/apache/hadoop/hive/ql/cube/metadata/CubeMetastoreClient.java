@@ -27,17 +27,25 @@ import org.apache.thrift.TException;
  *
  */
 public class CubeMetastoreClient {
-  private final Hive metastore;
+  private Hive metastore;
   private final HiveConf config;
+  private boolean enableCaching;
 
-  private CubeMetastoreClient(HiveConf conf)
-      throws HiveException {
-    this.metastore = Hive.get(conf);
+  private CubeMetastoreClient(HiveConf conf) {
     this.config = conf;
   }
 
-  private static final Map<HiveConf, CubeMetastoreClient> clientMapping =
-      new HashMap<HiveConf, CubeMetastoreClient>();
+  private final List<String> allHiveTableNames = new ArrayList<String>();
+  // map from table name to Table
+  private final Map<String, Table> allHiveTables = new HashMap<String, Table>();
+  // map from cube name to Cube
+  private final Map<String, Cube> allCubes = new HashMap<String, Cube>();
+  // map from dim name to CubeDimensionTable
+  private final Map<String, CubeDimensionTable> allDims = new HashMap<String, CubeDimensionTable>();
+  // map from cube to fact tables
+  private final Map<Cube, List<CubeFactTable>> allFactTables = new HashMap<Cube, List<CubeFactTable>>();
+
+  private static CubeMetastoreClient instance;
 
   /**
    * Get the instance of {@link CubeMetastoreClient} corresponding
@@ -49,10 +57,15 @@ public class CubeMetastoreClient {
    */
   public static CubeMetastoreClient getInstance(HiveConf conf)
       throws HiveException {
-    if (clientMapping.get(conf) == null) {
-      clientMapping.put(conf, new CubeMetastoreClient(conf));
+    if (instance == null) {
+      instance = new CubeMetastoreClient(conf);
+    } else if (conf.getBoolean(MetastoreConstants.METASTORE_NEEDS_REFRESH, false)) {
+      // refresh the client
+      instance = new CubeMetastoreClient(conf);
     }
-    return clientMapping.get(conf);
+    instance.metastore = Hive.get(conf);
+    instance.enableCaching = conf.getBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, true);
+    return instance;
   }
 
   private Hive getClient() {
@@ -577,7 +590,11 @@ public class CubeMetastoreClient {
   private Table getTable(String tableName) throws HiveException {
     Table tbl;
     try {
-      tbl = getClient().getTable(tableName.toLowerCase());
+      tbl = allHiveTables.get(tableName);
+      if (tbl == null) {
+        tbl = getClient().getTable(tableName.toLowerCase());
+        allHiveTables.put(tableName, tbl);
+      }
     } catch (HiveException e) {
       e.printStackTrace();
       throw new HiveException("Could not get table", e);
@@ -686,11 +703,17 @@ public class CubeMetastoreClient {
    */
   public CubeDimensionTable getDimensionTable(String tableName)
       throws HiveException {
-    Table tbl = getTable(tableName);
-    if (isDimensionTable(tbl)) {
-      return getDimensionTable(tbl);
+    CubeDimensionTable dimTable = allDims.get(tableName);
+    if (dimTable == null) {
+      Table tbl = getTable(tableName);
+      if (isDimensionTable(tbl)) {
+        dimTable = getDimensionTable(tbl);
+        if (enableCaching) {
+          allDims.put(tableName, dimTable);
+        }
+      }
     }
-    return null;
+    return dimTable;
   }
 
   private CubeDimensionTable getDimensionTable(Table tbl)
@@ -706,11 +729,17 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public Cube getCube(String tableName) throws HiveException {
-    Table tbl = getTable(tableName);
-    if (isCube(tbl)) {
-      return getCube(tbl);
+    Cube cube = allCubes.get(tableName);
+    if (cube == null) {
+      Table tbl = getTable(tableName);
+      if (isCube(tbl)) {
+        cube = getCube(tbl);
+        if (enableCaching) {
+          allCubes.put(tableName, cube);
+        }
+      }
     }
-    return null;
+    return cube;
   }
 
   private Cube getCube(Table tbl) {
@@ -726,34 +755,13 @@ public class CubeMetastoreClient {
    */
   public List<CubeDimensionTable> getAllDimensionTables()
       throws HiveException {
+
     List<CubeDimensionTable> dimTables = new ArrayList<CubeDimensionTable>();
     try {
-      for (String table : getClient().getAllTables()) {
-        Table tbl = getHiveTable(table);
-        if (isDimensionTable(tbl)) {
-          dimTables.add(getDimensionTable(tbl));
-        }
-      }
-    } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
-    }
-    return dimTables;
-  }
-
-  /**
-   * Get all dimension tables names
-   *
-   * @return List of dimension table names
-   *
-   * @throws HiveException
-   */
-  public List<String> getAllDimensionTableNames()
-      throws HiveException {
-    List<String> dimTables = new ArrayList<String>();
-    try {
-      for (String table : getClient().getAllTables()) {
-        if (isDimensionTable(table)) {
-          dimTables.add(table);
+      for (String table : getAllHiveTableNames()) {
+        CubeDimensionTable dim = getDimensionTable(table);
+        if (dim != null) {
+          dimTables.add(dim);
         }
       }
     } catch (HiveException e) {
@@ -772,10 +780,10 @@ public class CubeMetastoreClient {
       throws HiveException {
     List<Cube> cubes = new ArrayList<Cube>();
     try {
-      for (String table : getClient().getAllTables()) {
-        Table tbl = getHiveTable(table);
-        if (isCube(tbl)) {
-          cubes.add(getCube(tbl));
+      for (String table : getAllHiveTableNames()) {
+        Cube cube = getCube(table);
+        if (cube != null) {
+          cubes.add(cube);
         }
       }
     } catch (HiveException e) {
@@ -784,25 +792,15 @@ public class CubeMetastoreClient {
     return cubes;
   }
 
-  /**
-   * Get all cube names in metastore
-   *
-   * @return List of String objects
-   * @throws HiveException
-   */
-  public List<String> getAllCubeNames()
-      throws HiveException {
-    List<String> cubes = new ArrayList<String>();
-    try {
-      for (String table : getClient().getAllTables()) {
-        if (isCube(table)) {
-          cubes.add(table);
-        }
+  private List<String> getAllHiveTableNames() throws HiveException {
+    if (allHiveTableNames.isEmpty()) {
+      if (enableCaching) {
+      allHiveTableNames.addAll(getClient().getAllTables());
+      } else {
+        return getClient().getAllTables();
       }
-    } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
     }
-    return cubes;
+    return allHiveTableNames;
   }
 
   /**
@@ -814,39 +812,22 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public List<CubeFactTable> getAllFactTables(Cube cube) throws HiveException {
-    List<CubeFactTable> factTables = new ArrayList<CubeFactTable>();
-    try {
-      for (String tableName : getClient().getAllTables()) {
-        Table tbl = getTable(tableName);
-        if (isFactTableForCube(tbl, cube.getName())) {
-          factTables.add(new CubeFactTable(tbl));
+    List<CubeFactTable> factTables = allFactTables.get(cube);
+    if (factTables == null) {
+      factTables = new ArrayList<CubeFactTable>();
+      try {
+        for (String tableName : getAllHiveTableNames()) {
+          Table tbl = getTable(tableName);
+          if (isFactTableForCube(tbl, cube.getName())) {
+            factTables.add(new CubeFactTable(tbl));
+          }
         }
+      } catch (HiveException e) {
+        throw new HiveException("Could not get all tables", e);
       }
-    } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
-    }
-    return factTables;
-  }
-
-  /**
-   * Get all fact table anmess in the cube.
-   *
-   * @param cube Cube object
-   *
-   * @return List of fact tables
-   * @throws HiveException
-   */
-  public List<String> getAllFactTableNames(String cube) throws HiveException {
-    List<String> factTables = new ArrayList<String>();
-    try {
-      for (String tableName : getClient().getAllTables()) {
-        Table tbl = getTable(tableName);
-        if (isFactTableForCube(tbl, cube)) {
-          factTables.add(tableName);
-        }
+      if (enableCaching) {
+        allFactTables.put(cube, factTables);
       }
-    } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
     }
     return factTables;
   }
