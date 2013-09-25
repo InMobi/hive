@@ -15,6 +15,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.ql.cube.parse.JoinResolver;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -47,6 +48,7 @@ public class CubeMetastoreClient {
 
   private static CubeMetastoreClient instance;
 
+  private JoinResolver.SchemaGraph schemaGraph;
   /**
    * Get the instance of {@link CubeMetastoreClient} corresponding
    * to {@link HiveConf}
@@ -851,5 +853,13 @@ public class CubeMetastoreClient {
       }
     }
     return false;
+  }
+
+  public void setSchemaGraph(JoinResolver.SchemaGraph schemaGraph) {
+    this.schemaGraph = schemaGraph;
+  }
+
+  public JoinResolver.SchemaGraph getSchemaGraph() {
+    return schemaGraph;
   }
 }

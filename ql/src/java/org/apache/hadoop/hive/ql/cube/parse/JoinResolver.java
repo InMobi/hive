@@ -210,19 +210,19 @@ public class JoinResolver implements ContextRewriter {
     // sub graph that contains only dimensions, mainly used while checking connectivity
     // between a set of dimensions
     private Map<AbstractCubeTable, Set<TableRelationship>> dimOnlySubGraph;
-    
+
     public SchemaGraph(CubeMetastoreClient metastore) {
       this.metastore = metastore;
     }
-    
+
     protected Map<AbstractCubeTable, Set<TableRelationship>> getCubeGraph(Cube cube) {
       return cubeToGraph.get(cube);
     }
-    
+
     protected Map<AbstractCubeTable, Set<TableRelationship>> getDimOnlyGraph() {
       return dimOnlySubGraph;
     }
-    
+
     /**
      * Build the schema graph for all cubes and dimensions
      * @return
@@ -231,23 +231,23 @@ public class JoinResolver implements ContextRewriter {
     public void buildSchemaGraph() throws HiveException {
       cubeToGraph = new HashMap<Cube, Map<AbstractCubeTable, Set<TableRelationship>>>();
       for (Cube cube : metastore.getAllCubes()) {
-        Map<AbstractCubeTable, Set<TableRelationship>> graph = 
+        Map<AbstractCubeTable, Set<TableRelationship>> graph =
             new HashMap<AbstractCubeTable, Set<TableRelationship>>();
         buildCubeGraph(cube, graph);
-        
+
         for (CubeDimensionTable dim : metastore.getAllDimensionTables()) {
           buildDimGraph(dim, graph);
         }
-        
+
         cubeToGraph.put(cube, graph);
       }
-      
+
       dimOnlySubGraph = new HashMap<AbstractCubeTable, Set<TableRelationship>>();
       for (CubeDimensionTable dim : metastore.getAllDimensionTables()) {
         buildDimGraph(dim, dimOnlySubGraph);
       }
     }
-    
+
     // Build schema graph for a cube
     private void buildCubeGraph(Cube cube, Map<AbstractCubeTable, Set<TableRelationship>> graph)
         throws HiveException {
@@ -264,18 +264,18 @@ public class JoinResolver implements ContextRewriter {
           }
         }
       }
-      
+
       // build graph for each linked dimension
       for (CubeDimension dim : refDimensions) {
         // Find out references leading from dimension columns of the cube if any
         if (dim instanceof ReferencedDimension) {
           ReferencedDimension refDim = (ReferencedDimension) dim;
           List<TableReference> refs = refDim.getReferences();
-          
+
           for (TableReference ref : refs) {
             String destColumnName = ref.getDestColumn();
             String destTableName = ref.getDestTable();
-            
+
             if (metastore.isDimensionTable(destTableName)) {
               // Cube -> Dimension reference
               CubeDimensionTable relatedDim = metastore.getDimensionTable(destTableName);
@@ -288,23 +288,23 @@ public class JoinResolver implements ContextRewriter {
         }
       }
     }
-    
+
     // Build schema graph starting at a dimension
-    private void buildDimGraph(CubeDimensionTable tab, 
+    private void buildDimGraph(CubeDimensionTable tab,
         Map<AbstractCubeTable, Set<TableRelationship>> graph) throws HiveException {
       Map<String, List<TableReference>> references = tab.getDimensionReferences();
-      
+
       if (references != null && !references.isEmpty()) {
         // for each column that leads to another dim table
         for (Map.Entry<String, List<TableReference>> referredColumn : references.entrySet()) {
           String colName = referredColumn.getKey();
           List<TableReference> dests = referredColumn.getValue();
-          
+
           // for each link which leads from this column
           for (TableReference destRef : dests) {
             String destCol = destRef.getDestColumn();
             String destTab = destRef.getDestTable();
-            
+
             if (metastore.isDimensionTable(destTab)) {
               CubeDimensionTable relTab = metastore.getDimensionTable(destTab);
               addLinks(colName, tab, destCol, relTab, graph);
@@ -316,36 +316,36 @@ public class JoinResolver implements ContextRewriter {
         }
       }
     }
-    
+
     private void addLinks(String col1, AbstractCubeTable tab1, String col2, AbstractCubeTable tab2,
         Map<AbstractCubeTable, Set<TableRelationship>> graph) {
-      
+
       TableRelationship rel1 = new TableRelationship(col1, tab1, col2, tab2);
       TableRelationship rel2 = new TableRelationship(col2, tab2, col1, tab1);
-      
+
       Set<TableRelationship> inEdges = graph.get(tab2);
       if (inEdges == null) {
         inEdges = new LinkedHashSet<TableRelationship>();
         graph.put(tab2, inEdges);
       }
       inEdges.add(rel1);
-      
+
       Set<TableRelationship> outEdges = graph.get(tab1);
       if (outEdges == null) {
         outEdges = new LinkedHashSet<TableRelationship>();
         graph.put(tab1, outEdges);
       }
-      
+
       outEdges.add(rel2);
-      
+
     }
-    
-    
+
+
     // This returns the first path found between the dimTable and the target
-    private boolean findJoinChain(CubeDimensionTable dimTable, AbstractCubeTable target, 
+    private boolean findJoinChain(CubeDimensionTable dimTable, AbstractCubeTable target,
         Map<AbstractCubeTable, Set<TableRelationship>> graph,
         List<TableRelationship> chain,
-        Set<AbstractCubeTable> visited) 
+        Set<AbstractCubeTable> visited)
     {
       // Mark node as visited
       visited.add(dimTable);
@@ -359,7 +359,7 @@ public class JoinResolver implements ContextRewriter {
         if (visited.contains(edge.fromTable)) {
           continue;
         }
-        
+
         if (edge.fromTable.equals(target)) {
           chain.add(edge);
           // Search successful
@@ -367,7 +367,7 @@ public class JoinResolver implements ContextRewriter {
           break;
         } else if (edge.fromTable instanceof CubeDimensionTable) {
           List<TableRelationship> tmpChain = new ArrayList<TableRelationship>();
-          if (findJoinChain((CubeDimensionTable) edge.fromTable, target, 
+          if (findJoinChain((CubeDimensionTable) edge.fromTable, target,
               graph, tmpChain, visited)) {
             // This dim eventually leads to the cube
             chain.add(edge);
@@ -377,7 +377,7 @@ public class JoinResolver implements ContextRewriter {
           }
         } // else - this edge doesn't lead to the target, try next one
       }
-      
+
       return foundPath;
     }
 
@@ -401,7 +401,7 @@ public class JoinResolver implements ContextRewriter {
       }
     }
   }
-  
+
   private CubeMetastoreClient metastore;
   private Map<AbstractCubeTable, String> partialJoinConditions;
   private AbstractCubeTable target;
@@ -442,9 +442,12 @@ public class JoinResolver implements ContextRewriter {
   }
 
   protected SchemaGraph getSchemaGraph() throws HiveException {
-    SchemaGraph graph;
-    graph = new SchemaGraph(getMetastoreClient());
-    graph.buildSchemaGraph();
+    SchemaGraph graph = getMetastoreClient().getSchemaGraph();
+    if (graph == null) {
+      graph = new SchemaGraph(getMetastoreClient());
+      graph.buildSchemaGraph();
+      getMetastoreClient().setSchemaGraph(graph);
+    }
     return graph;
   }
   /**
