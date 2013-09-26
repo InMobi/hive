@@ -291,18 +291,22 @@ public class TestCubeRewriter {
     }
     compareQueries(expected, hqlQuery);
 
+    // Union query
     conf.setBoolean(CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT, false);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
-    // rewrite to union query
-    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
-      " where " + twoDaysRange);
-    System.out.println("Union hql query:" + hqlQuery);
+    try {
+      // rewrite to union query
+      hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
+          " where " + twoDaysRange);
+      System.out.println("Union hql query:" + hqlQuery);
 
-    //TODO: uncomment the following once union query
-    // rewriting has been done
-    // expected = // write expected union query
-    // compareQueries(expected, hqlQuery);
-
+      //TODO: uncomment the following once union query
+      // rewriting has been done
+      // expected = // write expected union query
+      // compareQueries(expected, hqlQuery);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
     conf.setBoolean(CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT, true);
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "");
     conf.set(CubeQueryConfUtil.getValidStorageTablesKey("testfact"),
@@ -337,15 +341,19 @@ public class TestCubeRewriter {
     conf.set(CubeQueryConfUtil.getValidUpdatePeriodsKey("testfact",
       "C2"), "MONTHLY,HOURLY");
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
-    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
-      " where " + twoMonthsRangeUptoHours);
-    System.out.println("union query:" + hqlQuery);
-    //TODO: uncomment the following once union query
-    // rewriting has been done
-    //expected = getExpectedQuery(cubeName,
-    //    "select sum(testcube.msr2) FROM ", null, null,
-    //    getWhereForMonthlyDailyAndHourly2months("C1_testfact"));
-    //compareQueries(expected, hqlQuery);
+    try {
+      hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
+          " where " + twoMonthsRangeUptoHours);
+      System.out.println("union query:" + hqlQuery);
+      //TODO: uncomment the following once union query
+      // rewriting has been done
+      //expected = getExpectedQuery(cubeName,
+      //    "select sum(testcube.msr2) FROM ", null, null,
+      //    getWhereForMonthlyDailyAndHourly2months("C1_testfact"));
+      //compareQueries(expected, hqlQuery);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
 
   }
 

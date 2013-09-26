@@ -1069,7 +1069,8 @@ public class CubeQueryContext {
       storageTableToQuery.put(getCube(), fact.storageTables);
       if (fact.storageTables != null && fact.storageTables.size() > 1
           && !fact.enabledMultiTableSelect) {
-        return unionQuery();
+        throw new SemanticException("Querying multiple storage tables within" +
+            " the same query is not supported");
       }
       return toHQL(fact);
     } else {
