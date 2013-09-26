@@ -126,12 +126,14 @@ public abstract class Storage implements Named {
    * @param storageTableName TableName
    * @param partSpec Partition specification
    * @param conf {@link HiveConf} object
-   * @param makeLatest boolean saying whether this is the latest partition
+   * @param latestPartCol The partition column name for the pointing the latest
+   *        partition, null if latest should not be created
    *
    * @throws HiveException
    */
   public abstract void addPartition(String storageTableName,
-      Map<String, String> partSpec, HiveConf conf, boolean makeLatest)
+      Map<String, String> partSpec, HiveConf conf,
+      String latestPartCol)
       throws HiveException;
 
   /**
@@ -155,19 +157,31 @@ public abstract class Storage implements Named {
     return StorageConstants.DATE_PARTITION_KEY;
   }
 
-  private static Map<String, String> latestSpec = new HashMap<String, String>();
-  static {
-    latestSpec.put(getDatePartitionKey(),
-        StorageConstants.LATEST_PARTITION_VALUE);
+  /**
+   * Get the partition spec for latest partition
+   *
+   * @param The partition column for latest spec
+   *
+   * @return latest partition spec as Map from String to String
+   */
+  public static Map<String, String> getLatestPartSpec(
+      Map<String, String> partSpec, String partCol) {
+    Map<String, String> latestSpec = new HashMap<String, String>();
+    latestSpec.putAll(partSpec);
+    latestSpec.put(partCol,
+          StorageConstants.LATEST_PARTITION_VALUE);
+   return latestSpec;
   }
 
   /**
    * Get the partition spec for latest partition
    *
+   * @param The partition column for latest spec
+   *
    * @return latest partition spec as Map from String to String
    */
-  public static Map<String, String> getLatestPartSpec() {
-    return latestSpec;
+  public static String getLatestPartFilter(String partCol) {
+    return partCol + "='" + StorageConstants.LATEST_PARTITION_VALUE + "'";
   }
 
   /**

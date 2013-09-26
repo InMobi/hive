@@ -539,7 +539,7 @@ public class CubeTestSetup {
       Map<String, Date> timeParts = new HashMap<String, Date>();
       timeParts.put(Storage.getDatePartitionKey(), temp);
       client.addPartition(fact2, hdfsStorage,
-        UpdatePeriod.HOURLY, timeParts);
+        UpdatePeriod.HOURLY, timeParts, Storage.getDatePartitionKey());
       cal.add(Calendar.HOUR_OF_DAY, 1);
       temp = cal.getTime();
     }
@@ -975,7 +975,7 @@ public class CubeTestSetup {
         timeParts.put("it", itime);
         timeParts.put("et", itime);
         client.addPartition(fact, hdfsStorage,
-            UpdatePeriod.DAILY, timeParts);
+            UpdatePeriod.DAILY, timeParts, "pt");
         pcal.add(Calendar.DAY_OF_MONTH, 1);
         ical.add(Calendar.HOUR_OF_DAY, 20);
       } else if (p == 2) { // day2
@@ -990,7 +990,7 @@ public class CubeTestSetup {
         timeParts.put("et", itime);
         // pt=day2 and it=day1
         client.addPartition(fact, hdfsStorage,
-            UpdatePeriod.DAILY, timeParts);
+            UpdatePeriod.DAILY, timeParts, "pt");
         // pt=day2-hour[0-3] it = day1-hour[20-23]
         // pt=day2-hour[4-23] it = day2-hour[0-19]
         for (int i = 0; i < 24; i++) {
@@ -1000,13 +1000,13 @@ public class CubeTestSetup {
           timeParts.put("it", itime);
           timeParts.put("et", itime);
           client.addPartition(fact, hdfsStorage,
-              UpdatePeriod.HOURLY, timeParts);
+              UpdatePeriod.HOURLY, timeParts, "pt");
           pcal.add(Calendar.HOUR_OF_DAY, 1);
           ical.add(Calendar.HOUR_OF_DAY, 1);
         }
         // pt=day2 and it=day2
         client.addPartition(fact, hdfsStorage,
-            UpdatePeriod.DAILY, timeParts);
+            UpdatePeriod.DAILY, timeParts, "pt");
       }
       else if (p == 3) { // day3
         // pt=day3-hour[0-3] it = day2-hour[20-23]
@@ -1018,7 +1018,7 @@ public class CubeTestSetup {
           timeParts.put("it", itime);
           timeParts.put("et", itime);
           client.addPartition(fact, hdfsStorage,
-              UpdatePeriod.HOURLY, timeParts);
+              UpdatePeriod.HOURLY, timeParts, "pt");
           pcal.add(Calendar.HOUR_OF_DAY, 1);
           ical.add(Calendar.HOUR_OF_DAY, 1);
         }

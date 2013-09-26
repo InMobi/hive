@@ -165,7 +165,7 @@ public class HDFSStorage extends Storage {
   @Override
   public void addPartition(String storageTableName,
       Map<String, String> partSpec, HiveConf conf,
-      boolean makeLatest) throws HiveException {
+      String latestPartCol) throws HiveException {
     Hive client = Hive.get(conf);
     Table storageTbl = client.getTable(storageTableName);
     Path location = null;
@@ -180,14 +180,21 @@ public class HDFSStorage extends Storage {
     client.createPartition(storageTbl, partSpec,
         location, getTableParameters(), inputFormat, outputFormat, -1,
         storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
-    if (makeLatest) {
+    if (latestPartCol != null) {
       // symlink this partition to latest
-      Partition part = client.getPartition(storageTbl,  getLatestPartSpec(), false);
-      if (part != null) {
-        client.dropPartition(storageTbl.getTableName(),
-            getPartitionsForLatest(), false);
+      List<Partition> latest;
+      try {
+        latest = client.getPartitionsByFilter(storageTbl,
+            getLatestPartFilter(latestPartCol));
+      } catch (Exception e) {
+        throw new HiveException("Could not get latest partition", e);
       }
-      client.createPartition(storageTbl, getLatestPartSpec(),
+      if (!latest.isEmpty()) {
+        client.dropPartition(storageTbl.getTableName(),
+            latest.get(0).getValues(), false);
+      }
+      client.createPartition(storageTbl, getLatestPartSpec(partSpec,
+          latestPartCol),
           location, getTableParameters(), inputFormat, outputFormat, -1,
           storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
     }

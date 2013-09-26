@@ -405,15 +405,18 @@ public class CubeMetastoreClient {
    * @param storage The {@link Storage} object
    * @param updatePeriod The updatePeriod
    * @param partitionTimestamp partition timestamp
+   * @param latestPartCol The partitoin column name if latest symlink has to be
+   *        created, null otherwise
    * @throws HiveException
    */
   public void addPartition(CubeFactTable table, Storage storage,
-      UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps)
+      UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps,
+      String latestPartCol)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         table.getName(), storage.getPrefix());
     addPartition(storageTableName, storage, getPartitionSpec(updatePeriod,
-        partitionTimestamps), false);
+        partitionTimestamps), latestPartCol);
   }
 
   /**
@@ -425,17 +428,19 @@ public class CubeMetastoreClient {
    * @param updatePeriod The updatePeriod
    * @param partitionTimestamp partition timestamp
    * @param partSpec The partition spec
+   * @param latestPartCol The partitoin column name if latest symlink has to be
+   *        created, null otherwise
    * @throws HiveException
    */
   public void addPartition(CubeFactTable table, Storage storage,
       UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps,
-      Map<String, String> partSpec)
+      Map<String, String> partSpec, String latestPartCol)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         table.getName(), storage.getPrefix());
     partSpec.putAll(getPartitionSpec(updatePeriod,
         partitionTimestamps));
-    addPartition(storageTableName, storage, partSpec, false);
+    addPartition(storageTableName, storage, partSpec, latestPartCol);
   }
 
   /**
@@ -452,7 +457,7 @@ public class CubeMetastoreClient {
         table.getName(), storage.getPrefix());
     addPartition(storageTableName, storage, getPartitionSpec(table.
         getSnapshotDumpPeriods().get(storage.getName()), partitionTimestamp),
-        true);
+        Storage.getDatePartitionKey());
   }
 
   private Map<String, String> getPartitionSpec(
@@ -476,8 +481,8 @@ public class CubeMetastoreClient {
   }
 
   private void addPartition(String storageTableName, Storage storage,
-      Map<String, String> partSpec, boolean makeLatest) throws HiveException {
-    storage.addPartition(storageTableName, partSpec, config, makeLatest);
+      Map<String, String> partSpec, String latestPartCol) throws HiveException {
+    storage.addPartition(storageTableName, partSpec, config, latestPartCol);
   }
 
   boolean tableExists(String cubeName)
@@ -516,9 +521,14 @@ public class CubeMetastoreClient {
   }
 
   public boolean partitionExistsByFilter(String storageTableName, String filter)
-      throws MetaException, NoSuchObjectException, HiveException, TException {
-    List<Partition> parts = getClient().getPartitionsByFilter(
-        getTable(storageTableName), filter);
+      throws HiveException {
+    List<Partition> parts;
+    try {
+      parts = getClient().getPartitionsByFilter(
+          getTable(storageTableName), filter);
+    } catch (Exception e) {
+      throw new HiveException("Could not find partitions for given filter", e);
+    }
     return !(parts.isEmpty());
   }
 
@@ -575,7 +585,16 @@ public class CubeMetastoreClient {
       Storage storage) throws HiveException {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
         dim.getName(), storage.getPrefix());
-    return partitionExists(storageTableName, Storage.getLatestPartSpec());
+    return partitionExistsByFilter(storageTableName,
+        Storage.getLatestPartFilter(Storage.getDatePartitionKey()));
+  }
+
+  boolean latestPartitionExists(CubeFactTable fact,
+      Storage storage, String latestPartCol) throws HiveException {
+    String storageTableName = MetastoreUtil.getFactStorageTableName(
+        fact.getName(), storage.getPrefix());
+    return partitionExistsByFilter(storageTableName,
+        Storage.getLatestPartFilter(latestPartCol));
   }
 
   /**
