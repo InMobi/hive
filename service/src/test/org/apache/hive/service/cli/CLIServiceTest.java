@@ -24,7 +24,9 @@ import java.io.ByteArrayInputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -137,6 +139,7 @@ public abstract class CLIServiceTest {
     // Change lock manager, otherwise unit-test doesn't go through
     String setLockMgr = "SET hive.lock.manager=" +
         "org.apache.hadoop.hive.ql.lockmgr.EmbeddedLockManager";
+    confOverlay.put("hive.lock.manager", "org.apache.hadoop.hive.ql.lockmgr.EmbeddedLockManager");
     client.executeStatement(sessionHandle, setLockMgr, confOverlay);
 
     String createTable = "CREATE TABLE TEST_EXEC(ID STRING)";
@@ -149,6 +152,7 @@ public abstract class CLIServiceTest {
     // expect query to be completed now
     assertEquals("Query should be finished",
         OperationState.FINISHED, client.getOperationStatus(ophandle).getState());
+    client.closeSession(sessionHandle);
   }
 
   @Test
@@ -230,5 +234,20 @@ public abstract class CLIServiceTest {
     state = client.getOperationStatus(ophandle).getState();
     System.out.println(ophandle + " after cancelling, state= " + state);
     assertEquals("Query should be cancelled", OperationState.CANCELED, state);
+    client.closeSession(sessionHandle);
+  }
+
+  @Test
+  public void testSessionStateChange() throws Exception {
+    HiveConf conf = new HiveConf(CLIServiceTest.class);
+    SessionState before = SessionState.start(conf);
+    SessionHandle sessionHandle = client.openSession("tom", "password",
+      new HashMap<String, String>());
+    Map<String, String> confOverlay = new HashMap<String, String>();
+    client.executeStatement(sessionHandle, "DROP TABLE IF EXISTS SESSION_TEST", confOverlay);
+    client.executeStatement(sessionHandle, "CREATE TABLE SESSION_TEST(ID STRING)", confOverlay);
+    SessionState after = SessionState.get();
+    assertTrue(before == after);
+    client.closeSession(sessionHandle);
   }
 }
