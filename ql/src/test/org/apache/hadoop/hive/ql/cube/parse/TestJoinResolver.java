@@ -4,12 +4,9 @@ import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
-import org.apache.hadoop.hive.ql.cube.metadata.Cube;
-import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
-import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
-import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.SchemaGraph;
-import org.apache.hadoop.hive.ql.cube.parse.JoinResolver.TableRelationship;
+import org.apache.hadoop.hive.ql.cube.metadata.*;
+import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
+import static org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph.TableRelationship;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.junit.*;
@@ -70,10 +67,10 @@ public class TestJoinResolver {
     
     List<TableRelationship> edges = new ArrayList<TableRelationship>(dim4Edges);
     TableRelationship dim4edge = edges.get(0);
-    assertEquals("id", dim4edge.toColumn);
-    assertEquals(metastore.getDimensionTable("testdim4"), dim4edge.toTable);
-    assertEquals("testdim4id", dim4edge.fromColumn);
-    assertEquals(metastore.getDimensionTable("testdim3"), dim4edge.fromTable);
+    assertEquals("id", dim4edge.getToColumn());
+    assertEquals(metastore.getDimensionTable("testdim4"), dim4edge.getToTable());
+    assertEquals("testdim4id", dim4edge.getFromColumn());
+    assertEquals(metastore.getDimensionTable("testdim3"), dim4edge.getFromTable());
   }
   
   @Test
