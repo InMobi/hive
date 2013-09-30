@@ -65,9 +65,9 @@ public class GenericUDFFormatNumber extends GenericUDF {
   private final StringBuilder pattern = new StringBuilder("");
   private final DecimalFormat numberFormat = new DecimalFormat("");
   private int lastDValue = -1;
-  private final String lastFValue = "";
+  private String lastFValue = "";
   private PrimitiveCategory dType;
-  private transient StringConverter stringConverter;
+  private StringConverter stringConverter;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments)
@@ -164,7 +164,9 @@ public class GenericUDFFormatNumber extends GenericUDF {
       String fValue = (String) stringConverter.convert(arguments[1].get());
 
       if (fValue != lastFValue) {
-        numberFormat.applyPattern(fValue);
+        lastFValue = fValue;
+        DecimalFormat dFormat = new DecimalFormat(fValue);
+        numberFormat.applyPattern(dFormat.toPattern());
       }
     } else {
       int dValue = ((IntObjectInspector) argumentOIs[1]).get(arguments[1].get());
