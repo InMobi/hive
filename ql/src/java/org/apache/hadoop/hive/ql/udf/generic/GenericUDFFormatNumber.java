@@ -28,9 +28,12 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorConverter;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorConverter.StringConverter;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.io.Text;
 
@@ -44,26 +47,34 @@ import org.apache.hadoop.io.Text;
  * @see org.apache.hadoop.hive.ql.udf.generic.GenericUDF
  */
 @Description(name = "format_number",
-    value = "_FUNC_(X, D) - Formats the number X to "
-    + "a format like '#,###,###.##', rounded to D decimal places,"
+    value = "_FUNC_(X, D or F) - Formats the number X to "
+    + "a format like '#,###,###.##', rounded to D decimal places, Or"
+    + " Uses the format specified F to format,"
     + " and returns the result as a string. If D is 0, the result"
     + " has no decimal point or fractional part."
     + " This is supposed to function like MySQL's FORMAT",
     extended = "Example:\n"
     + "  > SELECT _FUNC_(12332.123456, 4) FROM src LIMIT 1;\n"
-    + "  '12,332.1235'")
+    + "  '12,332.1235'\n"
+    + "  > SELECT _FUNC_(12332.123456, '##################.###') FROM"
+    + " src LIMIT 1;\n"
+    + "  '12332.123'")
 public class GenericUDFFormatNumber extends GenericUDF {
   private transient ObjectInspector[] argumentOIs;
   private final Text resultText = new Text();
   private final StringBuilder pattern = new StringBuilder("");
   private final DecimalFormat numberFormat = new DecimalFormat("");
   private int lastDValue = -1;
+  private final String lastFValue = "";
+  private PrimitiveCategory dType;
+  private transient StringConverter stringConverter;
 
   @Override
-  public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
+  public ObjectInspector initialize(ObjectInspector[] arguments)
+      throws UDFArgumentException {
     if (arguments.length != 2) {
       throw new UDFArgumentLengthException(
-          "The function FORMAT_NUMBER(X, D) needs two arguments.");
+          "The function FORMAT_NUMBER(X, D or F) needs two arguments.");
     }
 
     switch (arguments[0].getCategory()) {
@@ -90,7 +101,8 @@ public class GenericUDFFormatNumber extends GenericUDF {
           + serdeConstants.TINYINT_TYPE_NAME + "\""
           + " or \"" + serdeConstants.SMALLINT_TYPE_NAME + "\""
           + " or \"" + serdeConstants.INT_TYPE_NAME + "\""
-          + " or \"" + serdeConstants.BIGINT_TYPE_NAME + "\", but \""
+          + " or \"" + serdeConstants.BIGINT_TYPE_NAME + "\""
+          + " or \"" + serdeConstants.STRING_TYPE_NAME + "\", but \""
           + arguments[1].getTypeName() + "\" was found.");
     }
 
@@ -124,6 +136,12 @@ public class GenericUDFFormatNumber extends GenericUDF {
       case SHORT:
       case INT:
       case LONG:
+        dType = dObjectInspector.getPrimitiveCategory();
+        break;
+      case STRING:
+        dType = dObjectInspector.getPrimitiveCategory();
+        stringConverter = new PrimitiveObjectInspectorConverter.StringConverter(
+            dObjectInspector);
         break;
       default:
         throw new UDFArgumentTypeException(1, "Argument 2"
@@ -131,7 +149,8 @@ public class GenericUDFFormatNumber extends GenericUDF {
           + serdeConstants.TINYINT_TYPE_NAME + "\""
           + " or \"" + serdeConstants.SMALLINT_TYPE_NAME + "\""
           + " or \"" + serdeConstants.INT_TYPE_NAME + "\""
-          + " or \"" + serdeConstants.BIGINT_TYPE_NAME + "\", but \""
+          + " or \"" + serdeConstants.BIGINT_TYPE_NAME + "\""
+          + " or \"" + serdeConstants.STRING_TYPE_NAME + "\", but \""
           + arguments[1].getTypeName() + "\" was found.");
     }
 
@@ -141,30 +160,37 @@ public class GenericUDFFormatNumber extends GenericUDF {
 
   @Override
   public Object evaluate(DeferredObject[] arguments) throws HiveException {
-    int dValue = ((IntObjectInspector) argumentOIs[1]).get(arguments[1].get());
+    if (dType.equals(PrimitiveCategory.STRING)) {
+      String fValue = (String) stringConverter.convert(arguments[1].get());
 
-    if (dValue < 0) {
-      throw new HiveException("Argument 2 of function FORMAT_NUMBER must be >= 0, but \""
-      + dValue + "\" was found");
-    }
-
-    if (dValue != lastDValue) {
-      // construct a new DecimalFormat only if a new dValue
-      pattern.delete(0, pattern.length());
-      pattern.append("#,###,###,###,###,###,##0");
-
-      //decimal place
-      if (dValue > 0) {
-        pattern.append(".");
-        for (int i = 0; i < dValue; i++) {
-          pattern.append("0");
-        }
+      if (fValue != lastFValue) {
+        numberFormat.applyPattern(fValue);
       }
-      DecimalFormat dFormat = new DecimalFormat(pattern.toString());
-      lastDValue = dValue;
-      numberFormat.applyPattern(dFormat.toPattern());
-    }
+    } else {
+      int dValue = ((IntObjectInspector) argumentOIs[1]).get(arguments[1].get());
 
+      if (dValue < 0) {
+        throw new HiveException("Argument 2 of function FORMAT_NUMBER must be" +
+            " >= 0, but \"" + dValue + "\" was found");
+      }
+
+      if (dValue != lastDValue) {
+        // construct a new DecimalFormat only if a new dValue
+        pattern.delete(0, pattern.length());
+        pattern.append("#,###,###,###,###,###,##0");
+
+        //decimal place
+        if (dValue > 0) {
+          pattern.append(".");
+          for (int i = 0; i < dValue; i++) {
+            pattern.append("0");
+          }
+        }
+        DecimalFormat dFormat = new DecimalFormat(pattern.toString());
+        lastDValue = dValue;
+        numberFormat.applyPattern(dFormat.toPattern());
+      }
+    }
     double xDoubleValue = 0.0;
     int xIntValue = 0;
     long xLongValue = 0L;
