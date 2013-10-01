@@ -12,6 +12,7 @@ import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class Cube extends AbstractCubeTable {
@@ -111,21 +112,21 @@ public final class Cube extends AbstractCubeTable {
     super.addProperties();
     getProperties().put(MetastoreUtil.getCubeMeasureListKey(getName()),
         MetastoreUtil.getNamedStr(measures));
-    addMeasures(getProperties(), measures);
+    setMeasureProperties(getProperties(), measures);
     getProperties().put(MetastoreUtil.getCubeDimensionListKey(getName()),
         MetastoreUtil.getNamedStr(dimensions));
-    addDimensions(getProperties(), dimensions);
+    setDimensionProperties(getProperties(), dimensions);
   }
 
-  public static void addMeasures(Map<String, String> props,
-      Set<CubeMeasure> measures) {
+  private static void setMeasureProperties(Map<String, String> props,
+                                           Set<CubeMeasure> measures) {
     for (CubeMeasure measure : measures) {
       measure.addProperties(props);
     }
   }
 
-  public static void addDimensions(Map<String, String> props,
-      Set<CubeDimension> dimensions) {
+  private static void setDimensionProperties(Map<String, String> props,
+                                             Set<CubeDimension> dimensions) {
     for (CubeDimension dimension : dimensions) {
       dimension.addProperties(props);
     }
@@ -238,5 +239,44 @@ public final class Cube extends AbstractCubeTable {
       cubeCol = (CubeColumn)getDimensionByName(column);
     }
     return cubeCol;
+  }
+
+  public void addMeasure(CubeMeasure measure) throws HiveException {
+    if (measure == null) {
+      throw new NullPointerException("Cannot add null measure");
+    }
+    if (measures.contains(measure))  {
+      throw new HiveException("Measure " + measure + " is already present in cube " + getName());
+    }
+
+    measures.add(measure);
+    measureMap.put(measure.getName(), measure);
+  }
+
+  public void addDimension(CubeDimension dimension) throws HiveException {
+    if (dimension == null) {
+      throw new NullPointerException("Cannot add null dimension");
+    }
+
+    if (dimensions.contains(dimension)) {
+      throw new HiveException("Dimension " + dimension + " is already present in cube " + getName());
+    }
+
+    dimensions.add(dimension);
+    dimMap.put(dimension.getName(), dimension);
+  }
+
+  public void addTimedDimension(String timedDimension) throws HiveException {
+    if (timedDimension == null || timedDimension.isEmpty()) {
+      throw new HiveException("Invalid timed dimension " + timedDimension);
+    }
+
+    Set<String> timeDims = getTimedDimensions();
+    if (timeDims.contains(timedDimension)) {
+      throw new HiveException("Timed dimension " + timedDimension + " is already present in cube "+ getName());
+    }
+
+    timeDims.add(timedDimension);
+    getProperties().put(MetastoreUtil.getCubeTimedDimensionListKey(getName()), StringUtils.join(timeDims, ","));
   }
 }

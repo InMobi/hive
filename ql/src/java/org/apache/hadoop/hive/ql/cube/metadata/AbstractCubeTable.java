@@ -1,11 +1,9 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public abstract class AbstractCubeTable implements Named {
@@ -60,6 +58,28 @@ public abstract class AbstractCubeTable implements Named {
 
   public double weight() {
     return weight;
+  }
+
+  protected void addColumn(FieldSchema column) throws HiveException {
+    if (column == null) {
+      throw new NullPointerException("Column cannot be null");
+    }
+    for (FieldSchema c : columns) {
+      if (column.equals(c)) {
+        throw new HiveException("Column '" + column.getName() + " " + column.getType()
+          + "' already exists in " + name) ;
+      }
+    }
+    columns.add(column);
+  }
+
+  protected void addColumns(Collection<FieldSchema> columns) throws HiveException{
+    if (columns == null) {
+      throw new NullPointerException("Columns cannot be null");
+    }
+    for (FieldSchema column : columns) {
+      addColumn(column);
+    }
   }
 
   @Override

@@ -880,4 +880,16 @@ public class CubeMetastoreClient {
   public SchemaGraph getSchemaGraph() {
     return schemaGraph;
   }
+
+  public void alterCube(String cubeName, Cube cube) throws HiveException {
+
+  }
+
+  public void alterCubeFactTable(String factTableName, CubeFactTable factTable) throws  HiveException {
+
+  }
+
+  public void alterCubeDimensionTable(String cubeDimensionName, CubeDimensionTable dimensionTable) throws HiveException {
+
+  }
 }

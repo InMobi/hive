@@ -8,6 +8,7 @@ import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeDimensionTable extends AbstractCubeTable {
@@ -83,8 +84,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   @Override
   protected void addProperties() {
     super.addProperties();
-    addDimensionReferenceProperties(getProperties(), dimensionReferences);
-    addSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
+    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+    setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
 
   public Map<String, List<TableReference>> getDimensionReferences() {
@@ -95,8 +96,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     return snapshotDumpPeriods;
   }
 
-  public static void addSnapshotPeriods(String name, Map<String, String> props,
-      Map<String, UpdatePeriod> snapshotDumpPeriods) {
+  private static void setSnapshotPeriods(String name, Map<String, String> props,
+                                        Map<String, UpdatePeriod> snapshotDumpPeriods) {
     if (snapshotDumpPeriods != null) {
       props.put(MetastoreUtil.getDimensionStorageListKey(name),
           MetastoreUtil.getStr(snapshotDumpPeriods.keySet()));
@@ -110,8 +111,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
   }
 
-  public static void addDimensionReferenceProperties(Map<String, String> props,
-      Map<String, List<TableReference>> dimensionReferences) {
+  private static void setDimensionReferenceProperties(Map<String, String> props,
+                                                     Map<String, List<TableReference>> dimensionReferences) {
     if (dimensionReferences != null) {
       for (Map.Entry<String, List<TableReference>> entry : dimensionReferences.entrySet()) {
         props.put(MetastoreUtil.getDimensionSrcReferenceKey(entry.getKey()),
@@ -202,5 +203,32 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   public boolean hasStorageSnapshots(String storage) {
     return (snapshotDumpPeriods.get(storage) != null);
+  }
+
+  public void addDimensionReference(String referenceName, TableReference reference) throws HiveException {
+    List<TableReference> refs = dimensionReferences.get(referenceName);
+    if (refs != null) {
+      for (TableReference existing : refs) {
+        if (existing.equals(reference)) {
+          throw new HiveException("Table reference " + reference + " already exists in " + getName());
+        }
+      }
+    } else {
+      refs = new ArrayList<TableReference>(1);
+      dimensionReferences.put(referenceName, refs);
+    }
+    refs.add(reference);
+  }
+
+  public void addSnapshotDumpPeriod(String storage, UpdatePeriod period) throws HiveException {
+    if (storage == null) {
+      throw new NullPointerException("Cannot add null storage for " + getName());
+    }
+
+    if (snapshotDumpPeriods.containsKey(storage)) {
+      throw new HiveException("Storage " + storage + " is already present in " + getName());
+    }
+
+    snapshotDumpPeriods.put(storage, period);
   }
 }
