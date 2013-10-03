@@ -193,6 +193,10 @@ public class GenericUDFFormatNumber extends GenericUDF {
         numberFormat.applyPattern(dFormat.toPattern());
       }
     }
+    if (arguments[0] == null || arguments[0].get() == null) {
+      resultText.set(numberFormat.format(0));
+      return resultText;
+    }
     double xDoubleValue = 0.0;
     int xIntValue = 0;
     long xLongValue = 0L;
