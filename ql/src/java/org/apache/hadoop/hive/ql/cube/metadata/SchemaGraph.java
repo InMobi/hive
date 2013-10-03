@@ -264,4 +264,20 @@ public class SchemaGraph {
       return false;
     }
   }
+
+  public void print() {
+    for (Cube cube : cubeToGraph.keySet()) {
+      Map<AbstractCubeTable, Set<TableRelationship>> graph = cubeToGraph.get(cube);
+      System.out.println("**Cube " + cube.getName());
+      System.out.println("--Graph-Nodes=" + graph.size());
+      for (AbstractCubeTable tab : graph.keySet()) {
+        System.out.println(tab.getName() + "::" + graph.get(tab));
+      }
+    }
+    System.out.println("**Dim only subgraph");
+    System.out.println("--Graph-Nodes=" + dimOnlySubGraph.size());
+    for (AbstractCubeTable tab : dimOnlySubGraph.keySet()) {
+      System.out.println(tab.getName() + "::" + dimOnlySubGraph.get(tab));
+    }
+  }
 }

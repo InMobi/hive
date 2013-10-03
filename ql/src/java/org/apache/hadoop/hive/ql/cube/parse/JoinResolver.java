@@ -243,6 +243,9 @@ public class JoinResolver implements ContextRewriter {
         joinChain.put(joinee, chain);
       } else {
         // No link to cube from this dim, can't proceed with query
+        if (LOG.isDebugEnabled()) {
+          graph.print();
+        }
         throw new SemanticException("No join path from " + joinee.getName() 
             + " to " + target.getName());
       }
