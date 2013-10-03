@@ -1054,10 +1054,9 @@ public class CubeQueryContext {
         fact = candidateFacts.iterator().next();
         LOG.info("Available candidate facts:" + candidateFacts +
             ", picking up " + fact.fact + " for querying");
+      } else {
+        throw new SemanticException("No candidate facts available");
       }
-    }
-    if (fact == null && !hasDimensionInQuery()) {
-      throw new SemanticException("No valid fact table available");
     }
 
     if (fact != null) {
