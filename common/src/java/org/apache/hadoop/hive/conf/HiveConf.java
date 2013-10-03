@@ -323,6 +323,8 @@ public class HiveConf extends Configuration {
     METASTORE_VALIDATE_CONSTRAINTS("datanucleus.validateConstraints", false),
     METASTORE_STORE_MANAGER_TYPE("datanucleus.storeManagerType", "rdbms"),
     METASTORE_AUTO_CREATE_SCHEMA("datanucleus.autoCreateSchema", true),
+    METASTORE_FIXED_DATASTORE("datanucleus.fixedDatastore", false),
+    METASTORE_SCHEMA_VERIFICATION("hive.metastore.schema.verification", false),
     METASTORE_AUTO_START_MECHANISM_MODE("datanucleus.autoStartMechanismMode", "checked"),
     METASTORE_TRANSACTION_ISOLATION("datanucleus.transactionIsolation", "read-committed"),
     METASTORE_CACHE_LEVEL2("datanucleus.cache.level2", false),
@@ -735,15 +737,24 @@ public class HiveConf extends Configuration {
     HIVE_DDL_OUTPUT_FORMAT("hive.ddl.output.format", null),
     HIVE_ENTITY_SEPARATOR("hive.entity.separator", "@"),
 
+    // binary or http
+    HIVE_SERVER2_TRANSPORT_MODE("hive.server2.transport.mode", "binary"),
+
+    // http (over thrift) transport settings
+    HIVE_SERVER2_THRIFT_HTTP_PORT("hive.server2.thrift.http.port", 10001),
+    HIVE_SERVER2_THRIFT_HTTP_PATH("hive.server2.thrift.http.path", "cliservice"),
+    HIVE_SERVER2_THRIFT_HTTP_MIN_WORKER_THREADS("hive.server2.thrift.http.min.worker.threads", 5),
+    HIVE_SERVER2_THRIFT_HTTP_MAX_WORKER_THREADS("hive.server2.thrift.http.max.worker.threads", 500),
+
+    // binary transport settings
+    HIVE_SERVER2_THRIFT_PORT("hive.server2.thrift.port", 10000),
+    HIVE_SERVER2_THRIFT_BIND_HOST("hive.server2.thrift.bind.host", ""),
+    HIVE_SERVER2_THRIFT_SASL_QOP("hive.server2.thrift.sasl.qop", "auth"),
     HIVE_SERVER2_THRIFT_MIN_WORKER_THREADS("hive.server2.thrift.min.worker.threads", 5),
     HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS("hive.server2.thrift.max.worker.threads", 100),
     // Configuration for async thread pool in SessionManagers
     HIVE_SERVER2_ASYNC_EXEC_THREADS("hive.server2.thrift.async.task.threads", 10),
     HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.thrift.async.task.timeout", 10000),
-
-    HIVE_SERVER2_THRIFT_PORT("hive.server2.thrift.port", 10000),
-    HIVE_SERVER2_THRIFT_BIND_HOST("hive.server2.thrift.bind.host", ""),
-    HIVE_SERVER2_THRIFT_SASL_QOP("hive.server2.thrift.sasl.qop", "auth"),
 
 
     // HiveServer2 auth configuration
@@ -797,6 +808,8 @@ public class HiveConf extends Configuration {
 
     // Whether to show the unquoted partition names in query results.
     HIVE_DECODE_PARTITION_NAME("hive.decode.partition.name", false),
+
+    HIVE_TYPE_CHECK_ON_INSERT("hive.typecheck.on.insert", true),
     ;
 
     public final String varname;
@@ -1138,6 +1151,11 @@ public class HiveConf extends Configuration {
       auxJars = this.get(ConfVars.HIVEAUXJARS.varname);
     }
 
+    if (getBoolVar(ConfVars.METASTORE_SCHEMA_VERIFICATION)) {
+      setBoolVar(ConfVars.METASTORE_AUTO_CREATE_SCHEMA, false);
+      setBoolVar(ConfVars.METASTORE_FIXED_DATASTORE, true);
+    }
+
     // setup list of conf vars that are not allowed to change runtime
     String restrictListStr = this.get(ConfVars.HIVE_CONF_RESTRICTED_LIST.toString());
     if (restrictListStr != null) {
@@ -1258,6 +1276,6 @@ public class HiveConf extends Configuration {
     } else {
       return Integer.parseInt(m.group(1));
     }
-
   }
+
 }

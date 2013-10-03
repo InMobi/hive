@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.exec.ExecuteException;
 import org.apache.hive.hcatalog.templeton.tool.TempletonControllerJob;
@@ -38,24 +39,26 @@ public class JarDelegator extends LauncherDelegator {
     super(appConf);
   }
 
-  public EnqueueBean run(String user, String jar, String mainClass,
+  public EnqueueBean run(String user, Map<String, Object> userArgs, String jar, String mainClass,
                String libjars, String files,
                List<String> jarArgs, List<String> defines,
-               String statusdir, String callback, String completedUrl)
+               String statusdir, String callback, String completedUrl,
+               boolean enablelog, JobType jobType)
     throws NotAuthorizedException, BadParam, BusyException, QueueException,
     ExecuteException, IOException, InterruptedException {
     runAs = user;
     List<String> args = makeArgs(jar, mainClass,
       libjars, files, jarArgs, defines,
-      statusdir, completedUrl);
+      statusdir, completedUrl, enablelog, jobType);
 
-    return enqueueController(user, callback, args);
+    return enqueueController(user, userArgs, callback, args);
   }
 
   private List<String> makeArgs(String jar, String mainClass,
                   String libjars, String files,
                   List<String> jarArgs, List<String> defines,
-                  String statusdir, String completedUrl)
+                  String statusdir, String completedUrl,
+                  boolean enablelog, JobType jobType)
     throws BadParam, IOException, InterruptedException {
     ArrayList<String> args = new ArrayList<String>();
     try {
@@ -63,30 +66,36 @@ public class JarDelegator extends LauncherDelegator {
       allFiles.add(TempletonUtils.hadoopFsFilename(jar, appConf, runAs));
 
       args.addAll(makeLauncherArgs(appConf, statusdir,
-        completedUrl, allFiles));
+        completedUrl, allFiles, enablelog, jobType));
       args.add("--");
+      TempletonUtils.addCmdForWindows(args);
       args.add(appConf.clusterHadoop());
       args.add("jar");
       args.add(TempletonUtils.hadoopFsPath(jar, appConf, runAs).getName());
       if (TempletonUtils.isset(mainClass))
         args.add(mainClass);
       if (TempletonUtils.isset(libjars)) {
+        String libjarsListAsString =
+            TempletonUtils.hadoopFsListAsString(libjars, appConf, runAs);
         args.add("-libjars");
-        args.add(TempletonUtils.hadoopFsListAsString(libjars, appConf,
-          runAs));
+        args.add(TempletonUtils.quoteForWindows(libjarsListAsString));
       }
       if (TempletonUtils.isset(files)) {
+        String filesListAsString =
+            TempletonUtils.hadoopFsListAsString(files, appConf, runAs);
         args.add("-files");
-        args.add(TempletonUtils.hadoopFsListAsString(files, appConf,
-          runAs));
+        args.add(TempletonUtils.quoteForWindows(filesListAsString));
       }
       //the token file location comes after mainClass, as a -Dprop=val
       args.add("-D" + TempletonControllerJob.TOKEN_FILE_ARG_PLACEHOLDER);
 
-      for (String d : defines)
-        args.add("-D" + d);
-
-      args.addAll(jarArgs);
+      for (String d : defines) {
+        args.add("-D");
+        TempletonUtils.quoteForWindows(d);
+      }
+      for (String arg : jarArgs) {
+        args.add(TempletonUtils.quoteForWindows(arg));
+      }
     } catch (FileNotFoundException e) {
       throw new BadParam(e.getMessage());
     } catch (URISyntaxException e) {

@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.exec.ExecuteException;
 import org.apache.hive.hcatalog.templeton.tool.TempletonControllerJob;
@@ -39,23 +40,23 @@ public class PigDelegator extends LauncherDelegator {
     super(appConf);
   }
 
-  public EnqueueBean run(String user,
+  public EnqueueBean run(String user, Map<String, Object> userArgs,
                String execute, String srcFile,
                List<String> pigArgs, String otherFiles,
-               String statusdir, String callback, String completedUrl)
+               String statusdir, String callback, String completedUrl, boolean enablelog)
     throws NotAuthorizedException, BadParam, BusyException, QueueException,
     ExecuteException, IOException, InterruptedException {
     runAs = user;
     List<String> args = makeArgs(execute,
       srcFile, pigArgs,
-      otherFiles, statusdir, completedUrl);
+      otherFiles, statusdir, completedUrl, enablelog);
 
-    return enqueueController(user, callback, args);
+    return enqueueController(user, userArgs, callback, args);
   }
 
   private List<String> makeArgs(String execute, String srcFile,
                   List<String> pigArgs, String otherFiles,
-                  String statusdir, String completedUrl)
+                  String statusdir, String completedUrl, boolean enablelog)
     throws BadParam, IOException, InterruptedException {
     ArrayList<String> args = new ArrayList<String>();
     try {
@@ -68,19 +69,25 @@ public class PigDelegator extends LauncherDelegator {
         allFiles.addAll(Arrays.asList(ofs));
       }
 
-      args.addAll(makeLauncherArgs(appConf, statusdir, completedUrl, allFiles));
-      args.add("-archives");
-      args.add(appConf.pigArchive());
+      args.addAll(makeLauncherArgs(appConf, statusdir, completedUrl, allFiles, enablelog, JobType.PIG));
+      if (appConf.pigArchive() != null && !appConf.pigArchive().equals(""))
+      {
+        args.add("-archives");
+        args.add(appConf.pigArchive());
+      }
 
       args.add("--");
+      TempletonUtils.addCmdForWindows(args);
       args.add(appConf.pigPath());
       //the token file location should be first argument of pig
       args.add("-D" + TempletonControllerJob.TOKEN_FILE_ARG_PLACEHOLDER);
 
-      args.addAll(pigArgs);
+      for (String pigArg : pigArgs) {
+        args.add(TempletonUtils.quoteForWindows(pigArg));
+      }
       if (TempletonUtils.isset(execute)) {
         args.add("-execute");
-        args.add(execute);
+        args.add(TempletonUtils.quoteForWindows(execute));
       } else if (TempletonUtils.isset(srcFile)) {
         args.add("-file");
         args.add(TempletonUtils.hadoopFsPath(srcFile, appConf, runAs)

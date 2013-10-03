@@ -566,4 +566,19 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
     return new String[0];
   }
 
+  @Override
+  public void verifySchema() throws MetaException {
+  }
+
+  @Override
+  public String getMetaStoreSchemaVersion() throws MetaException {
+    return objectStore.getMetaStoreSchemaVersion();
+  }
+
+  @Override
+  public void setMetaStoreSchemaVersion(String schemaVersion, String comment) throws MetaException {
+    objectStore.setMetaStoreSchemaVersion(schemaVersion, comment);
+
+  }
+
 }

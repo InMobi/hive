@@ -20,6 +20,7 @@ package org.apache.hive.hcatalog.templeton.tool;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.net.URISyntaxException;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -158,6 +159,12 @@ public class TestTempletonUtils {
   @Test
   public void testHadoopFsFilename() {
     try {
+      String tmpFileName1 = "/tmp/testHadoopFsListAsArray1";
+      String tmpFileName2 = "/tmp/testHadoopFsListAsArray2";
+      File tmpFile1 = new File(tmpFileName1);
+      File tmpFile2 = new File(tmpFileName2);
+      tmpFile1.createNewFile();
+      tmpFile2.createNewFile();
       Assert.assertEquals(null, TempletonUtils.hadoopFsFilename(null, null, null));
       Assert.assertEquals(null,
         TempletonUtils.hadoopFsFilename(tmpFile.toURI().toString(), null, null));
@@ -187,14 +194,22 @@ public class TestTempletonUtils {
   @Test
   public void testHadoopFsListAsArray() {
     try {
+      String tmpFileName1 = "/tmp/testHadoopFsListAsArray1";
+      String tmpFileName2 = "/tmp/testHadoopFsListAsArray2";
+      File tmpFile1 = new File(tmpFileName1);
+      File tmpFile2 = new File(tmpFileName2);
+      tmpFile1.createNewFile();
+      tmpFile2.createNewFile();
       Assert.assertTrue(TempletonUtils.hadoopFsListAsArray(null, null, null) == null);
-      Assert.assertTrue(TempletonUtils.hadoopFsListAsArray(
-        tmpFile.toURI().toString() + "," + usrFile.toString(), null, null) == null);
-      String[] tmp2 = TempletonUtils.hadoopFsListAsArray(
-        tmpFile.toURI().toString() + "," + usrFile.toURI().toString(),
-        new Configuration(), null);
-      Assert.assertEquals(tmpFile.toURI().toString(), tmp2[0]);
-      Assert.assertEquals(usrFile.toURI().toString(), tmp2[1]);
+      Assert.assertTrue(TempletonUtils.hadoopFsListAsArray(tmpFileName1 + "," + tmpFileName2,
+        null, null) == null);
+      String[] tmp2
+        = TempletonUtils.hadoopFsListAsArray(tmpFileName1 + "," + tmpFileName2,
+                                             new Configuration(), null);
+      Assert.assertEquals("file:" + tmpFileName1, tmp2[0]);
+      Assert.assertEquals("file:" + tmpFileName2, tmp2[1]);
+      tmpFile1.delete();
+      tmpFile2.delete();
     } catch (FileNotFoundException e) {
       Assert.fail("Couldn't find name for " + tmpFile.toURI().toString());
     } catch (Exception e) {
@@ -217,15 +232,18 @@ public class TestTempletonUtils {
   @Test
   public void testHadoopFsListAsString() {
     try {
+      String tmpFileName1 = "/tmp/testHadoopFsListAsString1";
+      String tmpFileName2 = "/tmp/testHadoopFsListAsString2";
+      File tmpFile1 = new File(tmpFileName1);
+      File tmpFile2 = new File(tmpFileName2);
+      tmpFile1.createNewFile();
+      tmpFile2.createNewFile();
       Assert.assertTrue(TempletonUtils.hadoopFsListAsString(null, null, null) == null);
-      Assert.assertTrue(TempletonUtils.hadoopFsListAsString(
-        tmpFile.toURI().toString() + "," + usrFile.toURI().toString(),
+      Assert.assertTrue(TempletonUtils.hadoopFsListAsString("/tmp,/usr",
         null, null) == null);
-      Assert.assertEquals(
-        tmpFile.toURI().toString() + "," + usrFile.toURI().toString(),
-        TempletonUtils.hadoopFsListAsString(
-          tmpFile.toURI().toString() + "," + usrFile.toURI().toString(),
-          new Configuration(), null));
+      Assert.assertEquals("file:" + tmpFileName1 + ",file:" + tmpFileName2,
+        TempletonUtils.hadoopFsListAsString
+        (tmpFileName1 + "," + tmpFileName2, new Configuration(), null));
     } catch (FileNotFoundException e) {
       Assert.fail("Couldn't find name for " + tmpFile.toURI().toString());
     } catch (Exception e) {
@@ -242,6 +260,34 @@ public class TestTempletonUtils {
     } catch (Exception e) {
       // Something else is wrong.
       e.printStackTrace();
+    }
+  }
+
+  @Test
+  public void testConstructingUserHomeDirectory() throws Exception {
+    String[] sources = new String[] { "output+", "/user/hadoop/output",
+      "hdfs://container", "hdfs://container/", "hdfs://container/path",
+      "output#link", "hdfs://cointaner/output#link",
+      "hdfs://container@acc/test" };
+    String[] expectedResults = new String[] { "/user/webhcat/output+",
+      "/user/hadoop/output", "hdfs://container/user/webhcat",
+      "hdfs://container/", "hdfs://container/path",
+      "/user/webhcat/output#link", "hdfs://cointaner/output#link",
+      "hdfs://container@acc/test" };
+    for (int i = 0; i < sources.length; i++) {
+      String source = sources[i];
+      String expectedResult = expectedResults[i];
+      String result = TempletonUtils.addUserHomeDirectoryIfApplicable(source,
+          "webhcat");
+      Assert.assertEquals(result, expectedResult);
+    }
+
+    String badUri = "c:\\some\\path";
+    try {
+      TempletonUtils.addUserHomeDirectoryIfApplicable(badUri, "webhcat");
+      Assert.fail("addUserHomeDirectoryIfApplicable should fail for bad URI: "
+          + badUri);
+    } catch (URISyntaxException ex) {
     }
   }
 

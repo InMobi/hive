@@ -26,6 +26,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -33,14 +34,16 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.ws.rs.core.UriBuilder;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hive.hcatalog.templeton.UgiFactory;
+import org.apache.hive.hcatalog.templeton.BadParam;
 
 /**
  * General utility methods.
@@ -213,22 +216,19 @@ public class TempletonUtils {
     }
   }
 
-  public static String addUserHomeDirectoryIfApplicable(String origPathStr, String user, Configuration conf) throws IOException {
-    Path path = new Path(origPathStr);
-    String result = origPathStr;
+  public static String addUserHomeDirectoryIfApplicable(String origPathStr, String user)
+    throws IOException, URISyntaxException {
+    URI uri = new URI(origPathStr);
 
-    // shortcut for s3/asv
-    // If path contains scheme, user should mean an absolute path,
-    // However, path.isAbsolute tell us otherwise.
-    // So we skip conversion for non-hdfs.
-    if (!(path.getFileSystem(conf) instanceof DistributedFileSystem)&&
-        !(path.getFileSystem(conf) instanceof LocalFileSystem)) {
-      return result;
-    }
-    if (!path.isAbsolute()) {
-      result = "/user/" + user + "/" + origPathStr;
-    }
-    return result;
+    if (uri.getPath().isEmpty()) {
+      String newPath = "/user/" + user;
+      uri = UriBuilder.fromUri(uri).replacePath(newPath).build();
+    } else if (!new Path(uri.getPath()).isAbsolute()) {
+      String newPath = "/user/" + user + "/" + uri.getPath();
+      uri = UriBuilder.fromUri(uri).replacePath(newPath).build();
+    } // no work needed for absolute paths
+
+    return uri.toString();
   }
 
   public static Path hadoopFsPath(String fname, final Configuration conf, String user)
@@ -254,7 +254,7 @@ public class TempletonUtils {
           }
         });
 
-    fname = addUserHomeDirectoryIfApplicable(fname, user, conf);
+    fname = addUserHomeDirectoryIfApplicable(fname, user);
     URI u = new URI(fname);
     Path p = new Path(u).makeQualified(defaultFs);
 
@@ -298,5 +298,47 @@ public class TempletonUtils {
     }
 
     return env;
+  }
+
+  // Add double quotes around the given input parameter if it is not already
+  // quoted. Quotes are not allowed in the middle of the parameter, and
+  // BadParam exception is thrown if this is the case.
+  //
+  // This method should be used to escape parameters before they get passed to
+  // Windows cmd scripts (specifically, special characters like a comma or an
+  // equal sign might be lost as part of the cmd script processing if not
+  // under quotes).
+  public static String quoteForWindows(String param) throws BadParam {
+    if (Shell.WINDOWS) {
+      if (param != null && param.length() > 0) {
+        String nonQuotedPart = param;
+        boolean addQuotes = true;
+        if (param.charAt(0) == '\"' && param.charAt(param.length() - 1) == '\"') {
+          if (param.length() < 2)
+            throw new BadParam("Passed in parameter is incorrectly quoted: " + param);
+
+          addQuotes = false;
+          nonQuotedPart = param.substring(1, param.length() - 1);
+        }
+
+        // If we have any quotes other then the outside quotes, throw
+        if (nonQuotedPart.contains("\"")) {
+          throw new BadParam("Passed in parameter is incorrectly quoted: " + param);
+        }
+
+        if (addQuotes) {
+          param = '\"' + param + '\"';
+        }
+      }
+    }
+    return param;
+  }
+
+  public static void addCmdForWindows(ArrayList<String> args) {
+    if(Shell.WINDOWS){
+      args.add("cmd");
+      args.add("/c");
+      args.add("call");
+    }
   }
 }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.exec.ExecuteException;
 import org.apache.commons.logging.Log;
@@ -43,18 +44,21 @@ import org.apache.hive.hcatalog.templeton.tool.ZooKeeperStorage;
 public class LauncherDelegator extends TempletonDelegator {
   private static final Log LOG = LogFactory.getLog(LauncherDelegator.class);
   protected String runAs = null;
+  static public enum JobType {JAR, STREAMING, PIG, HIVE};
 
   public LauncherDelegator(AppConfig appConf) {
     super(appConf);
   }
 
-  public void registerJob(String id, String user, String callback)
+  public void registerJob(String id, String user, String callback,
+      Map<String, Object> userArgs)
     throws IOException {
     JobState state = null;
     try {
       state = new JobState(id, Main.getAppConfigInstance());
       state.setUser(user);
       state.setCallback(callback);
+      state.setUserArgs(userArgs);
     } finally {
       if (state != null)
         state.close();
@@ -64,7 +68,7 @@ public class LauncherDelegator extends TempletonDelegator {
   /**
    * Enqueue the TempletonControllerJob directly calling doAs.
    */
-  public EnqueueBean enqueueController(String user, String callback,
+  public EnqueueBean enqueueController(String user, Map<String, Object> userArgs, String callback,
                      List<String> args)
     throws NotAuthorizedException, BusyException, ExecuteException,
     IOException, QueueException {
@@ -81,7 +85,7 @@ public class LauncherDelegator extends TempletonDelegator {
       if (id == null)
         throw new QueueException("Unable to get job id");
 
-      registerJob(id, user, callback);
+      registerJob(id, user, callback, userArgs);
 
       return new EnqueueBean(id);
     } catch (InterruptedException e) {
@@ -105,7 +109,9 @@ public class LauncherDelegator extends TempletonDelegator {
 
   public List<String> makeLauncherArgs(AppConfig appConf, String statusdir,
                      String completedUrl,
-                     List<String> copyFiles) {
+                     List<String> copyFiles,
+                     boolean enablelog,
+                     JobType jobType) {
     ArrayList<String> args = new ArrayList<String>();
 
     args.add("-libjars");
@@ -123,6 +129,10 @@ public class LauncherDelegator extends TempletonDelegator {
       TempletonUtils.encodeArray(copyFiles));
     addDef(args, TempletonControllerJob.OVERRIDE_CLASSPATH,
       makeOverrideClasspath(appConf));
+    addDef(args, TempletonControllerJob.ENABLE_LOG,
+      Boolean.toString(enablelog));
+    addDef(args, TempletonControllerJob.JOB_TYPE,
+      jobType.toString());
 
     // Hadoop queue information
     addDef(args, "mapred.job.queue.name", appConf.hadoopQueueName());

@@ -42,45 +42,37 @@ import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.SessionHandle;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.thrift.TException;
-import org.apache.thrift.TProcessorFactory;
-import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
-import org.apache.thrift.server.TThreadPoolServer;
-import org.apache.thrift.transport.TServerSocket;
-import org.apache.thrift.transport.TTransportFactory;
-
 
 /**
- * CLIService.
+ * ThriftCLIService.
  *
  */
-public class ThriftCLIService extends AbstractService implements TCLIService.Iface, Runnable {
+public abstract class ThriftCLIService extends AbstractService implements TCLIService.Iface, Runnable {
 
   public static final Log LOG = LogFactory.getLog(ThriftCLIService.class.getName());
-
 
   protected CLIService cliService;
   private static final TStatus OK_STATUS = new TStatus(TStatusCode.SUCCESS_STATUS);
   private static final TStatus ERROR_STATUS = new TStatus(TStatusCode.ERROR_STATUS);
 
-  private static HiveAuthFactory hiveAuthFactory;
-
-  private int portNum;
-  private InetSocketAddress serverAddress;
-  private TServer server;
+  protected int portNum;
+  protected InetSocketAddress serverAddress;
+  protected TServer server;
+  protected org.mortbay.jetty.Server httpServer;
 
   private boolean isStarted = false;
   protected boolean isEmbedded = false;
 
-  private HiveConf hiveConf;
+  protected HiveConf hiveConf;
 
-  private int minWorkerThreads;
-  private int maxWorkerThreads;
+  protected int minWorkerThreads;
+  protected int maxWorkerThreads;
 
+  protected static HiveAuthFactory hiveAuthFactory;
 
-
-  public ThriftCLIService(CLIService cliService) {
-    super("ThriftCLIService");
+  public ThriftCLIService(CLIService cliService, String serviceName) {
+    super(serviceName);
     this.cliService = cliService;
   }
 
@@ -102,7 +94,18 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
   @Override
   public synchronized void stop() {
     if (isStarted && !isEmbedded) {
-      server.stop();
+      if(server != null) {
+        server.stop();
+        LOG.info("Thrift server has stopped");
+      }
+      if((httpServer != null) && httpServer.isStarted()) {
+        try {
+          httpServer.stop();
+          LOG.info("Http server has stopped");
+        } catch (Exception e) {
+          LOG.error("Error stopping Http server: ", e);
+        }
+      }
       isStarted = false;
     }
     super.stop();
@@ -119,7 +122,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setConfiguration(new HashMap<String, String>());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error opening session: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -155,10 +158,10 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
         // The delegation token is not applicable in the given deployment mode
       }
       sessionHandle = cliService.openSessionWithImpersonation(userName, req.getPassword(),
-            req.getConfiguration(), delegationTokenStr);
+          req.getConfiguration(), delegationTokenStr);
     } else {
       sessionHandle = cliService.openSession(userName, req.getPassword(),
-            req.getConfiguration());
+          req.getConfiguration());
     }
     return sessionHandle;
   }
@@ -171,7 +174,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       cliService.closeSession(sessionHandle);
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error closing session: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -187,7 +190,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setInfoValue(getInfoValue.toTGetInfoValue());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting info: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -203,12 +206,12 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       Boolean runAsync = req.isRunAsync();
       OperationHandle operationHandle = runAsync ?
           cliService.executeStatementAsync(sessionHandle, statement, confOverlay)
-              : cliService.executeStatement(sessionHandle, statement, confOverlay);
-      resp.setOperationHandle(operationHandle.toTOperationHandle());
-      resp.setStatus(OK_STATUS);
+          : cliService.executeStatement(sessionHandle, statement, confOverlay);
+          resp.setOperationHandle(operationHandle.toTOperationHandle());
+          resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
-      resp.setStatus(HiveSQLException.toTStatus(e));
+       LOG.warn("Error fetching results: ", e);
+       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
   }
@@ -221,7 +224,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(operationHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error executing statement: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -235,7 +238,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting type info: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -250,7 +253,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting catalogs: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -266,7 +269,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting schemas: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -280,7 +283,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting tables: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -299,7 +302,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting table types: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -315,7 +318,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting columns: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -331,7 +334,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setTaskStatus(status.getTaskStatus());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting functions: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -344,7 +347,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       cliService.cancelOperation(new OperationHandle(req.getOperationHandle()));
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting operation status: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -357,7 +360,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       cliService.closeOperation(new OperationHandle(req.getOperationHandle()));
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error canceling operation: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -372,7 +375,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setSchema(schema.toTTableSchema());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error closing operation: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -390,7 +393,7 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
       resp.setHasMoreRows(false);
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting result set metadata: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -415,50 +418,5 @@ public class ThriftCLIService extends AbstractService implements TCLIService.Ifa
   }
 
   @Override
-  public void run() {
-    try {
-      hiveAuthFactory = new HiveAuthFactory();
-      TTransportFactory  transportFactory = hiveAuthFactory.getAuthTransFactory();
-      TProcessorFactory processorFactory = hiveAuthFactory.getAuthProcFactory(this);
-
-      String portString = System.getenv("HIVE_SERVER2_THRIFT_PORT");
-      if (portString != null) {
-        portNum = Integer.valueOf(portString);
-      } else {
-        portNum = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_PORT);
-      }
-
-      String hiveHost = System.getenv("HIVE_SERVER2_THRIFT_BIND_HOST");
-      if (hiveHost == null) {
-        hiveHost = hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_BIND_HOST);
-      }
-
-      if (hiveHost != null && !hiveHost.isEmpty()) {
-        serverAddress = new InetSocketAddress(hiveHost, portNum);
-      } else {
-        serverAddress = new  InetSocketAddress(portNum);
-      }
-
-
-      minWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_MIN_WORKER_THREADS);
-      maxWorkerThreads = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS);
-
-
-      TThreadPoolServer.Args sargs = new TThreadPoolServer.Args(new TServerSocket(serverAddress))
-      .processorFactory(processorFactory)
-      .transportFactory(transportFactory)
-      .protocolFactory(new TBinaryProtocol.Factory())
-      .minWorkerThreads(minWorkerThreads)
-      .maxWorkerThreads(maxWorkerThreads);
-
-      server = new TThreadPoolServer(sargs);
-
-      LOG.info("ThriftCLIService listening on " + serverAddress);
-
-      server.serve();
-    } catch (Throwable t) {
-      t.printStackTrace();
-    }
-  }
-
+  public abstract void run();
 }
