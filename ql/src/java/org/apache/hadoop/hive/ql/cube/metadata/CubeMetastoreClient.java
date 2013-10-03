@@ -11,10 +11,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -154,8 +151,8 @@ public class CubeMetastoreClient {
       Storage storage, StorageDescriptor parentSD) throws HiveException {
     StorageDescriptor physicalSd = getStorageSD(storage, parentSD);
     createStorageHiveTable(name,
-        physicalSd, storage.getTableParameters(),
-        storage.getTableType(), storage.getPartCols());
+      physicalSd, storage.getTableParameters(),
+      storage.getTableType(), storage.getPartCols());
   }
 
   private Map<String, Set<UpdatePeriod>> getUpdatePeriods(
@@ -415,7 +412,7 @@ public class CubeMetastoreClient {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         table.getName(), storage.getPrefix());
     addPartition(storageTableName, storage, getPartitionSpec(updatePeriod,
-        partitionTimestamps), latestPartCol);
+      partitionTimestamps), latestPartCol);
   }
 
   /**
@@ -535,14 +532,14 @@ public class CubeMetastoreClient {
       String filter) throws MetaException, NoSuchObjectException,
       HiveException, TException {
     return getClient().getPartitionsByFilter(
-        getTable(storageTableName), filter);
+      getTable(storageTableName), filter);
   }
 
   public int getNumPartitionsByFilter(String storageTableName,
       String filter) throws MetaException, NoSuchObjectException,
       HiveException, TException {
     return getClient().getNumPartitionsByFilter(
-        getTable(storageTableName), filter);
+      getTable(storageTableName), filter);
   }
 
   public boolean partitionExists(String storageTableName,
@@ -585,7 +582,7 @@ public class CubeMetastoreClient {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
         dim.getName(), storage.getPrefix());
     return partitionExistsByFilter(storageTableName,
-        Storage.getLatestPartFilter(Storage.getDatePartitionKey()));
+      Storage.getLatestPartFilter(Storage.getDatePartitionKey()));
   }
 
   boolean latestPartitionExists(CubeFactTable fact,
@@ -688,7 +685,7 @@ public class CubeMetastoreClient {
    */
   boolean isCube(Table tbl) throws HiveException {
     String tableType = tbl.getParameters().get(
-        MetastoreConstants.TABLE_TYPE_KEY);
+      MetastoreConstants.TABLE_TYPE_KEY);
     return CubeTableType.CUBE.name().equals(tableType);
   }
 
@@ -881,15 +878,40 @@ public class CubeMetastoreClient {
     return schemaGraph;
   }
 
-  public void alterCube(String cubeName, Cube cube) throws HiveException {
-
+  private void alterCubeTable(String table, Table hiveTable, AbstractCubeTable cubeTable)
+    throws HiveException, InvalidOperationException {
+    hiveTable.getParameters().putAll(cubeTable.getProperties());
+    hiveTable.getTTable().getSd().setCols(cubeTable.getColumns());
+    hiveTable.getTTable().getParameters().putAll(cubeTable.getProperties());
+    metastore.alterTable(table, hiveTable);
   }
 
-  public void alterCubeFactTable(String factTableName, CubeFactTable factTable) throws  HiveException {
-
+  public void alterCube(String cubeName, Cube cube) throws HiveException, InvalidOperationException {
+    Table cubeTbl = metastore.getTable(cubeName);
+    if (isCube(cubeTbl)) {
+      alterCubeTable(cubeName, cubeTbl, cube);
+    } else {
+      throw new HiveException(cubeName + " is not a cube");
+    }
   }
 
-  public void alterCubeDimensionTable(String cubeDimensionName, CubeDimensionTable dimensionTable) throws HiveException {
+  public void alterCubeFactTable(String factTableName, CubeFactTable cubeFactTable)
+    throws  HiveException, InvalidOperationException {
+    Table factTbl = metastore.getTable(factTableName);
+    if (isFactTable(factTbl)) {
+      alterCubeTable(factTableName, factTbl, cubeFactTable);
+    } else {
+      throw new HiveException(factTableName + " is not a fact table");
+    }
+  }
 
+  public void alterCubeDimensionTable(String dimTableName, CubeDimensionTable cubeDimensionTable)
+    throws HiveException, InvalidOperationException {
+    Table dimTbl = metastore.getTable(dimTableName);
+    if (isDimensionTable(dimTbl)) {
+      alterCubeTable(dimTableName, dimTbl, cubeDimensionTable);
+    } else {
+      throw new HiveException(dimTableName + " is not a dimension table");
+    }
   }
 }

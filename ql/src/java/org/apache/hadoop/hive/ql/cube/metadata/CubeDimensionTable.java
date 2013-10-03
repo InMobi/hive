@@ -218,6 +218,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
       dimensionReferences.put(referenceName, refs);
     }
     refs.add(reference);
+    addProperties();
   }
 
   public void addSnapshotDumpPeriod(String storage, UpdatePeriod period) throws HiveException {
@@ -230,5 +231,6 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
 
     snapshotDumpPeriods.put(storage, period);
+    addProperties();
   }
 }

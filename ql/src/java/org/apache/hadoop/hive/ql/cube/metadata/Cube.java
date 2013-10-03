@@ -2,13 +2,7 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -147,19 +141,7 @@ public final class Cube extends AbstractCubeTable {
         constructor = clazz.getConstructor(String.class, Map.class);
         measure = (CubeMeasure) constructor.newInstance(new Object[]
             {measureName, props});
-      } catch (ClassNotFoundException e) {
-        throw new IllegalArgumentException("Invalid measure", e);
-      } catch (SecurityException e) {
-        throw new IllegalArgumentException("Invalid measure", e);
-      } catch (NoSuchMethodException e) {
-        throw new IllegalArgumentException("Invalid measure", e);
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Invalid measure", e);
-      } catch (InstantiationException e) {
-        throw new IllegalArgumentException("Invalid measure", e);
-      } catch (IllegalAccessException e) {
-        throw new IllegalArgumentException("Invalid measure", e);
-      } catch (InvocationTargetException e) {
+      } catch (Exception e) {
         throw new IllegalArgumentException("Invalid measure", e);
       }
       measures.add(measure);
@@ -182,19 +164,7 @@ public final class Cube extends AbstractCubeTable {
         constructor = clazz.getConstructor(String.class, Map.class);
         dim = (CubeDimension) constructor.newInstance(new Object[]
             {dimName, props});
-      } catch (ClassNotFoundException e) {
-        throw new IllegalArgumentException("Invalid dimension", e);
-      } catch (SecurityException e) {
-        throw new IllegalArgumentException("Invalid dimension", e);
-      } catch (NoSuchMethodException e) {
-        throw new IllegalArgumentException("Invalid dimension", e);
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Invalid dimension", e);
-      } catch (InstantiationException e) {
-        throw new IllegalArgumentException("Invalid dimension", e);
-      } catch (IllegalAccessException e) {
-        throw new IllegalArgumentException("Invalid dimension", e);
-      } catch (InvocationTargetException e) {
+      } catch (Exception e) {
         throw new IllegalArgumentException("Invalid dimension", e);
       }
       dimensions.add(dim);
@@ -250,7 +220,8 @@ public final class Cube extends AbstractCubeTable {
     }
 
     measures.add(measure);
-    measureMap.put(measure.getName(), measure);
+    measureMap.put(measure.getName().toLowerCase(), measure);
+    addProperties();
   }
 
   public void addDimension(CubeDimension dimension) throws HiveException {
@@ -263,20 +234,25 @@ public final class Cube extends AbstractCubeTable {
     }
 
     dimensions.add(dimension);
-    dimMap.put(dimension.getName(), dimension);
+    dimMap.put(dimension.getName().toLowerCase(), dimension);
+    addProperties();
   }
 
   public void addTimedDimension(String timedDimension) throws HiveException {
     if (timedDimension == null || timedDimension.isEmpty()) {
       throw new HiveException("Invalid timed dimension " + timedDimension);
     }
-
+    timedDimension = timedDimension.toLowerCase();
     Set<String> timeDims = getTimedDimensions();
+    if (timeDims == null) {
+      timeDims = new LinkedHashSet<String>();
+    }
     if (timeDims.contains(timedDimension)) {
       throw new HiveException("Timed dimension " + timedDimension + " is already present in cube "+ getName());
     }
 
     timeDims.add(timedDimension);
     getProperties().put(MetastoreUtil.getCubeTimedDimensionListKey(getName()), StringUtils.join(timeDims, ","));
+    addProperties();
   }
 }
