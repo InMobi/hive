@@ -29,10 +29,14 @@ public class CubeQueryConfUtil {
   public static final String QUERY_MAX_INTERVAL = "cube.query.max.interval";
   public static final String PROCESS_TIME_PART_COL = "cube.query.process.time" +
       ".partition.column";
-  public static final String LOOK_AHEAD_PT_PARTS_PFX = "cube.query.lookahead.ptparts.forinterval.";
+  public static final String LOOK_AHEAD_PT_PARTS_PFX =
+      "cube.query.lookahead.ptparts.forinterval.";
+  public static final String ENABLE_AUTOMATIC_GROUP_BY_RESOLVER =
+      "cube.query.enable.automatic.groupby.resolver";
 
   public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
   public static final int DEFAULT_LOOK_AHEAD_PT_PARTS = 1;
+  public static final boolean DEFAULT_ENABLE_AUTOMATIC_GROUP_BY_RESOLVER = true;
 
   public static String getLookAheadPTPartsKey(UpdatePeriod interval) {
     return LOOK_AHEAD_PT_PARTS_PFX + interval.name().toLowerCase();

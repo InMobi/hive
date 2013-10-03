@@ -9,11 +9,17 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class GroupbyResolver implements ContextRewriter {
 
+  private final boolean enabled;
   public GroupbyResolver(Configuration conf) {
+    enabled = conf.getBoolean(CubeQueryConfUtil.ENABLE_AUTOMATIC_GROUP_BY_RESOLVER,
+        CubeQueryConfUtil.DEFAULT_ENABLE_AUTOMATIC_GROUP_BY_RESOLVER);
   }
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
+    if (!enabled) {
+      return;
+    }
     // Process Aggregations by making sure that all group by keys are projected;
     // and all projection fields are added to group by keylist;
     String groupByTree = cubeql.getGroupByTree();
