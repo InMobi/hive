@@ -255,12 +255,13 @@ public class TestJoinResolver {
   public void testPreserveTableAlias() throws Exception {
     hconf.set(JoinResolver.JOIN_TYPE_KEY, "LEFTOUTER");
     String query = "select c.name, t.msr2 FROM testCube t join citytable c WHERE " + twoDaysRange;
+    CubeQueryRewriter driver = new CubeQueryRewriter(hconf);
     CubeQueryContext ctx = driver.rewrite(query);
     String hql = ctx.toHQL();
     System.out.println("testPreserveTableAlias@@HQL:" + hql);
     System.out.println("testPreserveTableAlias@@Resolved join clause - " + ctx.getAutoResolvedJoinChain());
     // Check that aliases are preserved in the join clause
-    assertEquals(ctx.getAutoResolvedJoinChain().trim(), "full outer join citytable c on t.cityid = c.id and (c.dt = 'latest')");
+    assertEquals(ctx.getAutoResolvedJoinChain().trim(), "left outer join citytable c on t.cityid = c.id and (c.dt = 'latest')");
     String whereClause = hql.substring(hql.indexOf("WHERE"));
     // Check that the partition condition is not added again in where clause
     assertFalse(whereClause.contains("c.dt = 'latest'"));
