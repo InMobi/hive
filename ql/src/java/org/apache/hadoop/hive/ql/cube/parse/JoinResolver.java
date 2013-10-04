@@ -40,11 +40,13 @@ public class JoinResolver implements ContextRewriter {
   public static class AutoJoinContext {
     private final Map<CubeDimensionTable, List<TableRelationship>> joinChain;
     private final Map<AbstractCubeTable, String> partialJoinConditions;
+    private final Set<String> whereClauseAddedTables;
 
     public AutoJoinContext(Map<CubeDimensionTable, List<TableRelationship>> joinChain,
                             Map<AbstractCubeTable, String> partialJoinConditions) {
       this.joinChain = joinChain;
       this.partialJoinConditions = partialJoinConditions;
+      whereClauseAddedTables = new HashSet<String>();
     }
 
     public Map<CubeDimensionTable, List<TableRelationship>> getJoinChain() {
@@ -57,7 +59,8 @@ public class JoinResolver implements ContextRewriter {
 
     public String getMergedJoinClause(Configuration conf,
                                       Map<String, String> dimStorageTableToWhereClause,
-                                      Map<AbstractCubeTable, Set<String>> storageTableToQuery) {
+                                      Map<AbstractCubeTable, Set<String>> storageTableToQuery,
+                                      CubeQueryContext cubeql) {
       for (List<TableRelationship> chain : joinChain.values()) {
         // Need to reverse the chain so that left most table in join comes first
         Collections.reverse(chain);
@@ -95,11 +98,19 @@ public class JoinResolver implements ContextRewriter {
       for (List<TableRelationship> chain : joinChain.values()) {
         for (TableRelationship rel : chain) {
           StringBuilder clause = new StringBuilder(joinType)
-            .append(" join ")
-            .append(rel.getToTable().getName())
-            .append(" on ")
-            .append(rel.getFromTable().getName()).append(".").append(rel.getFromColumn())
-            .append(" = ").append(rel.getToTable().getName()).append(".").append(rel.getToColumn());
+            .append(" join ");
+          String alias = cubeql.getAliasForTabName(rel.getToTable().getName());
+
+          if (!alias.equalsIgnoreCase(rel.getToTable().getName())) {
+            clause.append(rel.getToTable().getName()).append(' ').append(alias);
+          } else {
+            clause.append(rel.getToTable().getName());
+          }
+
+          clause.append(" on ")
+            .append(cubeql.getAliasForTabName(rel.getFromTable().getName())).append(".").append(rel.getFromColumn())
+            .append(" = ")
+            .append(cubeql.getAliasForTabName(rel.getToTable().getName())).append(".").append(rel.getToColumn());
           // Check if user specified a join clause, if yes, add it
           String filter = partialJoinConditions.get(rel.getToTable());
 
@@ -113,19 +124,24 @@ public class JoinResolver implements ContextRewriter {
             if (queries != null) {
               String storageTableKey = queries.iterator().next();
               if (StringUtils.isNotBlank(storageTableKey)) {
-                whereClause = dimStorageTableToWhereClause.get(queries.iterator().next());
+                whereClause = dimStorageTableToWhereClause.get(storageTableKey);
               }
             }
           }
 
           if (StringUtils.isNotBlank(whereClause)) {
             clause.append (" and (").append(whereClause).append(")");
+            whereClauseAddedTables.add(rel.getToTable().getName());
           }
           clauses.add(clause.toString());
         }
       }
 
       return StringUtils.join(clauses, " ");
+    }
+
+    public Set<String> getWhereClauseAddedTables() {
+      return whereClauseAddedTables;
     }
 
   }

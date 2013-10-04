@@ -609,7 +609,8 @@ public class CubeQueryContext {
 
   public String getAliasForTabName(String tabName) {
     for (String alias : qb.getTabAliases()) {
-      if (qb.getTabNameForAlias(alias).equalsIgnoreCase(tabName)) {
+      String table = qb.getTabNameForAlias(alias);
+      if (table != null && table.equalsIgnoreCase(tabName)) {
         return alias;
       }
     }
@@ -1022,6 +1023,10 @@ public class CubeQueryContext {
       }
     }
 
+    if (joinsResolvedAutomatically()) {
+      tablesAlreadyAdded.addAll(getAutoJoinCtx().getWhereClauseAddedTables());
+    }
+
     // add where clause for all dimensions
     Iterator<CubeDimensionTable> it = dimensions.iterator();
     if (it.hasNext()) {
@@ -1245,7 +1250,7 @@ public class CubeQueryContext {
 
   public String getAutoResolvedJoinChain() {
     if (getAutoJoinCtx() != null) {
-      return getAutoJoinCtx().getMergedJoinClause(conf, dimStorageTableToWhereClause, storageTableToQuery);
+      return getAutoJoinCtx().getMergedJoinClause(conf, dimStorageTableToWhereClause, storageTableToQuery, this);
     } else {
       return "";
     }
