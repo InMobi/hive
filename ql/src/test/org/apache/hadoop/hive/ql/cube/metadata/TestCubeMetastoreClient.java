@@ -198,9 +198,9 @@ public class TestCubeMetastoreClient {
     // Test alter cube
     Table cubeTbl = client.getHiveTable(cubeName);
     Cube toAlter = new Cube(cubeTbl);
-    toAlter.addMeasure(new ColumnMeasure(new FieldSchema("testAddMsr1", "int", "testAddMeasure")));
+    toAlter.alterMeasure(new ColumnMeasure(new FieldSchema("testAddMsr1", "int", "testAddMeasure")));
     toAlter.addTimedDimension("zt");
-    toAlter.addDimension(new BaseDimension(new FieldSchema("testAddDim1", "string", "dim to add")));
+    toAlter.alterDimension(new BaseDimension(new FieldSchema("testAddDim1", "string", "dim to add")));
 
     Assert.assertNotNull(toAlter.getMeasureByName("testAddMsr1"));
 
@@ -226,6 +226,12 @@ public class TestCubeMetastoreClient {
     Assert.assertEquals(addedDim.getType(), "string");
     Assert.assertTrue(altered.getTimedDimensions().contains("zt"));
 
+    toAlter.alterMeasure(new ColumnMeasure(new FieldSchema("testAddMsr1", "double", "testAddMeasure")));
+    client.alterCube(cubeName, toAlter);
+    altered = new Cube(Hive.get(conf).getTable(cubeName));
+    addedMsr = altered.getMeasureByName("testaddmsr1");
+    Assert.assertNotNull(addedMsr);
+    Assert.assertEquals(addedMsr.getType(), "double");
     // Drop the table
     Hive.get(conf).dropTable(cubeName);
   }
@@ -318,7 +324,7 @@ public class TestCubeMetastoreClient {
       storageAggregatePeriods, 0L, null);
 
     CubeFactTable factTable = new CubeFactTable(Hive.get(conf).getTable(factName));
-    factTable.addColumn(new FieldSchema("testFactColAdd", "int", "test add column"));
+    factTable.alterColumn(new FieldSchema("testFactColAdd", "int", "test add column"));
 
     client.alterCubeFactTable(factName, factTable);
 
@@ -658,10 +664,10 @@ public class TestCubeMetastoreClient {
     timeParts.put(Storage.getDatePartitionKey(), now);
     // test partition
     client.addPartition(cubeFactWithTwoStorages, hdfsStorageWithParts,
-        UpdatePeriod.HOURLY, timeParts, partSpec, Storage.getDatePartitionKey());
+      UpdatePeriod.HOURLY, timeParts, partSpec, Storage.getDatePartitionKey());
     Assert.assertTrue(client.factPartitionExists(cubeFactWithTwoStorages,
-        hdfsStorageWithParts,
-        UpdatePeriod.HOURLY, timeParts, partSpec));
+      hdfsStorageWithParts,
+      UpdatePeriod.HOURLY, timeParts, partSpec));
     Assert.assertTrue(client.latestPartitionExists(cubeFactWithTwoStorages,
         hdfsStorageWithParts,
         Storage.getDatePartitionKey()));
@@ -672,8 +678,8 @@ public class TestCubeMetastoreClient {
         hdfsStorageWithNoParts,
         UpdatePeriod.HOURLY, timeParts, new HashMap<String, String>()));
     Assert.assertTrue(client.latestPartitionExists(cubeFactWithTwoStorages,
-        hdfsStorageWithParts,
-        Storage.getDatePartitionKey()));
+      hdfsStorageWithParts,
+      Storage.getDatePartitionKey()));
   }
 
   @Test
@@ -813,7 +819,7 @@ public class TestCubeMetastoreClient {
       dimensionReferences, snapshotDumpPeriods, null);
     conf.setBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, false);
     CubeDimensionTable dimTable = client.getDimensionTable(dimName);
-    dimTable.addColumn(new FieldSchema("testAddDim", "string", "test add column"));
+    dimTable.alterColumn(new FieldSchema("testAddDim", "string", "test add column"));
 
     client.alterCubeDimensionTable(dimName, dimTable);
 
@@ -828,8 +834,22 @@ public class TestCubeMetastoreClient {
       }
     }
     Assert.assertTrue(contains);
-    Hive.get(conf).dropTable(dimName);
+
+    // Test alter column
+    dimTable.alterColumn(new FieldSchema("testAddDim", "int", "change type"));
+    client.alterCubeDimensionTable(dimName, dimTable);
+
+    altered = new CubeDimensionTable(Hive.get(conf).getTable(dimName));
+    boolean typeChanged = false;
+    for (FieldSchema column : altered.getColumns()) {
+      if (column.getName().equals("testadddim") && column.getType().equals("int")) {
+        typeChanged = true;
+        break;
+      }
+    }
+    Assert.assertTrue(typeChanged);
     conf.setBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, true);
+    Hive.get(conf).dropTable(dimName);
   }
 
 

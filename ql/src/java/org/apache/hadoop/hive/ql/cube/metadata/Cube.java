@@ -211,12 +211,14 @@ public final class Cube extends AbstractCubeTable {
     return cubeCol;
   }
 
-  public void addMeasure(CubeMeasure measure) throws HiveException {
+  public void alterMeasure(CubeMeasure measure) throws HiveException {
     if (measure == null) {
       throw new NullPointerException("Cannot add null measure");
     }
-    if (measures.contains(measure))  {
-      throw new HiveException("Measure " + measure + " is already present in cube " + getName());
+
+    // Replace measure if already existing
+    if (measureMap.containsKey(measure.getName().toLowerCase()))  {
+      measures.remove(measureMap.get(getMeasureByName(measure.getName())));
     }
 
     measures.add(measure);
@@ -224,13 +226,14 @@ public final class Cube extends AbstractCubeTable {
     addProperties();
   }
 
-  public void addDimension(CubeDimension dimension) throws HiveException {
+  public void alterDimension(CubeDimension dimension) throws HiveException {
     if (dimension == null) {
       throw new NullPointerException("Cannot add null dimension");
     }
 
-    if (dimensions.contains(dimension)) {
-      throw new HiveException("Dimension " + dimension + " is already present in cube " + getName());
+    // Replace dimension if already existing
+    if (dimMap.containsKey(dimension.getName().toLowerCase())) {
+      dimensions.remove(dimMap.get(dimension.getName().toLowerCase()));
     }
 
     dimensions.add(dimension);

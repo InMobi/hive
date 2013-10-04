@@ -60,17 +60,27 @@ public abstract class AbstractCubeTable implements Named {
     return weight;
   }
 
-  protected void addColumn(FieldSchema column) throws HiveException {
+  protected void alterColumn(FieldSchema column) throws HiveException {
     if (column == null) {
       throw new NullPointerException("Column cannot be null");
     }
-    for (FieldSchema c : columns) {
-      if (column.equals(c)) {
-        throw new HiveException("Column '" + column.getName() + " " + column.getType()
-          + "' already exists in " + name) ;
+    Iterator<FieldSchema> columnItr = columns.iterator();
+    int alterPos = -1;
+    int i = 0;
+    while (columnItr.hasNext()) {
+      FieldSchema c = columnItr.next();
+      // Replace column if already existing
+      if (column.getName().equalsIgnoreCase(c.getName())) {
+        columnItr.remove();
+        alterPos = i;
       }
+      i++;
     }
-    columns.add(column);
+    if (alterPos != -1) {
+      columns.add(alterPos, column);
+    } else {
+      columns.add(column);
+    }
   }
 
   protected void addColumns(Collection<FieldSchema> columns) throws HiveException{
@@ -78,7 +88,7 @@ public abstract class AbstractCubeTable implements Named {
       throw new NullPointerException("Columns cannot be null");
     }
     for (FieldSchema column : columns) {
-      addColumn(column);
+      alterColumn(column);
     }
   }
 
