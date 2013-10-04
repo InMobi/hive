@@ -233,7 +233,7 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(addedMsr);
     Assert.assertEquals(addedMsr.getType(), "double");
     // Drop the table
-    Hive.get(conf).dropTable(cubeName);
+    client.dropCube(cubeName);
   }
 
   @Test
@@ -339,7 +339,7 @@ public class TestCubeMetastoreClient {
       }
     }
     Assert.assertTrue(contains);
-    Hive.get(conf).dropTable(factName);
+    client.dropFact(factName);
   }
 
   @Test

@@ -573,8 +573,8 @@ public class CubeMetastoreClient {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
         dim.getName(), storage.getPrefix());
     return partitionExists(storageTableName,
-        dim.getSnapshotDumpPeriods().get(storage.getName()),
-        partitionTimestamp);
+      dim.getSnapshotDumpPeriods().get(storage.getName()),
+      partitionTimestamp);
   }
 
   boolean latestPartitionExists(CubeDimensionTable dim,
@@ -590,7 +590,7 @@ public class CubeMetastoreClient {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
         fact.getName(), storage.getPrefix());
     return partitionExistsByFilter(storageTableName,
-        Storage.getLatestPartFilter(latestPartCol));
+      Storage.getLatestPartFilter(latestPartCol));
   }
 
   /**
@@ -619,6 +619,12 @@ public class CubeMetastoreClient {
     return tbl;
   }
 
+  public void dropHiveTable(String table) throws HiveException {
+    metastore.dropTable(table);
+    allHiveTables.remove(table);
+    allHiveTableNames.remove(table);
+  }
+
   /**
    * Is the table name passed a fact table?
    *
@@ -633,7 +639,7 @@ public class CubeMetastoreClient {
 
   boolean isFactTable(Table tbl) {
     String tableType = tbl.getParameters().get(
-        MetastoreConstants.TABLE_TYPE_KEY);
+      MetastoreConstants.TABLE_TYPE_KEY);
     return CubeTableType.FACT.name().equals(tableType);
   }
 
@@ -660,7 +666,7 @@ public class CubeMetastoreClient {
 
   boolean isDimensionTable(Table tbl) throws HiveException {
     String tableType = tbl.getParameters().get(
-        MetastoreConstants.TABLE_TYPE_KEY);
+      MetastoreConstants.TABLE_TYPE_KEY);
     return CubeTableType.DIMENSION.name().equals(tableType);
   }
 
@@ -893,6 +899,51 @@ public class CubeMetastoreClient {
     } else {
       throw new HiveException(cubeName + " is not a cube");
     }
+  }
+
+  public void dropCube(String cubeName) throws HiveException {
+    dropCube(cubeName, true);
+  }
+
+  public void dropCube(String cubeName, boolean cascade) throws HiveException {
+    if (isCube(cubeName)) {
+      if (cascade) {
+        Cube cube = getCube(cubeName);
+        List<CubeFactTable> factTables = getAllFactTables(cube);
+        for (CubeFactTable fact : factTables) {
+          dropFact(fact.getName(), cascade);
+        }
+        allFactTables.remove(cube);
+      }
+
+      allCubes.remove(cubeName);
+      dropHiveTable(cubeName);
+    } else {
+      throw new HiveException(cubeName + " is not a cube");
+    }
+  }
+
+  public void dropFact(String factName) throws HiveException {
+    dropFact(factName, true);
+  }
+
+  public void dropFact(String factName, boolean cascade) throws HiveException {
+    if (isFactTable(factName)) {
+      if (cascade) {
+        CubeFactTable fact = getFactTable(factName);
+        for (String storage : fact.getStorages()) {
+          dropStorageFromFact(factName, storage);
+        }
+      }
+      dropHiveTable(factName);
+    } else {
+      throw new HiveException(factName + " is not a CubeFactTable");
+    }
+  }
+
+  public void dropStorageFromFact(String factName, String storage) throws HiveException {
+    dropHiveTable(MetastoreUtil.getFactStorageTableName(factName,
+      Storage.getPrefix(storage)));
   }
 
   public void alterCubeFactTable(String factTableName, CubeFactTable cubeFactTable)
