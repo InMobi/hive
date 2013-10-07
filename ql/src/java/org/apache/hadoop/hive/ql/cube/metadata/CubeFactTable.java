@@ -210,6 +210,13 @@ public final class CubeFactTable extends AbstractCubeTable {
     addProperties();
   }
 
+  public void removeUpdatePeriod(String storage, UpdatePeriod period) {
+    if (storageUpdatePeriods.containsKey(storage)) {
+      storageUpdatePeriods.get(storage).remove(period);
+    }
+    addProperties();
+  }
+
   public void addStorage(String storage) {
     storageUpdatePeriods.put(storage, new HashSet<UpdatePeriod>());
     addProperties();
