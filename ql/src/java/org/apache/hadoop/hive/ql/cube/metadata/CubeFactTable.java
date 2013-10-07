@@ -1,15 +1,7 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod.UpdatePeriodComparator;
@@ -207,6 +199,20 @@ public final class CubeFactTable extends AbstractCubeTable {
         getName()));
     return  validColsStr == null ? null : Arrays.asList(StringUtils.split(
         validColsStr.toLowerCase()));
+  }
+
+  public void addUpdatePeriod(String storage, UpdatePeriod period) {
+    if (storageUpdatePeriods.containsKey(storage)) {
+      storageUpdatePeriods.get(storage).add(period);
+    } else {
+      storageUpdatePeriods.put(storage, new HashSet<UpdatePeriod>(Arrays.asList(period)));
+    }
+    addProperties();
+  }
+
+  public void addStorage(String storage) {
+    storageUpdatePeriods.put(storage, new HashSet<UpdatePeriod>());
+    addProperties();
   }
 
   public void dropStorage(String storage) {
