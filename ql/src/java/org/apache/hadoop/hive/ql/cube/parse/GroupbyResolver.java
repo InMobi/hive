@@ -3,9 +3,11 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
 
 public class GroupbyResolver implements ContextRewriter {
 
@@ -25,13 +27,13 @@ public class GroupbyResolver implements ContextRewriter {
     String groupByTree = cubeql.getGroupByTree();
     String selectTree = cubeql.getSelectTree();
     List<String> selectExprs = new ArrayList<String>();
-    String[] sel = getExpressions(cubeql.getSelectAST()).toArray(new String[]{});
+    String[] sel = getExpressions(cubeql.getSelectAST(), cubeql).toArray(new String[]{});
     for (String s : sel) {
       selectExprs.add(s.trim());
     }
     List<String> groupByExprs = new ArrayList<String>();
     if (groupByTree != null) {
-      String[] gby = getExpressions(cubeql.getGroupByAST()).toArray(new String[]{});
+      String[] gby = getExpressions(cubeql.getGroupByAST(), cubeql).toArray(new String[]{});
       for (String g : gby) {
         groupByExprs.add(g.trim());
       }
@@ -87,7 +89,7 @@ public class GroupbyResolver implements ContextRewriter {
     return false;
   }
 
-  private List<String> getExpressions(ASTNode node) {
+  private List<String> getExpressions(ASTNode node, CubeQueryContext cubeql) {
 
     List<String> list = new ArrayList<String>();
 
@@ -96,10 +98,47 @@ public class GroupbyResolver implements ContextRewriter {
     }
 
     for (int i = 0; i < node.getChildCount(); i++) {
+      ASTNode child = (ASTNode) node.getChild(i);
+      if (hasMeasure(child, cubeql)) {
+        continue;
+      }
       list.add(HQLParser.getString((ASTNode)node.getChild(i)));
     }
 
     return list;
+  }
+
+  boolean hasMeasure(ASTNode node, CubeQueryContext cubeql) {
+    int nodeType = node.getToken().getType();
+    if (nodeType == TOK_TABLE_OR_COL ||
+      nodeType == DOT) {
+      String colname;
+      String tabname = null;
+
+      if (node.getToken().getType() == TOK_TABLE_OR_COL) {
+        colname = ((ASTNode) node.getChild(0)).getText();
+      } else {
+        // node in 'alias.column' format
+        ASTNode tabident = HQLParser.findNodeByPath(node, TOK_TABLE_OR_COL, Identifier);
+        ASTNode colIdent = (ASTNode) node.getChild(1);
+
+        colname = colIdent.getText();
+        tabname = tabident.getText();
+      }
+
+      String msrname = StringUtils.isBlank(tabname) ? colname : tabname + "."
+        + colname;
+      if (cubeql.hasCubeInQuery() && cubeql.isCubeMeasure(msrname)) {
+        return true;
+      }
+    } else {
+      for (int i = 0; i < node.getChildCount(); i++) {
+        if (hasMeasure((ASTNode) node.getChild(i), cubeql)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
 }

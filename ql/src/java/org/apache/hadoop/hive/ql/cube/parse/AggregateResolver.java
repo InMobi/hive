@@ -18,13 +18,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 /**
  * <p>
  * Replace select and having columns with default aggregate functions on them,
- * if default aggregate is defined and if there isn't already an aggregate
- * function specified on the columns.
- * </p>
- *
- * <p>
- * Expressions which already contain aggregate sub-expressions will not be
- * changed.
+ * if default aggregate is defined
  * </p>
  *
  * <p>
@@ -34,7 +28,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
-
+  public static final String DISABLE_AGGREGATE_RESOLVER = "hive.cube.disable.aggregate.resolver";
   private final Configuration conf;
 
   public AggregateResolver(Configuration conf) {
@@ -47,8 +41,10 @@ public class AggregateResolver implements ContextRewriter {
       return;
     }
 
-    validateAggregates(cubeql, cubeql.getSelectAST(), false, false, false);
-    validateAggregates(cubeql, cubeql.getHavingAST(), false, false, false);
+    if (conf.getBoolean(DISABLE_AGGREGATE_RESOLVER, false)) {
+      return;
+    }
+
     String rewritSelect = resolveClause(cubeql, cubeql.getSelectAST());
     cubeql.setSelectTree(rewritSelect);
 
@@ -57,119 +53,6 @@ public class AggregateResolver implements ContextRewriter {
       cubeql.setHavingTree(rewritHaving);
     }
   }
-
-  private void validateAggregates(CubeQueryContext cubeql, ASTNode node,
-      boolean insideAggregate,
-      boolean insideArithExpr, boolean insideNonAggrFn)
-          throws SemanticException {
-    if (node == null) {
-      return;
-    }
-
-    int nodeType = node.getToken().getType();
-    if (nodeType == HiveParser.TOK_TABLE_OR_COL || nodeType == HiveParser.DOT) {
-      // Found a column ref. If this is a measure, it should be inside an
-      // aggregate if its part of
-      // an arithmetic expression or an argument of a non-aggregate function
-      String msrname = getColName(node);
-      if (cubeql.isCubeMeasure(msrname) &&
-          !insideAggregate
-          && (insideArithExpr || insideNonAggrFn)) {
-        throw new SemanticException("Not inside aggregate " + msrname);
-      }
-    } else if (HQLParser.isArithmeticOp(nodeType)) {
-      // Allowed - sum ( msr1 * msr2 + msr3)
-      // Allowed - sum(msr1) * sum(msr2) + sum(msr3)
-      // Not allowed - msr1 + msr2 * msr3 <- Not inside aggregate
-      // Not allowed - sum(msr1) + msr2 <- Aggregate only on one measure
-      // count of measures within aggregates must be equal to count of measures
-      // if both counts are equal and zero, then this node should be inside
-      // aggregate
-      int measuresInAggregates = countMeasuresInAggregates(cubeql, node, false);
-      int measuresInTree = countMeasures(cubeql, node);
-
-      if (measuresInAggregates == measuresInTree) {
-        if (measuresInAggregates == 0 && !insideAggregate) {
-          // (msr1 + msr2)
-          throw new SemanticException("Invalid projection expression: arithmetic expression of measures "
-              + HQLParser.getString(node));
-        } else if (insideAggregate) {
-          // sum(sum(msr1) + sum(msr2))
-          throw new SemanticException("Invalid projection expression: aggreate over aggregates "
-              + HQLParser.getString(node));
-        } else {
-          // Valid complex aggregate expression: sum(msr1) + sum(msr2)
-          // We have to add it to aggregate set, as Hive analyzer will add parts of the expression,
-          // but not the whole expression itself
-          cubeql.addAggregateExpr(HQLParser.getString(node));
-        }
-      } else {
-        throw new SemanticException("Invalid projection expression: mismatched aggregates and measures"
-            + HQLParser.getString(node) + " measures in aggregates =" + measuresInAggregates
-            + " total measures =" + measuresInTree);
-      }
-    } else {
-      boolean isArithmetic = HQLParser.isArithmeticOp(nodeType);
-      boolean isAggregate = isAggregateAST(node);
-      boolean isNonAggrFn = nodeType == HiveParser.TOK_FUNCTION && !isAggregate;
-      for (int i = 0; i < node.getChildCount(); i++) {
-        validateAggregates(cubeql, (ASTNode) node.getChild(i), isAggregate,
-            isArithmetic, isNonAggrFn);
-      }
-    }
-  }
-
-  private int countMeasures(CubeQueryContext cubeql, ASTNode node) {
-    int nodeType = node.getToken().getType();
-    if (nodeType == HiveParser.TOK_TABLE_OR_COL || nodeType == HiveParser.DOT) {
-      String msrname = getColName(node);
-      if (cubeql.isCubeMeasure(msrname)) {
-        return 1;
-      } else {
-        return 0;
-      }
-    } else {
-      int count = 0;
-      for (int i = 0; i < node.getChildCount(); i++) {
-        count += countMeasures(cubeql, (ASTNode) node.getChild(i));
-      }
-      return count;
-    }
-  }
-
-  private int countMeasuresInAggregates(CubeQueryContext cubeql, ASTNode node,
-      boolean hasAggregateParent) throws SemanticException {
-    int nodeType = node.getToken().getType();
-    if (nodeType == HiveParser.TOK_TABLE_OR_COL || nodeType == HiveParser.DOT) {
-      String msrname = getColName(node);
-      if (cubeql.isCubeMeasure(msrname) && hasAggregateParent) {
-        return 1;
-      } else {
-        return 0;
-      }
-    } else {
-      int count = 0;
-      // Tell children if they are inside an aggregate function:
-      // if this node is already in aggregate, then pass true, otherwise check if current node is
-      // an aggregate and pass that
-
-      boolean isCurrentNodeAggregate = isAggregateAST(node);
-
-      if (hasAggregateParent && isCurrentNodeAggregate) {
-        throw new SemanticException("Invalid projection - aggregate inside aggregate");
-      }
-
-      boolean isAggr = hasAggregateParent ? true : isCurrentNodeAggregate;
-
-      for (int i = 0; i < node.getChildCount(); i++) {
-        count += countMeasuresInAggregates(cubeql, (ASTNode) node.getChild(i),
-            isAggr);
-      }
-
-      return count;
-    }
-  }
-
 
   // We need to traverse the clause looking for eligible measures which can be wrapped inside
   // Aggregates
@@ -196,48 +79,28 @@ public class AggregateResolver implements ContextRewriter {
     }
     int nodeType = node.getToken().getType();
 
-    if (!(isAggregateAST(node) || HQLParser.isArithmeticOp(nodeType))) {
-      if (nodeType == HiveParser.TOK_TABLE_OR_COL ||
-          nodeType == HiveParser.DOT) {
-        // Leaf node
-        ASTNode wrapped = wrapAggregate(cubeql, node);
-        if (wrapped != node) {
-          parent.setChild(nodePos, wrapped);
-          // Check if this node has an alias
-          ASTNode sibling = HQLParser.findNodeByPath(parent, Identifier);
-          String expr;
-          if (sibling != null) {
-            expr = HQLParser.getString(parent);
-          } else {
-            expr = HQLParser.getString(wrapped);
-          }
-          cubeql.addAggregateExpr(expr.trim());
+    if (nodeType == HiveParser.TOK_TABLE_OR_COL ||
+        nodeType == HiveParser.DOT) {
+      // Leaf node
+      ASTNode wrapped = wrapAggregate(cubeql, node);
+      if (wrapped != node) {
+        parent.setChild(nodePos, wrapped);
+        // Check if this node has an alias
+        ASTNode sibling = HQLParser.findNodeByPath(parent, Identifier);
+        String expr;
+        if (sibling != null) {
+          expr = HQLParser.getString(parent);
+        } else {
+          expr = HQLParser.getString(wrapped);
         }
-      } else {
-        // Dig deeper in non-leaf nodes
-        for (int i = 0; i < node.getChildCount(); i++) {
-          transform(cubeql, node, (ASTNode) node.getChild(i), i);
-        }
+        cubeql.addAggregateExpr(expr.trim());
+      }
+    } else {
+      // Dig deeper in non-leaf nodes
+      for (int i = 0; i < node.getChildCount(); i++) {
+        transform(cubeql, node, (ASTNode) node.getChild(i), i);
       }
     }
-  }
-
-  private boolean isAggregateAST(ASTNode node) {
-    int exprTokenType = node.getToken().getType();
-    if (exprTokenType == HiveParser.TOK_FUNCTION
-        || exprTokenType == HiveParser.TOK_FUNCTIONDI
-        || exprTokenType == HiveParser.TOK_FUNCTIONSTAR) {
-      assert (node.getChildCount() != 0);
-      if (node.getChild(0).getType() == HiveParser.Identifier) {
-        String functionName = BaseSemanticAnalyzer.unescapeIdentifier(
-            node.getChild(0).getText());
-        if (FunctionRegistry.getGenericUDAFResolver(functionName) != null) {
-          return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   // Wrap an aggregate function around the node if its a measure, leave it
@@ -246,7 +109,7 @@ public class AggregateResolver implements ContextRewriter {
       throws SemanticException {
 
     String tabname = null;
-    String colname = null;
+    String colname;
 
     if (node.getToken().getType() == HiveParser.TOK_TABLE_OR_COL) {
       colname = ((ASTNode) node.getChild(0)).getText();
@@ -286,24 +149,5 @@ public class AggregateResolver implements ContextRewriter {
     } else {
       return node;
     }
-  }
-
-  private String getColName(ASTNode node) {
-    String tabname = null;
-    String colname = null;
-    int nodeType = node.getToken().getType();
-    if (nodeType == HiveParser.TOK_TABLE_OR_COL) {
-      colname = ((ASTNode) node.getChild(0)).getText();
-    } else {
-      // node in 'alias.column' format
-      ASTNode tabident = HQLParser.findNodeByPath(node, TOK_TABLE_OR_COL,
-          Identifier);
-      ASTNode colIdent = (ASTNode) node.getChild(1);
-
-      colname = colIdent.getText();
-      tabname = tabident.getText();
-    }
-
-    return StringUtils.isBlank(tabname) ? colname : tabname + "." + colname;
   }
 }
