@@ -219,6 +219,7 @@ public final class Cube extends AbstractCubeTable {
     // Replace measure if already existing
     if (measureMap.containsKey(measure.getName().toLowerCase()))  {
       measures.remove(measureMap.get(getMeasureByName(measure.getName())));
+      LOG.info("Replacing measure " + measureMap.get(measure.getName()) + " with " + measure);
     }
 
     measures.add(measure);
@@ -234,6 +235,7 @@ public final class Cube extends AbstractCubeTable {
     // Replace dimension if already existing
     if (dimMap.containsKey(dimension.getName().toLowerCase())) {
       dimensions.remove(dimMap.get(dimension.getName().toLowerCase()));
+      LOG.info("Replacing dimension " + dimMap.get(dimension.getName()) + " with " + dimension);
     }
 
     dimensions.add(dimension);

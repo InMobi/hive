@@ -933,6 +933,7 @@ public class CubeMetastoreClient {
         CubeFactTable fact = getFactTable(factName);
         for (String storage : fact.getStorages()) {
           dropStorageFromFact(factName, storage);
+          fact.dropStorage(storage);
         }
       }
       dropHiveTable(factName);

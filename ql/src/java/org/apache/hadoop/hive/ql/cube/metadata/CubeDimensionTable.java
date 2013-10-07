@@ -1,10 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -207,10 +203,12 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   public void addDimensionReference(String referenceName, TableReference reference) throws HiveException {
     List<TableReference> refs = dimensionReferences.get(referenceName);
-    if (refs != null) {
-      for (TableReference existing : refs) {
+    if (refs == null) {
+      Iterator<TableReference> itr = refs.iterator();
+      while (itr.hasNext()) {
+        TableReference existing = itr.next();
         if (existing.equals(reference)) {
-          throw new HiveException("Table reference " + reference + " already exists in " + getName());
+          itr.remove();
         }
       }
     } else {
@@ -227,7 +225,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
 
     if (snapshotDumpPeriods.containsKey(storage)) {
-      throw new HiveException("Storage " + storage + " is already present in " + getName());
+      LOG.info("Updating dump period for " + storage + " from " + snapshotDumpPeriods.get(storage)
+      + " to " + period);
     }
 
     snapshotDumpPeriods.put(storage, period);

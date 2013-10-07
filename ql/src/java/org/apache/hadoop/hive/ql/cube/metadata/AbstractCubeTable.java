@@ -5,8 +5,10 @@ import java.util.*;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.log4j.Logger;
 
 public abstract class AbstractCubeTable implements Named {
+  public static final Logger LOG = Logger.getLogger(AbstractCubeTable.class);
   private final String name;
   private final List<FieldSchema> columns;
   private final Map<String, String> properties = new HashMap<String, String>();
@@ -67,16 +69,20 @@ public abstract class AbstractCubeTable implements Named {
     Iterator<FieldSchema> columnItr = columns.iterator();
     int alterPos = -1;
     int i = 0;
+    FieldSchema toReplace = null;
     while (columnItr.hasNext()) {
       FieldSchema c = columnItr.next();
       // Replace column if already existing
       if (column.getName().equalsIgnoreCase(c.getName())) {
+        toReplace = c;
         columnItr.remove();
         alterPos = i;
       }
       i++;
     }
     if (alterPos != -1) {
+      LOG.info("In " + getName() + " replacing column " + toReplace.getName() + ":" + toReplace.getType() +
+        " to " + column.getName() + ":" + column.getType());
       columns.add(alterPos, column);
     } else {
       columns.add(column);

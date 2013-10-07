@@ -208,4 +208,10 @@ public final class CubeFactTable extends AbstractCubeTable {
     return  validColsStr == null ? null : Arrays.asList(StringUtils.split(
         validColsStr.toLowerCase()));
   }
+
+  public void dropStorage(String storage) {
+    storageUpdatePeriods.remove(storage);
+    getProperties().remove(MetastoreUtil.getFactUpdatePeriodKey(getName(), storage));
+    addProperties();
+  }
 }
