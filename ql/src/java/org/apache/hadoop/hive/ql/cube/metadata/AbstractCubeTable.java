@@ -1,6 +1,11 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -12,7 +17,7 @@ public abstract class AbstractCubeTable implements Named {
   private final String name;
   private final List<FieldSchema> columns;
   private final Map<String, String> properties = new HashMap<String, String>();
-  private final double weight;
+  private double weight;
 
   protected AbstractCubeTable(String name, List<FieldSchema> columns,
       Map<String, String> props, double weight) {
@@ -62,9 +67,44 @@ public abstract class AbstractCubeTable implements Named {
     return weight;
   }
 
+  /**
+   * Alters the weight of table
+   *
+   * @param weight
+   */
+  public void alterWeight(double weight) {
+    this.weight = weight;
+    this.addProperties();
+  }
+
+  /**
+   * Add more table properties
+   *
+   * @param properties
+   */
+  public void addProperties(Map<String, String> props) {
+    this.properties.putAll(props);
+    addProperties();
+  }
+
+  /**
+   * Remove property specified by the key
+   *
+   * @param propKey
+   */
+  public void removeProperty(String propKey) {
+    properties.remove(propKey);
+  }
+
+  /**
+   * Alters the column if already existing or just adds it if it is new column
+   *
+   * @param column
+   * @throws HiveException
+   */
   protected void alterColumn(FieldSchema column) throws HiveException {
     if (column == null) {
-      throw new NullPointerException("Column cannot be null");
+      throw new HiveException("Column cannot be null");
     }
     Iterator<FieldSchema> columnItr = columns.iterator();
     int alterPos = -1;
@@ -81,7 +121,8 @@ public abstract class AbstractCubeTable implements Named {
       i++;
     }
     if (alterPos != -1) {
-      LOG.info("In " + getName() + " replacing column " + toReplace.getName() + ":" + toReplace.getType() +
+      LOG.info("In " + getName() + " replacing column " + toReplace.getName()
+        + ":" + toReplace.getType() +
         " to " + column.getName() + ":" + column.getType());
       columns.add(alterPos, column);
     } else {
@@ -89,9 +130,15 @@ public abstract class AbstractCubeTable implements Named {
     }
   }
 
-  protected void addColumns(Collection<FieldSchema> columns) throws HiveException{
+  /**
+   * Adds or alters the columns passed
+   *
+   * @param columns
+   * @throws HiveException
+   */
+  protected void addColumns(Collection<FieldSchema> columns) throws HiveException {
     if (columns == null) {
-      throw new NullPointerException("Columns cannot be null");
+      throw new HiveException("Columns cannot be null");
     }
     for (FieldSchema column : columns) {
       alterColumn(column);

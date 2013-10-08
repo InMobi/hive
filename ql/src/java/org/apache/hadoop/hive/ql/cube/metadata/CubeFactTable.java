@@ -1,11 +1,22 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod.UpdatePeriodComparator;
 import org.apache.hadoop.hive.ql.cube.parse.DateUtil;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.util.StringUtils;
 
@@ -52,7 +63,7 @@ public final class CubeFactTable extends AbstractCubeTable {
     addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
   }
 
-  public static void addUpdatePeriodProperies(String name,
+  private static void addUpdatePeriodProperies(String name,
       Map<String, String> props,
       Map<String, Set<UpdatePeriod>> updatePeriods) {
     if (updatePeriods != null) {
@@ -65,7 +76,7 @@ public final class CubeFactTable extends AbstractCubeTable {
     }
   }
 
-  public static Map<String, Set<UpdatePeriod>> getUpdatePeriods(String name,
+  private static Map<String, Set<UpdatePeriod>> getUpdatePeriods(String name,
       Map<String, String> props) {
     Map<String, Set<UpdatePeriod>> storageUpdatePeriods = new HashMap<String,
         Set<UpdatePeriod>>();
@@ -112,6 +123,14 @@ public final class CubeFactTable extends AbstractCubeTable {
     return CubeTableType.FACT;
   }
 
+  /**
+   * Get partition value strings for given range, for the specified updateInterval
+   *
+   * @param fromDate
+   * @param toDate
+   * @param interval
+   * @return
+   */
   public List<String> getPartitions(Date fromDate, Date toDate,
       UpdatePeriod interval) {
     String fmt = interval.format();
@@ -132,7 +151,14 @@ public final class CubeFactTable extends AbstractCubeTable {
     }
   }
 
-
+  /**
+   * Get the max update period for the given range and available update periods
+   *
+   * @param from
+   * @param to
+   * @param updatePeriods
+   * @return
+   */
   public static UpdatePeriod maxIntervalInRange(Date from, Date to,
       Set<UpdatePeriod> updatePeriods) {
     UpdatePeriod max = null;
@@ -194,6 +220,12 @@ public final class CubeFactTable extends AbstractCubeTable {
     return cubeName;
   }
 
+  /**
+   * Return valid columns of the fact, which can be specified by the property
+   * MetastoreUtil.getValidColumnsKey(getName())
+   *
+   * @return
+   */
   public List<String> getValidColumns() {
     String validColsStr = getProperties().get(MetastoreUtil.getValidColumnsKey(
         getName()));
@@ -201,30 +233,80 @@ public final class CubeFactTable extends AbstractCubeTable {
         validColsStr.toLowerCase()));
   }
 
+  /**
+   * Add update period to storage
+   *
+   * @param storage
+   * @param period
+   */
   public void addUpdatePeriod(String storage, UpdatePeriod period) {
     if (storageUpdatePeriods.containsKey(storage)) {
       storageUpdatePeriods.get(storage).add(period);
     } else {
       storageUpdatePeriods.put(storage, new HashSet<UpdatePeriod>(Arrays.asList(period)));
     }
-    addProperties();
+    addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
   }
 
+  /**
+   * Remove update period from storage
+   *
+   * @param storage
+   * @param period
+   */
   public void removeUpdatePeriod(String storage, UpdatePeriod period) {
     if (storageUpdatePeriods.containsKey(storage)) {
       storageUpdatePeriods.get(storage).remove(period);
+      addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
     }
-    addProperties();
   }
 
-  public void addStorage(String storage) {
-    storageUpdatePeriods.put(storage, new HashSet<UpdatePeriod>());
-    addProperties();
+  /**
+   * Alter a storage with specified update periods
+   *
+   * @param storage
+   * @param updatePeriods
+   * @throws HiveException
+   */
+  public void alterStorage(String storage, Set<UpdatePeriod> updatePeriods)
+      throws HiveException {
+    if (!storageUpdatePeriods.containsKey(storage)) {
+      throw new HiveException("Invalid storage" + storage);
+    }
+    storageUpdatePeriods.put(storage, updatePeriods);
+    addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
   }
 
-  public void dropStorage(String storage) {
+  /**
+   * Add a storage with specified update periods
+   *
+   * @param storage
+   * @param updatePeriods
+   * @throws HiveException
+   */
+  void addStorage(String storage, Set<UpdatePeriod> updatePeriods)
+      throws HiveException {
+    storageUpdatePeriods.put(storage, updatePeriods);
+    addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
+  }
+
+  /**
+   * Drop a storage from the fact
+   *
+   * @param storage
+   */
+  void dropStorage(String storage) {
     storageUpdatePeriods.remove(storage);
     getProperties().remove(MetastoreUtil.getFactUpdatePeriodKey(getName(), storage));
-    addProperties();
+  }
+
+  @Override
+  public void alterColumn(FieldSchema column) throws HiveException {
+    super.alterColumn(column);
+  }
+
+  @Override
+  public void addColumns(Collection<FieldSchema> columns) throws HiveException {
+    super.addColumns(columns);
   }
 }
