@@ -641,10 +641,13 @@ public class TestCubeRewriter {
     compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select name n, count(1) from citytable"
-        + "order by n ");
-    expected = getExpectedQuery("citytable", "select citytable.name n," +
-        " count(1) from ", "groupby citytable.name order by n", "c2_citytable",
-        false);
+      + " order by n ");
+    compareQueries(expected, hqlQuery);
+    hqlQuery = rewrite(driver, "select count(1) from citytable"
+      + " group by name order by name ");
+    expected = getExpectedQuery("citytable", "select citytable.name," +
+      " count(1) from ", "groupby citytable.name order by citytable.name",
+      "c2_citytable", false);
     compareQueries(expected, hqlQuery);
   }
 
