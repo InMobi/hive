@@ -18,7 +18,13 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 /**
  * <p>
  * Replace select and having columns with default aggregate functions on them,
- * if default aggregate is defined
+ * if default aggregate is defined and if there isn't already an aggregate
+ * function specified on the columns.
+ * </p>
+ *
+ * <p>
+ * Expressions which already contain aggregate sub-expressions will not be
+ * changed.
  * </p>
  *
  * <p>
@@ -79,28 +85,47 @@ public class AggregateResolver implements ContextRewriter {
     }
     int nodeType = node.getToken().getType();
 
-    if (nodeType == HiveParser.TOK_TABLE_OR_COL ||
-        nodeType == HiveParser.DOT) {
-      // Leaf node
-      ASTNode wrapped = wrapAggregate(cubeql, node);
-      if (wrapped != node) {
-        parent.setChild(nodePos, wrapped);
-        // Check if this node has an alias
-        ASTNode sibling = HQLParser.findNodeByPath(parent, Identifier);
-        String expr;
-        if (sibling != null) {
-          expr = HQLParser.getString(parent);
-        } else {
-          expr = HQLParser.getString(wrapped);
+    if (!(isAggregateAST(node))) {
+      if (nodeType == HiveParser.TOK_TABLE_OR_COL ||
+          nodeType == HiveParser.DOT) {
+        // Leaf node
+        ASTNode wrapped = wrapAggregate(cubeql, node);
+        if (wrapped != node) {
+          parent.setChild(nodePos, wrapped);
+          // Check if this node has an alias
+          ASTNode sibling = HQLParser.findNodeByPath(parent, Identifier);
+          String expr;
+          if (sibling != null) {
+            expr = HQLParser.getString(parent);
+          } else {
+            expr = HQLParser.getString(wrapped);
+          }
+          cubeql.addAggregateExpr(expr.trim());
         }
-        cubeql.addAggregateExpr(expr.trim());
-      }
-    } else {
-      // Dig deeper in non-leaf nodes
-      for (int i = 0; i < node.getChildCount(); i++) {
-        transform(cubeql, node, (ASTNode) node.getChild(i), i);
+      } else {
+        // Dig deeper in non-leaf nodes
+        for (int i = 0; i < node.getChildCount(); i++) {
+          transform(cubeql, node, (ASTNode) node.getChild(i), i);
+        }
       }
     }
+  }
+
+  static boolean isAggregateAST(ASTNode node) {
+    int exprTokenType = node.getToken().getType();
+    if (exprTokenType == HiveParser.TOK_FUNCTION
+        || exprTokenType == HiveParser.TOK_FUNCTIONDI
+        || exprTokenType == HiveParser.TOK_FUNCTIONSTAR) {
+      assert (node.getChildCount() != 0);
+      if (node.getChild(0).getType() == HiveParser.Identifier) {
+        String functionName = BaseSemanticAnalyzer.unescapeIdentifier(
+            node.getChild(0).getText());
+        if (FunctionRegistry.getGenericUDAFResolver(functionName) != null) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // Wrap an aggregate function around the node if its a measure, leave it
