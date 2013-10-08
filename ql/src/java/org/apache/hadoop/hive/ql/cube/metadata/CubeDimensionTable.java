@@ -1,13 +1,16 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeDimensionTable extends AbstractCubeTable {
@@ -83,8 +86,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   @Override
   protected void addProperties() {
     super.addProperties();
-    addDimensionReferenceProperties(getProperties(), dimensionReferences);
-    addSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
+    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+    setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
 
   public Map<String, List<TableReference>> getDimensionReferences() {
@@ -95,8 +98,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     return snapshotDumpPeriods;
   }
 
-  public static void addSnapshotPeriods(String name, Map<String, String> props,
-      Map<String, UpdatePeriod> snapshotDumpPeriods) {
+  private static void setSnapshotPeriods(String name, Map<String, String> props,
+                                        Map<String, UpdatePeriod> snapshotDumpPeriods) {
     if (snapshotDumpPeriods != null) {
       props.put(MetastoreUtil.getDimensionStorageListKey(name),
           MetastoreUtil.getStr(snapshotDumpPeriods.keySet()));
@@ -110,8 +113,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
   }
 
-  public static void addDimensionReferenceProperties(Map<String, String> props,
-      Map<String, List<TableReference>> dimensionReferences) {
+  private static void setDimensionReferenceProperties(Map<String, String> props,
+                                                     Map<String, List<TableReference>> dimensionReferences) {
     if (dimensionReferences != null) {
       for (Map.Entry<String, List<TableReference>> entry : dimensionReferences.entrySet()) {
         props.put(MetastoreUtil.getDimensionSrcReferenceKey(entry.getKey()),
@@ -120,7 +123,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
   }
 
-  public static Map<String, List<TableReference>> getDimensionReferences(
+  private static Map<String, List<TableReference>> getDimensionReferences(
       Map<String, String> params) {
     Map<String, List<TableReference>> dimensionReferences =
         new HashMap<String, List<TableReference>>();
@@ -144,7 +147,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     return dimensionReferences;
   }
 
-  public static Map<String, UpdatePeriod> getDumpPeriods(String name,
+  private static Map<String, UpdatePeriod> getDumpPeriods(String name,
       Map<String, String> params) {
     String storagesStr = params.get(MetastoreUtil.getDimensionStorageListKey(
         name));
@@ -202,5 +205,92 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   public boolean hasStorageSnapshots(String storage) {
     return (snapshotDumpPeriods.get(storage) != null);
+  }
+
+  /**
+   * Add a table reference to dimension column
+   *
+   * @param referenceName The column name
+   * @param reference The new reference
+   *
+   * @throws HiveException
+   */
+  public void addDimensionReference(String referenceName,
+      TableReference reference) throws HiveException {
+    List<TableReference> refs = dimensionReferences.get(referenceName);
+    if (refs != null) {
+      Iterator<TableReference> itr = refs.iterator();
+      while (itr.hasNext()) {
+        TableReference existing = itr.next();
+        if (existing.equals(reference)) {
+          itr.remove();
+        }
+      }
+    } else {
+      refs = new ArrayList<TableReference>(1);
+      dimensionReferences.put(referenceName, refs);
+    }
+    refs.add(reference);
+    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+  }
+
+  /**
+   * Add or Alter the references of a dimension column
+   *
+   * @param referenceName The column name
+   * @param reference The new reference
+   *
+   * @throws HiveException
+   */
+  public void alterDimensionReferences(String referenceName,
+      List<TableReference> references) throws HiveException {
+    dimensionReferences.put(referenceName, references);
+    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+  }
+
+  /**
+   * Remove all the dimension references of specified dimension column
+   *
+   * @param referenceName
+   */
+  public void removeDimensionRefernces(String referenceName) {
+    dimensionReferences.remove(referenceName);
+    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+  }
+
+  /**
+   * Alter snapshot dump period of a storage
+   *
+   * @param storage Storage name
+   * @param period The new value
+   * @throws HiveException
+   */
+  public void alterSnapshotDumpPeriod(String storage,
+      UpdatePeriod period) throws HiveException {
+    if (storage == null) {
+      throw new HiveException("Cannot add null storage for " + getName());
+    }
+
+    if (snapshotDumpPeriods.containsKey(storage)) {
+      LOG.info("Updating dump period for " + storage + " from "
+        + snapshotDumpPeriods.get(storage) + " to " + period);
+    }
+
+    snapshotDumpPeriods.put(storage, period);
+    setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
+  }
+
+  @Override
+  public void alterColumn(FieldSchema column) throws HiveException {
+    super.alterColumn(column);
+  }
+
+  @Override
+  public void addColumns(Collection<FieldSchema> columns) throws HiveException {
+    super.addColumns(columns);
+  }
+
+  void dropStorage(String storage) {
+    snapshotDumpPeriods.remove(storage);
   }
 }
