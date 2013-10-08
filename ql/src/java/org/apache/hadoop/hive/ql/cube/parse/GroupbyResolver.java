@@ -1,13 +1,17 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
+import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
+
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
+import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
 
 public class GroupbyResolver implements ContextRewriter {
 
@@ -102,10 +106,31 @@ public class GroupbyResolver implements ContextRewriter {
       if (hasMeasure(child, cubeql)) {
         continue;
       }
+      if (hasAggregate(child)) {
+        continue;
+      }
       list.add(HQLParser.getString((ASTNode)node.getChild(i)));
     }
 
     return list;
+  }
+
+  private boolean hasAggregate(ASTNode node) {
+    int nodeType = node.getToken().getType();
+    if (nodeType == HiveParser.TOK_TABLE_OR_COL || nodeType == HiveParser.DOT) {
+      return false;
+    } else {
+      if (AggregateResolver.isAggregateAST(node)) {
+        return true;
+      }
+
+      for (int i = 0; i < node.getChildCount(); i++) {
+        if (hasAggregate((ASTNode) node.getChild(i))) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   boolean hasMeasure(ASTNode node, CubeQueryContext cubeql) {
