@@ -105,6 +105,8 @@ public class GroupbyResolver implements ContextRewriter {
       ASTNode child = (ASTNode) node.getChild(i);
       if (hasMeasure(child, cubeql)) {
         continue;
+      } else {
+        list.add(HQLParser.getString(child));
       }
       if (hasAggregate(child)) {
         continue;

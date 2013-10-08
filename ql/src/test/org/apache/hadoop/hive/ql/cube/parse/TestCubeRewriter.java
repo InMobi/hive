@@ -779,6 +779,19 @@ public class TestCubeRewriter {
     } catch (SemanticException exc) {
       Assert.assertNotNull(exc);
       exc.printStackTrace();
+
+      String queryWithFunction = "SELECT cityid, exp(testCube.msr2) FROM testCube where " + twoDaysRange;
+      String hql = rewrite(driver, queryWithFunction);
+      System.out.println("#### AGG resolver HQL with function " + hql);
+
+      String expectedHqlWithFunction = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
+        " exp(sum(testCube.msr2)) from ", null,
+        "group by testcube.cityid",
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+      compareQueries(expectedHqlWithFunction, hql);
+
+    } finally {
+      conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
     }
   }
 
