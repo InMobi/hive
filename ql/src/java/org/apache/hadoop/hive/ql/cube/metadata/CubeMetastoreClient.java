@@ -907,15 +907,42 @@ public class CubeMetastoreClient {
     return schemaGraph;
   }
 
-  private void alterCubeTable(String table, Table hiveTable,
+  /**
+   * Returns true if columns changed
+   *
+   * @param table
+   * @param hiveTable
+   * @param cubeTable
+   * @throws HiveException
+   */
+  private boolean alterCubeTable(String table, Table hiveTable,
       AbstractCubeTable cubeTable) throws HiveException {
     hiveTable.getParameters().putAll(cubeTable.getProperties());
-    hiveTable.getTTable().getSd().setCols(cubeTable.getColumns());
+    boolean columnsChanged = !(hiveTable.getCols().equals(
+        cubeTable.getColumns()));
+    if (columnsChanged) {
+      hiveTable.getTTable().getSd().setCols(cubeTable.getColumns());
+    }
     hiveTable.getTTable().getParameters().putAll(cubeTable.getProperties());
     try {
       metastore.alterTable(table, hiveTable);
     } catch (InvalidOperationException e) {
       throw new HiveException(e);
+    }
+    return columnsChanged;
+  }
+
+  private void alterHiveTable(String table, Table hiveTable,
+      List<FieldSchema> columns) throws HiveException {
+    hiveTable.getTTable().getSd().setCols(columns);
+    try {
+      metastore.alterTable(table, hiveTable);
+    } catch (InvalidOperationException e) {
+      throw new HiveException(e);
+    }
+    if (enableCaching) {
+      // refresh the table in cache
+      getTable(table, true);
     }
   }
 
@@ -1057,7 +1084,17 @@ public class CubeMetastoreClient {
       CubeFactTable cubeFactTable) throws  HiveException {
     Table factTbl = getTable(factTableName);
     if (isFactTable(factTbl)) {
-      alterCubeTable(factTableName, factTbl, cubeFactTable);
+      boolean colsChanged = alterCubeTable(factTableName, factTbl,
+          cubeFactTable);
+      if (colsChanged) {
+        // Change schema of all the storage tables
+        for (String storage : cubeFactTable.getStorages()) {
+          String storageTableName = MetastoreUtil.getFactStorageTableName(
+              factTableName, Storage.getPrefix(storage));
+          alterHiveTable(storageTableName, getTable(storageTableName),
+              cubeFactTable.getColumns());
+        }
+      }
       updateFactCache(factTableName);
     } else {
       throw new HiveException(factTableName + " is not a fact table");
@@ -1094,7 +1131,17 @@ public class CubeMetastoreClient {
       CubeDimensionTable cubeDimensionTable) throws HiveException {
     Table dimTbl = getTable(dimTableName);
     if (isDimensionTable(dimTbl)) {
-      alterCubeTable(dimTableName, dimTbl, cubeDimensionTable);
+      boolean colsChanged = alterCubeTable(dimTableName, dimTbl,
+          cubeDimensionTable);
+      if (colsChanged) {
+        // Change schema of all the storage tables
+        for (String storage : cubeDimensionTable.getStorages()) {
+          String storageTableName = MetastoreUtil.getDimStorageTableName(
+              dimTableName, Storage.getPrefix(storage));
+          alterHiveTable(storageTableName, getTable(storageTableName),
+              cubeDimensionTable.getColumns());
+        }
+      }
       updateDimCache(dimTableName);
     } else {
       throw new HiveException(dimTableName + " is not a dimension table");
