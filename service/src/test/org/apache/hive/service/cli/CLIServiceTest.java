@@ -215,7 +215,7 @@ public abstract class CLIServiceTest {
     }
 
     assertEquals("Query should be finished",
-        OperationState.FINISHED, client.getOperationStatus(ophandle));
+        OperationState.FINISHED, client.getOperationStatus(ophandle).getState());
 
     // Cancellation test
     ophandle = client.executeStatementAsync(sessionHandle, queryString, confOverlay);
