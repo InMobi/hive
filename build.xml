@@ -243,7 +243,7 @@
   -->
   <target name="ivy-init-antlib" depends="ivy-download,ivy-init-dirs,ivy-probe-antlib" unless="ivy.found">
     <echo message="Project: ${ant.project.name}"/>
-    <typedef uri="antlib:org.apache.ivy.ant" onerror="fail" loaderRef="ivyLoader">
+    <typedef uri="antlib:org.apache.ivy.ant" onerror="fail" loaderRef="ivyLoader" resource="org/apache/ivy/ant/antlib.xml">
       <classpath>
         <pathelement location="${ivy.jar}"/>
       </classpath>
@@ -1168,7 +1168,7 @@
           tofile="${mvn.pom.dir}/hive-jdbc-${version}.pom" />
     <copy file="${build.dir.hive}/metastore/pom.xml"
           tofile="${mvn.pom.dir}/hive-metastore-${version}.pom" />
-        <copy file="${build.dir.hive}/ql/pom.xml"
+    <copy file="${build.dir.hive}/ql/pom.xml"
           tofile="${mvn.pom.dir}/hive-exec-${version}.pom" />
     <copy file="${build.dir.hive}/serde/pom.xml"
           tofile="${mvn.pom.dir}/hive-serde-${version}.pom" />
@@ -1210,15 +1210,15 @@
     <artifact:pom
        file="${mvn.pom.dir}/hive-${hive.project}-${version}.pom"
        id="hive.project.pom" />
-    <artifact:install-provider artifactId="wagon-http" version="2.4" />
+    <artifact:install-provider artifactId="wagon-http" version="1.0-beta-2" />
     <if>
       <equals arg1="${mvn.publish.repo}" arg2="staging" />
       <then>
         <artifact:deploy
             file="${mvn.jar.dir}/hive-${hive.project}-${version}.jar">
           <pom refid="hive.project.pom" />
-          <remoteRepository id="${mvn.staging.repo.id}"
-              url="${mvn.staging.repo.url}" />
+          <remoteRepository
+              id="${mvn.staging.repo.id}" url="${mvn.staging.repo.url}"/>
           <attach file="${mvn.jar.dir}/hive-${hive.project}-${version}.jar.asc"
                   type="jar.asc"/>
           <attach file="${mvn.pom.dir}/hive-${hive.project}-${version}.pom.asc"
@@ -1287,24 +1287,23 @@
     <antcall target="maven-publish-artifact">
       <param name="hive.project" value="shims" />
     </antcall>
-
-    <!-- Handle HCat separately -->
+    <!-- Handle HCat separately; matches maven-publish-artifact-->
     <if>
       <equals arg1="${mvn.publish.repo}" arg2="staging" />
       <then>
-        <ant antfile="hcatalog" target="mvn-publish">
+        <ant dir="hcatalog" target="mvn-deploy-signed">
           <property name="mvn.deploy.repo.id" value="${mvn.staging.repo.id}"/>
           <property name="mvn.deploy.repo.url" value="${mvn.staging.repo.url}"/>
         </ant>
       </then>
       <elseif>
         <equals arg1="${mvn.publish.repo}" arg2="local"/>
-        <then>
-          <!-- NOP, HCat always publishes to the local repo -->
-        </then>
+          <then>
+            <!-- NOP, HCat always publishes to the local repo in jar target-->
+          </then>
       </elseif>
       <else>
-        <ant antfile="hcatalog" target="mvn-publish">
+        <ant dir="hcatalog" target="mvn-deploy">
           <property name="mvn.deploy.repo.id" value="${mvn.deploy.id}"/>
           <property name="mvn.deploy.repo.url" value="${mvn.deploy.url}"/>
         </ant>
@@ -1431,18 +1430,8 @@
         output.file="${mvn.jar.dir}/hive-metastore-${version}.jar.asc"
         gpg.passphrase="${gpg.passphrase}"/>
     <sign-artifact
-        input.file="${mvn.jar.dir}/hive-metastore-${version}.pom"
-        output.file="${mvn.jar.dir}/hive-metastore-${version}.pom.asc"
-        gpg.passphrase="${gpg.passphrase}"/>
-
-    <!-- hive-hcatalog -->
-    <sign-artifact
-        input.file="${mvn.pom.dir}/hive-hcatalog-${hcatalog.version}.jar"
-        output.file="${mvn.pom.dir}/hive-hcatalog-${hcatalog.version}.jar.asc"
-        gpg.passphrase="${gpg.passphrase}"/>
-    <sign-artifact
-        input.file="${mvn.pom.dir}/hive-hcatalog-${hcatalog.version}.pom"
-        output.file="${mvn.pom.dir}/hive-hcatalog-${hcatalog.version}.pom.asc"
+        input.file="${mvn.pom.dir}/hive-metastore-${version}.pom"
+        output.file="${mvn.pom.dir}/hive-metastore-${version}.pom.asc"
         gpg.passphrase="${gpg.passphrase}"/>
 
     <!-- hive-serde -->
