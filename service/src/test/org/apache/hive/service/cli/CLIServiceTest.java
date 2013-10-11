@@ -226,18 +226,4 @@ public abstract class CLIServiceTest {
     assertEquals("Query should be cancelled", OperationState.CANCELED, state);
     client.closeSession(sessionHandle);
   }
-
-  @Test
-  public void testSessionStateChange() throws Exception {
-    HiveConf conf = new HiveConf(CLIServiceTest.class);
-    SessionState before = SessionState.start(conf);
-    SessionHandle sessionHandle = client.openSession("tom", "password",
-      new HashMap<String, String>());
-    Map<String, String> confOverlay = new HashMap<String, String>();
-    client.executeStatement(sessionHandle, "DROP TABLE IF EXISTS SESSION_TEST", confOverlay);
-    client.executeStatement(sessionHandle, "CREATE TABLE SESSION_TEST(ID STRING)", confOverlay);
-    SessionState after = SessionState.get();
-    assertTrue(before == after);
-    client.closeSession(sessionHandle);
-  }
 }
