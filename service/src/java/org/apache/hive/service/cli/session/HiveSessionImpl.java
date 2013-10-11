@@ -89,11 +89,7 @@ public class HiveSessionImpl implements HiveSession {
     // set an explicit session name to control the download directory name
     hiveConf.set(ConfVars.HIVESESSIONID.varname,
         sessionHandle.getHandleIdentifier().toString());
-    if (SessionState.get() == null) {
-      sessionState = new SessionState(hiveConf);
-    } else {
-      sessionState = SessionState.get();
-    }
+    sessionState = new SessionState(hiveConf);
   }
 
   public SessionManager getSessionManager() {
