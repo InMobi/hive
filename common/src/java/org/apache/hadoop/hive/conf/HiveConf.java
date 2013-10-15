@@ -754,7 +754,7 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS("hive.server2.thrift.max.worker.threads", 100),
     // Configuration for async thread pool in SessionManagers
     HIVE_SERVER2_ASYNC_EXEC_THREADS("hive.server2.thrift.async.task.threads", 10),
-    HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.thrift.async.task.timeout", 10000),
+    HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.thrift.async.task.timeout", 10000L),
 
 
     // HiveServer2 auth configuration
