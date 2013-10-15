@@ -97,7 +97,19 @@ public class SQLOperation extends ExecuteStatementOperation {
     String SQLState = null;
 
     try {
-      driver = new Driver(getParentSession().getHiveConf());
+      HiveConf opConf;
+      if (confOverlay != null && !confOverlay.isEmpty()) {
+        // User passed op specific configuration we need to clone the sessions's conf, so that
+        // the conf specific to this operation does not affect other operations in the same session
+        opConf = new HiveConf(getParentSession().getHiveConf());
+        for (String key : confOverlay.keySet()) {
+          opConf.set(key, confOverlay.get(key));
+        }
+      } else {
+        opConf = getParentSession().getHiveConf();
+      }
+
+      driver = new Driver(opConf);
       // In Hive server mode, we are not able to retry in the FetchTask
       // case, when calling fetch queries since execute() has returned.
       // For now, we disable the test attempts.
