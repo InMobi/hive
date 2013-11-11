@@ -1,7 +1,20 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -222,7 +235,7 @@ public class StorageTableResolver implements ContextRewriter {
         cfact.numQueriedParts += rangeParts.size();
         answeringParts.addAll(rangeParts);
         cfact.rangeToWhereClause.put(range, StorageUtil.getWherePartClause(
-            cubeql.getAliasForTabName(cfact.fact.getCubeName()), rangeParts));
+            cubeql.getAliasForTabName(cubeql.getCube().getName()), rangeParts));
       }
       if (cfact.numQueriedParts == 0) {
         LOG.info("Not considering the fact table:" + cfact.fact + " as it could"

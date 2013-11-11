@@ -14,7 +14,7 @@ public interface MetastoreConstants {
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
   public static final String UPDATE_PERIOD_SFX = ".updateperiods";
-  public static final String CUBE_NAME_SFX = ".cubename";
+  public static final String CUBE_NAMES_SFX = ".cubenames";
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
 
   // column constants
@@ -41,6 +41,5 @@ public interface MetastoreConstants {
   public static final String CLASS_SFX = ".class";
   public static final String DUMP_PERIOD_SFX = ".dumpperiod";
   public static final String STORAGE_LIST_SFX = ".storages";
-  public static final String METASTORE_NEEDS_REFRESH = "cube.metastore.needs.refresh";
   public static final String METASTORE_ENABLE_CACHING = "cube.metastore.enable.cache";
 }

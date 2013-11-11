@@ -63,7 +63,6 @@ import org.apache.hadoop.mapred.TextInputFormat;
 @SuppressWarnings("deprecation")
 public class CubeTestSetup {
 
-  public static final String cubeName = "testcube";
   public static String HOUR_FMT = "yyyy-MM-dd-HH";
   public static final SimpleDateFormat HOUR_PARSER = new SimpleDateFormat(
     HOUR_FMT);
@@ -313,7 +312,7 @@ public class CubeTestSetup {
     }
     Collections.sort(parts);
     storageTableToWhereClause.put(tables.toString(),
-      StorageUtil.getWherePartClause("dt", cubeName, parts));
+      StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
 
@@ -325,7 +324,7 @@ public class CubeTestSetup {
       twoMonthsBack,
       DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
     storageTableToWhereClause.put(monthlyTable,
-      StorageUtil.getWherePartClause("dt", cubeName, parts));
+      StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
 
@@ -336,7 +335,7 @@ public class CubeTestSetup {
     addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
       DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
     storageTableToWhereClause.put(hourlyTable,
-      StorageUtil.getWherePartClause("dt", cubeName, parts));
+      StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
 
@@ -474,7 +473,9 @@ public class CubeTestSetup {
     storageAggregatePeriods.put(hdfsStorage3, updates);
 
     // create cube fact
-    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(TEST_CUBE_NAME);
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 0L, null);
   }
 
@@ -500,7 +501,9 @@ public class CubeTestSetup {
     storageAggregatePeriods.put(hdfsStorage, updates);
 
     // create cube fact
-    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(TEST_CUBE_NAME);
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 0L, null);
   }
 
@@ -528,7 +531,9 @@ public class CubeTestSetup {
     storageAggregatePeriods.put(hdfsStorage, updates);
 
     // create cube fact
-    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(TEST_CUBE_NAME);
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 10L, null);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
@@ -568,7 +573,9 @@ public class CubeTestSetup {
     storageAggregatePeriods.put(hdfsStorage, updates);
 
     // create cube fact
-    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(TEST_CUBE_NAME);
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 0L, null);
   }
 
@@ -893,7 +900,9 @@ public class CubeTestSetup {
     String validColumns = commonCols.toString() + ",dim1";
     properties.put(MetastoreUtil.getValidColumnsKey(factName),
         validColumns);
-    CubeFactTable fact1 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(TEST_CUBE_NAME);
+    CubeFactTable fact1 = new CubeFactTable(cubeNames, factName, factColumns,
         storageUpdatePeriods, 10L, properties);
     client.createCubeTable(fact1, storages);
     createPIEParts(client, fact1, hdfsStorage2);
@@ -919,7 +928,7 @@ public class CubeTestSetup {
     validColumns = commonCols.toString() + ",dim1,dim2";
     properties.put(MetastoreUtil.getValidColumnsKey(factName),
         validColumns);
-    CubeFactTable fact2 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    CubeFactTable fact2 = new CubeFactTable(cubeNames, factName, factColumns,
         storageUpdatePeriods, 20L, properties);
     client.createCubeTable(fact2, storages);
     createPIEParts(client, fact2, hdfsStorage2);
@@ -944,7 +953,7 @@ public class CubeTestSetup {
     validColumns = commonCols.toString() + ",dim1,dim2,cityid";
     properties.put(MetastoreUtil.getValidColumnsKey(factName),
         validColumns);
-    CubeFactTable fact3 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+    CubeFactTable fact3 = new CubeFactTable(cubeNames, factName, factColumns,
         storageUpdatePeriods, 30L, properties);
     client.createCubeTable(fact3, storages);
     createPIEParts(client, fact3, hdfsStorage2);

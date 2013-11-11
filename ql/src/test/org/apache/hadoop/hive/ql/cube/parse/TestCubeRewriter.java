@@ -34,7 +34,7 @@ public class TestCubeRewriter {
 
   private Configuration conf;
   private CubeQueryRewriter driver;
-  private final String cubeName = CubeTestSetup.cubeName;
+  private final String cubeName = CubeTestSetup.TEST_CUBE_NAME;
 
   static CubeTestSetup setup;
   static HiveConf hconf = new HiveConf(TestCubeRewriter.class);
