@@ -13,45 +13,44 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod.UpdatePeriodComparator;
 import org.apache.hadoop.hive.ql.cube.parse.DateUtil;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.util.StringUtils;
 
 public final class CubeFactTable extends AbstractCubeTable {
-  private final String cubeName;
+  private final List<String> cubeNames;
   private final Map<String, Set<UpdatePeriod>> storageUpdatePeriods;
 
   public CubeFactTable(Table hiveTable) {
     super(hiveTable);
     this.storageUpdatePeriods = getUpdatePeriods(getName(), getProperties());
-    this.cubeName = getProperties().get(
-        MetastoreUtil.getFactCubeNameKey(getName()));
+    this.cubeNames = getCubeNames(getName(), getProperties());
   }
 
-  public CubeFactTable(String cubeName, String factName,
+  public CubeFactTable(List<String> cubeNames, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageUpdatePeriods) {
-    this(cubeName, factName, columns, storageUpdatePeriods, 0L,
+    this(cubeNames, factName, columns, storageUpdatePeriods, 0L,
         new HashMap<String, String>());
   }
 
-  public CubeFactTable(String cubeName, String factName,
+  public CubeFactTable(List<String> cubeNames, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageUpdatePeriods, double weight) {
-    this(cubeName, factName, columns, storageUpdatePeriods, weight,
+    this(cubeNames, factName, columns, storageUpdatePeriods, weight,
         new HashMap<String, String>());
   }
 
-  public CubeFactTable(String cubeName, String factName,
+  public CubeFactTable(List<String> cubeNames, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageUpdatePeriods,
       double weight,
       Map<String, String> properties) {
     super(factName, columns, properties, weight);
-    this.cubeName = cubeName;
+    this.cubeNames = cubeNames;
     this.storageUpdatePeriods = storageUpdatePeriods;
     addProperties();
   }
@@ -59,7 +58,7 @@ public final class CubeFactTable extends AbstractCubeTable {
   @Override
   protected void addProperties() {
     super.addProperties();
-    getProperties().put(MetastoreUtil.getFactCubeNameKey(getName()), cubeName);
+    addCubeNames(getName(), getProperties(), cubeNames);
     addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
   }
 
@@ -74,6 +73,12 @@ public final class CubeFactTable extends AbstractCubeTable {
             MetastoreUtil.getNamedStr(entry.getValue()));
       }
     }
+  }
+
+  private static void addCubeNames(String factName, Map<String, String> props,
+      List<String> cubeNames) {
+    props.put(MetastoreUtil.getFactCubeNamesKey(factName),
+        StringUtils.join(cubeNames, ",").toLowerCase());
   }
 
   private static Map<String, Set<UpdatePeriod>> getUpdatePeriods(String name,
@@ -93,6 +98,13 @@ public final class CubeFactTable extends AbstractCubeTable {
       storageUpdatePeriods.put(storage, updatePeriods);
     }
     return storageUpdatePeriods;
+  }
+
+  static List<String> getCubeNames(String factName, Map<String, String> props) {
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.addAll(Arrays.asList(StringUtils.split(
+        props.get(MetastoreUtil.getFactCubeNamesKey(factName)), ',')));
+    return cubeNames;
   }
 
   public Map<String, Set<UpdatePeriod>> getUpdatePeriods() {
@@ -216,8 +228,8 @@ public final class CubeFactTable extends AbstractCubeTable {
     return storageUpdatePeriods.keySet();
   }
 
-  public String getCubeName() {
-    return cubeName;
+  public List<String> getCubeNames() {
+    return cubeNames;
   }
 
   /**
@@ -230,7 +242,7 @@ public final class CubeFactTable extends AbstractCubeTable {
     String validColsStr = getProperties().get(MetastoreUtil.getValidColumnsKey(
         getName()));
     return  validColsStr == null ? null : Arrays.asList(StringUtils.split(
-        validColsStr.toLowerCase()));
+        validColsStr.toLowerCase(), ','));
   }
 
   /**
@@ -308,5 +320,25 @@ public final class CubeFactTable extends AbstractCubeTable {
   @Override
   public void addColumns(Collection<FieldSchema> columns) throws HiveException {
     super.addColumns(columns);
+  }
+
+  /**
+   * Add a cubeName to which this fact belongs
+   *
+   * @param cubeName
+   */
+  public void addCubeName(String cubeName) {
+    cubeNames.add(cubeName.toLowerCase());
+    addCubeNames(getName(), getProperties(), cubeNames);
+  }
+
+  /**
+   * Remove a cubeName to which this fact no more belongs
+   *
+   * @param cubeName
+   */
+  public void removeCubeName(String cubeName) {
+    cubeNames.remove(cubeName.toLowerCase());
+    addCubeNames(getName(), getProperties(), cubeNames);
   }
 }

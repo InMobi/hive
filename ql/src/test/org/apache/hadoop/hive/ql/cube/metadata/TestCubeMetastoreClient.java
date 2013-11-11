@@ -63,6 +63,11 @@ public class TestCubeMetastoreClient {
 
   @AfterClass
   public static void teardown() throws Exception {
+    // Drop the cube
+    client.dropCube(cubeName);
+    client = CubeMetastoreClient.getInstance(conf);
+    Assert.assertFalse(client.tableExists(cubeName));
+
     Hive.get().dropDatabase(TestCubeMetastoreClient.class.getSimpleName(),
         true, true, true);
     CubeMetastoreClient.close();
@@ -246,15 +251,14 @@ public class TestCubeMetastoreClient {
     addedMsr = altered.getMeasureByName("testaddmsr1");
     Assert.assertNotNull(addedMsr);
     Assert.assertEquals(addedMsr.getType(), "double");
-    // Drop the table
-    client.dropCube(cubeName, true);
-    client = CubeMetastoreClient.getInstance(conf);
-    Assert.assertFalse(client.tableExists(cubeName));
+    Assert.assertTrue(client.getAllFactTables(altered).isEmpty());
   }
 
   @Test
   public void testCubeFact() throws Exception {
     String factName = "testMetastoreFact";
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeName);
     List<FieldSchema> factColumns = new ArrayList<FieldSchema>(
         cubeMeasures.size());
     for (CubeMeasure measure : cubeMeasures) {
@@ -278,16 +282,18 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorage, updates);
     updatePeriods.put(hdfsStorage.getName(), updates);
 
-    CubeFactTable cubeFact = new CubeFactTable(cubeName, factName, factColumns,
+    CubeFactTable cubeFact = new CubeFactTable(cubeNames, factName, factColumns,
         updatePeriods);
 
     // create cube fact
-    client.createCubeFactTable(cubeName, factName, factColumns,
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
     Assert.assertTrue(client.isFactTable(cubeTbl));
     Assert.assertTrue(client.isFactTableForCube(cubeTbl, cubeName));
+    Assert.assertEquals(client.getAllFactTables(
+        client.getCube(cubeName)).get(0).getName(), factName.toLowerCase());
     CubeFactTable cubeFact2 = new CubeFactTable(cubeTbl);
     Assert.assertTrue(cubeFact.equals(cubeFact2));
 
@@ -374,14 +380,17 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorage2, updates);
     updatePeriods.put(hdfsStorage2.getName(), updates);
 
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeName);
     // create cube fact
-    client.createCubeFactTable(cubeName, factName, factColumns,
+    client.createCubeFactTable(cubeNames, factName, factColumns,
       storageAggregatePeriods, 0L, null);
 
     CubeFactTable factTable = new CubeFactTable(Hive.get(conf).getTable(factName));
     factTable.alterColumn(new FieldSchema("testFactColAdd", "int", "test add column"));
     factTable.alterColumn(new FieldSchema("msr3", "int", "test alter column"));
     factTable.alterWeight(100L);
+    factTable.addCubeName(cubeNameWithProps);
     Map<String, String> newProp = new HashMap<String, String>();
     newProp.put("new.prop", "val");
     factTable.addProperties(newProp);
@@ -410,6 +419,9 @@ public class TestCubeMetastoreClient {
         .contains(UpdatePeriod.DAILY));
     Assert.assertTrue(altered.getUpdatePeriods().get(hdfsStorage2.getName())
         .contains(UpdatePeriod.HOURLY));
+    Assert.assertEquals(altered.getCubeNames().size(), 2);
+    Assert.assertTrue(altered.getCubeNames().contains(cubeName.toLowerCase()));
+    Assert.assertTrue(altered.getCubeNames().contains(cubeNameWithProps.toLowerCase()));
     boolean contains = false;
     for (FieldSchema column : altered.getColumns()) {
       if (column.getName().equals("testfactcoladd") && column.getType().equals("int")) {
@@ -433,12 +445,24 @@ public class TestCubeMetastoreClient {
     storageTableName = MetastoreUtil.getFactStorageTableName(
         factName, hdfsStorage2.getPrefix());
     Assert.assertFalse(client.tableExists(storageTableName));
+    List<CubeFactTable> cubeFacts = client.getAllFactTables(client.getCube(cubeName));
+    List<String> cubeFactNames = new ArrayList<String>();
+    for (CubeFactTable cfact : cubeFacts) {
+      cubeFactNames.add(cfact.getName());
+    }
+    Assert.assertTrue(cubeFactNames.contains(factName.toLowerCase()));
     client.dropFact(factName, true);
     Assert.assertFalse(client.tableExists(MetastoreUtil.getFactStorageTableName(
         factName, hdfsStorage.getPrefix())));
     Assert.assertFalse(client.tableExists(MetastoreUtil.getFactStorageTableName(
         factName, hdfsStorage3.getPrefix())));
     Assert.assertFalse(client.tableExists(factName));
+    cubeFacts = client.getAllFactTables(cube);
+    cubeFactNames = new ArrayList<String>();
+    for (CubeFactTable cfact : cubeFacts) {
+      cubeFactNames.add(cfact.getName());
+    }
+    Assert.assertFalse(cubeFactNames.contains(factName.toLowerCase()));
   }
 
   @Test
@@ -469,11 +493,13 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorage, updates);
     updatePeriods.put(hdfsStorage.getName(), updates);
 
-    CubeFactTable cubeFact = new CubeFactTable(cubeNameWithProps, factName,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeNameWithProps);
+    CubeFactTable cubeFact = new CubeFactTable(cubeNames, factName,
         factColumns, updatePeriods);
 
     // create cube fact
-    client.createCubeFactTable(cubeNameWithProps, factName, factColumns,
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
@@ -531,11 +557,13 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorage, updates);
     updatePeriods.put(hdfsStorage.getName(), updates);
 
-    CubeFactTable cubeFact = new CubeFactTable(cubeName, factName, factColumns,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeName);
+    CubeFactTable cubeFact = new CubeFactTable(cubeNames, factName, factColumns,
         updatePeriods, 100L);
 
     // create cube fact
-    client.createCubeFactTable(cubeName, factName, factColumns,
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 100L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
@@ -595,9 +623,11 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorageWithParts, updates);
     updatePeriods.put(hdfsStorageWithParts.getName(), updates);
 
-    CubeFactTable cubeFactWithParts = new CubeFactTable(cubeName,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeName);
+    CubeFactTable cubeFactWithParts = new CubeFactTable(cubeNames,
         factNameWithPart, factColumns, updatePeriods);
-    client.createCubeFactTable(cubeName, factNameWithPart, factColumns,
+    client.createCubeFactTable(cubeNames, factNameWithPart, factColumns,
         storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factNameWithPart));
     Table cubeTbl = client.getHiveTable(factNameWithPart);
@@ -662,9 +692,11 @@ public class TestCubeMetastoreClient {
     storageAggregatePeriods.put(hdfsStorageWithParts, updates);
     updatePeriods.put(hdfsStorageWithParts.getName(), updates);
 
-    CubeFactTable cubeFactWithParts = new CubeFactTable(cubeName,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeName);
+    CubeFactTable cubeFactWithParts = new CubeFactTable(cubeNames,
         factNameWithPart, factColumns, updatePeriods);
-    client.createCubeFactTable(cubeName, factNameWithPart, factColumns,
+    client.createCubeFactTable(cubeNames, factNameWithPart, factColumns,
         storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factNameWithPart));
     Table cubeTbl = client.getHiveTable(factNameWithPart);
@@ -739,9 +771,11 @@ public class TestCubeMetastoreClient {
     updatePeriods.put(hdfsStorageWithParts.getName(), updates);
     updatePeriods.put(hdfsStorageWithNoParts.getName(), updates);
 
-    CubeFactTable cubeFactWithTwoStorages = new CubeFactTable(cubeName,
+    List<String> cubeNames = new ArrayList<String>();
+    cubeNames.add(cubeName);
+    CubeFactTable cubeFactWithTwoStorages = new CubeFactTable(cubeNames,
         factName, factColumns, updatePeriods);
-    client.createCubeFactTable(cubeName, factName, factColumns,
+    client.createCubeFactTable(cubeNames, factName, factColumns,
         storageAggregatePeriods, 0L, null);
     Assert.assertTrue(client.tableExists(factName));
     Table cubeTbl = client.getHiveTable(factName);
@@ -1087,28 +1121,36 @@ public class TestCubeMetastoreClient {
   @Test
   public void testCaching() throws HiveException {
     client = CubeMetastoreClient.getInstance(conf);
-    List<Cube> cubes = client.getAllCubes();
-    Assert.assertEquals(2, cubes.size());
+    CubeMetastoreClient client2 = CubeMetastoreClient.getInstance(
+        new HiveConf(TestCubeMetastoreClient.class));
+    Assert.assertEquals(3, client.getAllCubes().size());
+    Assert.assertEquals(3, client2.getAllCubes().size());
+
     defineCube("testcache1", "testcache2");
     client.createCube("testcache1", cubeMeasures, cubeDimensions);
     client.createCube("testcache2", cubeMeasures, cubeDimensions, cubeProperties);
-    cubes = client.getAllCubes();
-    Assert.assertEquals(2, cubes.size());
-    client = CubeMetastoreClient.getInstance(conf);
-    cubes = client.getAllCubes();
-    Assert.assertEquals(2, cubes.size());
-    conf.setBoolean(MetastoreConstants.METASTORE_NEEDS_REFRESH, true);
-    client = CubeMetastoreClient.getInstance(conf);
-    cubes = client.getAllCubes();
-    Assert.assertEquals(4, cubes.size());
+    Assert.assertNotNull(client.getCube("testcache1"));
+    Assert.assertNotNull(client2.getCube("testcache1"));
+    Assert.assertEquals(5, client.getAllCubes().size());
+    Assert.assertEquals(5, client2.getAllCubes().size());
+
+    client2 = CubeMetastoreClient.getInstance(conf);
+    Assert.assertEquals(5, client.getAllCubes().size());
+    Assert.assertEquals(5, client2.getAllCubes().size());
+
     conf.setBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, false);
     client = CubeMetastoreClient.getInstance(conf);
-    cubes = client.getAllCubes();
-    Assert.assertEquals(4, cubes.size());
+    client2 = CubeMetastoreClient.getInstance(conf);
+    Assert.assertEquals(5, client.getAllCubes().size());
+    Assert.assertEquals(5, client2.getAllCubes().size());
     defineCube("testcache3", "testcache4");
     client.createCube("testcache3", cubeMeasures, cubeDimensions);
     client.createCube("testcache4", cubeMeasures, cubeDimensions, cubeProperties);
-    cubes = client.getAllCubes();
-    Assert.assertEquals(6, cubes.size());
+    Assert.assertNotNull(client.getCube("testcache3"));
+    Assert.assertNotNull(client2.getCube("testcache3"));
+    Assert.assertEquals(7, client.getAllCubes().size());
+    Assert.assertEquals(7, client2.getAllCubes().size());
+    conf.setBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, true);
+    client = CubeMetastoreClient.getInstance(conf);
   }
 }

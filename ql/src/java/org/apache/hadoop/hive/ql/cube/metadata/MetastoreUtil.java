@@ -185,8 +185,8 @@ public class MetastoreUtil implements MetastoreConstants {
         + UPDATE_PERIOD_SFX;
   }
 
-  public static String getFactCubeNameKey(String name) {
-    return getFactKeyPrefix(name) + CUBE_NAME_SFX;
+  public static String getFactCubeNamesKey(String name) {
+    return getFactKeyPrefix(name) + CUBE_NAMES_SFX;
   }
 
   public static String getValidColumnsKey(String name) {
