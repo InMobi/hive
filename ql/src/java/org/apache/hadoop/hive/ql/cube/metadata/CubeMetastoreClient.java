@@ -1039,10 +1039,12 @@ public class CubeMetastoreClient {
    */
   public void dropStorageFromFact(String factName, String storage)
       throws HiveException {
-    getFactTable(factName).dropStorage(storage);
+    CubeFactTable cft = getFactTable(factName);
+    cft.dropStorage(storage);
     dropHiveTable(MetastoreUtil.getFactStorageTableName(factName,
         Storage.getPrefix(storage)));
-    alterCubeTable(factName, getTable(factName), getFactTable(factName));
+    alterCubeTable(factName, getTable(factName), cft);
+    CubeFactTable cft2 = getFactTable(factName);
     updateFactCache(factName);
   }
 

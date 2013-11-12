@@ -90,12 +90,14 @@ public final class CubeFactTable extends AbstractCubeTable {
     for (String storage : storages) {
       String updatePeriodStr = props.get(MetastoreUtil.getFactUpdatePeriodKey(
           name, storage));
-      String[] periods = updatePeriodStr.split(",");
-      Set<UpdatePeriod> updatePeriods = new TreeSet<UpdatePeriod>();
-      for (String period : periods) {
-        updatePeriods.add(UpdatePeriod.valueOf(period));
+      if (StringUtils.isNotBlank(updatePeriodStr)) {
+        String[] periods = updatePeriodStr.split(",");
+        Set<UpdatePeriod> updatePeriods = new TreeSet<UpdatePeriod>();
+        for (String period : periods) {
+          updatePeriods.add(UpdatePeriod.valueOf(period));
+        }
+        storageUpdatePeriods.put(storage, updatePeriods);
       }
-      storageUpdatePeriods.put(storage, updatePeriods);
     }
     return storageUpdatePeriods;
   }
@@ -310,6 +312,8 @@ public final class CubeFactTable extends AbstractCubeTable {
   void dropStorage(String storage) {
     storageUpdatePeriods.remove(storage);
     getProperties().remove(MetastoreUtil.getFactUpdatePeriodKey(getName(), storage));
+    String newStorages = StringUtils.join(storageUpdatePeriods.keySet(), ",");
+    getProperties().put(MetastoreUtil.getFactStorageListKey(getName()), newStorages);
   }
 
   @Override
