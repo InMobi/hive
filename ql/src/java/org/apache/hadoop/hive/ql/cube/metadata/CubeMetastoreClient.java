@@ -622,7 +622,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get table", e);
+      throw new HiveException("Could not get table: " + tableName, e);
     }
     return tbl;
   }
@@ -633,14 +633,14 @@ public class CubeMetastoreClient {
       tbl = getClient().getTable(tableName.toLowerCase());
       allHiveTables.put(tableName.toLowerCase(), tbl);
     } catch (HiveException e) {
-      throw new HiveException("Could not get table", e);
+      throw new HiveException("Could not get table: " + tableName, e);
     }
     return tbl;
   }
 
   public void dropHiveTable(String table) throws HiveException {
     metastore.dropTable(table);
-    allHiveTables.remove(table);
+    allHiveTables.remove(table.toLowerCase());
   }
 
   /**
