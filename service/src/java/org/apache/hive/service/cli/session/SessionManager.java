@@ -18,9 +18,9 @@
 
 package org.apache.hive.service.cli.session;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -41,11 +41,15 @@ import org.apache.hive.service.cli.operation.OperationManager;
  *
  */
 public class SessionManager extends CompositeService {
+
   private static final Log LOG = LogFactory.getLog(CompositeService.class);
+
   private HiveConf hiveConf;
-  private final Map<SessionHandle, HiveSession> handleToSession = new HashMap<SessionHandle, HiveSession>();
-  private OperationManager operationManager = new OperationManager();
-  private static final Object sessionMapLock = new Object();
+
+  private final Map<SessionHandle, HiveSession> handleToSession =
+      new ConcurrentHashMap<SessionHandle, HiveSession>();
+  private final OperationManager operationManager = new OperationManager();
+
   private ThreadPoolExecutor backgroundOperationPool;
 
   private ExecutorService backgroundTaskPool;
@@ -57,7 +61,6 @@ public class SessionManager extends CompositeService {
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
-    operationManager = new OperationManager();
     int backgroundPoolSize = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_THREADS);
     LOG.info("HiveServer2: Async execution thread pool size: " + backgroundPoolSize);
     int backgroundPoolQueueSize = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_WAIT_QUEUE_SIZE);
@@ -115,9 +118,9 @@ public class SessionManager extends CompositeService {
     }
     session.setSessionManager(this);
     session.setOperationManager(operationManager);
-    synchronized(sessionMapLock) {
-      handleToSession.put(session.getSessionHandle(), session);
-    }
+
+    handleToSession.put(session.getSessionHandle(), session);
+
     try {
       executeSessionHooks(session);
     } catch (Exception e) {
@@ -127,10 +130,7 @@ public class SessionManager extends CompositeService {
   }
 
   public void closeSession(SessionHandle sessionHandle) throws HiveSQLException {
-    HiveSession session;
-    synchronized(sessionMapLock) {
-      session = handleToSession.remove(sessionHandle);
-    }
+    HiveSession session = handleToSession.remove(sessionHandle);
     if (session == null) {
       throw new HiveSQLException("Session does not exist!");
     }
@@ -138,10 +138,7 @@ public class SessionManager extends CompositeService {
   }
 
   public HiveSession getSession(SessionHandle sessionHandle) throws HiveSQLException {
-    HiveSession session;
-    synchronized(sessionMapLock) {
-      session = handleToSession.get(sessionHandle);
-    }
+    HiveSession session = handleToSession.get(sessionHandle);
     if (session == null) {
       throw new HiveSQLException("Invalid SessionHandle: " + sessionHandle);
     }
