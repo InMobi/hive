@@ -543,7 +543,7 @@ public class CubeTestSetup {
     while (!(temp.after(now))) {
       Map<String, Date> timeParts = new HashMap<String, Date>();
       timeParts.put(Storage.getDatePartitionKey(), temp);
-      client.addPartition(fact2, hdfsStorage,
+      client.addPartition(fact2.getName(), hdfsStorage,
         UpdatePeriod.HOURLY, timeParts, Storage.getDatePartitionKey());
       cal.add(Calendar.HOUR_OF_DAY, 1);
       temp = cal.getTime();
@@ -983,7 +983,7 @@ public class CubeTestSetup {
         timeParts.put("pt", ptime);
         timeParts.put("it", itime);
         timeParts.put("et", itime);
-        client.addPartition(fact, hdfsStorage,
+        client.addPartition(fact.getName(), hdfsStorage,
             UpdatePeriod.DAILY, timeParts, "pt");
         pcal.add(Calendar.DAY_OF_MONTH, 1);
         ical.add(Calendar.HOUR_OF_DAY, 20);
@@ -998,7 +998,7 @@ public class CubeTestSetup {
         timeParts.put("it", itime);
         timeParts.put("et", itime);
         // pt=day2 and it=day1
-        client.addPartition(fact, hdfsStorage,
+        client.addPartition(fact.getName(), hdfsStorage,
             UpdatePeriod.DAILY, timeParts, "pt");
         // pt=day2-hour[0-3] it = day1-hour[20-23]
         // pt=day2-hour[4-23] it = day2-hour[0-19]
@@ -1008,13 +1008,13 @@ public class CubeTestSetup {
           timeParts.put("pt", ptime);
           timeParts.put("it", itime);
           timeParts.put("et", itime);
-          client.addPartition(fact, hdfsStorage,
+          client.addPartition(fact.getName(), hdfsStorage,
               UpdatePeriod.HOURLY, timeParts, "pt");
           pcal.add(Calendar.HOUR_OF_DAY, 1);
           ical.add(Calendar.HOUR_OF_DAY, 1);
         }
         // pt=day2 and it=day2
-        client.addPartition(fact, hdfsStorage,
+        client.addPartition(fact.getName(), hdfsStorage,
             UpdatePeriod.DAILY, timeParts, "pt");
       }
       else if (p == 3) { // day3
@@ -1026,7 +1026,7 @@ public class CubeTestSetup {
           timeParts.put("pt", ptime);
           timeParts.put("it", itime);
           timeParts.put("et", itime);
-          client.addPartition(fact, hdfsStorage,
+          client.addPartition(fact.getName(), hdfsStorage,
               UpdatePeriod.HOURLY, timeParts, "pt");
           pcal.add(Calendar.HOUR_OF_DAY, 1);
           ical.add(Calendar.HOUR_OF_DAY, 1);

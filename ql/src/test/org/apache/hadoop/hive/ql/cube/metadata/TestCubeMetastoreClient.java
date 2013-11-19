@@ -307,11 +307,11 @@ public class TestCubeMetastoreClient {
     Map<String, Date> timeParts = new HashMap<String, Date>();
     timeParts.put(Storage.getDatePartitionKey(), now);
     // test partition
-    client.addPartition(cubeFact, hdfsStorage, UpdatePeriod.HOURLY, timeParts,
+    client.addPartition(cubeFact.getName(), hdfsStorage, UpdatePeriod.HOURLY, timeParts,
         Storage.getDatePartitionKey());
-    Assert.assertTrue(client.factPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertTrue(client.factPartitionExists(cubeFact.getName(), hdfsStorage,
         UpdatePeriod.HOURLY, timeParts, new HashMap<String, String>()));
-    Assert.assertTrue(client.latestPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertTrue(client.latestPartitionExists(cubeFact.getName(), hdfsStorage,
         Storage.getDatePartitionKey()));
 
     // Partition with different schema
@@ -333,13 +333,13 @@ public class TestCubeMetastoreClient {
     hdfsStorage2.addToPartCols(Storage.getDatePartition());
     Map<String, Date> timeParts2 = new HashMap<String, Date>();
     timeParts2.put(Storage.getDatePartitionKey(), nowPlus1);
-    client.addPartition(cubeFact, hdfsStorage2, UpdatePeriod.HOURLY, timeParts2,
+    client.addPartition(cubeFact.getName(), hdfsStorage2, UpdatePeriod.HOURLY, timeParts2,
         Storage.getDatePartitionKey());
-    Assert.assertTrue(client.factPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertTrue(client.factPartitionExists(cubeFact.getName(), hdfsStorage,
         UpdatePeriod.HOURLY, timeParts, new HashMap<String, String>()));
-    Assert.assertTrue(client.factPartitionExists(cubeFact, hdfsStorage2,
+    Assert.assertTrue(client.factPartitionExists(cubeFact.getName(), hdfsStorage2,
         UpdatePeriod.HOURLY, timeParts2, new HashMap<String, String>()));
-    Assert.assertTrue(client.latestPartitionExists(cubeFact, hdfsStorage2,
+    Assert.assertTrue(client.latestPartitionExists(cubeFact.getName(), hdfsStorage2,
         Storage.getDatePartitionKey()));
     parts = client.getPartitionsByFilter(storageTableName, "dt='latest'");
     Assert.assertEquals(1, parts.size());
@@ -523,11 +523,11 @@ public class TestCubeMetastoreClient {
     timeParts.put(Storage.getDatePartitionKey(), now);
     timeParts.put(testDtPart.getName(), testDt);
     // test partition
-    client.addPartition(cubeFact, hdfsStorage, UpdatePeriod.HOURLY, timeParts,
+    client.addPartition(cubeFact.getName(), hdfsStorage, UpdatePeriod.HOURLY, timeParts,
         testDtPart.getName());
-    Assert.assertTrue(client.factPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertTrue(client.factPartitionExists(cubeFact.getName(), hdfsStorage,
         UpdatePeriod.HOURLY, timeParts, new HashMap<String, String>()));
-    Assert.assertTrue(client.latestPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertTrue(client.latestPartitionExists(cubeFact.getName(), hdfsStorage,
         testDtPart.getName()));
   }
 
@@ -582,11 +582,11 @@ public class TestCubeMetastoreClient {
     // test partition
     Map<String, Date> timeParts = new HashMap<String, Date>();
     timeParts.put(Storage.getDatePartitionKey(), now);
-    client.addPartition(cubeFact, hdfsStorage, UpdatePeriod.HOURLY, timeParts,
+    client.addPartition(cubeFact.getName(), hdfsStorage, UpdatePeriod.HOURLY, timeParts,
         null);
-    Assert.assertTrue(client.factPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertTrue(client.factPartitionExists(cubeFact.getName(), hdfsStorage,
         UpdatePeriod.HOURLY, now));
-    Assert.assertFalse(client.latestPartitionExists(cubeFact, hdfsStorage,
+    Assert.assertFalse(client.latestPartitionExists(cubeFact.getName(), hdfsStorage,
         Storage.getDatePartitionKey()));
   }
 
@@ -648,12 +648,12 @@ public class TestCubeMetastoreClient {
     Map<String, Date> timeParts = new HashMap<String, Date>();
     timeParts.put(Storage.getDatePartitionKey(), now);
     // test partition
-    client.addPartition(cubeFactWithParts, hdfsStorageWithParts,
+    client.addPartition(cubeFactWithParts.getName(), hdfsStorageWithParts,
         UpdatePeriod.HOURLY, timeParts, partSpec, null);
-    Assert.assertTrue(client.factPartitionExists(cubeFactWithParts,
+    Assert.assertTrue(client.factPartitionExists(cubeFactWithParts.getName(),
         hdfsStorageWithParts,
         UpdatePeriod.HOURLY, timeParts, partSpec));
-    Assert.assertFalse(client.latestPartitionExists(cubeFactWithParts,
+    Assert.assertFalse(client.latestPartitionExists(cubeFactWithParts.getName(),
         hdfsStorageWithParts,
         Storage.getDatePartitionKey()));
   }
@@ -722,12 +722,12 @@ public class TestCubeMetastoreClient {
     timeParts.put(Storage.getDatePartitionKey(), now);
     timeParts.put(testDtPart.getName(), testDt);
     // test partition
-    client.addPartition(cubeFactWithParts, hdfsStorageWithParts,
+    client.addPartition(cubeFactWithParts.getName(), hdfsStorageWithParts,
         UpdatePeriod.HOURLY, timeParts, partSpec, null);
-    Assert.assertTrue(client.factPartitionExists(cubeFactWithParts,
+    Assert.assertTrue(client.factPartitionExists(cubeFactWithParts.getName(),
         hdfsStorageWithParts,
         UpdatePeriod.HOURLY, timeParts, partSpec));
-    Assert.assertFalse(client.latestPartitionExists(cubeFactWithParts,
+    Assert.assertFalse(client.latestPartitionExists(cubeFactWithParts.getName(),
         hdfsStorageWithParts,
         Storage.getDatePartitionKey()));
   }
@@ -796,21 +796,21 @@ public class TestCubeMetastoreClient {
     Map<String, Date> timeParts = new HashMap<String, Date>();
     timeParts.put(Storage.getDatePartitionKey(), now);
     // test partition
-    client.addPartition(cubeFactWithTwoStorages, hdfsStorageWithParts,
+    client.addPartition(cubeFactWithTwoStorages.getName(), hdfsStorageWithParts,
       UpdatePeriod.HOURLY, timeParts, partSpec, Storage.getDatePartitionKey());
-    Assert.assertTrue(client.factPartitionExists(cubeFactWithTwoStorages,
+    Assert.assertTrue(client.factPartitionExists(cubeFactWithTwoStorages.getName(),
       hdfsStorageWithParts,
       UpdatePeriod.HOURLY, timeParts, partSpec));
-    Assert.assertTrue(client.latestPartitionExists(cubeFactWithTwoStorages,
+    Assert.assertTrue(client.latestPartitionExists(cubeFactWithTwoStorages.getName(),
         hdfsStorageWithParts,
         Storage.getDatePartitionKey()));
 
-    client.addPartition(cubeFactWithTwoStorages, hdfsStorageWithNoParts,
+    client.addPartition(cubeFactWithTwoStorages.getName(), hdfsStorageWithNoParts,
         UpdatePeriod.HOURLY, timeParts, Storage.getDatePartitionKey());
-    Assert.assertTrue(client.factPartitionExists(cubeFactWithTwoStorages,
+    Assert.assertTrue(client.factPartitionExists(cubeFactWithTwoStorages.getName(),
         hdfsStorageWithNoParts,
         UpdatePeriod.HOURLY, timeParts, new HashMap<String, String>()));
-    Assert.assertTrue(client.latestPartitionExists(cubeFactWithTwoStorages,
+    Assert.assertTrue(client.latestPartitionExists(cubeFactWithTwoStorages.getName(),
       hdfsStorageWithParts,
       Storage.getDatePartitionKey()));
   }
@@ -855,9 +855,9 @@ public class TestCubeMetastoreClient {
     }
 
     // test partition
-    client.addPartition(cubeDim, hdfsStorage, now);
-    Assert.assertTrue(client.dimPartitionExists(cubeDim, hdfsStorage, now));
-    Assert.assertTrue(client.latestPartitionExists(cubeDim, hdfsStorage));
+    client.addPartition(cubeDim.getName(), hdfsStorage, now);
+    Assert.assertTrue(client.dimPartitionExists(cubeDim.getName(), hdfsStorage, now));
+    Assert.assertTrue(client.latestPartitionExists(cubeDim.getName(), hdfsStorage));
   }
 
   @Test
@@ -923,9 +923,9 @@ public class TestCubeMetastoreClient {
     }
 
     // test partition
-    client.addPartition(cubeDim, hdfsStorage, now);
-    Assert.assertTrue(client.dimPartitionExists(cubeDim, hdfsStorage, now));
-    Assert.assertTrue(client.latestPartitionExists(cubeDim, hdfsStorage));
+    client.addPartition(cubeDim.getName(), hdfsStorage, now);
+    Assert.assertTrue(client.dimPartitionExists(cubeDim.getName(), hdfsStorage, now));
+    Assert.assertTrue(client.latestPartitionExists(cubeDim.getName(), hdfsStorage));
 
     // Partition with different schema
     FieldSchema newcol = new FieldSchema("newcol", "int", "new col for part");
@@ -943,10 +943,10 @@ public class TestCubeMetastoreClient {
         SequenceFileInputFormat.class.getCanonicalName(),
         HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     hdfsStorage2.addToPartCols(Storage.getDatePartition());
-    client.addPartition(cubeDim, hdfsStorage2, nowPlus1);
-    Assert.assertTrue(client.dimPartitionExists(cubeDim, hdfsStorage, now));
-    Assert.assertTrue(client.dimPartitionExists(cubeDim, hdfsStorage2, nowPlus1));
-    Assert.assertTrue(client.latestPartitionExists(cubeDim, hdfsStorage));
+    client.addPartition(cubeDim.getName(), hdfsStorage2, nowPlus1);
+    Assert.assertTrue(client.dimPartitionExists(cubeDim.getName(), hdfsStorage, now));
+    Assert.assertTrue(client.dimPartitionExists(cubeDim.getName(), hdfsStorage2, nowPlus1));
+    Assert.assertTrue(client.latestPartitionExists(cubeDim.getName(), hdfsStorage));
     parts = client.getPartitionsByFilter(storageTableName, "dt='latest'");
     Assert.assertEquals(1, parts.size());
     Assert.assertEquals(SequenceFileInputFormat.class.getCanonicalName(),

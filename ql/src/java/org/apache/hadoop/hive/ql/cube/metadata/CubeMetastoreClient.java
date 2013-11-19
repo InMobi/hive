@@ -404,20 +404,20 @@ public class CubeMetastoreClient {
   /**
    * Add time partition to the fact on given storage for an updateperiod
    *
-   * @param table The {@link CubeFactTable} object
+   * @param factName The fact table name
    * @param storage The {@link Storage} object
    * @param updatePeriod The updatePeriod
-   * @param partitionTimestamp partition timestamp
+   * @param partitionTimestamps partition timestamps for each partition column
    * @param latestPartCol The partitoin column name if latest symlink has to be
    *        created, null otherwise
    * @throws HiveException
    */
-  public void addPartition(CubeFactTable table, Storage storage,
+  public void addPartition(String factName, Storage storage,
       UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps,
       String latestPartCol)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
-        table.getName(), storage.getPrefix());
+        factName, storage.getPrefix());
     addPartition(storageTableName, storage, getPartitionSpec(updatePeriod,
         partitionTimestamps), latestPartCol);
   }
@@ -426,21 +426,21 @@ public class CubeMetastoreClient {
    * Add a partition to the fact on given storage for an updateperiod, with
    *  custom partition spec
    *
-   * @param table The {@link CubeFactTable} object
+   * @param factName The fact table name
    * @param storage The {@link Storage} object
    * @param updatePeriod The updatePeriod
-   * @param partitionTimestamp partition timestamp
-   * @param partSpec The partition spec
+   * @param partitionTimestamps partition timestamps for each partition column
+   * @param partSpec The partition spec - The  non time partition spec
    * @param latestPartCol The partitoin column name if latest symlink has to be
    *        created, null otherwise
    * @throws HiveException
    */
-  public void addPartition(CubeFactTable table, Storage storage,
+  public void addPartition(String factName, Storage storage,
       UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps,
       Map<String, String> partSpec, String latestPartCol)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
-        table.getName(), storage.getPrefix());
+        factName, storage.getPrefix());
     partSpec.putAll(getPartitionSpec(updatePeriod,
         partitionTimestamps));
     addPartition(storageTableName, storage, partSpec, latestPartCol);
@@ -449,17 +449,18 @@ public class CubeMetastoreClient {
   /**
    * Add a partition to dimension table on a give storage
    *
-   * @param table The {@link CubeDimensionTable} object
+   * @param dimName The dimension table name
    * @param storage The {@link Storage} object
    * @param partitionTimestamp
    * @throws HiveException
    */
-  public void addPartition(CubeDimensionTable table, Storage storage,
+  public void addPartition(String dimName, Storage storage,
       Date partitionTimestamp) throws HiveException {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
-        table.getName(), storage.getPrefix());
-    addPartition(storageTableName, storage, getPartitionSpec(table.
-        getSnapshotDumpPeriods().get(storage.getName()), partitionTimestamp),
+        dimName, storage.getPrefix());
+    addPartition(storageTableName, storage, getPartitionSpec(
+        getDimensionTable(dimName).getSnapshotDumpPeriods().get(
+            storage.getName()), partitionTimestamp),
         Storage.getDatePartitionKey());
   }
 
@@ -497,20 +498,20 @@ public class CubeMetastoreClient {
     }
   }
 
-  boolean factPartitionExists(CubeFactTable fact,
+  boolean factPartitionExists(String factName,
       Storage storage, UpdatePeriod updatePeriod,
       Date partitionTimestamp) throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
-        fact.getName(), storage.getPrefix());
+        factName, storage.getPrefix());
     return partitionExists(storageTableName, updatePeriod, partitionTimestamp);
   }
 
-  boolean factPartitionExists(CubeFactTable fact,
+  boolean factPartitionExists(String factName,
       Storage storage, UpdatePeriod updatePeriod,
       Map<String, Date> partitionTimestamp, Map<String, String> partSpec)
           throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
-        fact.getName(), storage.getPrefix());
+        factName, storage.getPrefix());
     return partitionExists(storageTableName, updatePeriod, partitionTimestamp,
         partSpec);
   }
@@ -575,27 +576,27 @@ public class CubeMetastoreClient {
     }
   }
 
-  boolean dimPartitionExists(CubeDimensionTable dim,
+  boolean dimPartitionExists(String dimName,
       Storage storage, Date partitionTimestamp) throws HiveException {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
-        dim.getName(), storage.getPrefix());
+        dimName, storage.getPrefix());
     return partitionExists(storageTableName,
-        dim.getSnapshotDumpPeriods().get(storage.getName()),
+        getDimensionTable(dimName).getSnapshotDumpPeriods().get(storage.getName()),
         partitionTimestamp);
   }
 
-  boolean latestPartitionExists(CubeDimensionTable dim,
+  boolean latestPartitionExists(String dimName,
       Storage storage) throws HiveException {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
-        dim.getName(), storage.getPrefix());
+        dimName, storage.getPrefix());
     return partitionExistsByFilter(storageTableName,
         Storage.getLatestPartFilter(Storage.getDatePartitionKey()));
   }
 
-  boolean latestPartitionExists(CubeFactTable fact,
+  boolean latestPartitionExists(String factName,
       Storage storage, String latestPartCol) throws HiveException {
     String storageTableName = MetastoreUtil.getFactStorageTableName(
-        fact.getName(), storage.getPrefix());
+        factName, storage.getPrefix());
     return partitionExistsByFilter(storageTableName,
         Storage.getLatestPartFilter(latestPartCol));
   }
