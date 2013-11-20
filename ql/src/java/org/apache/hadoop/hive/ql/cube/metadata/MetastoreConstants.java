@@ -42,4 +42,10 @@ public interface MetastoreConstants {
   public static final String DUMP_PERIOD_SFX = ".dumpperiod";
   public static final String STORAGE_LIST_SFX = ".storages";
   public static final String METASTORE_ENABLE_CACHING = "cube.metastore.enable.cache";
+
+  // storage constants
+  public static final String STORAGE_PFX = "cube.storagetable.";
+  public static final String TIME_PART_COLUMNS = "cube.storagetable.time.partcols";
+  public static final String LATEST_PART_TIMESTAMP_SFX = ".latest.part.timestamp";
+  public static final String LATEST_PART_UPDATE_PERIOD_SFX = ".latest.part.update.period";
 }

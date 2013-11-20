@@ -100,14 +100,14 @@ public class HDFSStorage extends Storage {
 
   private HDFSStorage(String name, String inputFormat, String outputFormat,
       boolean isCompressed,
-      Map<String, String> tableParameters, Map<String, String> serdeParameters,
+      Map<String, String> tableOrPartParameters, Map<String, String> serdeParameters,
       Path tableLocation) {
     super(name, TableType.EXTERNAL_TABLE);
     this.inputFormat = inputFormat;
     this.outputFormat = outputFormat;
     this.isCompressed = isCompressed;
-    if (tableParameters != null) {
-      addToTableParameters(tableParameters);
+    if (tableOrPartParameters != null) {
+      addToTableOrPartParameters(tableOrPartParameters);
     }
     if (serdeParameters != null) {
       this.serdeParameters.putAll(serdeParameters);
@@ -165,7 +165,7 @@ public class HDFSStorage extends Storage {
   @Override
   public void addPartition(String storageTableName,
       Map<String, String> partSpec, HiveConf conf,
-      String latestPartCol) throws HiveException {
+      LatestInfo latestInfo) throws HiveException {
     Hive client = Hive.get(conf);
     Table storageTbl = client.getTable(storageTableName);
     Path location = null;
@@ -178,25 +178,30 @@ public class HDFSStorage extends Storage {
     }
     Log.info("Adding partition with partSpec:" + partSpec);
     client.createPartition(storageTbl, partSpec,
-        location, getTableParameters(), inputFormat, outputFormat, -1,
+        location, getTableOrPartParameters(), inputFormat, outputFormat, -1,
         storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
-    if (latestPartCol != null) {
-      // symlink this partition to latest
-      List<Partition> latest;
-      try {
-        latest = client.getPartitionsByFilter(storageTbl,
-            getLatestPartFilter(latestPartCol));
-      } catch (Exception e) {
-        throw new HiveException("Could not get latest partition", e);
+    if (latestInfo != null) {
+      for (Map.Entry<String, LatestPartColumnInfo> entry : latestInfo.latestParts.entrySet()) {
+        // symlink this partition to latest
+        List<Partition> latest;
+        String latestPartCol = entry.getKey();
+        try {
+          latest = client.getPartitionsByFilter(storageTbl,
+              getLatestPartFilter(latestPartCol));
+        } catch (Exception e) {
+          throw new HiveException("Could not get latest partition", e);
+        }
+        if (!latest.isEmpty()) {
+          client.dropPartition(storageTbl.getTableName(),
+              latest.get(0).getValues(), false);
+        }
+        Map<String, String> partParams = getTableOrPartParameters();
+        partParams.putAll(entry.getValue().partParams);
+        client.createPartition(storageTbl, getLatestPartSpec(partSpec,
+            latestPartCol),
+            location, partParams, inputFormat, outputFormat, -1,
+            storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
       }
-      if (!latest.isEmpty()) {
-        client.dropPartition(storageTbl.getTableName(),
-            latest.get(0).getValues(), false);
-      }
-      client.createPartition(storageTbl, getLatestPartSpec(partSpec,
-          latestPartCol),
-          location, getTableParameters(), inputFormat, outputFormat, -1,
-          storageTbl.getCols(), serdeClassName, serdeParameters, null, null);
     }
   }
 

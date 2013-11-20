@@ -21,7 +21,7 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 public abstract class Storage implements Named {
 
   private final TableType tableType;
-  private final Map<String, String> tableParameters =
+  private final Map<String, String> tableOrPartParameters =
       new HashMap<String, String>();
   private final List<FieldSchema> partCols = new ArrayList<FieldSchema>();
   protected final Map<String, String> serdeParameters =
@@ -56,8 +56,8 @@ public abstract class Storage implements Named {
    *
    * @return Map<String, String>
    */
-  public Map<String, String> getTableParameters() {
-    return tableParameters;
+  public Map<String, String> getTableOrPartParameters() {
+    return tableOrPartParameters;
   }
 
   /**
@@ -74,8 +74,8 @@ public abstract class Storage implements Named {
    *
    * @param parameters
    */
-  protected void addToTableParameters(Map<String, String> parameters) {
-    tableParameters.putAll(parameters);
+  protected void addToTableOrPartParameters(Map<String, String> parameters) {
+    tableOrPartParameters.putAll(parameters);
   }
 
   /**
@@ -85,7 +85,7 @@ public abstract class Storage implements Named {
    * @param value property value
    */
   protected void addTableProperty(String key, String value) {
-    tableParameters.put(key, value);
+    tableOrPartParameters.put(key, value);
   }
 
   public String getName() {
@@ -120,20 +120,35 @@ public abstract class Storage implements Named {
    */
   public abstract void setSD(StorageDescriptor physicalSd) throws HiveException;
 
+  public static final class LatestInfo {
+    Map<String, LatestPartColumnInfo> latestParts =
+        new HashMap<String, LatestPartColumnInfo>();
+    void addLatestPartInfo(String partCol, LatestPartColumnInfo partInfo) {
+      latestParts.put(partCol, partInfo);
+    }
+  }
+
+  public static final class LatestPartColumnInfo {
+    final Map<String, String> partParams;
+    public LatestPartColumnInfo(Map<String, String> partParams) {
+      this.partParams = partParams;
+    }
+  }
+
   /**
    * Add a partition in the underlying hive table
    *
    * @param storageTableName TableName
    * @param partSpec Partition specification
    * @param conf {@link HiveConf} object
-   * @param latestPartCol The partition column name for the pointing the latest
-   *        partition, null if latest should not be created
+   * @param latestInfo The latest partition info,
+   *  null if latest should not be created
    *
    * @throws HiveException
    */
   public abstract void addPartition(String storageTableName,
       Map<String, String> partSpec, HiveConf conf,
-      String latestPartCol)
+      LatestInfo latestInfo)
       throws HiveException;
 
   /**

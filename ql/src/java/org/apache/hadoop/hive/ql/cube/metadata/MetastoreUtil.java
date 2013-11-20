@@ -197,6 +197,16 @@ public class MetastoreUtil implements MetastoreConstants {
     return getCubeTableKeyPrefix(name) + WEIGHT_KEY_SFX;
   }
 
+  public static String getLatestPartTimestampKey(String partCol) {
+    return MetastoreConstants.STORAGE_PFX + partCol +
+        MetastoreConstants.LATEST_PART_TIMESTAMP_SFX;
+  }
+
+  public static String getLatestPartUpdatePeriodKey(String partCol) {
+    return MetastoreConstants.STORAGE_PFX + partCol +
+        MetastoreConstants.LATEST_PART_UPDATE_PERIOD_SFX;
+  }
+
   // //////////////////////////
   // Utils ///
   // /////////////////////////
