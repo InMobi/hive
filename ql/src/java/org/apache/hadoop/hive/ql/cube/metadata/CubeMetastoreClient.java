@@ -1,7 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -467,10 +466,9 @@ public class CubeMetastoreClient {
               MetastoreUtil.getLatestPartUpdatePeriodKey(partCol));
           UpdatePeriod latestUpdatePeriod = UpdatePeriod.valueOf(
               latestPartUpdatePeriod.toUpperCase());
-          SimpleDateFormat dateFormat = new SimpleDateFormat(latestUpdatePeriod.format());
           Date latestTimestamp = null;
           try {
-            latestTimestamp = dateFormat.parse(latestTimeStampStr);
+            latestTimestamp = latestUpdatePeriod.format().parse(latestTimeStampStr);
           } catch (ParseException e) {
             throw new HiveException(e);
           }
@@ -481,9 +479,8 @@ public class CubeMetastoreClient {
 
         if (makeLatest) {
           Map<String, String> latestParams = new HashMap<String, String>();
-          SimpleDateFormat dateFormat = new SimpleDateFormat(updatePeriod.format());
           latestParams.put(MetastoreUtil.getLatestPartTimestampKey(partCol),
-              dateFormat.format(pTimestamp));
+              updatePeriod.format().format(pTimestamp));
           latestParams.put(MetastoreUtil.getLatestPartUpdatePeriodKey(partCol),
               updatePeriod.getName());
           latest.latestParts.put(partCol, new LatestPartColumnInfo(latestParams));
@@ -519,8 +516,7 @@ public class CubeMetastoreClient {
   private Map<String, String> getPartitionSpec(
       UpdatePeriod updatePeriod, Date partitionTimestamp) {
     Map<String, String> partSpec = new HashMap<String, String>();
-    SimpleDateFormat dateFormat = new SimpleDateFormat(updatePeriod.format());
-    String pval = dateFormat.format(partitionTimestamp);
+    String pval = updatePeriod.format().format(partitionTimestamp);
     partSpec.put(Storage.getDatePartitionKey(), pval);
     return partSpec;
   }
@@ -528,9 +524,8 @@ public class CubeMetastoreClient {
   private Map<String, String> getPartitionSpec(
       UpdatePeriod updatePeriod, Map<String, Date> partitionTimestamps) {
     Map<String, String> partSpec = new HashMap<String, String>();
-    SimpleDateFormat dateFormat = new SimpleDateFormat(updatePeriod.format());
     for (Map.Entry<String, Date> entry : partitionTimestamps.entrySet()) {
-      String pval = dateFormat.format(entry.getValue());
+      String pval = updatePeriod.format().format(entry.getValue());
       partSpec.put(entry.getKey(), pval);
     }
     return partSpec;

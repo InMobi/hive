@@ -1,6 +1,5 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -326,7 +325,6 @@ public class StorageTableResolver implements ContextRewriter {
     Date floorToDate = DateUtil.getFloorDate(toDate, interval);
 
     // add partitions from ceilFrom to floorTo
-    String fmt = interval.format();
     Calendar cal = Calendar.getInstance();
     cal.setTime(ceilFromDate);
     Date dt = cal.getTime();
@@ -339,9 +337,8 @@ public class StorageTableResolver implements ContextRewriter {
     while (dt.compareTo(floorToDate) < 0) {
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
-      SimpleDateFormat pformat = new SimpleDateFormat(fmt);
       FactPartition part = new FactPartition(partCol,
-          pformat.format(dt), interval, containingPart);
+          interval.format().format(dt), interval, containingPart);
       Map<String, List<Partition>> metaParts = new HashMap<String, List<Partition>>();
       for (String storageTableName : storageTbls) {
         int numParts;
@@ -406,7 +403,7 @@ public class StorageTableResolver implements ContextRewriter {
                 temp.setTime(start);
                 while (temp.getTime().compareTo(end) < 0) {
                   Date pdt = temp.getTime();
-                  String lPart = pformat.format(pdt);
+                  String lPart = interval.format().format(pdt);
                   temp.add(interval.calendarField(), 1);
                   Boolean foundLookAheadParts = false;
                   for (Map.Entry<String, List<Partition>> entry : metaParts.entrySet()) {

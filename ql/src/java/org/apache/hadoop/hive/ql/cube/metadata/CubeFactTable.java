@@ -1,6 +1,5 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -147,22 +146,17 @@ public final class CubeFactTable extends AbstractCubeTable {
    */
   public List<String> getPartitions(Date fromDate, Date toDate,
       UpdatePeriod interval) {
-    String fmt = interval.format();
-    if (fmt != null) {
-      Calendar cal = Calendar.getInstance();
-      cal.setTime(fromDate);
-      List<String> partitions = new ArrayList<String>();
-      Date dt = cal.getTime();
-      while (dt.compareTo(toDate) < 0) {
-        String part = new SimpleDateFormat(fmt).format(cal.getTime());
-        partitions.add(part);
-        cal.add(interval.calendarField(), 1);
-        dt = cal.getTime();
-      }
-      return partitions;
-    } else {
-      return null;
+    Calendar cal = Calendar.getInstance();
+    cal.setTime(fromDate);
+    List<String> partitions = new ArrayList<String>();
+    Date dt = cal.getTime();
+    while (dt.compareTo(toDate) < 0) {
+      String part = interval.format().format(cal.getTime());
+      partitions.add(part);
+      cal.add(interval.calendarField(), 1);
+      dt = cal.getTime();
     }
+    return partitions;
   }
 
   /**

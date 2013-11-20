@@ -2,6 +2,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 import static org.junit.Assert.assertEquals;
 
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -341,12 +342,12 @@ public class CubeTestSetup {
 
   public static void addParts(List<String> partitions, UpdatePeriod updatePeriod,
                         Date from, Date to) {
-    String fmt = updatePeriod.format();
+    DateFormat fmt = updatePeriod.format();
     Calendar cal = Calendar.getInstance();
     cal.setTime(from);
     Date dt = cal.getTime();
     while (dt.before(to)) {
-      String part = new SimpleDateFormat(fmt).format(dt);
+      String part = fmt.format(dt);
       cal.add(updatePeriod.calendarField(), 1);
       partitions.add(part);
       dt = cal.getTime();
