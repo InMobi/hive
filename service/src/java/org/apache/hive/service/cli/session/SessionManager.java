@@ -18,19 +18,19 @@
 
 package org.apache.hive.service.cli.session;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.hooks.HookUtils;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.ql.hooks.HookUtils;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.SessionHandle;
@@ -41,12 +41,16 @@ import org.apache.hive.service.cli.operation.OperationManager;
  *
  */
 public class SessionManager extends CompositeService {
+
   private static final Log LOG = LogFactory.getLog(CompositeService.class);
+
   private HiveConf hiveConf;
-  private final Map<SessionHandle, HiveSession> handleToSession = new HashMap<SessionHandle, HiveSession>();
-  private OperationManager operationManager = new OperationManager();
-  private static final Object sessionMapLock = new Object();
-  private ExecutorService backgroundOperationPool;
+
+  private final Map<SessionHandle, HiveSession> handleToSession =
+      new ConcurrentHashMap<SessionHandle, HiveSession>();
+  private final OperationManager operationManager = new OperationManager();
+
+  private ThreadPoolExecutor backgroundOperationPool;
 
   private ExecutorService backgroundTaskPool;
 
@@ -57,10 +61,18 @@ public class SessionManager extends CompositeService {
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
-    operationManager = new OperationManager();
     int backgroundPoolSize = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_THREADS);
-    LOG.info("HiveServer2: Async execution pool size" + backgroundPoolSize);
-    backgroundOperationPool = Executors.newFixedThreadPool(backgroundPoolSize);
+    LOG.info("HiveServer2: Async execution thread pool size: " + backgroundPoolSize);
+    int backgroundPoolQueueSize = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_WAIT_QUEUE_SIZE);
+    LOG.info("HiveServer2: Async execution wait queue size: " + backgroundPoolQueueSize);
+    int keepAliveTime = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_KEEPALIVE_TIME);
+    LOG.info("HiveServer2: Async execution thread keepalive time: " + keepAliveTime);
+    // Create a thread pool with #backgroundPoolSize threads
+    // Threads terminate when they are idle for more than the keepAliveTime
+    // An bounded blocking queue is used to queue incoming operations, if #operations > backgroundPoolSize
+    backgroundOperationPool = new ThreadPoolExecutor(backgroundPoolSize, backgroundPoolSize,
+        keepAliveTime, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(backgroundPoolQueueSize));
+    backgroundOperationPool.allowCoreThreadTimeOut(true);
     addService(operationManager);
     super.init(hiveConf);
   }
@@ -68,25 +80,22 @@ public class SessionManager extends CompositeService {
   @Override
   public synchronized void start() {
     super.start();
-    // TODO
   }
 
   @Override
   public synchronized void stop() {
-    // TODO
     super.stop();
     if (backgroundOperationPool != null) {
       backgroundOperationPool.shutdown();
-      long timeout = hiveConf.getLongVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT);
+      int timeout = hiveConf.getIntVar(ConfVars.HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT);
       try {
         backgroundOperationPool.awaitTermination(timeout, TimeUnit.SECONDS);
-      } catch (InterruptedException exc) {
+      } catch (InterruptedException e) {
         LOG.warn("HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT = " + timeout +
-        		" seconds has been exceeded. RUNNING background operations will be shut down", exc);
+            " seconds has been exceeded. RUNNING background operations will be shut down", e);
       }
     }
   }
-
 
   public SessionHandle openSession(String username, String password, Map<String, String> sessionConf)
           throws HiveSQLException {
@@ -109,9 +118,9 @@ public class SessionManager extends CompositeService {
     }
     session.setSessionManager(this);
     session.setOperationManager(operationManager);
-    synchronized(sessionMapLock) {
-      handleToSession.put(session.getSessionHandle(), session);
-    }
+
+    handleToSession.put(session.getSessionHandle(), session);
+
     try {
       executeSessionHooks(session);
     } catch (Exception e) {
@@ -121,22 +130,15 @@ public class SessionManager extends CompositeService {
   }
 
   public void closeSession(SessionHandle sessionHandle) throws HiveSQLException {
-    HiveSession session;
-    synchronized(sessionMapLock) {
-      session = handleToSession.remove(sessionHandle);
-    }
+    HiveSession session = handleToSession.remove(sessionHandle);
     if (session == null) {
       throw new HiveSQLException("Session does not exist!");
     }
     session.close();
   }
 
-
   public HiveSession getSession(SessionHandle sessionHandle) throws HiveSQLException {
-    HiveSession session;
-    synchronized(sessionMapLock) {
-      session = handleToSession.get(sessionHandle);
-    }
+    HiveSession session = handleToSession.get(sessionHandle);
     if (session == null) {
       throw new HiveSQLException("Invalid SessionHandle: " + sessionHandle);
     }

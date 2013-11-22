@@ -86,7 +86,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   public void prepare() throws HiveSQLException {
   }
 
-  private void runInternal() throws HiveSQLException {
+  private void runInternal(HiveConf sqlOperationConf) throws HiveSQLException {
     setState(OperationState.RUNNING);
     String statement_trimmed = statement.trim();
     String[] tokens = statement_trimmed.split("\\s");
@@ -97,25 +97,15 @@ public class SQLOperation extends ExecuteStatementOperation {
     String SQLState = null;
 
     try {
-      HiveConf opConf;
-      if (confOverlay != null && !confOverlay.isEmpty()) {
-        // User passed op specific configuration we need to clone the sessions's conf, so that
-        // the conf specific to this operation does not affect other operations in the same session
-        opConf = new HiveConf(getParentSession().getHiveConf());
-        for (String key : confOverlay.keySet()) {
-          opConf.set(key, confOverlay.get(key));
-        }
-      } else {
-        opConf = getParentSession().getHiveConf();
-      }
 
-      driver = new Driver(opConf);
+      // TODO We need to merge the change to pass user name to driver
+      driver = new Driver(sqlOperationConf);
       // In Hive server mode, we are not able to retry in the FetchTask
       // case, when calling fetch queries since execute() has returned.
       // For now, we disable the test attempts.
       driver.setTryCount(Integer.MAX_VALUE);
 
-      String subStatement = new VariableSubstitution().substitute(getParentSession().getHiveConf(), statement);
+      String subStatement = new VariableSubstitution().substitute(sqlOperationConf, statement);
 
       response = driver.run(subStatement);
       if (0 != response.getResponseCode()) {
@@ -159,7 +149,7 @@ public class SQLOperation extends ExecuteStatementOperation {
   public void run() throws HiveSQLException {
     setState(OperationState.PENDING);
     if (!shouldRunAsync()) {
-      runInternal();
+      runInternal(getConfigForOperation());
     } else {
       Runnable backgroundOperation = new Runnable() {
         SessionState ss = SessionState.get();
@@ -167,7 +157,7 @@ public class SQLOperation extends ExecuteStatementOperation {
         public void run() {
           SessionState.start(ss);
           try {
-            runInternal();
+            runInternal(getConfigForOperation());
           } catch (HiveSQLException e) {
             LOG.error("Error: ", e);
             // TODO: Return a more detailed error to the client,
@@ -181,7 +171,8 @@ public class SQLOperation extends ExecuteStatementOperation {
           getParentSession().getSessionManager().submitBackgroundOperation(backgroundOperation);
       } catch (RejectedExecutionException rejected) {
         setState(OperationState.ERROR);
-        throw new HiveSQLException(rejected);
+        throw new HiveSQLException("All the asynchronous threads are currently busy, " +
+            "please retry the operation", rejected);
       }
     }
   }
@@ -349,7 +340,6 @@ public class SQLOperation extends ExecuteStatementOperation {
     return runAsync;
   }
 
-
   @Override
   public String getTaskStatus() throws HiveSQLException {
     if (driver != null) {
@@ -381,5 +371,32 @@ public class SQLOperation extends ExecuteStatementOperation {
 
     // Driver not initialized
     return null;
+  }
+  /**
+   * If there are query specific settings to overlay, then create a copy of config
+   * There are two cases we need to clone the session config that's being passed to hive driver
+   * 1. Async query -
+   *    If the client changes a config setting, that shouldn't reflect in the execution already underway
+   * 2. confOverlay -
+   *    The query specific settings should only be applied to the query config and not session
+   * @return new configuration
+   * @throws HiveSQLException
+   */
+  private HiveConf getConfigForOperation() throws HiveSQLException {
+    HiveConf sqlOperationConf = getParentSession().getHiveConf();
+    if (!getConfOverlay().isEmpty() || shouldRunAsync()) {
+      // clone the partent session config for this query
+      sqlOperationConf = new HiveConf(sqlOperationConf);
+
+      // apply overlay query specific settings, if any
+      for (Map.Entry<String, String> confEntry : getConfOverlay().entrySet()) {
+        try {
+          sqlOperationConf.verifyAndSet(confEntry.getKey(), confEntry.getValue());
+        } catch (IllegalArgumentException e) {
+          throw new HiveSQLException("Error applying statement specific settings", e);
+        }
+      }
+    }
+    return sqlOperationConf;
   }
 }
