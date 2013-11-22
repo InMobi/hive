@@ -52,8 +52,6 @@ public class SessionManager extends CompositeService {
 
   private ThreadPoolExecutor backgroundOperationPool;
 
-  private ExecutorService backgroundTaskPool;
-
   public SessionManager() {
     super("SessionManager");
   }
