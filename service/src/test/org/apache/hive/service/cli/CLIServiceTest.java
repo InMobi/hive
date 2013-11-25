@@ -259,7 +259,7 @@ public abstract class CLIServiceTest {
     assertNotNull(opHandle);
     // query should pass and create the table
     assertEquals("Query should be finished",
-        OperationState.FINISHED, client.getOperationStatus(opHandle));
+        OperationState.FINISHED, client.getOperationStatus(opHandle).getState());
     client.closeOperation(opHandle);
 
     // select from  the new table should pass
@@ -268,7 +268,7 @@ public abstract class CLIServiceTest {
     assertNotNull(opHandle);
     // query should pass and create the table
     assertEquals("Query should be finished",
-        OperationState.FINISHED, client.getOperationStatus(opHandle));
+        OperationState.FINISHED, client.getOperationStatus(opHandle).getState());
     client.closeOperation(opHandle);
 
     // the settings in confoverly should not be part of session config
