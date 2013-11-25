@@ -1,5 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
+import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -294,5 +295,19 @@ public abstract class Storage implements Named, PartitionMetahook {
         rollbackDropPartition(storageTableName, partVals);
       }
     }
+  }
+
+  public static Storage createInstance(String storageClassName, String storageName)
+      throws HiveException {
+    try {
+      Class<?> clazz = Class.forName(storageClassName);
+      Constructor<?> constructor = clazz.getConstructor(String.class);
+      Storage storage = (Storage) constructor.newInstance(new Object[]
+          {storageName});
+      return storage;
+    } catch (Exception e) {
+      throw new HiveException("Could not create storage class" + storageClassName, e);
+    }
+
   }
 }

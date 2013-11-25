@@ -476,11 +476,11 @@ public class CubeTestSetup {
     s1.setPartCols(partCols);
     s1.setTimePartCols(timePartCols);
 
-    Storage hdfsStorage = new HDFSStorage("C1");
+    Storage hdfsStorage = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     storageAggregatePeriods.put(hdfsStorage.getName(), updates);
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     storageAggregatePeriods.put(hdfsStorage2.getName(), updates);
-    Storage hdfsStorage3 = new HDFSStorage("C3");
+    Storage hdfsStorage3 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C3");
     storageAggregatePeriods.put(hdfsStorage3.getName(), updates);
 
     Map<Storage, StorageTableDesc> storageTables = new HashMap<Storage, StorageTableDesc>();
@@ -519,7 +519,7 @@ public class CubeTestSetup {
     s1.setPartCols(partCols);
     s1.setTimePartCols(timePartCols);
 
-    Storage hdfsStorage = new HDFSStorage("C1");
+    Storage hdfsStorage = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     storageAggregatePeriods.put(hdfsStorage.getName(), updates);
 
     Map<Storage, StorageTableDesc> storageTables = new HashMap<Storage, StorageTableDesc>();
@@ -558,7 +558,7 @@ public class CubeTestSetup {
     s1.setPartCols(partCols);
     s1.setTimePartCols(timePartCols);
 
-    Storage hdfsStorage = new HDFSStorage("C1");
+    Storage hdfsStorage = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     storageAggregatePeriods.put(hdfsStorage.getName(), updates);
 
     Map<Storage, StorageTableDesc> storageTables = new HashMap<Storage, StorageTableDesc>();
@@ -611,7 +611,7 @@ public class CubeTestSetup {
     s1.setPartCols(partCols);
     s1.setTimePartCols(timePartCols);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     storageAggregatePeriods.put(hdfsStorage2.getName(), updates);
 
     Map<Storage, StorageTableDesc> storageTables = new HashMap<Storage, StorageTableDesc>();
@@ -648,7 +648,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -656,7 +656,7 @@ public class CubeTestSetup {
     s1.setTimePartCols(timePartCols);
     dumpPeriods.put(hdfsStorage1.getName(), UpdatePeriod.HOURLY);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     StorageTableDesc s2 = new StorageTableDesc();
     s2.setInputFormat(TextInputFormat.class.getCanonicalName());
     s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -690,7 +690,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -698,7 +698,7 @@ public class CubeTestSetup {
     s1.setTimePartCols(timePartCols);
     dumpPeriods.put(hdfsStorage1.getName(), UpdatePeriod.HOURLY);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     StorageTableDesc s2 = new StorageTableDesc();
     s2.setInputFormat(TextInputFormat.class.getCanonicalName());
     s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -732,7 +732,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -740,7 +740,7 @@ public class CubeTestSetup {
     s1.setTimePartCols(timePartCols);
     dumpPeriods.put(hdfsStorage1.getName(), UpdatePeriod.HOURLY);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     StorageTableDesc s2 = new StorageTableDesc();
     s2.setInputFormat(TextInputFormat.class.getCanonicalName());
     s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -770,7 +770,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -778,7 +778,7 @@ public class CubeTestSetup {
     s1.setTimePartCols(timePartCols);
     dumpPeriods.put(hdfsStorage1.getName(), UpdatePeriod.HOURLY);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     StorageTableDesc s2 = new StorageTableDesc();
     s2.setInputFormat(TextInputFormat.class.getCanonicalName());
     s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -810,7 +810,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -818,7 +818,7 @@ public class CubeTestSetup {
     s1.setTimePartCols(timePartCols);
     dumpPeriods.put(hdfsStorage1.getName(), UpdatePeriod.HOURLY);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     StorageTableDesc s2 = new StorageTableDesc();
     s2.setInputFormat(TextInputFormat.class.getCanonicalName());
     s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -850,7 +850,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -858,7 +858,7 @@ public class CubeTestSetup {
     s1.setTimePartCols(timePartCols);
     dumpPeriods.put(hdfsStorage1.getName(), UpdatePeriod.HOURLY);
 
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     StorageTableDesc s2 = new StorageTableDesc();
     s2.setInputFormat(TextInputFormat.class.getCanonicalName());
     s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -887,7 +887,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -916,7 +916,7 @@ public class CubeTestSetup {
         new HashMap<String, List<TableReference>>();
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -948,7 +948,7 @@ public class CubeTestSetup {
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
-    Storage hdfsStorage1 = new HDFSStorage("C1");
+    Storage hdfsStorage1 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
@@ -1044,9 +1044,9 @@ public class CubeTestSetup {
     s2.setPartCols(partCols2);
     s2.setTimePartCols(timePartCols2);
 
-    Storage hdfsStorage = new HDFSStorage("C1");
+    Storage hdfsStorage = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C1");
     storageUpdatePeriods.put(hdfsStorage.getName(), updates);
-    Storage hdfsStorage2 = new HDFSStorage("C2");
+    Storage hdfsStorage2 = Storage.createInstance(HDFSStorage.class.getCanonicalName(), "C2");
     storageUpdatePeriods.put(hdfsStorage2.getName(), updates);
 
     Map<Storage, StorageTableDesc> storageTables = new HashMap<Storage, StorageTableDesc>();
