@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.Storage;
+import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -128,9 +129,9 @@ public class StorageTableResolver implements ContextRewriter {
           storageTables.add(tableName);
           if (dim.hasStorageSnapshots(storage)) {
             dimStorageTableToWhereClause.put(tableName,
-                StorageUtil.getWherePartClause(Storage.getDatePartitionKey(),
+                StorageUtil.getWherePartClause(dim.getTimedDimension(),
                     cubeql.getAliasForTabName(dim.getName()),
-                    Storage.getPartitionsForLatest()));
+                    StorageConstants.getPartitionsForLatest()));
           }
         } else {
           LOG.info("Storage:" + storage + " is not supported");
