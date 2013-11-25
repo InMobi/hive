@@ -33,7 +33,7 @@ public abstract class ExecuteStatementOperation extends Operation {
   public ExecuteStatementOperation(HiveSession parentSession, String statement, Map<String, String> confOverlay) {
     super(parentSession, OperationType.EXECUTE_STATEMENT);
     this.statement = statement;
-    this.confOverlay = confOverlay;
+    setConfOverlay(confOverlay);
   }
 
   public String getStatement() {
@@ -57,4 +57,13 @@ public abstract class ExecuteStatementOperation extends Operation {
     }
   }
 
+  protected Map<String, String> getConfOverlay() {
+    return confOverlay;
+  }
+
+  protected void setConfOverlay(Map<String, String> confOverlay) {
+    if (confOverlay != null) {
+      this.confOverlay = confOverlay;
+    }
+  }
 }

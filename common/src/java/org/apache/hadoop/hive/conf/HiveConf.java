@@ -150,16 +150,6 @@ public class HiveConf extends Configuration {
   };
 
   /**
-   * The conf variables that depends on current user
-   */
-  public static final HiveConf.ConfVars[] userVars = {
-    HiveConf.ConfVars.SCRATCHDIR,
-    HiveConf.ConfVars.LOCALSCRATCHDIR,
-    HiveConf.ConfVars.DOWNLOADED_RESOURCES_DIR,
-    HiveConf.ConfVars.HIVEHISTORYFILELOC
-  };
-
-  /**
    * ConfVars.
    *
    * These are the default configuration properties for Hive. Each HiveConf
@@ -751,10 +741,20 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_THRIFT_BIND_HOST("hive.server2.thrift.bind.host", ""),
     HIVE_SERVER2_THRIFT_SASL_QOP("hive.server2.thrift.sasl.qop", "auth"),
     HIVE_SERVER2_THRIFT_MIN_WORKER_THREADS("hive.server2.thrift.min.worker.threads", 5),
-    HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS("hive.server2.thrift.max.worker.threads", 100),
-    // Configuration for async thread pool in SessionManagers
-    HIVE_SERVER2_ASYNC_EXEC_THREADS("hive.server2.thrift.async.task.threads", 10),
-    HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.thrift.async.task.timeout", 10000L),
+
+    HIVE_SERVER2_THRIFT_MAX_WORKER_THREADS("hive.server2.thrift.max.worker.threads", 500),
+
+    // Configuration for async thread pool in SessionManager
+    // Number of async threads
+    HIVE_SERVER2_ASYNC_EXEC_THREADS("hive.server2.async.exec.threads", 100),
+    // Number of seconds HiveServer2 shutdown will wait for async threads to terminate
+    HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.async.exec.shutdown.timeout", 10L),
+    // Size of the wait queue for async thread pool in HiveServer2.
+    // After hitting this limit, the async thread pool will reject new requests.
+    HIVE_SERVER2_ASYNC_EXEC_WAIT_QUEUE_SIZE("hive.server2.async.exec.wait.queue.size", 100),
+    // Number of seconds that an idle HiveServer2 async thread (from the thread pool)
+    // will wait for a new task to arrive before terminating
+    HIVE_SERVER2_ASYNC_EXEC_KEEPALIVE_TIME("hive.server2.async.exec.keepalive.time", 10),
 
 
     // HiveServer2 auth configuration
@@ -768,6 +768,9 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_ENABLE_DOAS("hive.server2.enable.doAs", true),
     HIVE_SERVER2_TABLE_TYPE_MAPPING("hive.server2.table.type.mapping", "CLASSIC"),
     HIVE_SERVER2_SESSION_HOOK("hive.server2.session.hook", ""),
+    HIVE_SERVER2_USE_SSL("hive.server2.use.SSL", false),
+    HIVE_SERVER2_SSL_KEYSTORE_PATH("hive.server2.keystore.path", ""),
+    HIVE_SERVER2_SSL_KEYSTORE_PASSWORD("hive.server2.keystore.password", ""),
 
     HIVE_CONF_RESTRICTED_LIST("hive.conf.restricted.list", null),
 
