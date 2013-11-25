@@ -3,57 +3,58 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 import java.util.List;
 
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.AddPartitionDesc;
 
 public interface PartitionMetahook {
 
   /**
    * Called before calling add partition
    *
-   * @param addPartitionDesc
+   * @param StoragePartitionDesc
    * @throws HiveException
    */
-  public void preAddPartition(AddPartitionDesc addPartitionDesc) throws HiveException;
+  public void preAddPartition(StoragePartitionDesc StoragePartitionDesc) throws HiveException;
 
   /**
    * Called after successfully adding the partition
    *
-   * @param addPartitionDesc
+   * @param StoragePartitionDesc
    * @throws HiveException
    */
-  public void commitAddPartition(AddPartitionDesc addPartitionDesc) throws HiveException;
+  public void commitAddPartition(StoragePartitionDesc StoragePartitionDesc) throws HiveException;
 
   /**
    * Called if add partition fails.
    *
-   * @param addPartitionDesc
+   * @param StoragePartitionDesc
    * @throws HiveException
    */
-  public void rollbackAddPartition(AddPartitionDesc addPartitionDesc) throws HiveException;
+  public void rollbackAddPartition(StoragePartitionDesc StoragePartitionDesc) throws HiveException;
 
   /**
    * Called before calling drop partition
    *
-   * @param addPartitionDesc
+   * @param storageTableName
+   * @param partVals
    * @throws HiveException
    */
   public void preDropPartition(String storageTableName,
       List<String> partVals) throws HiveException;
 
   /**
-   * Called after successfully adding the partition
+   * Called after successfully droping the partition
    *
-   * @param addPartitionDesc
+   * @param storageTableName
+   * @param partVals
    * @throws HiveException
    */
   public void commitDropPartition(String storageTableName,
       List<String> partVals) throws HiveException;
 
   /**
-   * Called if add partition fails.
+   * Called if drop partition fails.
    *
-   * @param addPartitionDesc
-   * @throws HiveException
+   * @param storageTableName
+   * @param partVals
    */
   public void rollbackDropPartition(String storageTableName,
       List<String> partVals) throws HiveException;

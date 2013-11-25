@@ -3,7 +3,6 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 import java.util.List;
 
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.AddPartitionDesc;
 
 public class HDFSStorage extends Storage {
 
@@ -12,19 +11,19 @@ public class HDFSStorage extends Storage {
   }
 
   @Override
-  public void preAddPartition(AddPartitionDesc addPartitionDesc) throws HiveException {
+  public void preAddPartition(StoragePartitionDesc addPartitionDesc) throws HiveException {
     // No op
 
   }
 
   @Override
-  public void commitAddPartition(AddPartitionDesc addPartitionDesc) throws HiveException {
+  public void commitAddPartition(StoragePartitionDesc addPartitionDesc) throws HiveException {
     // No op
 
   }
 
   @Override
-  public void rollbackAddPartition(AddPartitionDesc addPartitionDesc) throws HiveException {
+  public void rollbackAddPartition(StoragePartitionDesc addPartitionDesc) throws HiveException {
     // No op
 
   }
