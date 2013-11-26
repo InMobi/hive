@@ -11,7 +11,7 @@ import static org.junit.Assert.fail;
 import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.cube.metadata.Storage;
+import org.apache.hadoop.hive.ql.cube.metadata.TestCubeMetastoreClient;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -101,8 +101,8 @@ public class TestTimeRangeExtractor {
     // Check that column name in time range is extracted properly
     TimeRange range = cubeql.getTimeRanges().get(0);
     assertNotNull(range);
-    assertEquals("Time dimension should be " + Storage.getDatePartitionKey(),
-      Storage.getDatePartitionKey(),
+    assertEquals("Time dimension should be " + TestCubeMetastoreClient.getDatePartitionKey(),
+      TestCubeMetastoreClient.getDatePartitionKey(),
       range.getPartitionColumn());
   }
 

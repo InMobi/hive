@@ -293,4 +293,12 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   void dropStorage(String storage) {
     snapshotDumpPeriods.remove(storage);
   }
+
+  /**
+   * @return the timedDimension
+   */
+  public String getTimedDimension() {
+    return getProperties().get(MetastoreConstants.TIMED_DIMENSION);
+  }
+
 }

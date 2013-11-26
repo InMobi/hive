@@ -19,7 +19,7 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.cube.metadata.Storage;
+import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -365,7 +365,7 @@ public class TestCubeRewriter {
       + " where " + twoDaysRange);
     List<String> joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "citytable", Storage.getPartitionsForLatest()));
+      "citytable", StorageConstants.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select sum(testcube.msr2)" +
       " FROM ", " INNER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id", null, null, joinWhereConds,
@@ -381,9 +381,9 @@ public class TestCubeRewriter {
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "citytable", Storage.getPartitionsForLatest()));
+      "citytable", StorageConstants.getPartitionsForLatest()));
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "ziptable", Storage.getPartitionsForLatest()));
+      "ziptable", StorageConstants.getPartitionsForLatest()));
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id LEFT OUTER JOIN c1_statetable statetable"
@@ -403,9 +403,9 @@ public class TestCubeRewriter {
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "ct", Storage.getPartitionsForLatest()));
+      "ct", StorageConstants.getPartitionsForLatest()));
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "zt", Storage.getPartitionsForLatest()));
+      "zt", StorageConstants.getPartitionsForLatest()));
     expected = getExpectedQuery("tc", "select st.name," +
       " sum(tc.msr2) FROM ", " INNER JOIN c1_citytable ct ON" +
       " tc.cityid = ct.id LEFT OUTER JOIN c1_statetable st"
@@ -458,7 +458,7 @@ public class TestCubeRewriter {
       twoDaysRange);
     List<String> joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "citytable", Storage.getPartitionsForLatest()));
+      "citytable", StorageConstants.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select citytable.name," +
       " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id", null, " group by citytable.name ",
