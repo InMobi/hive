@@ -341,6 +341,9 @@ public class SessionState {
     return UUID.randomUUID().toString();
   }
 
+  public void setSessionConsole(LogHelper sessionConsole) {
+    this.sessionConsole = sessionConsole;
+  }
   /**
    * This class provides helper routines to emit informational and error
    * messages to the user and log4j files while obeying the current session's
@@ -358,6 +361,11 @@ public class SessionState {
 
     protected Log LOG;
     protected boolean isSilent;
+    private PrintStream childErrStream;
+    private PrintStream childOutStream;
+    private PrintStream errorStream;
+    private PrintStream outStream;
+    private PrintStream infoStream;
 
     public LogHelper(Log LOG) {
       this(LOG, false);
@@ -369,26 +377,42 @@ public class SessionState {
     }
 
     public PrintStream getOutStream() {
+      if (outStream != null) {
+        return outStream;
+      }
       SessionState ss = SessionState.get();
       return ((ss != null) && (ss.out != null)) ? ss.out : System.out;
     }
 
     public PrintStream getInfoStream() {
+      if (infoStream != null) {
+        return infoStream;
+      }
       SessionState ss = SessionState.get();
       return ((ss != null) && (ss.info != null)) ? ss.info : getErrStream();
     }
 
     public PrintStream getErrStream() {
+      if (errorStream != null) {
+        return errorStream;
+      }
       SessionState ss = SessionState.get();
       return ((ss != null) && (ss.err != null)) ? ss.err : System.err;
     }
 
     public PrintStream getChildOutStream() {
+      if (childOutStream != null) {
+        return childOutStream;
+      }
+
       SessionState ss = SessionState.get();
       return ((ss != null) && (ss.childOut != null)) ? ss.childOut : System.out;
     }
 
     public PrintStream getChildErrStream() {
+      if (childErrStream != null) {
+        return childErrStream;
+      }
       SessionState ss = SessionState.get();
       return ((ss != null) && (ss.childErr != null)) ? ss.childErr : System.err;
     }
@@ -418,14 +442,36 @@ public class SessionState {
       getErrStream().println(error);
       LOG.error(error + StringUtils.defaultString(detail));
     }
+
+    public void setChildErrStream(PrintStream childErrStream) {
+      this.childErrStream = childErrStream;
+    }
+    public void setChildOutStream(PrintStream childOutStream) {
+      this.childOutStream = childOutStream;
+    }
+    public void setInfoStream(PrintStream stream) {
+      infoStream = stream;
+    }
+    public void setOutStream(PrintStream stream) {
+      outStream = stream;
+    }
+    public void setErrorStream(PrintStream stream) {
+      errorStream = stream;
+    }
   }
 
   private static LogHelper _console;
+  private LogHelper sessionConsole;
 
   /**
    * initialize or retrieve console object for SessionState.
    */
   public static LogHelper getConsole() {
+    SessionState ss = tss.get();
+    if (ss != null && ss.sessionConsole != null) {
+      return ss.sessionConsole;
+    }
+
     if (_console == null) {
       Log LOG = LogFactory.getLog("SessionState");
       _console = new LogHelper(LOG);

@@ -757,6 +757,9 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_ASYNC_EXEC_KEEPALIVE_TIME("hive.server2.async.exec.keepalive.time", 10),
 
 
+    HIVE_SERVER2_LOG_REDIRECTION_ENABLED("hive.server2.log.redirection.enabled", false),
+    HIVE_SERVER2_LOG_DIRECTORY("hive.hiveserver2.query.log.dir", "query_logs"),
+
     // HiveServer2 auth configuration
     HIVE_SERVER2_AUTHENTICATION("hive.server2.authentication", "NONE"),
     HIVE_SERVER2_KERBEROS_KEYTAB("hive.server2.authentication.kerberos.keytab", ""),

@@ -274,16 +274,16 @@ public class MapRedTask extends ExecDriver implements Serializable {
       // Run ExecDriver in another JVM
       executor = Runtime.getRuntime().exec(cmdLine, env, new File(workDir));
 
-      CachingPrintStream errPrintStream =
-          new CachingPrintStream(SessionState.getConsole().getChildErrStream());
-
-      StreamPrinter outPrinter = new StreamPrinter(
-          executor.getInputStream(), null,
-          SessionState.getConsole().getChildOutStream());
-      StreamPrinter errPrinter = new StreamPrinter(
-          executor.getErrorStream(), null,
-          errPrintStream);
-
+      StreamPrinter outPrinter = null, errPrinter = null;
+      CachingPrintStream errPrintStream = null;
+      if (conf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED)) {
+        outPrinter = new StreamPrinter(executor.getInputStream(), null, getConsole().getChildOutStream());
+        errPrintStream = new CachingPrintStream(getConsole().getChildErrStream());
+      } else {
+        outPrinter = new StreamPrinter(executor.getInputStream(), null, SessionState.getConsole().getChildOutStream());
+        errPrintStream = new CachingPrintStream(SessionState.getConsole().getChildErrStream());
+      }
+      errPrinter = new StreamPrinter(executor.getErrorStream(), null, errPrintStream);
       outPrinter.start();
       errPrinter.start();
 

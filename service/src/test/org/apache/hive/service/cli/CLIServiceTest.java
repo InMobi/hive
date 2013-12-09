@@ -120,8 +120,9 @@ public abstract class CLIServiceTest {
   @Test
   public void testExecuteStatement() throws Exception {
     HashMap<String, String> confOverlay = new HashMap<String, String>();
+    confOverlay.put(HiveConf.ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED.varname, "true");
     SessionHandle sessionHandle = client.openSession("tom", "password",
-        new HashMap<String, String>());
+        confOverlay);
     assertNotNull(sessionHandle);
 
     // Change lock manager, otherwise unit-test doesn't go through

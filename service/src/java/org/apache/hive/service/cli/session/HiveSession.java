@@ -18,6 +18,7 @@
 
 package org.apache.hive.service.cli.session;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 
@@ -182,4 +183,10 @@ public interface HiveSession {
 
   public String getQueryPlan(String statement, Map<String, String> confOverlay)
       throws HiveSQLException;
+
+  public File getSessionLogDir();
+
+  public boolean isLogRedirectionEnabled();
+
+  public void setupLogRedirection(File queryLogDir) throws HiveSQLException;
 }

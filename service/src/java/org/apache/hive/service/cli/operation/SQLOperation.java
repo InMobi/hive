@@ -80,6 +80,7 @@ public class SQLOperation extends ExecuteStatementOperation {
     // TODO: call setRemoteUser in ExecuteStatementOperation or higher.
     super(parentSession, statement, confOverlay);
     this.runAsync = runInBackground;
+    openLogStreams();
   }
 
 
@@ -100,6 +101,11 @@ public class SQLOperation extends ExecuteStatementOperation {
 
       // TODO We need to merge the change to pass user name to driver
       driver = new Driver(sqlOperationConf);
+      if (getParentSession().isLogRedirectionEnabled()) {
+        driver.setConsole(console);
+      } else {
+        System.out.println("Log redirection disabled in session " + getParentSession().getSessionHandle());
+      }
       // In Hive server mode, we are not able to retry in the FetchTask
       // case, when calling fetch queries since execute() has returned.
       // For now, we disable the test attempts.
@@ -192,6 +198,8 @@ public class SQLOperation extends ExecuteStatementOperation {
     if (ss.getTmpOutputFile() != null) {
       ss.getTmpOutputFile().delete();
     }
+
+    closeLogStreams();
     setState(state);
   }
 

@@ -18,7 +18,7 @@
 
 package org.apache.hive.service.cli.session;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.ql.history.HiveHistory;
+import org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.hive.service.cli.FetchOrientation;
@@ -76,6 +77,11 @@ public class HiveSessionImpl implements HiveSession {
   private OperationManager operationManager;
   private IMetaStoreClient metastoreClient = null;
   private final Set<OperationHandle> opHandleSet = new HashSet<OperationHandle>();
+  private boolean isLogRedirectionEnabled;
+  protected File queryLogDir;
+  private PrintStream sessionOut;
+  private PrintStream sessionErr;
+  private File sessionLogDir;
 
   public HiveSessionImpl(String username, String password, Map<String, String> sessionConf) {
     this.username = username;
@@ -90,6 +96,49 @@ public class HiveSessionImpl implements HiveSession {
     hiveConf.set(ConfVars.HIVESESSIONID.varname,
         sessionHandle.getHandleIdentifier().toString());
     sessionState = new SessionState(hiveConf);
+  }
+
+  @Override
+  public void setupLogRedirection(File queryLogDir) throws HiveSQLException {
+    // Create session.out and .err directories
+    sessionLogDir = new File(queryLogDir, sessionHandle.getHandleIdentifier().toString());
+    isLogRedirectionEnabled = true;
+    if (!sessionLogDir.exists()) {
+      if (!sessionLogDir.mkdir()) {
+        LOG.warn("Query logs - unable to create session dir " + sessionLogDir.getAbsolutePath());
+        isLogRedirectionEnabled = false;
+        return;
+      }
+    } else {
+      LOG.warn("Session log directory already exsits " + sessionLogDir.getAbsolutePath());
+    }
+
+    try {
+      sessionOut = new PrintStream(new FileOutputStream(new File(sessionLogDir, "session.out")), true, "UTF-8");
+      sessionErr = new PrintStream(new FileOutputStream(new File(sessionLogDir, "session.err")), true, "UTF-8");
+      SessionState.LogHelper console = new SessionState.LogHelper(LOG);
+      console.setErrorStream(sessionErr);
+      console.setInfoStream(sessionOut);
+      console.setOutStream(sessionOut);
+      sessionState.setSessionConsole(console);
+      LOG.info("Created session log files in " + sessionLogDir.getAbsolutePath());
+    } catch (FileNotFoundException e) {
+      isLogRedirectionEnabled = false;
+      LOG.error("Error creating session log file for " + sessionHandle.toString(), e);
+    } catch (UnsupportedEncodingException e) {
+      isLogRedirectionEnabled = false;
+      LOG.error("Error creating session log file for " + sessionHandle.toString(), e);
+    }
+  }
+
+  private void closeSessionLog() {
+    if (sessionOut != null) {
+      sessionOut.close();
+    }
+
+    if (sessionErr != null) {
+      sessionErr.close();
+    }
   }
 
   public SessionManager getSessionManager() {
@@ -344,6 +393,7 @@ public class HiveSessionImpl implements HiveSession {
   public void close() throws HiveSQLException {
     try {
       acquire();
+      closeSessionLog();
       /**
        *  For metadata operations like getTables(), getColumns() etc,
        * the session allocates a private metastore handler which should be
@@ -449,5 +499,14 @@ public class HiveSessionImpl implements HiveSession {
     } else {
       throw new HiveSQLException("Not an SQL statement: " + statement);
     }
+  }
+
+  @Override
+  public boolean isLogRedirectionEnabled() {
+    return isLogRedirectionEnabled;
+  }
+
+  public File getSessionLogDir() {
+    return sessionLogDir;
   }
 }

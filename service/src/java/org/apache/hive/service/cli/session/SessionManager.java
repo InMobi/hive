@@ -18,6 +18,7 @@
 
 package org.apache.hive.service.cli.session;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +52,8 @@ public class SessionManager extends CompositeService {
   private final OperationManager operationManager = new OperationManager();
 
   private ThreadPoolExecutor backgroundOperationPool;
+  private File queryLogDir;
+  private boolean isLogRedirectionEnabled;
 
   public SessionManager() {
     super("SessionManager");
@@ -71,6 +74,24 @@ public class SessionManager extends CompositeService {
     backgroundOperationPool = new ThreadPoolExecutor(backgroundPoolSize, backgroundPoolSize,
         keepAliveTime, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(backgroundPoolQueueSize));
     backgroundOperationPool.allowCoreThreadTimeOut(true);
+
+    if (hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED)) {
+      queryLogDir = new File(hiveConf.getVar(ConfVars.HIVE_SERVER2_LOG_DIRECTORY));
+      isLogRedirectionEnabled = true;
+      if (queryLogDir.exists() && !queryLogDir.isDirectory()) {
+        LOG.warn("Query logs - not a directory! " + queryLogDir.getAbsolutePath());
+        isLogRedirectionEnabled = false;
+      }
+
+      if (!queryLogDir.exists()) {
+        if (!queryLogDir.mkdir()) {
+          LOG.warn("Query logs - unable to create query log directory - " + queryLogDir.getAbsolutePath());
+          isLogRedirectionEnabled = false;
+        }
+      }
+      //TODO start query log cleanup service
+    }
+
     addService(operationManager);
     super.init(hiveConf);
   }
@@ -116,6 +137,9 @@ public class SessionManager extends CompositeService {
     }
     session.setSessionManager(this);
     session.setOperationManager(operationManager);
+    if (isLogRedirectionEnabled) {
+      session.setupLogRedirection(queryLogDir);
+    }
 
     handleToSession.put(session.getSessionHandle(), session);
 
