@@ -202,11 +202,6 @@ public class MetastoreUtil implements MetastoreConstants {
         MetastoreConstants.LATEST_PART_TIMESTAMP_SFX;
   }
 
-  public static String getLatestPartUpdatePeriodKey(String partCol) {
-    return MetastoreConstants.STORAGE_PFX + partCol +
-        MetastoreConstants.LATEST_PART_UPDATE_PERIOD_SFX;
-  }
-
   // //////////////////////////
   // Utils ///
   // /////////////////////////
