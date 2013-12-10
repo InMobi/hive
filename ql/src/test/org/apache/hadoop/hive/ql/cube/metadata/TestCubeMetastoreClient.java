@@ -1450,7 +1450,7 @@ public class TestCubeMetastoreClient {
     Assert.assertFalse(client.latestPartitionExists(
         cubeFactWithTwoStorages.getName(), hdfsStorageWithNoParts,
         TestCubeMetastoreClient.getDatePartitionKey()));
-    Assert.assertEquals(client.getAllParts(storageTableName2), 0);
+    Assert.assertEquals(client.getAllParts(storageTableName2).size(), 0);
   }
 
   @Test
