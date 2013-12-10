@@ -337,6 +337,10 @@ public class CubeMetastoreClient {
     }
   }
 
+  private boolean isLatestPart(Partition part) {
+    return part.getValues().contains(StorageConstants.LATEST_PARTITION_VALUE);
+  }
+
   private Date getLatestTimeStamp(Partition part, String storageTableName, String partCol)
       throws HiveException {
     if (part != null) {
@@ -355,7 +359,7 @@ public class CubeMetastoreClient {
     return null;
   }
 
-  Date getPartDate(Partition part, int timeColIndex) {
+  private Date getPartDate(Partition part, int timeColIndex) {
     String partVal = part.getValues().get(timeColIndex);
     String updatePeriodStr = part.getParameters().get(MetastoreConstants.PARTITION_UPDATE_PERIOD);
     Date partDate = null;
@@ -394,9 +398,11 @@ public class CubeMetastoreClient {
       }
     });
     for (Partition part : partitions) {
-      Date partDate = getPartDate(part, timeColIndex);
-      if (partDate != null) {
-        allPartTimeVals.add(part);
+      if (!isLatestPart(part)){
+        Date partDate = getPartDate(part, timeColIndex);
+        if (partDate != null) {
+          allPartTimeVals.add(part);
+        }
       }
     }
     Iterator<Partition> it = allPartTimeVals.iterator();
@@ -534,6 +540,10 @@ public class CubeMetastoreClient {
       throw new HiveException("Could not find partitions for given filter", e);
     }
     return !(parts.isEmpty());
+  }
+
+  public List<Partition> getAllParts(String storageTableName) throws HiveException {
+    return getClient().getPartitions(getHiveTable(storageTableName));
   }
 
   public List<Partition> getPartitionsByFilter(String storageTableName,
