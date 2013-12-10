@@ -95,11 +95,13 @@ public class SessionManager extends CompositeService {
         }
       }
 
-      logPurgerService = Executors.newSingleThreadScheduledExecutor();
-      long purgeDelay = hiveConf.getLongVar(ConfVars.HIVE_SERVER2_LOG_PURGE_DELAY);
-      QueryLogPurger purger = new QueryLogPurger(queryLogDir, purgeDelay);
-      logPurgerService.scheduleWithFixedDelay(purger, 60, 60, TimeUnit.SECONDS);
-      LOG.info("Started log purger service");
+      if (isLogRedirectionEnabled) {
+        logPurgerService = Executors.newSingleThreadScheduledExecutor();
+        long purgeDelay = hiveConf.getLongVar(ConfVars.HIVE_SERVER2_LOG_PURGE_DELAY);
+        QueryLogPurger purger = new QueryLogPurger(queryLogDir, purgeDelay);
+        logPurgerService.scheduleWithFixedDelay(purger, 60, 60, TimeUnit.SECONDS);
+        LOG.info("Started log purger service");
+      }
     }
 
     addService(operationManager);
