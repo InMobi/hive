@@ -94,11 +94,7 @@ public class SessionManager extends CompositeService {
           isLogRedirectionEnabled = false;
         }
       }
-      //TODO start query log cleanup service
-    }
 
-    // setup log purger service
-    if (isLogRedirectionEnabled && hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_PURGE_ENABLED)) {
       logPurgerService = Executors.newSingleThreadScheduledExecutor();
       long purgeDelay = hiveConf.getLongVar(ConfVars.HIVE_SERVER2_LOG_PURGE_DELAY);
       QueryLogPurger purger = new QueryLogPurger(queryLogDir, purgeDelay);

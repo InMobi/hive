@@ -757,9 +757,8 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_ASYNC_EXEC_KEEPALIVE_TIME("hive.server2.async.exec.keepalive.time", 10),
 
 
-    HIVE_SERVER2_LOG_REDIRECTION_ENABLED("hive.server2.log.redirection.enabled", false),
+    HIVE_SERVER2_LOG_REDIRECTION_ENABLED("hive.server2.log.redirection.enabled", true),
     HIVE_SERVER2_LOG_DIRECTORY("hive.server2.query.log.dir", "query_logs"),
-    HIVE_SERVER2_LOG_PURGE_ENABLED("hive.server2.log.purge.enabled", true),
     // By default, logs will be purged after a week
     HIVE_SERVER2_LOG_PURGE_DELAY("hive.server2.log.purge.delay", 7 * 1440 * 60 * 1000L),
 
