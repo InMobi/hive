@@ -18,12 +18,17 @@
 
 package org.apache.hive.service.cli;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.service.cli.thrift.EmbeddedThriftBinaryCLIService;
 import org.apache.hive.service.cli.thrift.ThriftCLIService;
 import org.apache.hive.service.cli.thrift.ThriftCLIServiceClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Test;
+
+import java.io.File;
+import java.util.UUID;
 
 /**
  * TestEmbeddedThriftBinaryCLIService.
@@ -55,5 +60,4 @@ public class TestEmbeddedThriftBinaryCLIService extends CLIServiceTest {
   public void tearDown() throws Exception {
     super.tearDown();
   }
-
 }

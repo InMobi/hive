@@ -113,7 +113,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 public class Driver implements CommandProcessor {
 
   static final private Log LOG = LogFactory.getLog(Driver.class.getName());
-  static final private LogHelper console = new LogHelper(LOG);
+  private LogHelper console = new LogHelper(LOG);
 
   private static final Object compileMonitor = new Object();
 
@@ -1431,6 +1431,13 @@ public class Driver implements CommandProcessor {
       console.printInfo("Launching Job " + cxt.getCurJobNo() + " out of " + jobs);
     }
     tsk.initialize(conf, plan, cxt);
+    if (conf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED)) {
+      tsk.getConsole().setInfoStream(console.getInfoStream());
+      tsk.getConsole().setErrorStream(console.getErrStream());
+      tsk.getConsole().setOutStream(console.getOutStream());
+      tsk.getConsole().setChildErrStream(console.getChildErrStream());
+      tsk.getConsole().setChildOutStream(console.getChildOutStream());
+    }
     TaskResult tskRes = new TaskResult();
     TaskRunner tskRun = new TaskRunner(tsk, tskRes);
 
@@ -1635,5 +1642,9 @@ public class Driver implements CommandProcessor {
       statuses.add(new TaskStatus(tsk.getId(), tsk.getExternalHandle(), tsk.getTaskState()));
     }
     return statuses;
+  }
+
+  public void setConsole(LogHelper console) {
+    this.console = console;
   }
 }

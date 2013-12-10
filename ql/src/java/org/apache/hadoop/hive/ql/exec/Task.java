@@ -88,6 +88,14 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   protected String id;
   protected T work;
 
+  public void setConsole(LogHelper console) {
+    this.console = console;
+  }
+
+  public LogHelper getConsole() {
+    return console;
+  }
+
   public static enum FeedType {
     DYNAMIC_PARTITIONS, // list of dynamic partitions
   };
@@ -145,7 +153,6 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
       throw new RuntimeException(e);
     }
     this.driverContext = driverContext;
-
     console = new LogHelper(LOG);
   }
 

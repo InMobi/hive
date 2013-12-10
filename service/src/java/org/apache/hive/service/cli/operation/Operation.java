@@ -17,12 +17,14 @@
  */
 package org.apache.hive.service.cli.operation;
 
+import java.io.*;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.TaskStatus;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationHandle;
@@ -42,11 +44,15 @@ public abstract class Operation {
   public static final Log LOG = LogFactory.getLog(Operation.class.getName());
   public static final long DEFAULT_FETCH_MAX_ROWS = 100;
   protected boolean hasResultSet;
+  protected SessionState.LogHelper console;
+  protected PrintStream opLogOut;
+  protected PrintStream opLogErr;
 
   protected Operation(HiveSession parentSession, OperationType opType) {
     super();
     this.parentSession = parentSession;
     opHandle = new OperationHandle(opType);
+    console = new SessionState.LogHelper(LOG);
   }
 
   public void setConfiguration(HiveConf configuration) {
@@ -132,4 +138,52 @@ public abstract class Operation {
     return null;
   }
 
+  public void setConsole(SessionState.LogHelper log) {
+    console = log;
+  }
+
+  public SessionState.LogHelper getConsole() {
+    return console;
+  }
+
+  protected void openLogStreams() {
+    if (parentSession.isLogRedirectionEnabled()) {
+      File sessionLogDir = parentSession.getSessionLogDir();
+      String operationId = opHandle.getHandleIdentifier().toString();
+      try {
+        opLogOut = new PrintStream(new FileOutputStream(new File(sessionLogDir, operationId + ".out")),
+          true, "UTF-8");
+        opLogErr = new PrintStream(new FileOutputStream(new File(sessionLogDir, operationId + ".err")),
+          true, "UTF-8" );
+        console.setInfoStream(opLogOut);
+        console.setOutStream(opLogOut);
+        console.setErrorStream(opLogErr);
+        console.setChildErrStream(opLogErr);
+        console.setChildOutStream(opLogOut);
+      } catch (FileNotFoundException e) {
+        LOG.error("Error setting up log redirection for operation " + getHandle().toString(), e);
+      } catch (UnsupportedEncodingException e) {
+        LOG.error("Error setting up log redirection, unable to create print stream", e);
+      }
+
+      LOG.info("Created session log files in dir " + parentSession.getSessionLogDir().getAbsolutePath()
+        + " operation " + operationId);
+      System.out.println("%%% " + parentSession.getSessionLogDir() + " %% " + operationId);
+    } else {
+      System.out.println("%%% Log redirection disabled");
+    }
+
+  }
+
+  protected void closeLogStreams() {
+    if (parentSession.isLogRedirectionEnabled()) {
+      if (opLogOut != null) {
+        opLogOut.close();
+      }
+
+      if (opLogErr != null) {
+        opLogErr.close();
+      }
+    }
+  }
 }
