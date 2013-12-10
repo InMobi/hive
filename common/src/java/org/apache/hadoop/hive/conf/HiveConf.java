@@ -758,7 +758,10 @@ public class HiveConf extends Configuration {
 
 
     HIVE_SERVER2_LOG_REDIRECTION_ENABLED("hive.server2.log.redirection.enabled", false),
-    HIVE_SERVER2_LOG_DIRECTORY("hive.hiveserver2.query.log.dir", "query_logs"),
+    HIVE_SERVER2_LOG_DIRECTORY("hive.server2.query.log.dir", "query_logs"),
+    HIVE_SERVER2_LOG_PURGE_ENABLED("hive.server2.log.purge.enabled", true),
+    // By default, logs will be purged after a week
+    HIVE_SERVER2_LOG_PURGE_DELAY("hive.server2.log.purge.delay", 7 * 1440 * 60 * 1000L),
 
     // HiveServer2 auth configuration
     HIVE_SERVER2_AUTHENTICATION("hive.server2.authentication", "NONE"),
@@ -815,8 +818,7 @@ public class HiveConf extends Configuration {
     // Whether to show the unquoted partition names in query results.
     HIVE_DECODE_PARTITION_NAME("hive.decode.partition.name", false),
 
-    HIVE_TYPE_CHECK_ON_INSERT("hive.typecheck.on.insert", true),
-    ;
+    HIVE_TYPE_CHECK_ON_INSERT("hive.typecheck.on.insert", true);
 
     public final String varname;
     public final String defaultVal;

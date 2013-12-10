@@ -60,7 +60,6 @@ import org.apache.hive.service.cli.operation.SQLOperation;
  *
  */
 public class HiveSessionImpl implements HiveSession {
-
   private final SessionHandle sessionHandle = new SessionHandle();
   private String username;
   private final String password;
@@ -132,12 +131,21 @@ public class HiveSessionImpl implements HiveSession {
   }
 
   private void closeSessionLog() {
-    if (sessionOut != null) {
-      sessionOut.close();
-    }
+    if (isLogRedirectionEnabled) {
+      if (sessionOut != null) {
+        sessionOut.close();
+      }
 
-    if (sessionErr != null) {
-      sessionErr.close();
+      if (sessionErr != null) {
+        sessionErr.close();
+      }
+      // Mark session as closed in log dir
+      File sessionClosed = new File(sessionLogDir,  SESSION_CLOSED_MARKER);
+      try {
+        sessionClosed.createNewFile();
+      } catch (IOException e) {
+        LOG.error("Unable to create session closed marker", e);
+      }
     }
   }
 
@@ -393,7 +401,6 @@ public class HiveSessionImpl implements HiveSession {
   public void close() throws HiveSQLException {
     try {
       acquire();
-      closeSessionLog();
       /**
        *  For metadata operations like getTables(), getColumns() etc,
        * the session allocates a private metastore handler which should be
@@ -412,10 +419,11 @@ public class HiveSessionImpl implements HiveSession {
         hiveHist.closeStream();
       }
       sessionState.close();
-      release();
     } catch (IOException ioe) {
-      release();
       throw new HiveSQLException("Failure to close", ioe);
+    } finally {
+      release();
+      closeSessionLog();
     }
   }
 

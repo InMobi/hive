@@ -19,14 +19,18 @@
 package org.apache.hive.service.cli.session;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -52,6 +56,7 @@ public class SessionManager extends CompositeService {
   private final OperationManager operationManager = new OperationManager();
 
   private ThreadPoolExecutor backgroundOperationPool;
+  private ScheduledExecutorService logPurgerService;
   private File queryLogDir;
   private boolean isLogRedirectionEnabled;
 
@@ -92,6 +97,15 @@ public class SessionManager extends CompositeService {
       //TODO start query log cleanup service
     }
 
+    // setup log purger service
+    if (isLogRedirectionEnabled && hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_PURGE_ENABLED)) {
+      logPurgerService = Executors.newSingleThreadScheduledExecutor();
+      long purgeDelay = hiveConf.getLongVar(ConfVars.HIVE_SERVER2_LOG_PURGE_DELAY);
+      QueryLogPurger purger = new QueryLogPurger(queryLogDir, purgeDelay);
+      logPurgerService.scheduleWithFixedDelay(purger, 60, 60, TimeUnit.SECONDS);
+      LOG.info("Started log purger service");
+    }
+
     addService(operationManager);
     super.init(hiveConf);
   }
@@ -113,6 +127,10 @@ public class SessionManager extends CompositeService {
         LOG.warn("HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT = " + timeout +
             " seconds has been exceeded. RUNNING background operations will be shut down", e);
       }
+    }
+
+    if (logPurgerService != null) {
+      logPurgerService.shutdownNow();
     }
   }
 
@@ -214,4 +232,46 @@ public class SessionManager extends CompositeService {
     return backgroundOperationPool.submit(r);
   }
 
+  public static class QueryLogPurger implements Runnable {
+    private final File queryLogDir;
+    private final long purgeDelay;
+
+    /**
+     * Log purging runnable.
+     * @param dir location of query logs
+     * @param delay period after which a closed session's log will be deleted. If this is negative or zero, it means
+     *              logs are eligible for purging immediately after the session is closed
+     */
+    public QueryLogPurger(File dir, long delay) {
+      if (dir == null) {
+        throw new NullPointerException("Query log directory cannot be null");
+      }
+      queryLogDir = dir;
+      purgeDelay = delay;
+    }
+
+    @Override
+    public void run() {
+      long now = System.currentTimeMillis();
+      for (File session : queryLogDir.listFiles()) {
+        if (session.isDirectory()) {
+          File sessionClosedMarker = new File(session, HiveSession.SESSION_CLOSED_MARKER);
+          if (sessionClosedMarker.exists()) {
+            long sessionClosedSince = now - sessionClosedMarker.lastModified();
+            if (sessionClosedSince >= purgeDelay) {
+              LOG.info("Query log purger - begin delete session " + session.getName()
+                + " closed since " + sessionClosedSince);
+              try {
+                FileUtils.forceDelete(session);
+                LOG.info("Query log purger - deleted logs of session " + session.getName());
+              } catch (IOException e) {
+                LOG.error("Error deleting session logs ", e);
+              }
+
+            }
+          }
+        }
+      }
+    }
+  }
 }

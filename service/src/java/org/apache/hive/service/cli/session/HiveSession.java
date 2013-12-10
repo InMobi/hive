@@ -189,4 +189,5 @@ public interface HiveSession {
   public boolean isLogRedirectionEnabled();
 
   public void setupLogRedirection(File queryLogDir) throws HiveSQLException;
+  public static final String SESSION_CLOSED_MARKER = "SESSION_CLOSED";
 }
