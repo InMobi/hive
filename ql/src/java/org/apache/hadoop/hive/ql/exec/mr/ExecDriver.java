@@ -610,7 +610,6 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
 
   @SuppressWarnings("unchecked")
   public static void main(String[] args) throws IOException, HiveException {
-    System.out.println("##### !!!!!!");
     String planFileName = null;
     String jobConfFileName = null;
     boolean noLog = false;
