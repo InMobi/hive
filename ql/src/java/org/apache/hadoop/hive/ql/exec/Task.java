@@ -69,6 +69,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   protected int taskTag;
   private boolean isLocalMode =false;
   private boolean retryCmdWhenFail = false;
+  protected boolean isLogRedirectionEnabled;
 
   public static final int NO_TAG = 0;
   public static final int COMMON_JOIN = 1;
@@ -550,5 +551,13 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   }
   void setException(Throwable ex) {
     exception = ex;
+  }
+
+  public boolean isLogRedirectionEnabled() {
+    return isLogRedirectionEnabled;
+  }
+
+  public void setLogRedirectionEnabled(boolean isLogRedirectionEnabled) {
+    this.isLogRedirectionEnabled = isLogRedirectionEnabled;
   }
 }

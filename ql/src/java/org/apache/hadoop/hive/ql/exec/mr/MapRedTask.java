@@ -276,7 +276,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
 
       StreamPrinter outPrinter = null, errPrinter = null;
       CachingPrintStream errPrintStream = null;
-      if (conf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED)) {
+      if (isLogRedirectionEnabled) {
         outPrinter = new StreamPrinter(executor.getInputStream(), null, getConsole().getChildOutStream());
         errPrintStream = new CachingPrintStream(getConsole().getChildErrStream());
       } else {

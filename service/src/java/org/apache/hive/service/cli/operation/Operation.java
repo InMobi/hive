@@ -168,11 +168,7 @@ public abstract class Operation {
 
       LOG.info("Created session log files in dir " + parentSession.getSessionLogDir().getAbsolutePath()
         + " operation " + operationId);
-      System.out.println("%%% " + parentSession.getSessionLogDir() + " %% " + operationId);
-    } else {
-      System.out.println("%%% Log redirection disabled");
     }
-
   }
 
   protected void closeLogStreams() {

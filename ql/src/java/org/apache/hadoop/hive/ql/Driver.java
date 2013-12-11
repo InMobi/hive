@@ -136,6 +136,7 @@ public class Driver implements CommandProcessor {
   private static final int SLEEP_TIME = 2000;
   protected int tryCount = Integer.MAX_VALUE;
   private DriverContext driverCxt;
+  private boolean logRedirecionEnabled;
 
 
   private boolean checkLockManager() {
@@ -1431,7 +1432,8 @@ public class Driver implements CommandProcessor {
       console.printInfo("Launching Job " + cxt.getCurJobNo() + " out of " + jobs);
     }
     tsk.initialize(conf, plan, cxt);
-    if (conf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED)) {
+    if (logRedirecionEnabled) {
+      tsk.setLogRedirectionEnabled(true);
       tsk.getConsole().setInfoStream(console.getInfoStream());
       tsk.getConsole().setErrorStream(console.getErrStream());
       tsk.getConsole().setOutStream(console.getOutStream());
@@ -1646,5 +1648,13 @@ public class Driver implements CommandProcessor {
 
   public void setConsole(LogHelper console) {
     this.console = console;
+  }
+
+  public boolean isLogRedirecionEnabled() {
+    return logRedirecionEnabled;
+  }
+
+  public void setLogRedirecionEnabled(boolean isLogRedirecionEnabled) {
+    this.logRedirecionEnabled = isLogRedirecionEnabled;
   }
 }
