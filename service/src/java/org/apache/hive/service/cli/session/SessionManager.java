@@ -247,12 +247,12 @@ public class SessionManager extends CompositeService {
       purgeDelay = delay;
     }
 
-    private void deleteDirectory(File session, long age, boolean sessionClosed) {
-      LOG.info("Query log purger - begin delete logs of session " + session.getName()
+    private void deleteDirectory(File dir, long age, boolean sessionClosed) {
+      LOG.info("Query log purger - begin delete logs " + dir.getPath()
         + ", inactive since " + age + ", session closed? " + (sessionClosed ? "yes" : "no"));
       try {
-        FileUtils.forceDelete(session);
-        LOG.info("Query log purger - deleted logs of session " + session.getName());
+        FileUtils.forceDelete(dir);
+        LOG.info("Query log purger - deleted logs " + dir.getPath());
       } catch (IOException e) {
         LOG.error("Error deleting session logs ", e);
       }
@@ -288,11 +288,21 @@ public class SessionManager extends CompositeService {
                   lastModifiedTime = f.lastModified();
                 }
                 if (f.isDirectory()) {
+                  // Its an operation log dir
+                  long operationLastLogTime = f.lastModified();
                   File[] logFiles = f.listFiles();
                   if (logFiles != null) {
                     for (File child : logFiles) {
+                      if (operationLastLogTime < child.lastModified()) {
+                        operationLastLogTime = child.lastModified();
+                      }
                       queue.offer(child);
                     }
+                  }
+                  if (System.currentTimeMillis() - operationLastLogTime >= purgeDelay) {
+                    // there hasn't been anything logged for this operation for a long time
+                    // assume that this operation is done and delete its logs
+                    deleteDirectory(f, System.currentTimeMillis() - operationLastLogTime, false);
                   }
                 }
               }
