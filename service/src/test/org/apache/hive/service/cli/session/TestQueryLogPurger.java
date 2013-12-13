@@ -18,7 +18,11 @@ public class TestQueryLogPurger {
       final int PURGE_PERIOD = 2000;
       SessionManager.QueryLogPurger purger = new SessionManager.QueryLogPurger(queryLogDir, PURGE_PERIOD);
       System.out.println("Creating test files " + new Date());
-      createSessionFiles(queryLogDir, 1);
+      // Create a session with closed marker
+      createSessionFiles(queryLogDir, 1, true);
+      // Another session without closed marker
+      createSessionFiles(queryLogDir, 2, false);
+
       System.out.println("Done creating test files " + new Date());
       long before = System.currentTimeMillis();
       System.out.println("purger run 1 " + new Date());
@@ -26,7 +30,7 @@ public class TestQueryLogPurger {
       if (System.currentTimeMillis() - before < PURGE_PERIOD) {
         System.out.println("Should not delete in this run " + new Date());
         // Expecting logs not to be deleted in this run
-        assertEquals(1, queryLogDir.listFiles().length);
+        assertEquals(2, queryLogDir.listFiles().length);
       }
 
       Thread.sleep(PURGE_PERIOD);
@@ -41,7 +45,7 @@ public class TestQueryLogPurger {
     }
   }
 
-  private void createSessionFiles(File queryLogDir, int sessionId) throws Exception {
+  private void createSessionFiles(File queryLogDir, int sessionId, boolean closeSession) throws Exception {
     String session = "test_session" + sessionId;
     String testOp = "op1";
     File sessionDir = new File(queryLogDir, session);
@@ -61,9 +65,11 @@ public class TestQueryLogPurger {
     File op1Err = new File(op1Dir, testOp + ".err");
     op1Err.createNewFile();
 
-    // Create session closed marker
-    File sessionClosedMarker = new File(sessionDir, HiveSession.SESSION_CLOSED_MARKER);
-    sessionClosedMarker.createNewFile();
+    if (closeSession) {
+      // Create session closed marker
+      File sessionClosedMarker = new File(sessionDir, HiveSession.SESSION_CLOSED_MARKER);
+      sessionClosedMarker.createNewFile();
+    }
     System.out.println("Created session files " + sessionId);
   }
 }

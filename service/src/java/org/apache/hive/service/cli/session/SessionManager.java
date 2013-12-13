@@ -20,8 +20,7 @@ package org.apache.hive.service.cli.session;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -248,25 +247,61 @@ public class SessionManager extends CompositeService {
       purgeDelay = delay;
     }
 
+    private void deleteDirectory(File session, long age, boolean sessionClosed) {
+      LOG.info("Query log purger - begin delete logs of session " + session.getName()
+        + ", inactive since " + age + ", session closed? " + (sessionClosed ? "yes" : "no"));
+      try {
+        FileUtils.forceDelete(session);
+        LOG.info("Query log purger - deleted logs of session " + session.getName());
+      } catch (IOException e) {
+        LOG.error("Error deleting session logs ", e);
+      }
+    }
+
     @Override
     public void run() {
-      long now = System.currentTimeMillis();
-      for (File session : queryLogDir.listFiles()) {
-        if (session.isDirectory()) {
-          File sessionClosedMarker = new File(session, HiveSession.SESSION_CLOSED_MARKER);
-          if (sessionClosedMarker.exists()) {
-            long sessionClosedSince = now - sessionClosedMarker.lastModified();
-            if (sessionClosedSince >= purgeDelay) {
-              LOG.info("Query log purger - begin delete session " + session.getName()
-                + " closed since " + sessionClosedSince);
-              try {
-                FileUtils.forceDelete(session);
-                LOG.info("Query log purger - deleted logs of session " + session.getName());
-              } catch (IOException e) {
-                LOG.error("Error deleting session logs ", e);
-              }
+      File[] sessions = queryLogDir.listFiles();
+      if (sessions == null) {
+        return;
+      }
 
+      for (File session : sessions) {
+        if (session.isDirectory()) {
+          long inactiveSince;
+          boolean sessionClosed = false;
+          File sessionClosedMarker = new File(session, HiveSession.SESSION_CLOSED_MARKER);
+
+          if (sessionClosedMarker.exists()) {
+            inactiveSince = System.currentTimeMillis() - sessionClosedMarker.lastModified();
+            sessionClosed = true;
+          } else {
+            // Find last modified log file for this session, since closed marker is not present
+            // Check for sessions with no operations created in a long time
+            long lastModifiedTime = session.lastModified();
+            if (System.currentTimeMillis() - lastModifiedTime >= purgeDelay) {
+              Queue<File> queue = new LinkedList<File>();
+              queue.add(session);
+
+              while (queue.isEmpty()) {
+                File f = queue.poll();
+                if (lastModifiedTime < f.lastModified()) {
+                  lastModifiedTime = f.lastModified();
+                }
+                if (f.isDirectory()) {
+                  File[] logFiles = f.listFiles();
+                  if (logFiles != null) {
+                    for (File child : logFiles) {
+                      queue.offer(child);
+                    }
+                  }
+                }
+              }
             }
+            inactiveSince = System.currentTimeMillis() - lastModifiedTime;
+          }
+
+          if (inactiveSince >= purgeDelay) {
+            deleteDirectory(session, inactiveSince, sessionClosed);
           }
         }
       }
