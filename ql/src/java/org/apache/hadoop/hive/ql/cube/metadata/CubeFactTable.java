@@ -22,7 +22,6 @@ import org.apache.hadoop.hive.ql.metadata.Table;
 public final class CubeFactTable extends AbstractCubeTable {
   private final List<String> cubeNames;
   private final Map<String, Set<UpdatePeriod>> storageUpdatePeriods;
-  private CubeFactTable factTable;
 
   public CubeFactTable(Table hiveTable) {
     super(hiveTable);
