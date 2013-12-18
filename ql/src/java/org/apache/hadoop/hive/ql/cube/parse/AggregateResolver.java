@@ -227,8 +227,6 @@ public class AggregateResolver implements ContextRewriter {
     return false;
   }
 
-  // Wrap an aggregate function around the node if its a measure, leave it
-  // unchanged otherwise
   private boolean isMeasure(CubeQueryContext cubeql, ASTNode node) {
     String tabname = null;
     String colname;
