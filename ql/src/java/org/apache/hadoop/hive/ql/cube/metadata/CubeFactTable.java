@@ -22,6 +22,7 @@ import org.apache.hadoop.hive.ql.metadata.Table;
 public final class CubeFactTable extends AbstractCubeTable {
   private final List<String> cubeNames;
   private final Map<String, Set<UpdatePeriod>> storageUpdatePeriods;
+  private CubeFactTable factTable;
 
   public CubeFactTable(Table hiveTable) {
     super(hiveTable);
@@ -338,5 +339,14 @@ public final class CubeFactTable extends AbstractCubeTable {
   public void removeCubeName(String cubeName) {
     cubeNames.remove(cubeName.toLowerCase());
     addCubeNames(getName(), getProperties(), cubeNames);
+  }
+
+  public boolean isAggregated() {
+    // It's aggregate table unless explicitly set to false
+    return !"false".equalsIgnoreCase(getProperties().get(MetastoreConstants.FACT_AGGREGATED_PROPERTY));
+  }
+
+  public void setAggregated(boolean isAggregated) {
+    getProperties().put(MetastoreConstants.FACT_AGGREGATED_PROPERTY, Boolean.toString(isAggregated));
   }
 }

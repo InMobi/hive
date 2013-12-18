@@ -1286,6 +1286,10 @@ public class CubeQueryContext {
     public String toString() {
       return fact.toString();
     }
+
+    public CubeFactTable getFact() {
+      return fact;
+    }
   }
 
 }
