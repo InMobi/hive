@@ -15,6 +15,8 @@ import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+import java.util.Iterator;
+
 /**
  * <p>
  * Replace select and having columns with default aggregate functions on them,
@@ -48,6 +50,19 @@ public class AggregateResolver implements ContextRewriter {
     }
 
     if (conf.getBoolean(DISABLE_AGGREGATE_RESOLVER, false)) {
+      // Check if the query contains measures not inside default aggregate expressions
+      // If yes, only the raw (non aggregated) fact can answer this query.
+      // In that case remove aggregate facts from the candidate fact list
+      if (hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null)) {
+        Iterator<CubeQueryContext.CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
+        while (factItr.hasNext()) {
+          CubeQueryContext.CandidateFact candidate = factItr.next();
+          if (candidate.fact.isAggregated()) {
+            factItr.remove();
+          }
+        }
+      }
       return;
     }
 
@@ -60,10 +75,8 @@ public class AggregateResolver implements ContextRewriter {
     }
   }
 
-  // We need to traverse the clause looking for eligible measures which can be wrapped inside
-  // Aggregates
-  // We have to skip any columns that are already inside an aggregate UDAF or
-  // inside an arithmetic expression
+  // We need to traverse the clause looking for eligible measures which can be wrapped inside aggregates
+  // We have to skip any columns that are already inside an aggregate UDAF
   private String resolveClause(CubeQueryContext cubeql, ASTNode clause)
       throws SemanticException {
 
@@ -174,5 +187,70 @@ public class AggregateResolver implements ContextRewriter {
     } else {
       return node;
     }
+  }
+
+  private boolean hasMeasuresNotInDefaultAggregates(CubeQueryContext cubeql, ASTNode node, String function) {
+    if (node == null) {
+      return false;
+    }
+
+    if (isAggregateAST(node)) {
+      if (node.getChild(0).getType() == HiveParser.Identifier) {
+        function = BaseSemanticAnalyzer.unescapeIdentifier(
+          node.getChild(0).getText());
+      }
+    } else if (isMeasure(cubeql, node)) {
+      // Exit for the recursion
+
+      if (function != null && !function.isEmpty()) {
+        // Get the cube measure object and check if the passed function is the default one set for this measure
+        String colname;
+        if (node.getToken().getType() == HiveParser.TOK_TABLE_OR_COL) {
+          colname = ((ASTNode) node.getChild(0)).getText();
+        } else {
+          // node in 'alias.column' format
+          ASTNode colIdent = (ASTNode) node.getChild(1);
+          colname = colIdent.getText();
+        }
+        CubeMeasure measure = cubeql.getCube().getMeasureByName(colname);
+        return !function.equalsIgnoreCase(measure.getAggregate());
+      }
+      return true;
+    }
+
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (hasMeasuresNotInDefaultAggregates(cubeql, (ASTNode) node.getChild(i), function)) {
+        // Return on the first measure not inside its default aggregate
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean isMeasure(CubeQueryContext cubeql, ASTNode node) {
+    String tabname = null;
+    String colname;
+    int nodeType = node.getToken().getType();
+    if (!(nodeType == HiveParser.TOK_TABLE_OR_COL ||
+      nodeType == HiveParser.DOT)) {
+      return false;
+    }
+
+    if (nodeType == HiveParser.TOK_TABLE_OR_COL) {
+      colname = ((ASTNode) node.getChild(0)).getText();
+    } else {
+      // node in 'alias.column' format
+      ASTNode tabident = HQLParser.findNodeByPath(node, TOK_TABLE_OR_COL,
+        Identifier);
+      ASTNode colIdent = (ASTNode) node.getChild(1);
+
+      colname = colIdent.getText();
+      tabname = tabident.getText();
+    }
+
+    String msrname = StringUtils.isBlank(tabname) ? colname : tabname + "."
+      + colname;
+
+    return cubeql.isCubeMeasure(msrname);
   }
 }

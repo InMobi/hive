@@ -339,4 +339,13 @@ public final class CubeFactTable extends AbstractCubeTable {
     cubeNames.remove(cubeName.toLowerCase());
     addCubeNames(getName(), getProperties(), cubeNames);
   }
+
+  public boolean isAggregated() {
+    // It's aggregate table unless explicitly set to false
+    return !"false".equalsIgnoreCase(getProperties().get(MetastoreConstants.FACT_AGGREGATED_PROPERTY));
+  }
+
+  public void setAggregated(boolean isAggregated) {
+    getProperties().put(MetastoreConstants.FACT_AGGREGATED_PROPERTY, Boolean.toString(isAggregated));
+  }
 }

@@ -793,6 +793,23 @@ public class TestCubeRewriter {
     } finally {
       conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
     }
+
+    // Test if raw fact is selected for query with no aggregate function on a measure, with aggregate resolver disabled
+    String query = "SELECT cityid, testCube.msr2 FROM testCube WHERE " + twoDaysRange;
+    conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
+    CubeQueryRewriter driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    CubeQueryContext cubeql = driver.rewrite(query);
+    Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
+    CubeQueryContext.CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
+
+    // Check a query with non default aggregate function
+    String nonDefaultAggrQuery = "SELECT cityid, avg(testCube.msr2) FROM testCube WHERE " + twoDaysRange;
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    cubeql = driver.rewrite(nonDefaultAggrQuery);
+    Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
+    candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
   }
 
   @Test

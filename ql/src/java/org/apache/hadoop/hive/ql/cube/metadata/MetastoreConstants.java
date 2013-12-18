@@ -16,6 +16,7 @@ public interface MetastoreConstants {
   public static final String UPDATE_PERIOD_SFX = ".updateperiods";
   public static final String CUBE_NAMES_SFX = ".cubenames";
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
+  public static final String FACT_AGGREGATED_PROPERTY = "cube.fact.is.aggregated";
 
   // column constants
   public static final String COL_PFX = "cube.col.";
