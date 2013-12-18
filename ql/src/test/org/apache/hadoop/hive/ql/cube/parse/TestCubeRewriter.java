@@ -802,6 +802,14 @@ public class TestCubeRewriter {
     Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
     CubeQueryContext.CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
+
+    // Check a query with non default aggregate function
+    String nonDefaultAggrQuery = "SELECT cityid, avg(testCube.msr2) FROM testCube WHERE " + twoDaysRange;
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    cubeql = driver.rewrite(nonDefaultAggrQuery);
+    Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
+    candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
   }
 
   @Test

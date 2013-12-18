@@ -50,11 +50,11 @@ public class AggregateResolver implements ContextRewriter {
     }
 
     if (conf.getBoolean(DISABLE_AGGREGATE_RESOLVER, false)) {
-      // Check if the query contains measures without aggregate expressions
+      // Check if the query contains measures not inside default aggregate expressions
       // If yes, only the raw (non aggregated) fact can answer this query.
       // In that case remove aggregate facts from the candidate fact list
-      if (hasMeasuresNotInAggregates(cubeql, cubeql.getSelectAST())
-        || hasMeasuresNotInAggregates(cubeql, cubeql.getHavingAST())) {
+      if (hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null)) {
         Iterator<CubeQueryContext.CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
         while (factItr.hasNext()) {
           CubeQueryContext.CandidateFact candidate = factItr.next();
@@ -189,21 +189,38 @@ public class AggregateResolver implements ContextRewriter {
     }
   }
 
-  private boolean hasMeasuresNotInAggregates(CubeQueryContext cubeql, ASTNode node) {
+  private boolean hasMeasuresNotInDefaultAggregates(CubeQueryContext cubeql, ASTNode node, String function) {
     if (node == null) {
       return false;
     }
 
     if (isAggregateAST(node)) {
-      return false;
-    }
+      if (node.getChild(0).getType() == HiveParser.Identifier) {
+        function = BaseSemanticAnalyzer.unescapeIdentifier(
+          node.getChild(0).getText());
+      }
+    } else if (isMeasure(cubeql, node)) {
+      // Exit for the recursion
 
-    if (isMeasure(cubeql, node)) {
+      if (function != null && !function.isEmpty()) {
+        // Get the cube measure object and check if the passed function is the default one set for this measure
+        String colname;
+        if (node.getToken().getType() == HiveParser.TOK_TABLE_OR_COL) {
+          colname = ((ASTNode) node.getChild(0)).getText();
+        } else {
+          // node in 'alias.column' format
+          ASTNode colIdent = (ASTNode) node.getChild(1);
+          colname = colIdent.getText();
+        }
+        CubeMeasure measure = cubeql.getCube().getMeasureByName(colname);
+        return !function.equalsIgnoreCase(measure.getAggregate());
+      }
       return true;
     }
 
     for (int i = 0; i < node.getChildCount(); i++) {
-      if (hasMeasuresNotInAggregates(cubeql, (ASTNode) node.getChild(i))) {
+      if (hasMeasuresNotInDefaultAggregates(cubeql, (ASTNode) node.getChild(i), function)) {
+        // Return on the first measure not inside its default aggregate
         return true;
       }
     }
