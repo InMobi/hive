@@ -20,7 +20,9 @@ struct TProtocolVersion {
   enum type {
     HIVE_CLI_SERVICE_PROTOCOL_V1 = 0,
     HIVE_CLI_SERVICE_PROTOCOL_V2 = 1,
-    HIVE_CLI_SERVICE_PROTOCOL_V3 = 2
+    HIVE_CLI_SERVICE_PROTOCOL_V3 = 2,
+    HIVE_CLI_SERVICE_PROTOCOL_V4 = 3,
+    HIVE_CLI_SERVICE_PROTOCOL_V5 = 4
   };
 };
 
@@ -1581,8 +1583,8 @@ class TOpenSessionReq {
   static const char* ascii_fingerprint; // = "C8FD0F306A16C16BDA7B57F58BFAE5B2";
   static const uint8_t binary_fingerprint[16]; // = {0xC8,0xFD,0x0F,0x30,0x6A,0x16,0xC1,0x6B,0xDA,0x7B,0x57,0xF5,0x8B,0xFA,0xE5,0xB2};
 
-  TOpenSessionReq() : client_protocol((TProtocolVersion::type)2), username(), password() {
-    client_protocol = (TProtocolVersion::type)2;
+  TOpenSessionReq() : client_protocol((TProtocolVersion::type)4), username(), password() {
+    client_protocol = (TProtocolVersion::type)4;
 
   }
 
@@ -1657,8 +1659,8 @@ class TOpenSessionResp {
   static const char* ascii_fingerprint; // = "CFE7D7F4E9EC671F2518ED74FEE9F163";
   static const uint8_t binary_fingerprint[16]; // = {0xCF,0xE7,0xD7,0xF4,0xE9,0xEC,0x67,0x1F,0x25,0x18,0xED,0x74,0xFE,0xE9,0xF1,0x63};
 
-  TOpenSessionResp() : serverProtocolVersion((TProtocolVersion::type)2) {
-    serverProtocolVersion = (TProtocolVersion::type)2;
+  TOpenSessionResp() : serverProtocolVersion((TProtocolVersion::type)4) {
+    serverProtocolVersion = (TProtocolVersion::type)4;
 
   }
 
@@ -2914,18 +2916,21 @@ class TGetOperationStatusReq {
 void swap(TGetOperationStatusReq &a, TGetOperationStatusReq &b);
 
 typedef struct _TGetOperationStatusResp__isset {
-  _TGetOperationStatusResp__isset() : operationState(false), taskStatus(false) {}
+  _TGetOperationStatusResp__isset() : operationState(false), taskStatus(false), sqlState(false), errorCode(false), errorMessage(false) {}
   bool operationState;
   bool taskStatus;
+  bool sqlState;
+  bool errorCode;
+  bool errorMessage;
 } _TGetOperationStatusResp__isset;
 
 class TGetOperationStatusResp {
  public:
 
-  static const char* ascii_fingerprint; // = "FA7B29961930695EBE2F7CD5430542C4";
-  static const uint8_t binary_fingerprint[16]; // = {0xFA,0x7B,0x29,0x96,0x19,0x30,0x69,0x5E,0xBE,0x2F,0x7C,0xD5,0x43,0x05,0x42,0xC4};
+  static const char* ascii_fingerprint; // = "F35EE2264AEE6F73E36483035F4D96BA";
+  static const uint8_t binary_fingerprint[16]; // = {0xF3,0x5E,0xE2,0x26,0x4A,0xEE,0x6F,0x73,0xE3,0x64,0x83,0x03,0x5F,0x4D,0x96,0xBA};
 
-  TGetOperationStatusResp() : operationState((TOperationState::type)0), taskStatus() {
+  TGetOperationStatusResp() : operationState((TOperationState::type)0), taskStatus(), sqlState(), errorCode(0), errorMessage() {
   }
 
   virtual ~TGetOperationStatusResp() throw() {}
@@ -2933,6 +2938,9 @@ class TGetOperationStatusResp {
   TStatus status;
   TOperationState::type operationState;
   std::string taskStatus;
+  std::string sqlState;
+  int32_t errorCode;
+  std::string errorMessage;
 
   _TGetOperationStatusResp__isset __isset;
 
@@ -2950,6 +2958,21 @@ class TGetOperationStatusResp {
     __isset.taskStatus = true;
   }
 
+  void __set_sqlState(const std::string& val) {
+    sqlState = val;
+    __isset.sqlState = true;
+  }
+
+  void __set_errorCode(const int32_t val) {
+    errorCode = val;
+    __isset.errorCode = true;
+  }
+
+  void __set_errorMessage(const std::string& val) {
+    errorMessage = val;
+    __isset.errorMessage = true;
+  }
+
   bool operator == (const TGetOperationStatusResp & rhs) const
   {
     if (!(status == rhs.status))
@@ -2961,6 +2984,18 @@ class TGetOperationStatusResp {
     if (__isset.taskStatus != rhs.__isset.taskStatus)
       return false;
     else if (__isset.taskStatus && !(taskStatus == rhs.taskStatus))
+      return false;
+    if (__isset.sqlState != rhs.__isset.sqlState)
+      return false;
+    else if (__isset.sqlState && !(sqlState == rhs.sqlState))
+      return false;
+    if (__isset.errorCode != rhs.__isset.errorCode)
+      return false;
+    else if (__isset.errorCode && !(errorCode == rhs.errorCode))
+      return false;
+    if (__isset.errorMessage != rhs.__isset.errorMessage)
+      return false;
+    else if (__isset.errorMessage && !(errorMessage == rhs.errorMessage))
       return false;
     return true;
   }

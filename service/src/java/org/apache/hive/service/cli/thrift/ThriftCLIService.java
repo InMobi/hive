@@ -114,6 +114,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
 
   @Override
   public TOpenSessionResp OpenSession(TOpenSessionReq req) throws TException {
+    LOG.info("Client protocol version: " + req.getClient_protocol());
     TOpenSessionResp resp = new TOpenSessionResp();
     try {
       SessionHandle sessionHandle = getSessionHandle(req);
@@ -210,8 +211,8 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
           resp.setOperationHandle(operationHandle.toTOperationHandle());
           resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-       LOG.warn("Error fetching results: ", e);
-       resp.setStatus(HiveSQLException.toTStatus(e));
+      LOG.warn("Error executing statement: ", e);
+      resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
   }
@@ -328,10 +329,16 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   public TGetOperationStatusResp GetOperationStatus(TGetOperationStatusReq req) throws TException {
     TGetOperationStatusResp resp = new TGetOperationStatusResp();
     try {
-      OperationHandle ophandle = new OperationHandle(req.getOperationHandle());
-      OperationStatus status = cliService.getOperationStatus(ophandle);
-      resp.setOperationState(status.getState().toTOperationState());
-      resp.setTaskStatus(status.getTaskStatus());
+      OperationStatus operationStatus = cliService.getOperationStatus(
+          new OperationHandle(req.getOperationHandle()));
+      resp.setOperationState(operationStatus.getState().toTOperationState());
+      resp.setTaskStatus(operationStatus.getTaskStatus());
+      HiveSQLException opException = operationStatus.getOperationException();
+      if (opException != null) {
+        resp.setSqlState(opException.getSQLState());
+        resp.setErrorCode(opException.getErrorCode());
+        resp.setErrorMessage(opException.getMessage());
+      }
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
       LOG.warn("Error getting functions: ", e);

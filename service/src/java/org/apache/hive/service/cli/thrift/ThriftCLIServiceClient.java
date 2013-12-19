@@ -300,9 +300,14 @@ public class ThriftCLIServiceClient extends CLIServiceClient {
     try {
       TGetOperationStatusReq req = new TGetOperationStatusReq(opHandle.toTOperationHandle());
       TGetOperationStatusResp resp = cliService.GetOperationStatus(req);
+      // Checks the status of the RPC call, throws an exception in case of error
       checkStatus(resp.getStatus());
-      OperationState state = OperationState.getOperationState(resp.getOperationState());
-      return new OperationStatus(state, resp.getTaskStatus());
+      OperationState opState = OperationState.getOperationState(resp.getOperationState());
+      HiveSQLException opException = null;
+      if (opState == OperationState.ERROR) {
+        opException = new HiveSQLException(resp.getErrorMessage(), resp.getSqlState(), resp.getErrorCode());
+      }
+      return new OperationStatus(opState, opException, resp.getTaskStatus());
     } catch (HiveSQLException e) {
       throw e;
     } catch (Exception e) {

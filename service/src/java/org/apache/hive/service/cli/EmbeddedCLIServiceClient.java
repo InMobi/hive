@@ -142,7 +142,7 @@ public class EmbeddedCLIServiceClient extends CLIServiceClient {
   @Override
   public OperationHandle getFunctions(SessionHandle sessionHandle,
       String catalogName, String schemaName, String functionName)
-      throws HiveSQLException {
+          throws HiveSQLException {
     return cliService.getFunctions(sessionHandle, catalogName, schemaName, functionName);
   }
 

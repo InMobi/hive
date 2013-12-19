@@ -29,14 +29,6 @@ import java.util.Map;
  */
 public abstract class CLIServiceClient implements ICLIService {
 
-  /* (non-Javadoc)
-   * @see org.apache.hive.service.cli.ICLIService#openSession(java.lang.String, java.lang.String, java.util.Map)
-   */
-  @Override
-  public abstract SessionHandle openSession(String username, String password,
-      Map<String, String> configuration) throws HiveSQLException;
-
-
   public SessionHandle openSession(String username, String password)
       throws HiveSQLException {
     return openSession(username, password, Collections.<String, String>emptyMap());

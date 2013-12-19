@@ -141,7 +141,7 @@ public class TOpenSessionReq implements org.apache.thrift.TBase<TOpenSessionReq,
   }
 
   public TOpenSessionReq() {
-    this.client_protocol = org.apache.hive.service.cli.thrift.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V3;
+    this.client_protocol = org.apache.hive.service.cli.thrift.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V5;
 
   }
 
@@ -188,7 +188,7 @@ public class TOpenSessionReq implements org.apache.thrift.TBase<TOpenSessionReq,
 
   @Override
   public void clear() {
-    this.client_protocol = org.apache.hive.service.cli.thrift.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V3;
+    this.client_protocol = org.apache.hive.service.cli.thrift.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V5;
 
     this.username = null;
     this.password = null;
@@ -643,7 +643,7 @@ public class TOpenSessionReq implements org.apache.thrift.TBase<TOpenSessionReq,
                 for (int _i135 = 0; _i135 < _map134.size; ++_i135)
                 {
                   String _key136; // required
-                  String _val137; // required
+                  String _val137; // optional
                   _key136 = iprot.readString();
                   _val137 = iprot.readString();
                   struct.configuration.put(_key136, _val137);
@@ -770,7 +770,7 @@ public class TOpenSessionReq implements org.apache.thrift.TBase<TOpenSessionReq,
           for (int _i141 = 0; _i141 < _map140.size; ++_i141)
           {
             String _key142; // required
-            String _val143; // required
+            String _val143; // optional
             _key142 = iprot.readString();
             _val143 = iprot.readString();
             struct.configuration.put(_key142, _val143);
