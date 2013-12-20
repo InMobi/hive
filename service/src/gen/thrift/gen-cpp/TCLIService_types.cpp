@@ -13,14 +13,18 @@ namespace apache { namespace hive { namespace service { namespace cli { namespac
 int _kTProtocolVersionValues[] = {
   TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1,
   TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V2,
-  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V3
+  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V3,
+  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V4,
+  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V5
 };
 const char* _kTProtocolVersionNames[] = {
   "HIVE_CLI_SERVICE_PROTOCOL_V1",
   "HIVE_CLI_SERVICE_PROTOCOL_V2",
-  "HIVE_CLI_SERVICE_PROTOCOL_V3"
+  "HIVE_CLI_SERVICE_PROTOCOL_V3",
+  "HIVE_CLI_SERVICE_PROTOCOL_V4",
+  "HIVE_CLI_SERVICE_PROTOCOL_V5"
 };
-const std::map<int, const char*> _TProtocolVersion_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(3, _kTProtocolVersionValues, _kTProtocolVersionNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
+const std::map<int, const char*> _TProtocolVersion_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(5, _kTProtocolVersionValues, _kTProtocolVersionNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
 int _kTTypeIdValues[] = {
   TTypeId::BOOLEAN_TYPE,
@@ -4932,8 +4936,8 @@ void swap(TGetOperationStatusReq &a, TGetOperationStatusReq &b) {
   swap(a.operationHandle, b.operationHandle);
 }
 
-const char* TGetOperationStatusResp::ascii_fingerprint = "FA7B29961930695EBE2F7CD5430542C4";
-const uint8_t TGetOperationStatusResp::binary_fingerprint[16] = {0xFA,0x7B,0x29,0x96,0x19,0x30,0x69,0x5E,0xBE,0x2F,0x7C,0xD5,0x43,0x05,0x42,0xC4};
+const char* TGetOperationStatusResp::ascii_fingerprint = "F35EE2264AEE6F73E36483035F4D96BA";
+const uint8_t TGetOperationStatusResp::binary_fingerprint[16] = {0xF3,0x5E,0xE2,0x26,0x4A,0xEE,0x6F,0x73,0xE3,0x64,0x83,0x03,0x5F,0x4D,0x96,0xBA};
 
 uint32_t TGetOperationStatusResp::read(::apache::thrift::protocol::TProtocol* iprot) {
 
@@ -4982,6 +4986,30 @@ uint32_t TGetOperationStatusResp::read(::apache::thrift::protocol::TProtocol* ip
           xfer += iprot->skip(ftype);
         }
         break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->sqlState);
+          this->__isset.sqlState = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->errorCode);
+          this->__isset.errorCode = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->errorMessage);
+          this->__isset.errorMessage = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -5014,6 +5042,21 @@ uint32_t TGetOperationStatusResp::write(::apache::thrift::protocol::TProtocol* o
     xfer += oprot->writeString(this->taskStatus);
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.sqlState) {
+    xfer += oprot->writeFieldBegin("sqlState", ::apache::thrift::protocol::T_STRING, 4);
+    xfer += oprot->writeString(this->sqlState);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.errorCode) {
+    xfer += oprot->writeFieldBegin("errorCode", ::apache::thrift::protocol::T_I32, 5);
+    xfer += oprot->writeI32(this->errorCode);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.errorMessage) {
+    xfer += oprot->writeFieldBegin("errorMessage", ::apache::thrift::protocol::T_STRING, 6);
+    xfer += oprot->writeString(this->errorMessage);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -5024,6 +5067,9 @@ void swap(TGetOperationStatusResp &a, TGetOperationStatusResp &b) {
   swap(a.status, b.status);
   swap(a.operationState, b.operationState);
   swap(a.taskStatus, b.taskStatus);
+  swap(a.sqlState, b.sqlState);
+  swap(a.errorCode, b.errorCode);
+  swap(a.errorMessage, b.errorMessage);
   swap(a.__isset, b.__isset);
 }
 
@@ -5662,17 +5708,17 @@ uint32_t TGetQueryPlanReq::read(::apache::thrift::protocol::TProtocol* iprot) {
         if (ftype == ::apache::thrift::protocol::T_MAP) {
           {
             this->confOverlay.clear();
-            uint32_t _size132;
-            ::apache::thrift::protocol::TType _ktype133;
-            ::apache::thrift::protocol::TType _vtype134;
-            xfer += iprot->readMapBegin(_ktype133, _vtype134, _size132);
-            uint32_t _i136;
-            for (_i136 = 0; _i136 < _size132; ++_i136)
+            uint32_t _size140;
+            ::apache::thrift::protocol::TType _ktype141;
+            ::apache::thrift::protocol::TType _vtype142;
+            xfer += iprot->readMapBegin(_ktype141, _vtype142, _size140);
+            uint32_t _i144;
+            for (_i144 = 0; _i144 < _size140; ++_i144)
             {
-              std::string _key137;
-              xfer += iprot->readString(_key137);
-              std::string& _val138 = this->confOverlay[_key137];
-              xfer += iprot->readString(_val138);
+              std::string _key145;
+              xfer += iprot->readString(_key145);
+              std::string& _val146 = this->confOverlay[_key145];
+              xfer += iprot->readString(_val146);
             }
             xfer += iprot->readMapEnd();
           }
@@ -5713,11 +5759,11 @@ uint32_t TGetQueryPlanReq::write(::apache::thrift::protocol::TProtocol* oprot) c
     xfer += oprot->writeFieldBegin("confOverlay", ::apache::thrift::protocol::T_MAP, 3);
     {
       xfer += oprot->writeMapBegin(::apache::thrift::protocol::T_STRING, ::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->confOverlay.size()));
-      std::map<std::string, std::string> ::const_iterator _iter139;
-      for (_iter139 = this->confOverlay.begin(); _iter139 != this->confOverlay.end(); ++_iter139)
+      std::map<std::string, std::string> ::const_iterator _iter147;
+      for (_iter147 = this->confOverlay.begin(); _iter147 != this->confOverlay.end(); ++_iter147)
       {
-        xfer += oprot->writeString(_iter139->first);
-        xfer += oprot->writeString(_iter139->second);
+        xfer += oprot->writeString(_iter147->first);
+        xfer += oprot->writeString(_iter147->second);
       }
       xfer += oprot->writeMapEnd();
     }
