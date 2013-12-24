@@ -32,15 +32,12 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.ql.TaskStatus;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.auth.HiveAuthFactory;
-import org.apache.hive.service.cli.operation.Operation;
-import org.apache.hive.service.cli.operation.SQLOperation;
 import org.apache.hive.service.cli.session.HiveSession;
 import org.apache.hive.service.cli.session.SessionManager;
 
@@ -110,6 +107,9 @@ public class CLIService extends CompositeService implements ICLIService {
     super.stop();
   }
 
+  public SessionManager getSessionManager() {
+    return sessionManager;
+  }
 
   /* (non-Javadoc)
    * @see org.apache.hive.service.cli.ICLIService#openSession(java.lang.String, java.lang.String, java.util.Map)

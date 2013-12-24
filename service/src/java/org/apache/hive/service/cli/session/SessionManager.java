@@ -20,7 +20,11 @@ package org.apache.hive.service.cli.session;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.lang.reflect.Constructor;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -55,6 +59,8 @@ public class SessionManager extends CompositeService {
   private ScheduledExecutorService logPurgerService;
   private File queryLogDir;
   private boolean isLogRedirectionEnabled;
+  private String sessionImplWithUGIclassName;
+  private String sessionImplclassName;
 
   public SessionManager() {
     super("SessionManager");
@@ -76,6 +82,8 @@ public class SessionManager extends CompositeService {
         keepAliveTime, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(backgroundPoolQueueSize));
     backgroundOperationPool.allowCoreThreadTimeOut(true);
 
+    this.sessionImplclassName = hiveConf.getVar(ConfVars.HIVE_SESSION_IMPL_CLASSNAME);
+    this.sessionImplWithUGIclassName = hiveConf.getVar(ConfVars.HIVE_SESSION_IMPL_WITH_UGI_CLASSNAME);
     if (hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_LOG_REDIRECTION_ENABLED)) {
       queryLogDir = new File(hiveConf.getVar(ConfVars.HIVE_SERVER2_LOG_DIRECTORY));
       isLogRedirectionEnabled = true;
@@ -140,12 +148,35 @@ public class SessionManager extends CompositeService {
     }
     HiveSession session;
     if (withImpersonation) {
-      HiveSessionImplwithUGI hiveSessionUgi = new HiveSessionImplwithUGI(username, password,
-          sessionConf, delegationToken);
+      HiveSessionImplwithUGI hiveSessionUgi;
+      if (sessionImplWithUGIclassName == null) {
+        hiveSessionUgi = new HiveSessionImplwithUGI(username, password,
+            sessionConf, delegationToken);
+      } else {
+        try {
+          Class<?> clazz = Class.forName(sessionImplWithUGIclassName);
+          Constructor<?> constructor = clazz.getConstructor(String.class, String.class, Map.class, String.class);
+          hiveSessionUgi = (HiveSessionImplwithUGI) constructor.newInstance(new Object[]
+              {username, password, sessionConf, delegationToken});
+        } catch (Exception e) {
+          throw new HiveSQLException("Cannot initilize session class:" + sessionImplWithUGIclassName);
+        }
+      }
       session = HiveSessionProxy.getProxy(hiveSessionUgi, hiveSessionUgi.getSessionUgi());
       hiveSessionUgi.setProxySession(session);
     } else {
-      session = new HiveSessionImpl(username, password, sessionConf);
+      if (sessionImplclassName == null) {
+        session = new HiveSessionImpl(username, password, sessionConf);
+      } else {
+        try {
+          Class<?> clazz = Class.forName(sessionImplclassName);
+          Constructor<?> constructor = clazz.getConstructor(String.class, String.class, Map.class);
+          session = (HiveSession) constructor.newInstance(new Object[]
+              {username, password, sessionConf});
+        } catch (Exception e) {
+          throw new HiveSQLException("Cannot initilize session class:" + sessionImplclassName);
+        }
+      }
     }
     session.setSessionManager(this);
     session.setOperationManager(operationManager);

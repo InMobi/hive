@@ -762,6 +762,9 @@ public class HiveConf extends Configuration {
     // By default, logs will be purged after a week
     HIVE_SERVER2_LOG_PURGE_DELAY("hive.server2.log.purge.delay", 7 * 1440 * 60 * 1000L),
 
+    // Hive session impl classes
+    HIVE_SESSION_IMPL_CLASSNAME("hive.session.impl.classname", null),
+    HIVE_SESSION_IMPL_WITH_UGI_CLASSNAME("hive.session.impl.withugi.classname", null),
     // HiveServer2 auth configuration
     HIVE_SERVER2_AUTHENTICATION("hive.server2.authentication", "NONE"),
     HIVE_SERVER2_KERBEROS_KEYTAB("hive.server2.authentication.kerberos.keytab", ""),
