@@ -1,14 +1,18 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -24,16 +28,20 @@ import org.apache.hadoop.hive.serde.serdeConstants;
  * the data.
  *
  */
-public abstract class Storage implements Named, PartitionMetahook {
+public abstract class Storage extends AbstractCubeTable implements PartitionMetahook {
 
-  private final String name;
-
-  protected Storage(String name) {
-    this.name = name;
+  private static final List<FieldSchema> columns = new ArrayList<FieldSchema>();
+  static {
+    columns.add(new FieldSchema("dummy", "string", "dummy column"));
   }
 
-  public String getName() {
-    return name;
+  protected Storage(String name, Map<String, String> properties) {
+    super(name, columns, properties, 0L);
+    addProperties();
+  }
+
+  public Storage(Table hiveTable) {
+    super(hiveTable);
   }
 
   /**
@@ -43,6 +51,23 @@ public abstract class Storage implements Named, PartitionMetahook {
    */
   public String getPrefix() {
     return getPrefix(getName());
+  }
+
+  @Override
+  public CubeTableType getTableType() {
+    return CubeTableType.STORAGE;
+  }
+
+  @Override
+  public Set<String> getStorages() {
+    throw new NotImplementedException();
+  }
+
+  @Override
+  protected void addProperties() {
+    super.addProperties();
+    getProperties().put(MetastoreUtil.getStorageClassKey(getName()),
+        getClass().getCanonicalName());
   }
 
   /**
@@ -336,13 +361,13 @@ public abstract class Storage implements Named, PartitionMetahook {
     }
   }
 
-  public static Storage createInstance(String storageClassName, String storageName)
-      throws HiveException {
+  static Storage createInstance(Table tbl) throws HiveException {
+    String storageName = tbl.getTableName();
+    String storageClassName = tbl.getParameters().get(MetastoreUtil.getStorageClassKey(storageName));
     try {
       Class<?> clazz = Class.forName(storageClassName);
-      Constructor<?> constructor = clazz.getConstructor(String.class);
-      Storage storage = (Storage) constructor.newInstance(new Object[]
-          {storageName});
+      Constructor<?> constructor = clazz.getConstructor(Table.class);
+      Storage storage = (Storage) constructor.newInstance(new Object[]{tbl});
       return storage;
     } catch (Exception e) {
       throw new HiveException("Could not create storage class" + storageClassName, e);
