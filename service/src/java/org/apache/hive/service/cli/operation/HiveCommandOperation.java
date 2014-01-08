@@ -99,6 +99,7 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
   @Override
   public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
+    markOperationStartTime();
     try {
       String command = getStatement().trim();
       String[] tokens = statement.split("\\s");
@@ -119,6 +120,8 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
     } catch (Exception e) {
       setState(OperationState.ERROR);
       throw new HiveSQLException("Error running query: " + e.toString(), e);
+    } finally {
+      markOperationCompletedTime();
     }
     setState(OperationState.FINISHED);
   }

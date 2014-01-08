@@ -18,10 +18,6 @@
 
 package org.apache.hive.service.cli;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.util.Collections;
@@ -30,10 +26,11 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 /**
  * CLIServiceTest.
@@ -160,9 +157,9 @@ public abstract class CLIServiceTest {
     queryString = "SELECT ID FROM TEST_EXEC";
     opHandle = client.executeStatement(sessionHandle, queryString, confOverlay);
     // Expect query to be completed now
-    assertEquals("Query should be finished",
-        OperationState.FINISHED, client.getOperationStatus(opHandle).getState());
-    client.closeOperation(opHandle);
+    OperationStatus opStatus = client.getOperationStatus(opHandle);
+    checkOperationTimes(opHandle, opStatus);
+    assertEquals("Query should be finished", OperationState.FINISHED, opStatus.getState());
 
     // Cleanup
     queryString = "DROP TABLE IF EXISTS TEST_EXEC";
@@ -234,12 +231,14 @@ public abstract class CLIServiceTest {
       }
       Thread.sleep(1000);
     }
+    OperationStatus operationStatus = client.getOperationStatus(opHandle);
+    checkOperationTimes(opHandle, operationStatus);
     assertEquals("Operation should be in error state", OperationState.ERROR, state);
     // sqlState, errorCode should be set
     assertEquals(opStatus.getOperationException().getSQLState(), "08S01");
     assertEquals(opStatus.getOperationException().getErrorCode(), 1);
     client.closeOperation(opHandle);
-    
+
     // Test async execution when query is well formed
     queryString = "SELECT ID FROM TEST_EXEC_ASYNC";
     confOverlay.put("hive.exec.local.scratchdir", SCRATCH_DIR);
@@ -272,6 +271,8 @@ public abstract class CLIServiceTest {
     opHandle = client.executeStatementAsync(sessionHandle, queryString, confOverlay);
     System.out.println("cancelling " + opHandle);
     client.cancelOperation(opHandle);
+    operationStatus = client.getOperationStatus(opHandle);
+    checkOperationTimes(opHandle, operationStatus);
     state = client.getOperationStatus(opHandle).getState();
     System.out.println(opHandle + " after cancelling, state= " + state);
     assertEquals("Query should be cancelled", OperationState.CANCELED, state);
@@ -343,5 +344,17 @@ public abstract class CLIServiceTest {
     opHandle = client.executeStatement(sessionHandle, dropTable, null);
     client.closeOperation(opHandle);
     client.closeSession(sessionHandle);
+  }
+
+  private void checkOperationTimes(OperationHandle operationHandle, OperationStatus status) {
+    OperationState state = status.getState();
+    if (OperationState.CANCELED == state || state == OperationState.CLOSED
+      || state == OperationState.FINISHED || state == OperationState.ERROR) {
+      System.out.println("##OP " + operationHandle.getHandleIdentifier() + " STATE:" + status.getState()
+        +" START:" + status.getOperationStarted()
+        + " END:" + status.getOperationCompleted());
+      assertFalse(status.getOperationCompleted() ==  0);
+      assertTrue(status.getOperationCompleted() - status.getOperationStarted() >= 0);
+    }
   }
 }

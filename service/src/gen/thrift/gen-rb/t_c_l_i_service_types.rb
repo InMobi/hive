@@ -1300,6 +1300,8 @@ class TGetOperationStatusResp
   SQLSTATE = 4
   ERRORCODE = 5
   ERRORMESSAGE = 6
+  OPERATIONSTARTED = 7
+  OPERATIONCOMPLETED = 8
 
   FIELDS = {
     STATUS => {:type => ::Thrift::Types::STRUCT, :name => 'status', :class => ::TStatus},
@@ -1307,7 +1309,9 @@ class TGetOperationStatusResp
     TASKSTATUS => {:type => ::Thrift::Types::STRING, :name => 'taskStatus', :optional => true},
     SQLSTATE => {:type => ::Thrift::Types::STRING, :name => 'sqlState', :optional => true},
     ERRORCODE => {:type => ::Thrift::Types::I32, :name => 'errorCode', :optional => true},
-    ERRORMESSAGE => {:type => ::Thrift::Types::STRING, :name => 'errorMessage', :optional => true}
+    ERRORMESSAGE => {:type => ::Thrift::Types::STRING, :name => 'errorMessage', :optional => true},
+    OPERATIONSTARTED => {:type => ::Thrift::Types::I64, :name => 'operationStarted', :optional => true},
+    OPERATIONCOMPLETED => {:type => ::Thrift::Types::I64, :name => 'operationCompleted', :optional => true}
   }
 
   def struct_fields; FIELDS; end

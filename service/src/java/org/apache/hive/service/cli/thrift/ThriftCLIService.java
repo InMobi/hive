@@ -340,6 +340,8 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
         resp.setErrorMessage(opException.getMessage());
       }
       resp.setStatus(OK_STATUS);
+      resp.setOperationStarted(operationStatus.getOperationStarted());
+      resp.setOperationCompleted(operationStatus.getOperationCompleted());
     } catch (Exception e) {
       LOG.warn("Error getting functions: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));

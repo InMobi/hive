@@ -27,11 +27,16 @@ public class OperationStatus {
   private final OperationState state;
   private final HiveSQLException operationException;
   private final String taskStatus;
+  private final long operationStarted;
+  private final long operationCompleted;
 
-  public OperationStatus(OperationState state, HiveSQLException operationException, String taskStatus) {
+  public OperationStatus(OperationState state, HiveSQLException operationException, String taskStatus,
+    long operationStarted, long operationCompleted) {
     this.state = state;
     this.operationException = operationException;
     this.taskStatus = taskStatus;
+    this.operationStarted = operationStarted;
+    this.operationCompleted = operationCompleted;
   }
 
   public OperationState getState() {
@@ -44,5 +49,13 @@ public class OperationStatus {
 
   public String getTaskStatus() {
     return taskStatus;
+  }
+
+  public long getOperationStarted() {
+    return operationStarted;
+  }
+
+  public long getOperationCompleted() {
+    return operationCompleted;
   }
 }

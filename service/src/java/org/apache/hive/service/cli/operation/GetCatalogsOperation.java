@@ -46,7 +46,9 @@ public class GetCatalogsOperation extends MetadataOperation {
   @Override
   public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
+    markOperationStartTime();
     setState(OperationState.FINISHED);
+    markOperationCompletedTime();
   }
 
   /* (non-Javadoc)

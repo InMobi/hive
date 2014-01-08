@@ -72,6 +72,7 @@ public class GetFunctionsOperation extends MetadataOperation {
   @Override
   public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
+    markOperationStartTime();
     try {
       if ((null == catalogName || "".equals(catalogName))
           && (null == schemaName || "".equals(schemaName))) {
@@ -96,6 +97,8 @@ public class GetFunctionsOperation extends MetadataOperation {
     } catch (Exception e) {
       setState(OperationState.ERROR);
       throw new HiveSQLException(e);
+    } finally {
+      markOperationCompletedTime();
     }
   }
 

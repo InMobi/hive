@@ -54,6 +54,7 @@ public class GetTableTypesOperation extends MetadataOperation {
   @Override
   public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
+    markOperationStartTime();
     try {
       rowSet = new RowSet();
       for (TableType type : TableType.values()) {
@@ -64,6 +65,8 @@ public class GetTableTypesOperation extends MetadataOperation {
     } catch (Exception e) {
       setState(OperationState.ERROR);
       throw new HiveSQLException(e);
+    } finally {
+      markOperationCompletedTime();
     }
   }
 

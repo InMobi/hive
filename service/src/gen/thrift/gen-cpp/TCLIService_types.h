@@ -2916,21 +2916,23 @@ class TGetOperationStatusReq {
 void swap(TGetOperationStatusReq &a, TGetOperationStatusReq &b);
 
 typedef struct _TGetOperationStatusResp__isset {
-  _TGetOperationStatusResp__isset() : operationState(false), taskStatus(false), sqlState(false), errorCode(false), errorMessage(false) {}
+  _TGetOperationStatusResp__isset() : operationState(false), taskStatus(false), sqlState(false), errorCode(false), errorMessage(false), operationStarted(false), operationCompleted(false) {}
   bool operationState;
   bool taskStatus;
   bool sqlState;
   bool errorCode;
   bool errorMessage;
+  bool operationStarted;
+  bool operationCompleted;
 } _TGetOperationStatusResp__isset;
 
 class TGetOperationStatusResp {
  public:
 
-  static const char* ascii_fingerprint; // = "F35EE2264AEE6F73E36483035F4D96BA";
-  static const uint8_t binary_fingerprint[16]; // = {0xF3,0x5E,0xE2,0x26,0x4A,0xEE,0x6F,0x73,0xE3,0x64,0x83,0x03,0x5F,0x4D,0x96,0xBA};
+  static const char* ascii_fingerprint; // = "C872A36F57CCE24A7598048E62EB7DC4";
+  static const uint8_t binary_fingerprint[16]; // = {0xC8,0x72,0xA3,0x6F,0x57,0xCC,0xE2,0x4A,0x75,0x98,0x04,0x8E,0x62,0xEB,0x7D,0xC4};
 
-  TGetOperationStatusResp() : operationState((TOperationState::type)0), taskStatus(), sqlState(), errorCode(0), errorMessage() {
+  TGetOperationStatusResp() : operationState((TOperationState::type)0), taskStatus(), sqlState(), errorCode(0), errorMessage(), operationStarted(0), operationCompleted(0) {
   }
 
   virtual ~TGetOperationStatusResp() throw() {}
@@ -2941,6 +2943,8 @@ class TGetOperationStatusResp {
   std::string sqlState;
   int32_t errorCode;
   std::string errorMessage;
+  int64_t operationStarted;
+  int64_t operationCompleted;
 
   _TGetOperationStatusResp__isset __isset;
 
@@ -2973,6 +2977,16 @@ class TGetOperationStatusResp {
     __isset.errorMessage = true;
   }
 
+  void __set_operationStarted(const int64_t val) {
+    operationStarted = val;
+    __isset.operationStarted = true;
+  }
+
+  void __set_operationCompleted(const int64_t val) {
+    operationCompleted = val;
+    __isset.operationCompleted = true;
+  }
+
   bool operator == (const TGetOperationStatusResp & rhs) const
   {
     if (!(status == rhs.status))
@@ -2996,6 +3010,14 @@ class TGetOperationStatusResp {
     if (__isset.errorMessage != rhs.__isset.errorMessage)
       return false;
     else if (__isset.errorMessage && !(errorMessage == rhs.errorMessage))
+      return false;
+    if (__isset.operationStarted != rhs.__isset.operationStarted)
+      return false;
+    else if (__isset.operationStarted && !(operationStarted == rhs.operationStarted))
+      return false;
+    if (__isset.operationCompleted != rhs.__isset.operationCompleted)
+      return false;
+    else if (__isset.operationCompleted && !(operationCompleted == rhs.operationCompleted))
       return false;
     return true;
   }
