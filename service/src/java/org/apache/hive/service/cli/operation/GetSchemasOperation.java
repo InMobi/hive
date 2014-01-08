@@ -54,6 +54,7 @@ public class GetSchemasOperation extends MetadataOperation {
   @Override
   public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
+    markOperationStartTime();
     rowSet = new RowSet();
     try {
       IMetaStoreClient metastoreClient = getParentSession().getMetaStoreClient();
@@ -65,6 +66,8 @@ public class GetSchemasOperation extends MetadataOperation {
     } catch (Exception e) {
       setState(OperationState.ERROR);
       throw new HiveSQLException(e);
+    } finally {
+      markOperationCompletedTime();
     }
   }
 

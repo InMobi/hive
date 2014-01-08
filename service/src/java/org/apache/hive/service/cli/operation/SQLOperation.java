@@ -91,6 +91,7 @@ public class SQLOperation extends ExecuteStatementOperation {
 
   private void runInternal(HiveConf sqlOperationConf) throws HiveSQLException {
     setState(OperationState.RUNNING);
+    markOperationStartTime();
     String statement_trimmed = statement.trim();
     String[] tokens = statement_trimmed.split("\\s");
     String cmd_1 = statement_trimmed.substring(tokens[0].length()).trim();
@@ -151,6 +152,8 @@ public class SQLOperation extends ExecuteStatementOperation {
     } catch (Exception e) {
       setState(OperationState.ERROR);
       throw new HiveSQLException("Error running query: " + e.toString(), e);
+    } finally {
+      markOperationCompletedTime();
     }
     setState(OperationState.FINISHED);
   }
@@ -187,7 +190,7 @@ public class SQLOperation extends ExecuteStatementOperation {
 
   private void cleanup(OperationState state) throws HiveSQLException {
     if (runAsync) {
-      if (backgroundHandle != null) {
+      if (backgroundHandle != null && !backgroundHandle.isDone()) {
         backgroundHandle.cancel(true);
       }
     }
@@ -207,6 +210,7 @@ public class SQLOperation extends ExecuteStatementOperation {
 
   @Override
   public void cancel() throws HiveSQLException {
+    markOperationCompletedTime();
     cleanup(OperationState.CANCELED);
   }
 

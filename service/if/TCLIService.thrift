@@ -913,6 +913,10 @@ struct TGetOperationStatusResp {
 
   // Error message
   6: optional string errorMessage
+  // When was the operation started
+  7: optional i64 operationStarted
+  // When was the operation completed
+  8: optional i64 operationCompleted
 }
 
 

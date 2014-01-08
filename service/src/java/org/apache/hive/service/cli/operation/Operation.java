@@ -49,6 +49,8 @@ public abstract class Operation {
   protected PrintStream opLogOut;
   protected PrintStream opLogErr;
   protected volatile HiveSQLException operationException;
+  protected long operationStart;
+  protected long operationComplete;
 
   protected Operation(HiveSession parentSession, OperationType opType) {
     super();
@@ -84,7 +86,7 @@ public abstract class Operation {
     } catch (HiveSQLException sqlException) {
       LOG.error("Error getting task status for " + opHandle.toString(), sqlException);
     }
-    return new OperationStatus(state, operationException, taskStatus);
+    return new OperationStatus(state, operationException, taskStatus, operationStart, operationComplete);
   }
 
   public boolean hasResultSet() {
@@ -193,5 +195,20 @@ public abstract class Operation {
         opLogErr.close();
       }
     }
+  }
+
+  public long getOperationComplete() {
+    return operationComplete;
+  }
+
+  public long getOperationStart() {
+    return operationStart;
+  }
+
+  protected void markOperationStartTime() {
+    operationStart = System.currentTimeMillis();
+  }
+  protected void markOperationCompletedTime() {
+    operationComplete = System.currentTimeMillis();
   }
 }

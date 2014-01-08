@@ -4936,8 +4936,8 @@ void swap(TGetOperationStatusReq &a, TGetOperationStatusReq &b) {
   swap(a.operationHandle, b.operationHandle);
 }
 
-const char* TGetOperationStatusResp::ascii_fingerprint = "F35EE2264AEE6F73E36483035F4D96BA";
-const uint8_t TGetOperationStatusResp::binary_fingerprint[16] = {0xF3,0x5E,0xE2,0x26,0x4A,0xEE,0x6F,0x73,0xE3,0x64,0x83,0x03,0x5F,0x4D,0x96,0xBA};
+const char* TGetOperationStatusResp::ascii_fingerprint = "C872A36F57CCE24A7598048E62EB7DC4";
+const uint8_t TGetOperationStatusResp::binary_fingerprint[16] = {0xC8,0x72,0xA3,0x6F,0x57,0xCC,0xE2,0x4A,0x75,0x98,0x04,0x8E,0x62,0xEB,0x7D,0xC4};
 
 uint32_t TGetOperationStatusResp::read(::apache::thrift::protocol::TProtocol* iprot) {
 
@@ -5010,6 +5010,22 @@ uint32_t TGetOperationStatusResp::read(::apache::thrift::protocol::TProtocol* ip
           xfer += iprot->skip(ftype);
         }
         break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->operationStarted);
+          this->__isset.operationStarted = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->operationCompleted);
+          this->__isset.operationCompleted = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -5057,6 +5073,16 @@ uint32_t TGetOperationStatusResp::write(::apache::thrift::protocol::TProtocol* o
     xfer += oprot->writeString(this->errorMessage);
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.operationStarted) {
+    xfer += oprot->writeFieldBegin("operationStarted", ::apache::thrift::protocol::T_I64, 7);
+    xfer += oprot->writeI64(this->operationStarted);
+    xfer += oprot->writeFieldEnd();
+  }
+  if (this->__isset.operationCompleted) {
+    xfer += oprot->writeFieldBegin("operationCompleted", ::apache::thrift::protocol::T_I64, 8);
+    xfer += oprot->writeI64(this->operationCompleted);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -5070,6 +5096,8 @@ void swap(TGetOperationStatusResp &a, TGetOperationStatusResp &b) {
   swap(a.sqlState, b.sqlState);
   swap(a.errorCode, b.errorCode);
   swap(a.errorMessage, b.errorMessage);
+  swap(a.operationStarted, b.operationStarted);
+  swap(a.operationCompleted, b.operationCompleted);
   swap(a.__isset, b.__isset);
 }
 
