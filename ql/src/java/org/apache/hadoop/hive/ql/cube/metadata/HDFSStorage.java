@@ -3,11 +3,16 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 import java.util.List;
 
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.Table;
 
 public class HDFSStorage extends Storage {
 
   public HDFSStorage(String name) {
-    super(name);
+    super(name, null);
+  }
+
+  public HDFSStorage(Table hiveTable) {
+    super(hiveTable);
   }
 
   @Override

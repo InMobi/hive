@@ -11,18 +11,26 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 public class MetastoreUtil implements MetastoreConstants {
 
   public static final String getFactStorageTableName(String factName,
-      String storagePrefix) {
-    return getStorageTableName(factName, storagePrefix);
+      String storageName) {
+    return getStorageTableName(factName, Storage.getPrefix(storageName));
   }
 
   public static final String getDimStorageTableName(String dimName,
-      String storagePrefix) {
-    return getStorageTableName(dimName, storagePrefix);
+      String storageName) {
+    return getStorageTableName(dimName, Storage.getPrefix(storageName));
   }
 
   public static final String getStorageTableName(String cubeTableName,
       String storagePrefix) {
     return storagePrefix + cubeTableName;
+  }
+
+  public static String getStorageClassKey(String name) {
+    return getStorageEntityPrefix(name) + CLASS_SFX;
+  }
+
+  public static final String getStorageEntityPrefix(String storageName) {
+    return STORAGE_ENTITY_PFX + storageName.toLowerCase();
   }
 
   // ///////////////////////

@@ -46,6 +46,7 @@ public interface MetastoreConstants {
   public static final String TIMED_DIMENSION = "cube.dimensiontable.timed.dimension";
 
   // storage constants
+  public static final String STORAGE_ENTITY_PFX = "storage.";
   public static final String STORAGE_PFX = "cube.storagetable.";
   public static final String TIME_PART_COLUMNS = "cube.storagetable.time.partcols";
   public static final String LATEST_PART_TIMESTAMP_SFX = ".latest.part.timestamp";

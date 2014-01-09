@@ -23,7 +23,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
-import org.apache.hadoop.hive.ql.cube.metadata.Storage;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
@@ -115,7 +114,7 @@ public class StorageTableResolver implements ContextRewriter {
       for (String storage : dim.getStorages()) {
         if (isStorageSupported(storage)) {
           String tableName = MetastoreUtil.getDimStorageTableName(
-              dim.getName(), Storage.getPrefix(storage)).toLowerCase();
+              dim.getName(), storage).toLowerCase();
           if (validDimTables != null && !validDimTables.contains(tableName)) {
             LOG.info("Not considering the dim storage table:" + tableName
                 + " as it is not a valid dim storage");
@@ -211,7 +210,7 @@ public class StorageTableResolver implements ContextRewriter {
   String getStorageTableName(CubeFactTable fact, String storage,
       List<String> validFactStorageTables) {
     String tableName = MetastoreUtil.getFactStorageTableName(
-        fact.getName(), Storage.getPrefix(storage)).toLowerCase();
+        fact.getName(), storage).toLowerCase();
     if (validFactStorageTables != null && !validFactStorageTables
         .contains(tableName)) {
       LOG.info("Skipping storage table " + tableName + " as it is not valid");
