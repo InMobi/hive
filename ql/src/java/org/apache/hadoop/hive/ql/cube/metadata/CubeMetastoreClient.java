@@ -300,7 +300,7 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public void addPartition(StoragePartitionDesc partSpec, String storageName)
-          throws HiveException {
+      throws HiveException {
     String storageTableName = MetastoreUtil.getStorageTableName(
         partSpec.getCubeTableName(), Storage.getPrefix(storageName));
 
@@ -397,7 +397,7 @@ public class CubeMetastoreClient {
         } else if (partDate1 == null && partDate2 == null) {
           return o2.getTPartition().compareTo(o1.getTPartition());
         } else if (!partDate2.equals(partDate1)) {
-              return partDate2.compareTo(partDate1);
+          return partDate2.compareTo(partDate1);
         } else {
           return o2.getTPartition().compareTo(o1.getTPartition());
         }
@@ -509,7 +509,7 @@ public class CubeMetastoreClient {
     return partSpec;
   }
 
-  boolean tableExists(String cubeName)
+  public boolean tableExists(String cubeName)
       throws HiveException {
     try {
       return (getClient().getTable(cubeName.toLowerCase(), false) != null);
@@ -555,8 +555,8 @@ public class CubeMetastoreClient {
   public List<Partition> getPartitionsByFilter(String storageTableName,
       String filter) throws HiveException {
     try {
-    return getClient().getPartitionsByFilter(
-        getTable(storageTableName), filter);
+      return getClient().getPartitionsByFilter(
+          getTable(storageTableName), filter);
     } catch (Exception e) {
       throw new HiveException(e);
     }
