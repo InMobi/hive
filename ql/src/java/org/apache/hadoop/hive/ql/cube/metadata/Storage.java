@@ -14,6 +14,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
@@ -21,6 +22,7 @@ import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.mapred.TextInputFormat;
 
 /**
  *
@@ -199,8 +201,16 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
 
     tbl.setStoredAsSubDirectories(crtTbl.isStoredAsSubDirectories());
 
-    tbl.setInputFormatClass(crtTbl.getInputFormat());
-    tbl.setOutputFormatClass(crtTbl.getOutputFormat());
+    if (crtTbl.getInputFormat() != null) {
+      tbl.setInputFormatClass(crtTbl.getInputFormat());
+    } else {
+      tbl.setInputFormatClass(TextInputFormat.class.getName());
+    }
+    if (crtTbl.getOutputFormat() != null) {
+      tbl.setOutputFormatClass(crtTbl.getOutputFormat());
+    } else {
+      tbl.setOutputFormatClass(IgnoreKeyTextOutputFormat.class.getName());
+    }
 
     tbl.getTTable().getSd().setInputFormat(
         tbl.getInputFormatClass().getName());
