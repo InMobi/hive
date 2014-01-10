@@ -1176,9 +1176,10 @@ public class CubeMetastoreClient {
    */
   public void dropStorageFromDim(String dimName, String storage)
       throws HiveException {
-    getDimensionTable(dimName).dropStorage(storage);
+    CubeDimensionTable cdt = getDimensionTable(dimName);
+    cdt.dropStorage(storage);
     dropHiveTable(MetastoreUtil.getDimStorageTableName(dimName, storage));
-    alterCubeTable(dimName, getTable(dimName), getDimensionTable(dimName));
+    alterCubeTable(dimName, getTable(dimName), cdt);
     updateDimCache(dimName);
   }
 

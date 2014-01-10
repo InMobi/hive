@@ -14,8 +14,8 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeDimensionTable extends AbstractCubeTable {
-  private final Map<String, List<TableReference>> dimensionReferences;
-  private final Map<String, UpdatePeriod> snapshotDumpPeriods;
+  private final Map<String, List<TableReference>> dimensionReferences = new HashMap<String, List<TableReference>>();
+  private final Map<String, UpdatePeriod> snapshotDumpPeriods = new HashMap<String, UpdatePeriod>();
 
   public CubeDimensionTable(String dimName, List<FieldSchema> columns,
       double weight, Map<String, UpdatePeriod> snapshotDumpPeriods) {
@@ -57,8 +57,12 @@ public final class CubeDimensionTable extends AbstractCubeTable {
       Map<String, List<TableReference>> dimensionReferences,
       Map<String, String> properties) {
     super(dimName, columns, properties, weight);
-    this.dimensionReferences = dimensionReferences;
-    this.snapshotDumpPeriods = snapshotDumpPeriods;
+    if (dimensionReferences != null) {
+      this.dimensionReferences.putAll(dimensionReferences);
+    }
+    if (snapshotDumpPeriods != null) {
+      this.snapshotDumpPeriods.putAll(snapshotDumpPeriods);
+    }
     addProperties();
   }
 
@@ -74,8 +78,14 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   public CubeDimensionTable(Table tbl) {
     super(tbl);
-    this.dimensionReferences = getDimensionReferences(getProperties());
-    this.snapshotDumpPeriods = getDumpPeriods(getName(), getProperties());
+    Map<String, List<TableReference>> dimRefs = getDimensionReferences(getProperties());
+    if (dimRefs != null) {
+      this.dimensionReferences.putAll(dimRefs);
+    }
+    Map<String, UpdatePeriod> dumpPeriods = getDumpPeriods(getName(), getProperties());
+    if (dumpPeriods != null) {
+      this.snapshotDumpPeriods.putAll(dumpPeriods);
+    }
   }
 
   @Override
@@ -292,6 +302,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   void dropStorage(String storage) {
     snapshotDumpPeriods.remove(storage);
+    setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
 
   /**
