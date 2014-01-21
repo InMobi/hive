@@ -1169,7 +1169,8 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
           .warn("Using too many counters. Increase the total number of counters for "
           + counterName);
     } else if (reporter != null) {
-      reporter.incrCounter(pc, amount);
+      //reporter.incrCounter(pc, amount);
+      reporter.incrCounter("HiveOperator", counterName, amount);
     }
   }
 
