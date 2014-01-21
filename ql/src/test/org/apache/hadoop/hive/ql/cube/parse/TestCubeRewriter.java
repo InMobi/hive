@@ -372,6 +372,16 @@ public class TestCubeRewriter {
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
 
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
+        + " join citytable on cityid = citytable.id"
+        + " where " + twoDaysRange);
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
+        + " join citytable on cityid = id"
+        + " where " + twoDaysRange);
+    compareQueries(expected, hqlQuery);
+
     // q2
     hqlQuery = rewrite(driver, "select statetable.name, SUM(msr2) from"
       + " testCube"

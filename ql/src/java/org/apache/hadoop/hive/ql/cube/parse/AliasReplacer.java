@@ -71,6 +71,9 @@ public class AliasReplacer implements ContextRewriter {
       cubeql.setWhereTree(rewritWhere);
     }
 
+    ASTNode joinAST = cubeql.getJoinTree();
+    replaceAliases(joinAST, 0, colToTableAlias);
+
     // Update the aggregate expression set
     updateAggregates(selectAST, cubeql);
     updateAggregates(havingAST, cubeql);

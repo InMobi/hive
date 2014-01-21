@@ -1,5 +1,16 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
+import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FULLOUTERJOIN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_JOIN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LEFTOUTERJOIN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LEFTSEMIJOIN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_RIGHTOUTERJOIN;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SUBQUERY;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABNAME;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABREF;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_UNIQUEJOIN;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -10,14 +21,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.hadoop.hive.ql.parse.HiveParser.*;
-import static org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph.TableRelationship;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.cube.metadata.*;
+import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
+import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
+import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph.TableRelationship;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.JoinCond;
@@ -27,7 +40,7 @@ import org.apache.hadoop.hive.ql.parse.QBJoinTree;
 import org.apache.hadoop.hive.ql.parse.SemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 /**
- * 
+ *
  * JoinResolver.
  *
  */
@@ -147,19 +160,19 @@ public class JoinResolver implements ContextRewriter {
   }
 
   private CubeMetastoreClient metastore;
-  private Map<AbstractCubeTable, String> partialJoinConditions;
+  private final Map<AbstractCubeTable, String> partialJoinConditions;
   private AbstractCubeTable target;
   private HiveConf conf;
 
   public JoinResolver(Configuration conf) {
     partialJoinConditions = new HashMap<AbstractCubeTable, String>();
   }
-  
+
   private CubeMetastoreClient getMetastoreClient() throws HiveException {
     if (metastore == null) {
       metastore = CubeMetastoreClient.getInstance(new HiveConf(this.getClass()));
     }
-    
+
     return metastore;
   }
 
@@ -177,8 +190,8 @@ public class JoinResolver implements ContextRewriter {
     QB cubeQB = cubeql.getQB();
     boolean joinResolverDisabled = conf.getBoolean(DISABLE_AUTO_JOINS, false);
     if (joinResolverDisabled) {
-      if (cubeQB.getParseInfo().getJoinExpr() != null) {
-        cubeQB.setQbJoinTree(genJoinTree(cubeQB, cubeQB.getParseInfo().getJoinExpr(), cubeql));
+      if (cubeql.getJoinTree() != null) {
+        cubeQB.setQbJoinTree(genJoinTree(cubeQB, cubeql.getJoinTree(), cubeql));
       }
     } else {
       autoResolveJoins(cubeql);
@@ -203,7 +216,7 @@ public class JoinResolver implements ContextRewriter {
     // Check if this query needs a join -
     // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
     // dimensions
-    
+
     Set<CubeDimensionTable> autoJoinDims = cubeql.getAutoJoinDimensions();
     // Add dimensions specified in the partial join tree
     ASTNode joinClause = cubeql.getQB().getParseInfo().getJoinExpr();
@@ -230,11 +243,11 @@ public class JoinResolver implements ContextRewriter {
     boolean cubeAndDimQuery = cubeql.hasCubeInQuery() && hasDimensions;
     // This query has only dimensions in it
     boolean dimOnlyQuery = !cubeql.hasCubeInQuery() && hasDimensions;
-        
+
     if (!cubeAndDimQuery && !dimOnlyQuery) {
       return;
     }
-    
+
     Set<CubeDimensionTable> dimTables =
         new HashSet<CubeDimensionTable>(autoJoinDims);
     for (AbstractCubeTable partiallyJoinedTable : partialJoinConditions.keySet()) {
@@ -262,11 +275,11 @@ public class JoinResolver implements ContextRewriter {
         if (LOG.isDebugEnabled()) {
           graph.print();
         }
-        throw new SemanticException("No join path from " + joinee.getName() 
+        throw new SemanticException("No join path from " + joinee.getName()
             + " to " + target.getName());
       }
     }
-    
+
     if (joinsResolved) {
       for (List<TableRelationship> chain : joinChain.values()) {
         for (TableRelationship rel : chain) {

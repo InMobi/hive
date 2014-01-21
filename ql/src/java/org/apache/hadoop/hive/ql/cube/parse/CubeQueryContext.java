@@ -121,7 +121,6 @@ public class CubeQueryContext {
   private String orderByTree;
   private String selectTree;
   private String groupByTree;
-  private final ASTNode joinTree;
   private ASTNode havingAST;
   private ASTNode selectAST;
   private ASTNode whereAST;
@@ -170,7 +169,6 @@ public class CubeQueryContext {
       this.selectAST = qb.getParseInfo().getSelForClause(
           clauseName);
     }
-    this.joinTree = qb.getParseInfo().getJoinExpr();
     // read conf
     qlEnabledMultiTableSelect = conf.getBoolean(
         CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
@@ -768,7 +766,7 @@ public class CubeQueryContext {
   }
 
   public ASTNode getJoinTree() {
-    return joinTree;
+    return qb.getParseInfo().getJoinExpr();
   }
 
   public String getOrderByTree() {
@@ -852,7 +850,7 @@ public class CubeQueryContext {
 
   private String getFromString() throws SemanticException {
     String fromString = null;
-    if (joinTree == null || !conf.getBoolean(JoinResolver.DISABLE_AUTO_JOINS, false)) {
+    if (getJoinTree() == null || !conf.getBoolean(JoinResolver.DISABLE_AUTO_JOINS, false)) {
       if (cube != null) {
         fromString = getStorageString(cube) ;
       } else {
