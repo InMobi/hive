@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 
 import javax.security.auth.login.LoginException;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -1283,6 +1284,20 @@ public class HiveConf extends Configuration {
     } else {
       return Integer.parseInt(m.group(1));
     }
+  }
+
+  public void setStringEncoded(ConfVars var, String valueStr) {
+    if (valueStr != null) {
+      setVar(var, new String(Base64.encodeBase64(valueStr.getBytes())));
+    }
+  }
+
+  public String getStringDecoded(ConfVars var) {
+    String encodedStr = getVar(var);
+    if (encodedStr != null) {
+      return new String(Base64.decodeBase64(encodedStr.getBytes()));
+    }
+    return null;
   }
 
 }
