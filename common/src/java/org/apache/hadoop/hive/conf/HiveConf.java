@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 
 import javax.security.auth.login.LoginException;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -748,7 +749,7 @@ public class HiveConf extends Configuration {
     // Number of async threads
     HIVE_SERVER2_ASYNC_EXEC_THREADS("hive.server2.async.exec.threads", 100),
     // Number of seconds HiveServer2 shutdown will wait for async threads to terminate
-    HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.async.exec.shutdown.timeout", 10L),
+    HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT("hive.server2.async.exec.shutdown.timeout", 10),
     // Size of the wait queue for async thread pool in HiveServer2.
     // After hitting this limit, the async thread pool will reject new requests.
     HIVE_SERVER2_ASYNC_EXEC_WAIT_QUEUE_SIZE("hive.server2.async.exec.wait.queue.size", 100),
@@ -1283,6 +1284,20 @@ public class HiveConf extends Configuration {
     } else {
       return Integer.parseInt(m.group(1));
     }
+  }
+
+  public void setStringEncoded(ConfVars var, String valueStr) {
+    if (valueStr != null) {
+      setVar(var, new String(Base64.encodeBase64(valueStr.getBytes())));
+    }
+  }
+
+  public String getStringDecoded(ConfVars var) {
+    String encodedStr = getVar(var);
+    if (encodedStr != null) {
+      return new String(Base64.decodeBase64(encodedStr.getBytes()));
+    }
+    return null;
   }
 
 }

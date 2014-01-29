@@ -253,12 +253,18 @@ public class MapredLocalTask extends Task<MapredLocalWork> implements Serializab
 
       // Run ExecDriver in another JVM
       executor = Runtime.getRuntime().exec(cmdLine, env, new File(workDir));
+      // GRILL-157 Redirect logs of child jvm
+      StreamPrinter outPrinter = null, errPrinter = null;
+      CachingPrintStream errPrintStream = null;
 
-      CachingPrintStream errPrintStream = new CachingPrintStream(System.err);
-
-      StreamPrinter outPrinter = new StreamPrinter(executor.getInputStream(), null, System.out);
-      StreamPrinter errPrinter = new StreamPrinter(executor.getErrorStream(), null, errPrintStream);
-
+      if (isLogRedirectionEnabled()) {
+        outPrinter = new StreamPrinter(executor.getInputStream(), null, getConsole().getChildOutStream());
+        errPrintStream = new CachingPrintStream(getConsole().getChildErrStream());
+      } else {
+        outPrinter = new StreamPrinter(executor.getInputStream(), null, SessionState.getConsole().getChildOutStream());
+        errPrintStream = new CachingPrintStream(SessionState.getConsole().getChildErrStream());
+      }
+      errPrinter = new StreamPrinter(executor.getErrorStream(), null, errPrintStream);
       outPrinter.start();
       errPrinter.start();
 
