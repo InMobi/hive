@@ -1135,10 +1135,10 @@ public class Driver implements CommandProcessor {
     String queryStr = plan.getQueryStr();
 
     conf.setVar(HiveConf.ConfVars.HIVEQUERYID, queryId);
-    conf.setVar(HiveConf.ConfVars.HIVEQUERYSTRING, queryStr);
+    conf.setStringEncoded(HiveConf.ConfVars.HIVEQUERYSTRING, queryStr);
 
     conf.set("mapreduce.workflow.id", "hive_"+queryId);
-    conf.set("mapreduce.workflow.name", queryStr);
+    conf.set("mapreduce.workflow.name", conf.get(HiveConf.ConfVars.HIVEQUERYSTRING.varname));
 
     maxthreads = HiveConf.getIntVar(conf, HiveConf.ConfVars.EXECPARALLETHREADNUMBER);
 

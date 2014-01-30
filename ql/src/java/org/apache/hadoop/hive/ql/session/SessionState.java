@@ -206,11 +206,11 @@ public class SessionState {
       new SimpleDateFormat("yyyyMMddHHmm");
 
   public void setCmd(String cmdString) {
-    conf.setVar(HiveConf.ConfVars.HIVEQUERYSTRING, cmdString);
+    conf.setStringEncoded(HiveConf.ConfVars.HIVEQUERYSTRING, cmdString);
   }
 
   public String getCmd() {
-    return (conf.getVar(HiveConf.ConfVars.HIVEQUERYSTRING));
+    return (conf.getStringDecoded(HiveConf.ConfVars.HIVEQUERYSTRING));
   }
 
   public String getQueryId() {

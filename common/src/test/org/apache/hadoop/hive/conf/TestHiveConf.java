@@ -84,4 +84,13 @@ public class TestHiveConf extends TestCase {
       assertTrue(i == HiveConf.getPositionFromInternalName(HiveConf.getColumnInternalName(i)));
     }
   }
+
+  public void testEncoding() {
+    String s = "select '\u0002' from temp";
+    HiveConf conf = new HiveConf();
+    conf.setStringEncoded(ConfVars.HIVEQUERYSTRING, s);
+    String got = conf.getStringDecoded(ConfVars.HIVEQUERYSTRING);
+    assertEquals(s, got);
+  }
+
 }

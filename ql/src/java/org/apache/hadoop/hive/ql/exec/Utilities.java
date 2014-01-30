@@ -1949,7 +1949,7 @@ public final class Utilities {
                 // usages. The worst case is that IOException will always be
                 // retried for another getInputSummary(), which is fine as
                 // IOException is not considered as a common case.
-                LOG.info("Cannot get size of " + pathStr + ". Safely ignored.");
+                LOG.info("Cannot get size of " + pathStr + ". Safely ignored.", e);
               }
             }
           };
