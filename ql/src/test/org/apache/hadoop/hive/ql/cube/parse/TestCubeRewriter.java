@@ -54,9 +54,10 @@ public class TestCubeRewriter {
   public void setupDriver() throws Exception {
     conf = new Configuration();
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1,C2");
-    conf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, true);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
     conf.setBoolean(CubeQueryConfUtil.ENABLE_SELECT_TO_GROUPBY, true);
     conf.setBoolean(CubeQueryConfUtil.ENABLE_GROUP_BY_TO_SELECT, true);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, false);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
   }
 
@@ -553,7 +554,7 @@ public class TestCubeRewriter {
     compareQueries(expected, hqlQuery);
 
     // rewrite with expressions
-    conf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, false);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     hqlQuery = rewrite(driver, "SELECT citytable.name AS g1,"
        + " CASE  WHEN citytable.name=='NULL'  THEN 'NULL' "
@@ -943,12 +944,12 @@ public class TestCubeRewriter {
       compareQueries(expectedHqlWithFunction, hql);
 
     } finally {
-      conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
+      conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, true);
     }
 
     // Test if raw fact is selected for query with no aggregate function on a measure, with aggregate resolver disabled
     String query = "SELECT cityid, testCube.msr2 FROM testCube WHERE " + twoDaysRange;
-    conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, true);
     CubeQueryRewriter driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     CubeQueryContext cubeql = driver.rewrite(query);
     Assert.assertEquals(1, cubeql.getCandidateFactTables().size());

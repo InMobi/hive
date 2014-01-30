@@ -76,4 +76,10 @@ public class CubeQueryConfUtil {
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
     return list;
   }
+
+  public static final String DISABLE_AUTO_JOINS = "hive.cube.disable.auto.join";
+  public static final boolean DEFAULT_DISABLE_AUTO_JOINS = true;
+  public static final String JOIN_TYPE_KEY = "hive.cube.join.type";
+  public static final String DISABLE_AGGREGATE_RESOLVER = "hive.cube.disable.aggregate.resolver";
+  public static final boolean DEFAULT_DISABLE_AGGREGATE_RESOLVER = true;
 }

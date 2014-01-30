@@ -850,7 +850,7 @@ public class CubeQueryContext {
 
   private String getFromString() throws SemanticException {
     String fromString = null;
-    if (getJoinTree() == null || !conf.getBoolean(JoinResolver.DISABLE_AUTO_JOINS, false)) {
+    if (getJoinTree() == null || !conf.getBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, CubeQueryConfUtil.DEFAULT_DISABLE_AUTO_JOINS)) {
       if (cube != null) {
         fromString = getStorageString(cube) ;
       } else {
