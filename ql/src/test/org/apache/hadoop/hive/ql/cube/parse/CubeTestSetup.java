@@ -275,7 +275,6 @@ public class CubeTestSetup {
     List<String> monthlyparts = new ArrayList<String>();
     Date dayStart = twoMonthsBack;
     Date monthStart = twoMonthsBack;
-    boolean hourlyPartsAvailable = false;
     if (!CubeTestSetup.isZerothHour()) {
       addParts(hourlyparts, UpdatePeriod.HOURLY, twoMonthsBack,
         DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.DAILY));
@@ -285,16 +284,13 @@ public class CubeTestSetup {
       dayStart = DateUtil.getCeilDate(
         twoMonthsBack, UpdatePeriod.DAILY);
       monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
-      hourlyPartsAvailable = true;
     }
     Calendar cal = new GregorianCalendar();
     cal.setTime(dayStart);
-    boolean dailyPartsAvailable = false;
     if (cal.get(Calendar.DAY_OF_MONTH) != 1) {
       addParts(dailyparts, UpdatePeriod.DAILY, dayStart,
         DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
       monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
-      dailyPartsAvailable = true;
     }
     addParts(dailyparts, UpdatePeriod.DAILY,
       DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY),
@@ -308,11 +304,11 @@ public class CubeTestSetup {
     parts.addAll(monthlyparts);
     StringBuilder tables = new StringBuilder();
     if (storageTables.length > 1) {
-      if (hourlyPartsAvailable) {
+      if (!hourlyparts.isEmpty()) {
         tables.append(storageTables[0]);
         tables.append(",");
       }
-      if (dailyPartsAvailable) {
+      if (!dailyparts.isEmpty()) {
         tables.append(storageTables[1]);
         tables.append(",");
       }
