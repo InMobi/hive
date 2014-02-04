@@ -93,9 +93,7 @@ public class TestSessionState {
     System.out.println("Loader1:(Set in other thread) " + otherThread.loader);
     System.out.println("Loader2:(Set in SessionState.conf) " + loader2);
     System.out.println("Loader3:(CurrentThread.getContextClassLoader()) " + Thread.currentThread().getContextClassLoader());
-    assertEquals("Should get same class loaders", otherThread.loader, loader2);
-
-    // Test fails if the line below is not run
-    assertEquals("Should get same class loaders", otherThread.loader, Thread.currentThread().getContextClassLoader());
+    assertEquals("Other thread loader and session state loader", otherThread.loader, loader2);
+    assertEquals("Other thread loader and current thread loader", otherThread.loader, Thread.currentThread().getContextClassLoader());
   }
 }
