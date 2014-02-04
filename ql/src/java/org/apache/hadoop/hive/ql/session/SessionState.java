@@ -256,6 +256,7 @@ public class SessionState {
 
     tss.set(startSs);
 
+    Thread.currentThread().setContextClassLoader(startSs.conf.getClassLoader());
     if(startSs.hiveHist == null){
       if (startSs.getConf().getBoolVar(HiveConf.ConfVars.HIVE_SESSION_HISTORY_ENABLED)) {
         startSs.hiveHist = new HiveHistoryImpl(startSs);
