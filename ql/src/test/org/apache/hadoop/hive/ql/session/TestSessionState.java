@@ -17,12 +17,17 @@
  */
 package org.apache.hadoop.hive.ql.session;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Test SessionState
@@ -95,5 +100,36 @@ public class TestSessionState {
     System.out.println("Loader3:(CurrentThread.getContextClassLoader()) " + Thread.currentThread().getContextClassLoader());
     assertEquals("Other thread loader and session state loader", otherThread.loader, loader2);
     assertEquals("Other thread loader and current thread loader", otherThread.loader, Thread.currentThread().getContextClassLoader());
+  }
+
+  @Test
+  public void testRegisterJarForDifferentThreads() {
+    // Create a session state
+    SessionState ss1 = new SessionState(new HiveConf());
+    // Set the session state in current thread
+    SessionState.start(ss1);
+    // Add jar
+    SessionState.registerJar("test__1__.jar");
+
+    // Create another session state
+    SessionState ss2 = new SessionState(new HiveConf());
+    // Now set this one in the current thread
+    SessionState.start(ss2);
+    // Add another jar
+    SessionState.registerJar("test__2__.jar");
+
+    // Check if test1.jar is still present in the new session state
+    ClassLoader ss2Loader = ss2.conf.getClassLoader();
+    if (ss2Loader instanceof URLClassLoader) {
+      URLClassLoader classLoader = (URLClassLoader) ss2Loader;
+      List<URL> ss2Paths = new ArrayList<URL>();
+      for (URL path : classLoader.getURLs()) {
+        ss2Paths.add(path);
+        if (path.toString().contains("test__1__.jar")) {
+          System.out.println("SS2 CP URL: " + path);
+          fail("Jar from old session should not be present here!");
+        }
+      }
+    }
   }
 }
