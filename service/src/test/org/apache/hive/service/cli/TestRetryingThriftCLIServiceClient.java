@@ -18,23 +18,16 @@
 
 package org.apache.hive.service.cli;
 
-import com.sun.net.httpserver.Authenticator;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.service.auth.HiveAuthFactory;
-import org.apache.hive.service.auth.PlainSaslHelper;
-import org.apache.hive.service.cli.thrift.*;
+import org.apache.hive.service.cli.thrift.RetryingThriftCLIServiceClient;
+import org.apache.hive.service.cli.thrift.ThriftCLIService;
 import org.apache.hive.service.server.HiveServer2;
 import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
+import org.apache.thrift.transport.TTransportException;
 import org.junit.Test;
 
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
@@ -46,48 +39,25 @@ import static org.junit.Assert.*;
  * Test CLI service with a retrying client. All tests should pass. This is to validate that calls
  * are transferred successfully.
  */
-public class TestRetryingThriftCLIServiceClient extends TestEmbeddedThriftBinaryCLIService {
+public class TestRetryingThriftCLIServiceClient {
   protected static ThriftCLIService service;
-
-  @BeforeClass
-  public static void setUpBeforeClass() throws Exception {
-    service = new EmbeddedThriftBinaryCLIService();
-    client = RetryingThriftCLIServiceClient.newRetryingCLIServiceClient(new HiveConf(), service);
-  }
-
-  /* (non-Javadoc)
-   * @see org.apache.hive.service.cli.CLIServiceTest#setUp()
-   */
-  @Override
-  @Before
-  public void setUp() throws Exception {
-    super.setUp();
-  }
-
-  /* (non-Javadoc)
-   * @see org.apache.hive.service.cli.CLIServiceTest#tearDown()
-   */
-  @Override
-  @After
-  public void tearDown() throws Exception {
-    super.tearDown();
-  }
 
   static class RetryingThriftCLIServiceClientTest extends RetryingThriftCLIServiceClient {
     int callCount = 0;
+    int connectCount = 0;
     static RetryingThriftCLIServiceClientTest handlerInst;
 
-    protected RetryingThriftCLIServiceClientTest(HiveConf conf, TCLIService.Iface thriftClient) {
-      super(conf, thriftClient);
+    protected RetryingThriftCLIServiceClientTest(HiveConf conf) {
+      super(conf);
     }
 
-    public static CLIServiceClient newRetryingCLIServiceClient(HiveConf conf, TCLIService.Iface thriftClient) {
-      handlerInst = new RetryingThriftCLIServiceClientTest(conf, thriftClient);
-      InvocationHandler handler = handlerInst;
+    public static CLIServiceClient newRetryingCLIServiceClient(HiveConf conf) throws HiveSQLException {
+      handlerInst = new RetryingThriftCLIServiceClientTest(conf);
+      handlerInst.connectWithRetry(conf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_RETRY_LIMIT));
 
       ICLIService cliService =
         (ICLIService) Proxy.newProxyInstance(RetryingThriftCLIServiceClientTest.class.getClassLoader(),
-          CLIServiceClient.class.getInterfaces(), handler);
+          CLIServiceClient.class.getInterfaces(), handlerInst);
       return new CLIServiceClientWrapper(cliService);
     }
 
@@ -96,6 +66,12 @@ public class TestRetryingThriftCLIServiceClient extends TestEmbeddedThriftBinary
       System.out.println("## Calling: " + method.getName() + ", " + callCount + "/" + getRetryLimit());
       callCount++;
       return super.invokeInternal(method, args);
+    }
+
+    @Override
+    protected synchronized TTransport connect(HiveConf conf) throws HiveSQLException, TTransportException {
+      connectCount++;
+      return super.connect(conf);
     }
   }
   @Test
@@ -108,29 +84,32 @@ public class TestRetryingThriftCLIServiceClient extends TestEmbeddedThriftBinary
     hiveConf.setVar(HiveConf.ConfVars.HIVE_SERVER2_AUTHENTICATION, HiveAuthFactory.AuthTypes.NOSASL.toString());
     hiveConf.setVar(HiveConf.ConfVars.HIVE_SERVER2_TRANSPORT_MODE, "binary");
     hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_RETRY_LIMIT, 3);
+    hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_CONNECTION_RETRY_LIMIT, 3);
     hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_ASYNC_EXEC_THREADS, 10);
     hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_ASYNC_EXEC_SHUTDOWN_TIMEOUT, 1);
 
     final HiveServer2 server = new HiveServer2();
     server.init(hiveConf);
-    Thread serverTh = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        server.start();
-      }
-    });
-    serverTh.start();
-    Thread.sleep(2500);
+    server.start();
+    Thread.sleep(5000);
     System.out.println("## HiveServer started");
 
+    // Check if giving invalid address causes retry in connection attempt
+    hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_PORT, 17000);
+    try {
+      CLIServiceClient cliServiceClient =
+        RetryingThriftCLIServiceClientTest.newRetryingCLIServiceClient(hiveConf);
+      fail("Expected to throw exception for invalid port");
+    } catch (HiveSQLException sqlExc) {
+      assertTrue(sqlExc.getCause() instanceof TTransportException);
+      assertTrue(sqlExc.getMessage().contains("3"));
+    }
+
+    // Reset port setting
+    hiveConf.setIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_PORT, 15000);
     // Create client
-    TTransport transport = PlainSaslHelper.getPlainTransport("anonymous", "anonymous",
-      new TSocket("localhost", 15000));
-    transport.open();
-    TProtocol protocol = new TBinaryProtocol(transport);
-    TCLIService.Client client = new TCLIService.Client(protocol);
     CLIServiceClient cliServiceClient =
-      RetryingThriftCLIServiceClientTest.newRetryingCLIServiceClient(hiveConf, client);
+      RetryingThriftCLIServiceClientTest.newRetryingCLIServiceClient(hiveConf);
     System.out.println("## Created client");
 
     // kill server
@@ -140,13 +119,14 @@ public class TestRetryingThriftCLIServiceClient extends TestEmbeddedThriftBinary
     // submit few queries
     try {
       Map<String, String> confOverlay = new HashMap<String, String>();
-      SessionHandle session = cliServiceClient.openSession("anonymous", "anonymous");
       RetryingThriftCLIServiceClientTest.handlerInst.callCount = 0;
-      OperationHandle operation =
-        cliServiceClient.executeStatement(session, "CREATE TABLE RETRY_TEST(ID STRING)", confOverlay);
+      RetryingThriftCLIServiceClientTest.handlerInst.connectCount = 0;
+      SessionHandle session = cliServiceClient.openSession("anonymous", "anonymous");
     } catch (HiveSQLException exc) {
+      exc.printStackTrace();
       assertTrue(exc.getCause() instanceof TException);
-      assertEquals(3, RetryingThriftCLIServiceClientTest.handlerInst.callCount);
+      assertEquals(1, RetryingThriftCLIServiceClientTest.handlerInst.callCount);
+      assertEquals(3, RetryingThriftCLIServiceClientTest.handlerInst.connectCount);
     }
 
   }
