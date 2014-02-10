@@ -777,6 +777,8 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_USE_SSL("hive.server2.use.SSL", false),
     HIVE_SERVER2_SSL_KEYSTORE_PATH("hive.server2.keystore.path", ""),
     HIVE_SERVER2_SSL_KEYSTORE_PASSWORD("hive.server2.keystore.password", ""),
+    HIVE_SERVER2_THRIFT_CLIENT_RETRY_LIMIT("hive.server2.thrift.client.retry.limit", 1),
+    HIVE_SERVER2_THRIFT_CLIENT_RETRY_DELAY_SECONDS("hive.server2.thrift.client.retry.delay.seconds", 1),
 
     HIVE_CONF_RESTRICTED_LIST("hive.conf.restricted.list", null),
 
