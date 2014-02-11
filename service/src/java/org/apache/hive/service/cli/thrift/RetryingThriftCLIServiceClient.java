@@ -20,16 +20,24 @@ package org.apache.hive.service.cli.thrift;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hive.service.auth.KerberosSaslHelper;
+import org.apache.hive.service.auth.PlainSaslHelper;
 import org.apache.hive.service.cli.*;
 import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
 
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
+import javax.security.sasl.SaslException;
 import java.lang.reflect.*;
-import java.util.Arrays;
+import java.net.SocketException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -40,9 +48,11 @@ import java.util.Map;
  */
 public class RetryingThriftCLIServiceClient implements InvocationHandler {
   public static final Log LOG = LogFactory.getLog(RetryingThriftCLIServiceClient.class);
-  private final ThriftCLIServiceClient base;
+  private ThriftCLIServiceClient base;
   private final int retryLimit;
   private final int retryDelaySeconds;
+  private HiveConf conf;
+  private TTransport transport;
 
   public static class CLIServiceClientWrapper extends CLIServiceClient {
     private final ICLIService cliService;
@@ -166,18 +176,71 @@ public class RetryingThriftCLIServiceClient implements InvocationHandler {
     }
   }
 
-  protected RetryingThriftCLIServiceClient(HiveConf conf, TCLIService.Iface thriftClient) {
+  protected RetryingThriftCLIServiceClient(HiveConf conf) {
+    this.conf = conf;
     retryLimit = conf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_RETRY_LIMIT);
     retryDelaySeconds = conf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_RETRY_DELAY_SECONDS);
-    base = new ThriftCLIServiceClient(thriftClient);
   }
 
-  public static CLIServiceClient newRetryingCLIServiceClient(HiveConf conf, TCLIService.Iface thriftClient) {
-    InvocationHandler handler = new RetryingThriftCLIServiceClient(conf, thriftClient);
+  public static CLIServiceClient newRetryingCLIServiceClient(HiveConf conf) throws HiveSQLException {
+    RetryingThriftCLIServiceClient retryClient = new RetryingThriftCLIServiceClient(conf);
+    retryClient.connectWithRetry(conf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_CONNECTION_RETRY_LIMIT));
     ICLIService cliService =
       (ICLIService) Proxy.newProxyInstance(RetryingThriftCLIServiceClient.class.getClassLoader(),
-        CLIServiceClient.class.getInterfaces(), handler);
+        CLIServiceClient.class.getInterfaces(), retryClient);
     return new CLIServiceClientWrapper(cliService);
+  }
+
+  protected void connectWithRetry(int retries) throws HiveSQLException {
+    for (int i = 0 ; i < retries; i++) {
+      try {
+        connect(conf);
+        break;
+      } catch (TTransportException e) {
+        if (i + 1 == retries) {
+          throw new HiveSQLException("Unable to connect after " + retries + " retries", e);
+        }
+        LOG.warn("Connection attempt " + i, e);
+      }
+      try {
+        Thread.sleep(retryDelaySeconds * 1000);
+      } catch (InterruptedException e) {
+        LOG.warn("Interrupted", e);
+      }
+    }
+  }
+
+  protected synchronized TTransport connect(HiveConf conf) throws HiveSQLException, TTransportException {
+    if (transport != null && transport.isOpen()) {
+      transport.close();
+    }
+
+    String host = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_BIND_HOST);
+    int port = conf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_PORT);
+    LOG.info("Connecting to " + host + ":" + port);
+
+    transport = new TSocket(host, port);
+    ((TSocket) transport).setTimeout(conf.getIntVar(HiveConf.ConfVars.SERVER_READ_SOCKET_TIMEOUT));
+    try {
+      ((TSocket) transport).getSocket().setKeepAlive(conf.getBoolVar(HiveConf.ConfVars.SERVER_TCP_KEEP_ALIVE));
+    } catch (SocketException e) {
+      LOG.error("Error setting keep alive to " + conf.getBoolVar(HiveConf.ConfVars.SERVER_TCP_KEEP_ALIVE), e);
+    }
+
+    String userName = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_USER);
+    String passwd = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_PASSWORD);
+
+    try {
+      transport = PlainSaslHelper.getPlainTransport(userName, passwd, transport);
+    } catch (SaslException e) {
+      LOG.error("Error creating plain SASL transport", e);
+    }
+
+    TProtocol protocol = new TBinaryProtocol(transport);
+    transport.open();
+    base = new ThriftCLIServiceClient(new TCLIService.Client(protocol));
+    LOG.info("Connected!");
+    return transport;
   }
 
   protected class InvocationResult {
@@ -227,6 +290,9 @@ public class RetryingThriftCLIServiceClient implements InvocationHandler {
       if (invokeResult.success) {
         return invokeResult.result;
       }
+
+      // Error because of thrift client, we have to recreate base object
+      connectWithRetry(conf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_CLIENT_CONNECTION_RETRY_LIMIT));
 
       if (attempts >=  retryLimit) {
         LOG.error(method.getName() + " failed after " + attempts + " retries.",  invokeResult.exception);

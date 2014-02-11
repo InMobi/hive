@@ -778,8 +778,10 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_SSL_KEYSTORE_PATH("hive.server2.keystore.path", ""),
     HIVE_SERVER2_SSL_KEYSTORE_PASSWORD("hive.server2.keystore.password", ""),
     HIVE_SERVER2_THRIFT_CLIENT_RETRY_LIMIT("hive.server2.thrift.client.retry.limit", 1),
+    HIVE_SERVER2_THRIFT_CLIENT_CONNECTION_RETRY_LIMIT("hive.server2.thrift.client.connect.retry.limit", 1),
     HIVE_SERVER2_THRIFT_CLIENT_RETRY_DELAY_SECONDS("hive.server2.thrift.client.retry.delay.seconds", 1),
-
+    HIVE_SERVER2_THRIFT_CLIENT_USER("hive.server2.thrift.client.user", "anonymous"),
+    HIVE_SERVER2_THRIFT_CLIENT_PASSWORD("hive.server2.thrift.client.password", "anonymous"),
     HIVE_CONF_RESTRICTED_LIST("hive.conf.restricted.list", null),
 
     // If this is set all move tasks at the end of a multi-insert query will only begin once all
