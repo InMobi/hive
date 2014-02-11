@@ -220,7 +220,7 @@ public class RetryingThriftCLIServiceClient implements InvocationHandler {
     LOG.info("Connecting to " + host + ":" + port);
 
     transport = new TSocket(host, port);
-    ((TSocket) transport).setTimeout(conf.getIntVar(HiveConf.ConfVars.SERVER_READ_SOCKET_TIMEOUT));
+    ((TSocket) transport).setTimeout(conf.getIntVar(HiveConf.ConfVars.SERVER_READ_SOCKET_TIMEOUT) * 1000);
     try {
       ((TSocket) transport).getSocket().setKeepAlive(conf.getBoolVar(HiveConf.ConfVars.SERVER_TCP_KEEP_ALIVE));
     } catch (SocketException e) {
