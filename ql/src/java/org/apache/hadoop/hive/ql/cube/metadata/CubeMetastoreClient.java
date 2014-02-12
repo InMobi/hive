@@ -34,12 +34,12 @@ import org.apache.thrift.TException;
  *
  */
 public class CubeMetastoreClient {
-  private Hive metastore;
   private final HiveConf config;
-  private boolean enableCaching;
+  private final boolean enableCaching;
 
   private CubeMetastoreClient(HiveConf conf) {
     this.config = conf;
+    this.enableCaching = conf.getBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, true);
   }
 
   // map from table name to Table
@@ -67,13 +67,11 @@ public class CubeMetastoreClient {
     if (instance == null) {
       instance = new CubeMetastoreClient(conf);
     }
-    instance.metastore = Hive.get(conf);
-    instance.enableCaching = conf.getBoolean(MetastoreConstants.METASTORE_ENABLE_CACHING, true);
     return instance;
   }
 
-  private Hive getClient() {
-    return metastore;
+  private Hive getClient() throws HiveException {
+    return Hive.get(config);
   }
 
   /**
@@ -647,7 +645,7 @@ public class CubeMetastoreClient {
   }
 
   public void dropHiveTable(String table) throws HiveException {
-    metastore.dropTable(table);
+    getClient().dropTable(table);
     allHiveTables.remove(table.toLowerCase());
   }
 
@@ -956,7 +954,7 @@ public class CubeMetastoreClient {
     }
     hiveTable.getTTable().getParameters().putAll(cubeTable.getProperties());
     try {
-      metastore.alterTable(table, hiveTable);
+      getClient().alterTable(table, hiveTable);
     } catch (InvalidOperationException e) {
       throw new HiveException(e);
     }
@@ -967,7 +965,7 @@ public class CubeMetastoreClient {
       List<FieldSchema> columns) throws HiveException {
     hiveTable.getTTable().getSd().setCols(columns);
     try {
-      metastore.alterTable(table, hiveTable);
+      getClient().alterTable(table, hiveTable);
     } catch (InvalidOperationException e) {
       throw new HiveException(e);
     }
