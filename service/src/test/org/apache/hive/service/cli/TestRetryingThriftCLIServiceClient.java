@@ -18,6 +18,15 @@
 
 package org.apache.hive.service.cli;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.thrift.RetryingThriftCLIServiceClient;
@@ -27,13 +36,6 @@ import org.apache.thrift.TException;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.junit.Test;
-
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.Assert.*;
 
 /**
  * Test CLI service with a retrying client. All tests should pass. This is to validate that calls
@@ -58,7 +60,7 @@ public class TestRetryingThriftCLIServiceClient {
       ICLIService cliService =
         (ICLIService) Proxy.newProxyInstance(RetryingThriftCLIServiceClientTest.class.getClassLoader(),
           CLIServiceClient.class.getInterfaces(), handlerInst);
-      return new CLIServiceClientWrapper(cliService);
+      return new CLIServiceClientWrapper(cliService, handlerInst);
     }
 
     @Override
