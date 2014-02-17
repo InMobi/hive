@@ -62,6 +62,8 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   protected List<Operator<? extends OperatorDesc>> childOperators;
   protected List<Operator<? extends OperatorDesc>> parentOperators;
   protected String operatorId;
+  protected static String counterGroupName = "HiveOperator";
+
   /**
    * List of counter names associated with the operator. It contains the
    * following default counters NUM_INPUT_ROWS NUM_OUTPUT_ROWS TIME_TAKEN
@@ -69,14 +71,27 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    */
   protected ArrayList<String> counterNames;
 
-  /**
-   * Each operator has its own map of its counter names to disjoint
-   * ProgressCounter - it is populated at compile time and is read in at
-   * run-time while extracting the operator specific counts.
-   */
-  protected HashMap<String, ProgressCounter> counterNameToEnum;
-  protected static HashMap<ProgressCounter, String> counterEnumToName =
-      new HashMap<ProgressCounter, String>();
+  // Will be set to true if operator has to record counters
+  protected Boolean recordCounters = false;
+
+  public Boolean getRecordCounters() {
+    return recordCounters;
+  }
+
+  public void setRecordCounters(Boolean recordCounters) {
+    this.recordCounters = recordCounters;
+  }
+
+  // will be set to false when the operator exhausts the maximum counters
+  protected Boolean countersAvailable = true;
+
+  public Boolean getCountersAvailable() {
+    return countersAvailable;
+  }
+
+  public void setCountersAvailable(Boolean countersAvailable) {
+    this.countersAvailable = countersAvailable;
+  }
 
   private transient ExecMapperContext execContext;
 
@@ -490,7 +505,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
       return;
     }
 
-    if (counterNameToEnum != null) {
+    if (recordCounters) {
       inputRows++;
       if ((inputRows % 1000) == 0) {
         incrCounter(numInputRowsCntr, inputRows);
@@ -597,7 +612,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     // call the operator specific close routine
     closeOp(abort);
 
-    if (counterNameToEnum != null) {
+    if (recordCounters) {
       incrCounter(numInputRowsCntr, inputRows);
       incrCounter(numOutputRowsCntr, outputRows);
       incrCounter(timeTakenCntr, totalTime);
@@ -811,7 +826,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
   protected void forward(Object row, ObjectInspector rowInspector)
       throws HiveException {
 
-    if (counterNameToEnum != null) {
+    if (recordCounters) {
       if ((++outputRows % 1000) == 0) {
         incrCounter(numOutputRowsCntr, outputRows);
         outputRows = 0;
@@ -1131,17 +1146,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     C961, C962, C963, C964, C965, C966, C967, C968, C969, C970,
     C971, C972, C973, C974, C975, C976, C977, C978, C979, C980,
     C981, C982, C983, C984, C985, C986, C987, C988, C989, C990,
-    C991, C992, C993, C994, C995, C996, C997, C998, C999, C1000;
-
-    @Override
-    public String toString() {
-      String name = counterEnumToName.get(this);
-      if (name != null) {
-        return name;
-      } else {
-        return name();
-      }
-    }
+    C991, C992, C993, C994, C995, C996, C997, C998, C999, C1000
   };
 
   private static int totalNumCntrs = 1000;
@@ -1155,7 +1160,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    * keeps track of unique ProgressCounter enums used this value is used at
    * compile time while assigning ProgressCounter enums to counter names.
    */
-  private static int lastEnumUsed;
+  private static int lastCounterUsed;
 
   protected transient long inputRows = 0;
   protected transient long outputRows = 0;
@@ -1172,16 +1177,15 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    */
   protected void incrCounter(String name, long amount) {
     String counterName = getWrappedCounterName(name);
-    ProgressCounter pc = counterNameToEnum.get(counterName);
 
     // Currently, we maintain fixed number of counters per plan - in case of a
     // bigger tree, we may run out of them
-    if (pc == null) {
+    if (!countersAvailable) {
       LOG
           .warn("Using too many counters. Increase the total number of counters for "
           + counterName);
     } else if (reporter != null) {
-      reporter.incrCounter(pc, amount);
+      reporter.incrCounter(counterGroupName, counterName, amount);
     }
   }
 
@@ -1227,13 +1231,12 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
 
     // For some old unit tests, the counters will not be populated. Eventually,
     // the old tests should be removed
-    if (counterNameToEnum == null) {
+    if (!recordCounters) {
       return;
     }
 
-    for (Map.Entry<String, ProgressCounter> counter : counterNameToEnum
-        .entrySet()) {
-      counters.put(counter.getKey(), ctrs.getCounter(counter.getValue()));
+    for (String cname : getCounterNames()) {
+      counters.put(cname, getCounter(ctrs, cname));
     }
     // update counters of child operators
     // this wont be an infinite loop since the operator graph is acyclic
@@ -1245,6 +1248,10 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     }
   }
 
+  protected long getCounter(Counters ctrs, String counterName) {
+    return ctrs.getGroup(counterGroupName).getCounter(counterName);
+  }
+
   /**
    * Recursively check this operator and its descendants to see if the fatal
    * error counter is set to non-zero.
@@ -1252,21 +1259,19 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    * @param ctrs
    */
   public boolean checkFatalErrors(Counters ctrs, StringBuilder errMsg) {
-    if (counterNameToEnum == null) {
+    if (!recordCounters) {
       return false;
     }
 
     String counterName = getWrappedCounterName(fatalErrorCntr);
-    ProgressCounter pc = counterNameToEnum.get(counterName);
 
     // Currently, we maintain fixed number of counters per plan - in case of a
     // bigger tree, we may run out of them
-    if (pc == null) {
-      LOG
-          .warn("Using too many counters. Increase the total number of counters for "
+    if (!countersAvailable) {
+      LOG.warn("Using too many counters. Increase the total number of counters for "
           + counterName);
     } else {
-      long value = ctrs.getCounter(pc);
+      long value = getCounter(ctrs, counterName);
       fatalErrorMessage(errMsg, value);
       if (value != 0) {
         return true;
@@ -1297,7 +1302,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
 
   // A given query can have multiple map-reduce jobs
   public static void resetLastEnumUsed() {
-    lastEnumUsed = 0;
+    lastCounterUsed = 0;
   }
 
   /**
@@ -1305,27 +1310,23 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    * set of counter names.
    */
   public void assignCounterNameToEnum() {
-    if (counterNameToEnum != null) {
+    if (recordCounters) {
       return;
     }
-    counterNameToEnum = new HashMap<String, ProgressCounter>();
+    recordCounters = true;
     for (String counterName : getCounterNames()) {
-      ++lastEnumUsed;
+      ++lastCounterUsed;
 
       // TODO Hack for hadoop-0.17
       // Currently, only maximum number of 'totalNumCntrs' can be used. If you
       // want
       // to add more counters, increase the number of counters in
       // ProgressCounter
-      if (lastEnumUsed > totalNumCntrs) {
-        LOG
-            .warn("Using too many counters. Increase the total number of counters");
+      if (lastCounterUsed > totalNumCntrs) {
+        LOG.warn("Using too many counters. Increase the total number of counters");
+        countersAvailable = false;
         return;
       }
-      String enumName = "C" + lastEnumUsed;
-      ProgressCounter ctr = ProgressCounter.valueOf(enumName);
-      counterNameToEnum.put(counterName, ctr);
-      counterEnumToName.put(ctr, counterName);
     }
   }
 
@@ -1357,15 +1358,6 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    */
   protected List<String> getAdditionalCounters() {
     return null;
-  }
-
-  public HashMap<String, ProgressCounter> getCounterNameToEnum() {
-    return counterNameToEnum;
-  }
-
-  public void setCounterNameToEnum(
-      HashMap<String, ProgressCounter> counterNameToEnum) {
-    this.counterNameToEnum = counterNameToEnum;
   }
 
   /**

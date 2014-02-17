@@ -371,7 +371,7 @@ public class ReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     // forward is not called
     out.collect(key, value);
     if (++outputRows % 1000 == 0) {
-      if (counterNameToEnum != null) {
+      if (recordCounters) {
         incrCounter(numOutputRowsCntr, outputRows);
       }
       increaseForward(outputRows);
