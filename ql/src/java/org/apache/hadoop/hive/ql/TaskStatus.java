@@ -20,28 +20,32 @@ package org.apache.hadoop.hive.ql;
 
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.Task.TaskState;
+import org.apache.hadoop.hive.ql.plan.api.StageType;
 
 public class TaskStatus {
   private String taskId;
+  private StageType type;
   private String externalHandle;
   private Task.TaskState taskState;
 
-  public TaskStatus(String taskId, String externalHandle, Task.TaskState state) {
+  public TaskStatus(String taskId, String externalHandle, Task.TaskState state,
+      StageType type) {
     this.taskId = taskId;
+    this.type = type;
     this.externalHandle = externalHandle;
     this.taskState = state;
   }
-  
-  public TaskStatus() {
-    
-  }
 
-  public TaskStatus(String taskId, Task.TaskState state) {
-    this(taskId, null, state);
+  public TaskStatus() {
+
   }
 
   public String getTaskId() {
     return taskId;
+  }
+
+  public StageType getType() {
+    return type;
   }
 
   public String getExternalHandle() {
@@ -54,7 +58,7 @@ public class TaskStatus {
 
   @Override
   public String toString() {
-    return taskId + "/" + externalHandle + "/" + taskState;
+    return taskId + "/" + type + "/" + externalHandle + "/" + taskState;
   }
 
   public void setTaskId(String taskId) {
@@ -71,5 +75,9 @@ public class TaskStatus {
     } else {
       this.taskState = TaskState.valueOf(taskState.toUpperCase());
     }
+  }
+
+  public void setType(StageType type) {
+    this.type = type;
   }
 }
