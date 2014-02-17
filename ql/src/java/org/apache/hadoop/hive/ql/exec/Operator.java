@@ -75,6 +75,8 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
    * run-time while extracting the operator specific counts.
    */
   protected HashMap<String, ProgressCounter> counterNameToEnum;
+  protected static HashMap<ProgressCounter, String> counterEnumToName =
+      new HashMap<ProgressCounter, String>();
 
   private transient ExecMapperContext execContext;
 
@@ -1129,7 +1131,17 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
     C961, C962, C963, C964, C965, C966, C967, C968, C969, C970,
     C971, C972, C973, C974, C975, C976, C977, C978, C979, C980,
     C981, C982, C983, C984, C985, C986, C987, C988, C989, C990,
-    C991, C992, C993, C994, C995, C996, C997, C998, C999, C1000
+    C991, C992, C993, C994, C995, C996, C997, C998, C999, C1000;
+
+    @Override
+    public String toString() {
+      String name = counterEnumToName.get(this);
+      if (name != null) {
+        return name;
+      } else {
+        return name();
+      }
+    }
   };
 
   private static int totalNumCntrs = 1000;
@@ -1169,8 +1181,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
           .warn("Using too many counters. Increase the total number of counters for "
           + counterName);
     } else if (reporter != null) {
-      //reporter.incrCounter(pc, amount);
-      reporter.incrCounter("HiveOperator", counterName, amount);
+      reporter.incrCounter(pc, amount);
     }
   }
 
@@ -1314,6 +1325,7 @@ public abstract class Operator<T extends OperatorDesc> implements Serializable,C
       String enumName = "C" + lastEnumUsed;
       ProgressCounter ctr = ProgressCounter.valueOf(enumName);
       counterNameToEnum.put(counterName, ctr);
+      counterEnumToName.put(ctr, counterName);
     }
   }
 
