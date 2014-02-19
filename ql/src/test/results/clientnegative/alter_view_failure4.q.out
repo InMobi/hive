@@ -7,15 +7,12 @@ PARTITIONED ON (value)
 AS 
 SELECT * FROM src
 PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@src
 POSTHOOK: query: CREATE VIEW xxx5
 PARTITIONED ON (value)
 AS 
 SELECT * FROM src
 POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@src
 POSTHOOK: Output: default@xxx5
-PREHOOK: query: -- should fail:  LOCATION clause is illegal
-#### A masked pattern was here ####
-PREHOOK: type: ALTERTABLE_ADDPARTS
-PREHOOK: Input: default@src
-PREHOOK: Input: default@xxx5
-FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.exec.DDLTask. LOCATION clause illegal for view partition
+FAILED: SemanticException LOCATION clause illegal for view partition

@@ -135,6 +135,12 @@ Table:              	fact_daily
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
+	COLUMN_STATS_ACCURATE	false               
+#### A masked pattern was here ####
+	numFiles            	2                   
+	numRows             	-1                  
+	rawDataSize         	-1                  
+	totalSize           	8                   
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -175,7 +181,31 @@ POSTHOOK: type: QUERY
 POSTHOOK: Lineage: fact_tz PARTITION(ds=1,hr=1).x EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: fact_tz PARTITION(ds=1,hr=2).x EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME fact_daily))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL x))) (TOK_WHERE (and (= (TOK_TABLE_OR_COL ds) '1') (= (TOK_TABLE_OR_COL x) 484)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            fact_daily
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               x
+      TOK_WHERE
+         and
+            =
+               TOK_TABLE_OR_COL
+                  ds
+               '1'
+            =
+               TOK_TABLE_OR_COL
+                  x
+               484
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -184,26 +214,25 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        fact_daily 
+      Map Operator Tree:
           TableScan
             alias: fact_daily
+            Statistics: Num rows: 2 Data size: 8 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: (x = 484)
-                  type: boolean
+              predicate: (x = 484) (type: boolean)
+              Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions:
-                      expr: x
-                      type: int
+                expressions: x (type: int)
                 outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 File Output Operator
                   compressed: false
                   GlobalTableId: 0
 #### A masked pattern was here ####
                   NumFilesPerFileSink: 1
+                  Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                   table:
                       input format: org.apache.hadoop.mapred.TextInputFormat
@@ -214,6 +243,8 @@ STAGE PLANS:
                         escape.delim \
                         hive.serialization.extend.nesting.levels true
                         serialization.format 1
+                        serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                   TotalFiles: 1
                   GatherStats: false
                   MultiFileSpray: false
@@ -228,15 +259,20 @@ STAGE PLANS:
             partition values:
               ds 1
             properties:
+              COLUMN_STATS_ACCURATE false
               bucket_count -1
               columns x
               columns.types int
 #### A masked pattern was here ####
               name default.fact_daily
+              numFiles 2
+              numRows -1
               partition_columns ds
+              rawDataSize -1
               serialization.ddl struct fact_daily { i32 x}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              totalSize 8
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
@@ -264,7 +300,6 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
 PREHOOK: query: -- List Bucketing Query
 SELECT x FROM fact_daily WHERE ds='1' and x=484
 PREHOOK: type: QUERY
@@ -291,7 +326,31 @@ POSTHOOK: type: QUERY
 POSTHOOK: Lineage: fact_tz PARTITION(ds=1,hr=1).x EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: fact_tz PARTITION(ds=1,hr=2).x EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME fact_daily))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL x))) (TOK_WHERE (and (= (TOK_TABLE_OR_COL ds) '1') (= (TOK_TABLE_OR_COL x) 495)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            fact_daily
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               x
+      TOK_WHERE
+         and
+            =
+               TOK_TABLE_OR_COL
+                  ds
+               '1'
+            =
+               TOK_TABLE_OR_COL
+                  x
+               495
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -300,26 +359,25 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        fact_daily 
+      Map Operator Tree:
           TableScan
             alias: fact_daily
+            Statistics: Num rows: 2 Data size: 8 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: (x = 495)
-                  type: boolean
+              predicate: (x = 495) (type: boolean)
+              Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions:
-                      expr: x
-                      type: int
+                expressions: x (type: int)
                 outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 File Output Operator
                   compressed: false
                   GlobalTableId: 0
 #### A masked pattern was here ####
                   NumFilesPerFileSink: 1
+                  Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                   table:
                       input format: org.apache.hadoop.mapred.TextInputFormat
@@ -330,6 +388,8 @@ STAGE PLANS:
                         escape.delim \
                         hive.serialization.extend.nesting.levels true
                         serialization.format 1
+                        serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                   TotalFiles: 1
                   GatherStats: false
                   MultiFileSpray: false
@@ -344,15 +404,20 @@ STAGE PLANS:
             partition values:
               ds 1
             properties:
+              COLUMN_STATS_ACCURATE false
               bucket_count -1
               columns x
               columns.types int
 #### A masked pattern was here ####
               name default.fact_daily
+              numFiles 2
+              numRows -1
               partition_columns ds
+              rawDataSize -1
               serialization.ddl struct fact_daily { i32 x}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              totalSize 8
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
@@ -379,7 +444,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: -- List Bucketing Query
 SELECT x FROM fact_daily WHERE ds='1' and x=495
@@ -403,7 +467,31 @@ POSTHOOK: type: QUERY
 POSTHOOK: Lineage: fact_tz PARTITION(ds=1,hr=1).x EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: fact_tz PARTITION(ds=1,hr=2).x EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME fact_daily))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL x))) (TOK_WHERE (and (= (TOK_TABLE_OR_COL ds) '1') (= (TOK_TABLE_OR_COL x) 1)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            fact_daily
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               x
+      TOK_WHERE
+         and
+            =
+               TOK_TABLE_OR_COL
+                  ds
+               '1'
+            =
+               TOK_TABLE_OR_COL
+                  x
+               1
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -412,26 +500,25 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        fact_daily 
+      Map Operator Tree:
           TableScan
             alias: fact_daily
+            Statistics: Num rows: 2 Data size: 8 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: (x = 1)
-                  type: boolean
+              predicate: (x = 1) (type: boolean)
+              Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions:
-                      expr: x
-                      type: int
+                expressions: x (type: int)
                 outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
                 File Output Operator
                   compressed: false
                   GlobalTableId: 0
 #### A masked pattern was here ####
                   NumFilesPerFileSink: 1
+                  Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                   table:
                       input format: org.apache.hadoop.mapred.TextInputFormat
@@ -442,6 +529,8 @@ STAGE PLANS:
                         escape.delim \
                         hive.serialization.extend.nesting.levels true
                         serialization.format 1
+                        serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                   TotalFiles: 1
                   GatherStats: false
                   MultiFileSpray: false
@@ -456,15 +545,20 @@ STAGE PLANS:
             partition values:
               ds 1
             properties:
+              COLUMN_STATS_ACCURATE false
               bucket_count -1
               columns x
               columns.types int
 #### A masked pattern was here ####
               name default.fact_daily
+              numFiles 2
+              numRows -1
               partition_columns ds
+              rawDataSize -1
               serialization.ddl struct fact_daily { i32 x}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              totalSize 8
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
@@ -491,7 +585,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: SELECT x FROM fact_daily WHERE ds='1' and x=1
 PREHOOK: type: QUERY

@@ -31,6 +31,7 @@ PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
+alltypesorc
 src
 src1
 src_json
@@ -53,6 +54,7 @@ PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
+alltypesorc
 src
 src1
 src_json
@@ -76,9 +78,6 @@ PREHOOK: type: SHOWTABLES
 POSTHOOK: query: EXPLAIN
 SHOW TABLES
 POSTHOOK: type: SHOWTABLES
-ABSTRACT SYNTAX TREE:
-  TOK_SHOWTABLES
-
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
   Stage-1 is a root stage
@@ -92,5 +91,4 @@ STAGE PLANS:
   Stage: Stage-1
     Fetch Operator
       limit: -1
-
 

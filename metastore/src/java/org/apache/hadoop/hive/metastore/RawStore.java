@@ -18,12 +18,18 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.Index;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
@@ -48,8 +54,17 @@ import org.apache.hadoop.hive.metastore.model.MPartitionPrivilege;
 import org.apache.hadoop.hive.metastore.model.MRoleMap;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
+import org.apache.thrift.TException;
 
 public interface RawStore extends Configurable {
+
+  /***
+   * Annotation to skip retries
+   */
+  @Target(value = ElementType.METHOD)
+  @Retention(value = RetentionPolicy.RUNTIME)
+  public @interface CanNotRetry {
+  }
 
   public abstract void shutdown();
 
@@ -68,11 +83,13 @@ public interface RawStore extends Configurable {
    *
    * @return true or false
    */
+  @CanNotRetry
   public abstract boolean commitTransaction();
 
   /**
    * Rolls back the current transaction if it is active
    */
+  @CanNotRetry
   public abstract void rollbackTransaction();
 
   public abstract void createDatabase(Database db)
@@ -107,7 +124,13 @@ public interface RawStore extends Configurable {
   public abstract boolean addPartition(Partition part)
       throws InvalidObjectException, MetaException;
 
+  public abstract boolean addPartitions(String dbName, String tblName, List<Partition> parts)
+      throws InvalidObjectException, MetaException;
+
   public abstract Partition getPartition(String dbName, String tableName,
+      List<String> part_vals) throws MetaException, NoSuchObjectException;
+
+  public abstract boolean doesPartitionExist(String dbName, String tableName,
       List<String> part_vals) throws MetaException, NoSuchObjectException;
 
   public abstract boolean dropPartition(String dbName, String tableName,
@@ -115,7 +138,7 @@ public interface RawStore extends Configurable {
       InvalidInputException;
 
   public abstract List<Partition> getPartitions(String dbName,
-      String tableName, int max) throws MetaException;
+      String tableName, int max) throws MetaException, NoSuchObjectException;
 
   public abstract void alterTable(String dbname, String name, Table newTable)
       throws InvalidObjectException, MetaException;
@@ -190,6 +213,9 @@ public interface RawStore extends Configurable {
       String filter, short maxParts)
           throws MetaException, NoSuchObjectException;
 
+  public abstract boolean getPartitionsByExpr(String dbName, String tblName,
+      byte[] expr, String defaultPartitionName, short maxParts, List<Partition> result)
+      throws TException;
 
   public abstract List<Partition> getPartitionsByNames(
       String dbName, String tblName, List<String> partNames)
@@ -357,30 +383,15 @@ public interface RawStore extends Configurable {
    *
    */
   public abstract ColumnStatistics getTableColumnStatistics(String dbName, String tableName,
-    String colName) throws MetaException, NoSuchObjectException, InvalidInputException,
-    InvalidObjectException;
+    List<String> colName) throws MetaException, NoSuchObjectException;
 
   /**
-   * Returns the relevant column statistics for a given column in a given partition in a given
+   * Returns the relevant column statistics for given columns in given partitions in a given
    * table in a given database if such statistics exist.
-   * @param partName
-   *
-   * @param The name of the database, defaults to current database
-   * @param The name of the table
-   * @param The name of the partition
-   * @param List of partVals for the partition
-   * @param The name of the column for which statistics is requested
-   * @return Relevant column statistics for the column for the given partition in a given table
-   * @throws NoSuchObjectException
-   * @throws MetaException
-   * @throws InvalidInputException
-   * @throws InvalidObjectException
-   *
    */
-
-  public abstract ColumnStatistics getPartitionColumnStatistics(String dbName, String tableName,
-    String partName, List<String> partVals, String colName)
-    throws MetaException, NoSuchObjectException, InvalidInputException, InvalidObjectException;
+  public abstract List<ColumnStatistics> getPartitionColumnStatistics(
+     String dbName, String tblName, List<String> partNames, List<String> colNames)
+      throws MetaException, NoSuchObjectException;
 
   /**
    * Deletes column statistics if present associated with a given db, table, partition and col. If
@@ -422,29 +433,61 @@ public interface RawStore extends Configurable {
     String colName)
     throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException;
 
- public abstract long cleanupEvents();
+  public abstract long cleanupEvents();
 
- public abstract boolean addToken(String tokenIdentifier, String delegationToken);
+  public abstract boolean addToken(String tokenIdentifier, String delegationToken);
 
- public abstract boolean removeToken(String tokenIdentifier);
+  public abstract boolean removeToken(String tokenIdentifier);
 
- public abstract String getToken(String tokenIdentifier);
+  public abstract String getToken(String tokenIdentifier);
 
- public abstract List<String> getAllTokenIdentifiers();
+  public abstract List<String> getAllTokenIdentifiers();
 
- public abstract int addMasterKey(String key) throws MetaException;
+  public abstract int addMasterKey(String key) throws MetaException;
 
- public abstract void updateMasterKey(Integer seqNo, String key)
+  public abstract void updateMasterKey(Integer seqNo, String key)
      throws NoSuchObjectException, MetaException;
 
- public abstract boolean removeMasterKey(Integer keySeq);
+  public abstract boolean removeMasterKey(Integer keySeq);
 
- public abstract String[] getMasterKeys();
+  public abstract String[] getMasterKeys();
 
- public abstract void verifySchema() throws MetaException;
+  public abstract void verifySchema() throws MetaException;
 
- public abstract String getMetaStoreSchemaVersion() throws  MetaException;
+  public abstract String getMetaStoreSchemaVersion() throws  MetaException;
 
- public abstract void setMetaStoreSchemaVersion(String version, String comment) throws MetaException;
+  public abstract void setMetaStoreSchemaVersion(String version, String comment) throws MetaException;
 
+  void dropPartitions(String dbName, String tblName, List<String> partNames)
+      throws MetaException, NoSuchObjectException;
+
+  List<HiveObjectPrivilege> listPrincipalDBGrantsAll(
+      String principalName, PrincipalType principalType);
+
+  List<HiveObjectPrivilege> listPrincipalTableGrantsAll(
+      String principalName, PrincipalType principalType);
+
+  List<HiveObjectPrivilege> listPrincipalPartitionGrantsAll(
+      String principalName, PrincipalType principalType);
+
+  List<HiveObjectPrivilege> listPrincipalTableColumnGrantsAll(
+      String principalName, PrincipalType principalType);
+
+  List<HiveObjectPrivilege> listPrincipalPartitionColumnGrantsAll(
+      String principalName, PrincipalType principalType);
+
+  List<HiveObjectPrivilege> listGlobalGrantsAll();
+
+  List<HiveObjectPrivilege> listDBGrantsAll(String dbName);
+
+  List<HiveObjectPrivilege> listPartitionColumnGrantsAll(
+      String dbName, String tableName, String partitionName, String columnName);
+
+  List<HiveObjectPrivilege> listTableGrantsAll(String dbName, String tableName);
+
+  List<HiveObjectPrivilege> listPartitionGrantsAll(
+      String dbName, String tableName, String partitionName);
+
+  List<HiveObjectPrivilege> listTableColumnGrantsAll(
+      String dbName, String tableName, String columnName);
 }

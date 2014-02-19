@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.hive.ql.io.sarg;
 
-import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-
 import java.util.List;
+
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 
 /**
  * Primary interface for <a href="http://en.wikipedia.org/wiki/Sargable">
@@ -139,7 +139,7 @@ public interface SearchArgument {
      * Does the RecordReader need to include this set of records?
      * @return true unless none of the rows qualify
      */
-    public boolean isNotNeeded() {
+    public boolean isNeeded() {
       switch (this) {
         case NO:
         case NULL:
@@ -170,7 +170,7 @@ public interface SearchArgument {
    * in interfaces. *DOH*
    */
   public static class Factory {
-    public SearchArgument create(ExprNodeDesc expression) {
+    public SearchArgument create(ExprNodeGenericFuncDesc expression) {
       return new SearchArgumentImpl(expression);
     }
 

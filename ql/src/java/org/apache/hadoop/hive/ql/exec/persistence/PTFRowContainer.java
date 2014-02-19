@@ -28,12 +28,13 @@ import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.io.FSRecordWriter;
 import org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.PTFDeserializer;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
@@ -226,22 +227,20 @@ public class PTFRowContainer<Row extends List<Object>> extends RowContainer<Row>
   public static TableDesc createTableDesc(StructObjectInspector oI) {
     Map<String,String> props = new HashMap<String,String>();
     PTFDeserializer.addOIPropertiestoSerDePropsMap(oI, props);
-    String colNames = props.get(org.apache.hadoop.hive.serde.serdeConstants.LIST_COLUMNS);
-    String colTypes = props.get(org.apache.hadoop.hive.serde.serdeConstants.LIST_COLUMN_TYPES);
-    TableDesc tblDesc = new TableDesc(LazyBinarySerDe.class,
+    String colNames = props.get(serdeConstants.LIST_COLUMNS);
+    String colTypes = props.get(serdeConstants.LIST_COLUMN_TYPES);
+    TableDesc tblDesc = new TableDesc(
         PTFSequenceFileInputFormat.class, PTFHiveSequenceFileOutputFormat.class,
         Utilities.makeProperties(
-        org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_FORMAT, ""
-        + Utilities.ctrlaCode,
-        org.apache.hadoop.hive.serde.serdeConstants.LIST_COLUMNS, colNames
-        .toString(),
-        org.apache.hadoop.hive.serde.serdeConstants.LIST_COLUMN_TYPES,
-        colTypes.toString()));
+        serdeConstants.SERIALIZATION_FORMAT, ""+ Utilities.ctrlaCode,
+        serdeConstants.LIST_COLUMNS, colNames.toString(),
+        serdeConstants.LIST_COLUMN_TYPES,colTypes.toString(),
+        serdeConstants.SERIALIZATION_LIB,LazyBinarySerDe.class.getName()));
     return tblDesc;
   }
 
 
-  private static class PTFRecordWriter implements RecordWriter {
+  private static class PTFRecordWriter implements FSRecordWriter {
     BytesWritable EMPTY_KEY = new BytesWritable();
 
     SequenceFile.Writer outStream;
@@ -263,7 +262,7 @@ public class PTFRowContainer<Row extends List<Object>> extends RowContainer<Row>
     extends HiveSequenceFileOutputFormat<K,V> {
 
     @Override
-    public RecordWriter getHiveRecordWriter(JobConf jc, Path finalOutPath,
+    public FSRecordWriter getHiveRecordWriter(JobConf jc, Path finalOutPath,
         Class<? extends Writable> valueClass, boolean isCompressed,
         Properties tableProperties, Progressable progress) throws IOException {
 

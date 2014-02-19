@@ -16,7 +16,25 @@
 */
 lexer grammar HiveLexer;
 
-@lexer::header {package org.apache.hadoop.hive.ql.parse;}
+@lexer::header {
+package org.apache.hadoop.hive.ql.parse;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
+}
+
+@lexer::members {
+  private Configuration hiveConf;
+  
+  public void setHiveConf(Configuration hiveConf) {
+    this.hiveConf = hiveConf;
+  }
+  
+  protected boolean allowQuotedId() {
+    String supportedQIds = HiveConf.getVar(hiveConf, HiveConf.ConfVars.HIVE_QUOTEDID_SUPPORT);
+    return !"none".equals(supportedQIds);
+  }
+}
 
 // Keywords
 
@@ -105,6 +123,7 @@ KW_DATETIME: 'DATETIME';
 KW_TIMESTAMP: 'TIMESTAMP';
 KW_DECIMAL: 'DECIMAL';
 KW_STRING: 'STRING';
+KW_CHAR: 'CHAR';
 KW_VARCHAR: 'VARCHAR';
 KW_ARRAY: 'ARRAY';
 KW_STRUCT: 'STRUCT';
@@ -134,6 +153,7 @@ KW_SEQUENCEFILE: 'SEQUENCEFILE';
 KW_TEXTFILE: 'TEXTFILE';
 KW_RCFILE: 'RCFILE';
 KW_ORCFILE: 'ORC';
+KW_PARQUETFILE: 'PARQUET';
 KW_INPUTFORMAT: 'INPUTFORMAT';
 KW_OUTPUTFORMAT: 'OUTPUTFORMAT';
 KW_INPUTDRIVER: 'INPUTDRIVER';
@@ -175,6 +195,7 @@ KW_TBLPROPERTIES: 'TBLPROPERTIES';
 KW_IDXPROPERTIES: 'IDXPROPERTIES';
 KW_VALUE_TYPE: '$VALUE$';
 KW_ELEM_TYPE: '$ELEM$';
+KW_DEFINED: 'DEFINED';
 KW_CASE: 'CASE';
 KW_WHEN: 'WHEN';
 KW_THEN: 'THEN';
@@ -260,8 +281,10 @@ KW_NOSCAN: 'NOSCAN';
 KW_PARTIALSCAN: 'PARTIALSCAN';
 KW_USER: 'USER';
 KW_ROLE: 'ROLE';
+KW_ROLES: 'ROLES';
 KW_INNER: 'INNER';
 KW_EXCHANGE: 'EXCHANGE';
+KW_ADMIN: 'ADMIN';
 
 // Operators
 // NOTE: if you add a new function/operator, add it to sysFuncNames so that describe function _FUNC_ will work.
@@ -373,11 +396,40 @@ Number
     :
     (Digit)+ ( DOT (Digit)* (Exponent)? | Exponent)?
     ;
-    
+
+/*
+An Identifier can be:
+- tableName
+- columnName
+- select expr alias
+- lateral view aliases
+- database name
+- view name
+- subquery alias
+- function name
+- ptf argument identifier
+- index name
+- property name for: db,tbl,partition...
+- fileFormat
+- role name
+- privilege name
+- principal name
+- macro name
+- hint name
+- window name
+*/    
 Identifier
     :
     (Letter | Digit) (Letter | Digit | '_')*
+    | {allowQuotedId()}? QuotedIdentifier  /* though at the language level we allow all Identifiers to be QuotedIdentifiers; 
+                                              at the API level only columns are allowed to be of this form */
     | '`' RegexComponent+ '`'
+    ;
+
+fragment    
+QuotedIdentifier 
+    :
+    '`'  ( '``' | ~('`') )* '`' { setText(getText().substring(1, getText().length() -1 ).replaceAll("``", "`")); }
     ;
 
 CharSetName

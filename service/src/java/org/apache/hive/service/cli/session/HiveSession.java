@@ -34,13 +34,22 @@ import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.SessionHandle;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.operation.OperationManager;
+import org.apache.hive.service.cli.thrift.TProtocolVersion;
 
 public interface HiveSession {
+
+  TProtocolVersion getProtocolVersion();
+
   /**
    * Set the session manager for the session
    * @param sessionManager
    */
   public void setSessionManager(SessionManager sessionManager);
+  /**
+   * Get the session manager for the session
+   */
+  public SessionManager getSessionManager();
+
   /**
    * Get the session manager for the session
    */
@@ -74,12 +83,11 @@ public interface HiveSession {
    * execute operation handler
    * @param statement
    * @param confOverlay
-   * @param runAsync
    * @return
    * @throws HiveSQLException
    */
   public OperationHandle executeStatement(String statement,
-      Map<String, String> confOverlay, boolean runAsync) throws HiveSQLException;
+      Map<String, String> confOverlay) throws HiveSQLException;
 
   /**
    * execute operation handler

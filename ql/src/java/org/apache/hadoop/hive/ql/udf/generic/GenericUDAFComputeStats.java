@@ -83,6 +83,7 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
     case DOUBLE:
       return new GenericUDAFDoubleStatsEvaluator();
     case STRING:
+    case CHAR:
     case VARCHAR:
       return new GenericUDAFStringStatsEvaluator();
     case BINARY:
@@ -308,6 +309,7 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
      */
     private transient PrimitiveObjectInspector inputOI;
     private transient PrimitiveObjectInspector numVectorsOI;
+    private final static int MAX_BIT_VECTORS = 1024;
 
     /* Partial aggregation result returned by TerminatePartial. Partial result is a struct
      * containing a long field named "count".
@@ -477,6 +479,10 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
         if (!emptyTable) {
           numVectors = PrimitiveObjectInspectorUtils.getInt(parameters[1], numVectorsOI);
         }
+        if (numVectors > MAX_BIT_VECTORS) {
+          throw new HiveException("The maximum allowed value for number of bit vectors " +
+            " is " + MAX_BIT_VECTORS + ", but was passed " + numVectors + " bit vectors");
+        }
         initNDVEstimator(myagg, numVectors);
         myagg.firstItem = false;
         myagg.numBitVectors = numVectors;
@@ -604,6 +610,7 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
      */
     private transient PrimitiveObjectInspector inputOI;
     private transient PrimitiveObjectInspector numVectorsOI;
+    private final static int MAX_BIT_VECTORS = 1024;
 
     /* Partial aggregation result returned by TerminatePartial. Partial result is a struct
      * containing a long field named "count".
@@ -773,6 +780,12 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
         if (!emptyTable) {
           numVectors = PrimitiveObjectInspectorUtils.getInt(parameters[1], numVectorsOI);
         }
+
+        if (numVectors > MAX_BIT_VECTORS) {
+          throw new HiveException("The maximum allowed value for number of bit vectors " +
+            " is " + MAX_BIT_VECTORS + ", but was passed " + numVectors + " bit vectors");
+        }
+
         initNDVEstimator(myagg, numVectors);
         myagg.firstItem = false;
         myagg.numBitVectors = numVectors;
@@ -901,6 +914,7 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
      */
     private transient PrimitiveObjectInspector inputOI;
     private transient PrimitiveObjectInspector numVectorsOI;
+    private final static int MAX_BIT_VECTORS = 1024;
 
     /* Partial aggregation result returned by TerminatePartial. Partial result is a struct
      * containing a long field named "count".
@@ -1081,6 +1095,12 @@ public class GenericUDAFComputeStats extends AbstractGenericUDAFResolver {
         if (!emptyTable) {
           numVectors = PrimitiveObjectInspectorUtils.getInt(parameters[1], numVectorsOI);
         }
+
+        if (numVectors > MAX_BIT_VECTORS) {
+          throw new HiveException("The maximum allowed value for number of bit vectors " +
+            " is " + MAX_BIT_VECTORS + " , but was passed " + numVectors + " bit vectors");
+        }
+
         initNDVEstimator(myagg, numVectors);
         myagg.firstItem = false;
         myagg.numBitVectors = numVectors;

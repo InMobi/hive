@@ -63,6 +63,7 @@ import org.apache.hcatalog.hbase.snapshot.Transaction;
 import org.apache.hcatalog.mapreduce.HCatInputFormat;
 import org.apache.hcatalog.mapreduce.HCatOutputFormat;
 import org.apache.hcatalog.mapreduce.OutputJobInfo;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -82,6 +83,11 @@ public class TestHBaseDirectOutputFormat extends SkeletonHBaseTest {
 
   private final HiveConf allConf;
   private final HCatDriver hcatDriver;
+
+  @BeforeClass
+  public static void setup() throws Throwable {
+    setupSkeletonHBaseTest();
+  }
 
   public TestHBaseDirectOutputFormat() {
     allConf = getHiveConf();
@@ -183,6 +189,7 @@ public class TestHBaseDirectOutputFormat extends SkeletonHBaseTest {
       }
       index++;
     }
+    table.close();
     assertEquals(data.length, index);
   }
 
@@ -350,6 +357,7 @@ public class TestHBaseDirectOutputFormat extends SkeletonHBaseTest {
       }
       count++;
     }
+    table.close();
     assertEquals(data.length - 1, count);
 
     // verify that the inputformat returns empty results.

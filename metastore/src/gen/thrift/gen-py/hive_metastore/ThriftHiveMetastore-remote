@@ -50,6 +50,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  Partition add_partition_with_environment_context(Partition new_part, EnvironmentContext environment_context)'
   print '  i32 add_partitions( new_parts)'
   print '  Partition append_partition(string db_name, string tbl_name,  part_vals)'
+  print '  AddPartitionsResult add_partitions_req(AddPartitionsRequest request)'
   print '  Partition append_partition_with_environment_context(string db_name, string tbl_name,  part_vals, EnvironmentContext environment_context)'
   print '  Partition append_partition_by_name(string db_name, string tbl_name, string part_name)'
   print '  Partition append_partition_by_name_with_environment_context(string db_name, string tbl_name, string part_name, EnvironmentContext environment_context)'
@@ -57,6 +58,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  bool drop_partition_with_environment_context(string db_name, string tbl_name,  part_vals, bool deleteData, EnvironmentContext environment_context)'
   print '  bool drop_partition_by_name(string db_name, string tbl_name, string part_name, bool deleteData)'
   print '  bool drop_partition_by_name_with_environment_context(string db_name, string tbl_name, string part_name, bool deleteData, EnvironmentContext environment_context)'
+  print '  DropPartitionsResult drop_partitions_req(DropPartitionsRequest req)'
   print '  Partition get_partition(string db_name, string tbl_name,  part_vals)'
   print '  Partition exchange_partition( partitionSpecs, string source_db, string source_table_name, string dest_db, string dest_table_name)'
   print '  Partition get_partition_with_auth(string db_name, string tbl_name,  part_vals, string user_name,  group_names)'
@@ -68,7 +70,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '   get_partitions_ps_with_auth(string db_name, string tbl_name,  part_vals, i16 max_parts, string user_name,  group_names)'
   print '   get_partition_names_ps(string db_name, string tbl_name,  part_vals, i16 max_parts)'
   print '   get_partitions_by_filter(string db_name, string tbl_name, string filter, i16 max_parts)'
-  print '  i32 get_num_partitions_by_filter(string db_name, string tbl_name, string filter, i16 max_parts)'
+  print '  PartitionsByExprResult get_partitions_by_expr(PartitionsByExprRequest req)'
   print '   get_partitions_by_names(string db_name, string tbl_name,  names)'
   print '  void alter_partition(string db_name, string tbl_name, Partition new_part)'
   print '  void alter_partitions(string db_name, string tbl_name,  new_parts)'
@@ -90,6 +92,8 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  bool update_partition_column_statistics(ColumnStatistics stats_obj)'
   print '  ColumnStatistics get_table_column_statistics(string db_name, string tbl_name, string col_name)'
   print '  ColumnStatistics get_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name)'
+  print '  TableStatsResult get_table_statistics_req(TableStatsRequest request)'
+  print '  PartitionsStatsResult get_partitions_statistics_req(PartitionsStatsRequest request)'
   print '  bool delete_partition_column_statistics(string db_name, string tbl_name, string part_name, string col_name)'
   print '  bool delete_table_column_statistics(string db_name, string tbl_name, string col_name)'
   print '  bool create_role(Role role)'
@@ -319,6 +323,12 @@ elif cmd == 'append_partition':
     sys.exit(1)
   pp.pprint(client.append_partition(args[0],args[1],eval(args[2]),))
 
+elif cmd == 'add_partitions_req':
+  if len(args) != 1:
+    print 'add_partitions_req requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.add_partitions_req(eval(args[0]),))
+
 elif cmd == 'append_partition_with_environment_context':
   if len(args) != 4:
     print 'append_partition_with_environment_context requires 4 args'
@@ -360,6 +370,12 @@ elif cmd == 'drop_partition_by_name_with_environment_context':
     print 'drop_partition_by_name_with_environment_context requires 5 args'
     sys.exit(1)
   pp.pprint(client.drop_partition_by_name_with_environment_context(args[0],args[1],args[2],eval(args[3]),eval(args[4]),))
+
+elif cmd == 'drop_partitions_req':
+  if len(args) != 1:
+    print 'drop_partitions_req requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.drop_partitions_req(eval(args[0]),))
 
 elif cmd == 'get_partition':
   if len(args) != 3:
@@ -427,11 +443,11 @@ elif cmd == 'get_partitions_by_filter':
     sys.exit(1)
   pp.pprint(client.get_partitions_by_filter(args[0],args[1],args[2],eval(args[3]),))
 
-elif cmd == 'get_num_partitions_by_filter':
-  if len(args) != 4:
-    print 'get_num_partitions_by_filter requires 4 args'
+elif cmd == 'get_partitions_by_expr':
+  if len(args) != 1:
+    print 'get_partitions_by_expr requires 1 args'
     sys.exit(1)
-  pp.pprint(client.get_num_partitions_by_filter(args[0],args[1],args[2],eval(args[3]),))
+  pp.pprint(client.get_partitions_by_expr(eval(args[0]),))
 
 elif cmd == 'get_partitions_by_names':
   if len(args) != 3:
@@ -558,6 +574,18 @@ elif cmd == 'get_partition_column_statistics':
     print 'get_partition_column_statistics requires 4 args'
     sys.exit(1)
   pp.pprint(client.get_partition_column_statistics(args[0],args[1],args[2],args[3],))
+
+elif cmd == 'get_table_statistics_req':
+  if len(args) != 1:
+    print 'get_table_statistics_req requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.get_table_statistics_req(eval(args[0]),))
+
+elif cmd == 'get_partitions_statistics_req':
+  if len(args) != 1:
+    print 'get_partitions_statistics_req requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.get_partitions_statistics_req(eval(args[0]),))
 
 elif cmd == 'delete_partition_column_statistics':
   if len(args) != 4:

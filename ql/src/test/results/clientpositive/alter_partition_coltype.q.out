@@ -50,11 +50,11 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src
 25
 PREHOOK: query: -- alter partition key column data type for dt column.
 alter table alter_coltype partition column (dt int)
-PREHOOK: type: null
+PREHOOK: type: ALTERTABLE_PARTCOLTYPE
 PREHOOK: Input: default@alter_coltype
 POSTHOOK: query: -- alter partition key column data type for dt column.
 alter table alter_coltype partition column (dt int)
-POSTHOOK: type: null
+POSTHOOK: type: ALTERTABLE_PARTCOLTYPE
 POSTHOOK: Input: default@alter_coltype
 POSTHOOK: Output: default@alter_coltype
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
@@ -99,7 +99,26 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=10,ts=3.0).value SIMPLE [(src1)src
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME alter_coltype))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTIONSTAR count))) (TOK_WHERE (= (TOK_TABLE_OR_COL dt) '100x'))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            alter_coltype
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_FUNCTIONSTAR
+               count
+      TOK_WHERE
+         =
+            TOK_TABLE_OR_COL
+               dt
+            '100x'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -108,24 +127,23 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        alter_coltype 
+      Map Operator Tree:
           TableScan
             alias: alter_coltype
+            Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: COMPLETE
             GatherStats: false
             Select Operator
+              Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: COMPLETE
               Group By Operator
-                aggregations:
-                      expr: count()
-                bucketGroup: false
+                aggregations: count()
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                 Reduce Output Operator
                   sort order: 
+                  Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   tag: -1
-                  value expressions:
-                        expr: _col0
-                        type: bigint
+                  value expressions: _col0 (type: bigint)
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -138,6 +156,7 @@ STAGE PLANS:
               dt 100x
               ts 6:30pm
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -162,15 +181,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 2
-                numPartitions 2
-                numRows 50
                 partition_columns dt/ts
-                rawDataSize 382
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 432
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -180,21 +194,20 @@ STAGE PLANS:
       Needs Tagging: false
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: mergepartial
           outputColumnNames: _col0
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
+            expressions: _col0 (type: bigint)
             outputColumnNames: _col0
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
             File Output Operator
               compressed: false
               GlobalTableId: 0
 #### A masked pattern was here ####
               NumFilesPerFileSink: 1
+              Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
 #### A masked pattern was here ####
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
@@ -205,6 +218,8 @@ STAGE PLANS:
                     escape.delim \
                     hive.serialization.extend.nesting.levels true
                     serialization.format 1
+                    serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
@@ -213,12 +228,11 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
-PREHOOK: query: select count(*) from alter_coltype where dt = 100
+PREHOOK: query: select count(*) from alter_coltype where dt = '100'
 PREHOOK: type: QUERY
 PREHOOK: Input: default@alter_coltype
 #### A masked pattern was here ####
-POSTHOOK: query: select count(*) from alter_coltype where dt = 100
+POSTHOOK: query: select count(*) from alter_coltype where dt = '100'
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alter_coltype
 #### A masked pattern was here ####
@@ -229,11 +243,22 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src
 0
 PREHOOK: query: -- alter partition key column data type for ts column.
 alter table alter_coltype partition column (ts double)
-PREHOOK: type: null
+PREHOOK: type: ALTERTABLE_PARTCOLTYPE
 PREHOOK: Input: default@alter_coltype
 POSTHOOK: query: -- alter partition key column data type for ts column.
 alter table alter_coltype partition column (ts double)
-POSTHOOK: type: null
+POSTHOOK: type: ALTERTABLE_PARTCOLTYPE
+POSTHOOK: Input: default@alter_coltype
+POSTHOOK: Output: default@alter_coltype
+POSTHOOK: Lineage: alter_coltype PARTITION(dt=10,ts=3.0).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
+POSTHOOK: Lineage: alter_coltype PARTITION(dt=10,ts=3.0).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
+POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
+POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
+PREHOOK: query: alter table alter_coltype partition column (dt string)
+PREHOOK: type: ALTERTABLE_PARTCOLTYPE
+PREHOOK: Input: default@alter_coltype
+POSTHOOK: query: alter table alter_coltype partition column (dt string)
+POSTHOOK: type: ALTERTABLE_PARTCOLTYPE
 POSTHOOK: Input: default@alter_coltype
 POSTHOOK: Output: default@alter_coltype
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=10,ts=3.0).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
@@ -297,7 +322,26 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=3.0).value SIMPLE [(src1)s
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME alter_coltype))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTIONSTAR count))) (TOK_WHERE (= (TOK_TABLE_OR_COL ts) '6:30pm'))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            alter_coltype
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_FUNCTIONSTAR
+               count
+      TOK_WHERE
+         =
+            TOK_TABLE_OR_COL
+               ts
+            '6:30pm'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -306,24 +350,23 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        alter_coltype 
+      Map Operator Tree:
           TableScan
             alias: alter_coltype
+            Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: COMPLETE
             GatherStats: false
             Select Operator
+              Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: COMPLETE
               Group By Operator
-                aggregations:
-                      expr: count()
-                bucketGroup: false
+                aggregations: count()
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                 Reduce Output Operator
                   sort order: 
+                  Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   tag: -1
-                  value expressions:
-                        expr: _col0
-                        type: bigint
+                  value expressions: _col0 (type: bigint)
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -336,6 +379,7 @@ STAGE PLANS:
               dt 100x
               ts 6:30pm
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -360,15 +404,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -378,21 +417,20 @@ STAGE PLANS:
       Needs Tagging: false
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: mergepartial
           outputColumnNames: _col0
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
+            expressions: _col0 (type: bigint)
             outputColumnNames: _col0
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
             File Output Operator
               compressed: false
               GlobalTableId: 0
 #### A masked pattern was here ####
               NumFilesPerFileSink: 1
+              Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
 #### A masked pattern was here ####
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
@@ -403,6 +441,8 @@ STAGE PLANS:
                     escape.delim \
                     hive.serialization.extend.nesting.levels true
                     serialization.format 1
+                    serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
@@ -410,7 +450,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: --  validate partition key column predicate on two different partition column data type 
 --  can still work.
@@ -448,7 +487,31 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=3.0).value SIMPLE [(src1)s
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME alter_coltype))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTIONSTAR count))) (TOK_WHERE (and (= (TOK_TABLE_OR_COL ts) 3.0) (= (TOK_TABLE_OR_COL dt) 10)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            alter_coltype
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_FUNCTIONSTAR
+               count
+      TOK_WHERE
+         and
+            =
+               TOK_TABLE_OR_COL
+                  ts
+               3.0
+            =
+               TOK_TABLE_OR_COL
+                  dt
+               10
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -457,29 +520,27 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        alter_coltype 
+      Map Operator Tree:
           TableScan
             alias: alter_coltype
+            Statistics: Num rows: 75 Data size: 573 Basic stats: COMPLETE Column stats: COMPLETE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: ((ts = 3.0) and (dt = 10))
-                  type: boolean
+              predicate: ((ts = 3.0) and (dt = 10)) (type: boolean)
+              Statistics: Num rows: 75 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
               Select Operator
+                Statistics: Num rows: 75 Data size: 0 Basic stats: PARTIAL Column stats: COMPLETE
                 Group By Operator
-                  aggregations:
-                        expr: count()
-                  bucketGroup: false
+                  aggregations: count()
                   mode: hash
                   outputColumnNames: _col0
+                  Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   Reduce Output Operator
                     sort order: 
+                    Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                     tag: -1
-                    value expressions:
-                          expr: _col0
-                          type: bigint
+                    value expressions: _col0 (type: bigint)
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -492,6 +553,7 @@ STAGE PLANS:
               dt 10
               ts 3.0
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -516,15 +578,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -538,6 +595,7 @@ STAGE PLANS:
               dt 100x
               ts 3.0
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -562,15 +620,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -584,6 +637,7 @@ STAGE PLANS:
               dt 100x
               ts 6:30pm
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -608,15 +662,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -628,21 +677,20 @@ STAGE PLANS:
       Needs Tagging: false
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: mergepartial
           outputColumnNames: _col0
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
+            expressions: _col0 (type: bigint)
             outputColumnNames: _col0
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
             File Output Operator
               compressed: false
               GlobalTableId: 0
 #### A masked pattern was here ####
               NumFilesPerFileSink: 1
+              Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
 #### A masked pattern was here ####
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
@@ -653,6 +701,8 @@ STAGE PLANS:
                     escape.delim \
                     hive.serialization.extend.nesting.levels true
                     serialization.format 1
+                    serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
@@ -660,7 +710,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: -- query where multiple partition values (of different datatypes) are being selected 
 select key, value, dt, ts from alter_coltype where dt is not null
@@ -770,7 +819,35 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=3.0).value SIMPLE [(src1)s
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME alter_coltype))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_TABLE_OR_COL value)) (TOK_SELEXPR (TOK_TABLE_OR_COL dt)) (TOK_SELEXPR (TOK_TABLE_OR_COL ts))) (TOK_WHERE (TOK_FUNCTION TOK_ISNOTNULL (TOK_TABLE_OR_COL dt)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            alter_coltype
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               key
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               value
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               dt
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               ts
+      TOK_WHERE
+         TOK_FUNCTION
+            TOK_ISNOTNULL
+            TOK_TABLE_OR_COL
+               dt
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -779,27 +856,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        alter_coltype 
+      Map Operator Tree:
           TableScan
             alias: alter_coltype
+            Statistics: Num rows: 75 Data size: 573 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-                    expr: dt
-                    type: string
-                    expr: ts
-                    type: string
+              expressions: key (type: string), value (type: string), dt (type: string), ts (type: string)
               outputColumnNames: _col0, _col1, _col2, _col3
+              Statistics: Num rows: 75 Data size: 573 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 75 Data size: 573 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -810,6 +881,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -825,6 +898,7 @@ STAGE PLANS:
               dt 10
               ts 3.0
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -849,15 +923,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -871,6 +940,7 @@ STAGE PLANS:
               dt 100x
               ts 3.0
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -895,15 +965,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -917,6 +982,7 @@ STAGE PLANS:
               dt 100x
               ts 6:30pm
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -941,15 +1007,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -962,7 +1023,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: select count(*) from alter_coltype where ts = 3.0
 PREHOOK: type: QUERY
@@ -1019,7 +1079,31 @@ POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=3.0).value SIMPLE [(src1)s
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).key SIMPLE [(src1)src1.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: alter_coltype PARTITION(dt=100x,ts=6:30pm).value SIMPLE [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME alter_coltype))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTIONSTAR count))) (TOK_WHERE (or (= (TOK_TABLE_OR_COL dt) '100x') (= (TOK_TABLE_OR_COL dt) '10')))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            alter_coltype
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_FUNCTIONSTAR
+               count
+      TOK_WHERE
+         or
+            =
+               TOK_TABLE_OR_COL
+                  dt
+               '100x'
+            =
+               TOK_TABLE_OR_COL
+                  dt
+               '10'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -1028,24 +1112,23 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        alter_coltype 
+      Map Operator Tree:
           TableScan
             alias: alter_coltype
+            Statistics: Num rows: 75 Data size: 573 Basic stats: COMPLETE Column stats: COMPLETE
             GatherStats: false
             Select Operator
+              Statistics: Num rows: 75 Data size: 573 Basic stats: COMPLETE Column stats: COMPLETE
               Group By Operator
-                aggregations:
-                      expr: count()
-                bucketGroup: false
+                aggregations: count()
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                 Reduce Output Operator
                   sort order: 
+                  Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   tag: -1
-                  value expressions:
-                        expr: _col0
-                        type: bigint
+                  value expressions: _col0 (type: bigint)
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -1058,6 +1141,7 @@ STAGE PLANS:
               dt 10
               ts 3.0
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -1082,15 +1166,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -1104,6 +1183,7 @@ STAGE PLANS:
               dt 100x
               ts 3.0
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -1128,15 +1208,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -1150,6 +1225,7 @@ STAGE PLANS:
               dt 100x
               ts 6:30pm
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -1174,15 +1250,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.alter_coltype
-                numFiles 3
-                numPartitions 3
-                numRows 75
                 partition_columns dt/ts
-                rawDataSize 573
                 serialization.ddl struct alter_coltype { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 648
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.alter_coltype
@@ -1194,21 +1265,20 @@ STAGE PLANS:
       Needs Tagging: false
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: mergepartial
           outputColumnNames: _col0
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
+            expressions: _col0 (type: bigint)
             outputColumnNames: _col0
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
             File Output Operator
               compressed: false
               GlobalTableId: 0
 #### A masked pattern was here ####
               NumFilesPerFileSink: 1
+              Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
 #### A masked pattern was here ####
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
@@ -1219,6 +1289,8 @@ STAGE PLANS:
                     escape.delim \
                     hive.serialization.extend.nesting.levels true
                     serialization.format 1
+                    serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               TotalFiles: 1
               GatherStats: false
               MultiFileSpray: false
@@ -1226,7 +1298,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: desc alter_coltype
 PREHOOK: type: DESCTABLE

@@ -24,16 +24,18 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.io.RCFile.KeyBuffer;
 import org.apache.hadoop.hive.ql.io.rcfile.merge.RCFileKeyBufferWrapper;
 import org.apache.hadoop.hive.ql.io.rcfile.merge.RCFileValueBufferWrapper;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.stats.CounterStatsPublisher;
+import org.apache.hadoop.hive.ql.stats.StatsFactory;
 import org.apache.hadoop.hive.ql.stats.StatsPublisher;
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.shims.CombineHiveKey;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
@@ -58,6 +60,7 @@ public class PartialScanMapper extends MapReduceBase implements
   private long uncompressedFileSize = 0;
   private long rowNo = 0;
   private boolean exception = false;
+  private Reporter rp = null;
 
   public final static Log LOG = LogFactory.getLog("PartialScanMapper");
 
@@ -67,6 +70,7 @@ public class PartialScanMapper extends MapReduceBase implements
   @Override
   public void configure(JobConf job) {
     jc = job;
+    MapredContext.init(true, new JobConf(jc));
     statsAggKeyPrefix = HiveConf.getVar(job,
         HiveConf.ConfVars.HIVE_STATS_KEY_PREFIX);
   }
@@ -76,6 +80,12 @@ public class PartialScanMapper extends MapReduceBase implements
   public void map(Object k, RCFileValueBufferWrapper value,
       OutputCollector<Object, Object> output, Reporter reporter)
       throws IOException {
+
+    if (rp == null) {
+      this.rp = reporter;
+      MapredContext.get().setReporter(reporter);
+    }
+
     try {
       //CombineHiveInputFormat is set in PartialScanTask.
       RCFileKeyBufferWrapper key = (RCFileKeyBufferWrapper) ((CombineHiveKey) k).getKey();
@@ -113,6 +123,8 @@ public class PartialScanMapper extends MapReduceBase implements
     } catch (HiveException e) {
       this.exception = true;
       throw new RuntimeException(e);
+    } finally {
+      MapredContext.close();
     }
   }
 
@@ -139,11 +151,13 @@ public class PartialScanMapper extends MapReduceBase implements
       throw new HiveException(ErrorMsg.STATSPUBLISHER_CONNECTION_ERROR.getErrorCodedMsg());
     }
 
+    int maxPrefixLength = StatsFactory.getMaxPrefixLength(jc);
     // construct key used to store stats in intermediate db
-    String taskID = Utilities.getTaskIdFromFilename(Utilities.getTaskId(jc));
-    String keyPrefix = Utilities.getHashedStatsPrefix(
-        statsAggKeyPrefix, HiveConf.getIntVar(jc, ConfVars.HIVE_STATS_KEY_PREFIX_MAX_LENGTH));
-    String key = keyPrefix + taskID;
+    String key = Utilities.getHashedStatsPrefix(statsAggKeyPrefix, maxPrefixLength);
+    if (!(statsPublisher instanceof CounterStatsPublisher)) {
+      String taskID = Utilities.getTaskIdFromFilename(Utilities.getTaskId(jc));
+      key = Utilities.join(key, taskID);
+    }
 
     // construct statistics to be stored
     Map<String, String> statsToPublish = new HashMap<String, String>();

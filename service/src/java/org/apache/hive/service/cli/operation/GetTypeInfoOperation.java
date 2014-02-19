@@ -23,6 +23,7 @@ import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.OperationType;
 import org.apache.hive.service.cli.RowSet;
+import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.Type;
 import org.apache.hive.service.cli.session.HiveSession;
@@ -71,10 +72,11 @@ public class GetTypeInfoOperation extends MetadataOperation {
   .addPrimitiveColumn("NUM_PREC_RADIX", Type.INT_TYPE,
       "Usually 2 or 10");
 
-  private final RowSet rowSet = new RowSet();
+  private final RowSet rowSet;
 
   protected GetTypeInfoOperation(HiveSession parentSession) {
     super(parentSession, OperationType.GET_TYPE_INFO);
+    rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion());
   }
 
   /* (non-Javadoc)
@@ -106,7 +108,7 @@ public class GetTypeInfoOperation extends MetadataOperation {
             null, // SQL_DATETIME_SUB, unused
             type.getNumPrecRadix() //NUM_PREC_RADIX
         };
-        rowSet.addRow(RESULT_SET_SCHEMA, rowData);
+        rowSet.addRow(rowData);
       }
       setState(OperationState.FINISHED);
     } catch (Exception e) {
@@ -133,6 +135,10 @@ public class GetTypeInfoOperation extends MetadataOperation {
   @Override
   public RowSet getNextRowSet(FetchOrientation orientation, long maxRows) throws HiveSQLException {
     assertState(OperationState.FINISHED);
+    validateDefaultFetchOrientation(orientation);
+    if (orientation.equals(FetchOrientation.FETCH_FIRST)) {
+      rowSet.setStartOffset(0);
+    }
     return rowSet.extractSubset((int)maxRows);
   }
 }

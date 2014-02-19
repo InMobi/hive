@@ -18,8 +18,8 @@
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
-import org.apache.hadoop.hive.serde2.typeinfo.BaseTypeParams;
+import org.apache.hadoop.hive.serde2.typeinfo.HiveDecimalUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 /**
  * An AbstractPrimitiveObjectInspector is based on
@@ -28,14 +28,16 @@ import org.apache.hadoop.hive.serde2.typeinfo.BaseTypeParams;
 public abstract class AbstractPrimitiveObjectInspector implements
     PrimitiveObjectInspector {
 
-  transient PrimitiveTypeEntry typeEntry;
-  protected BaseTypeParams typeParams;
+  protected PrimitiveTypeInfo typeInfo;
 
+  protected AbstractPrimitiveObjectInspector() {
+    super();
+  }
   /**
    * Construct a AbstractPrimitiveObjectInspector.
    */
-  protected AbstractPrimitiveObjectInspector(PrimitiveTypeEntry typeEntry) {
-    this.typeEntry = typeEntry;
+  protected AbstractPrimitiveObjectInspector(PrimitiveTypeInfo typeInfo) {
+    this.typeInfo = typeInfo;
   }
 
   /**
@@ -44,7 +46,7 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public Class<?> getJavaPrimitiveClass() {
-    return typeEntry.primitiveJavaClass;
+    return typeInfo.getPrimitiveJavaClass();
   }
 
   /**
@@ -53,7 +55,7 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public PrimitiveCategory getPrimitiveCategory() {
-    return typeEntry.primitiveCategory;
+    return typeInfo.getPrimitiveCategory();
   }
 
   /**
@@ -62,7 +64,7 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public Class<?> getPrimitiveWritableClass() {
-    return typeEntry.primitiveWritableClass;
+    return typeInfo.getPrimitiveWritableClass();
   }
 
   /**
@@ -78,18 +80,27 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public String getTypeName() {
-    return typeEntry.toString();
+    return typeInfo.getTypeName();
   }
 
-  public BaseTypeParams getTypeParams() {
-    return typeParams;
+  public PrimitiveTypeInfo getTypeInfo() {
+    return this.typeInfo;
   }
 
-  public void setTypeParams(BaseTypeParams newParams) {
-    if (typeParams != null && !typeEntry.isParameterized()) {
-      throw new UnsupportedOperationException(
-          "Attempting to add type parameters " + typeParams + " to type " + getTypeName());
-    }
-    this.typeParams = newParams;
+  /**
+   * Default implementation.  Maybe overridden by exact types.
+   */
+  @Override
+  public int precision() {
+    return HiveDecimalUtils.getPrecisionForType(typeInfo);
   }
+
+  /**
+   * Default implementation.  Maybe overridden by exact types.
+   */
+  @Override
+  public int scale() {
+    return HiveDecimalUtils.getScaleForType(typeInfo);
+  }
+
 }

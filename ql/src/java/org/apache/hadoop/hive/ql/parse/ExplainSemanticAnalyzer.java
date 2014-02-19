@@ -19,10 +19,9 @@
 package org.apache.hadoop.hive.ql.parse;
 
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.Task;
@@ -60,21 +59,16 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
     ctx.setExplainLogical(logical);
 
     // Create a semantic analyzer for the query
-    BaseSemanticAnalyzer sem = SemanticAnalyzerFactory.get(conf, (ASTNode) ast
-        .getChild(0));
-    sem.analyze((ASTNode) ast.getChild(0), ctx);
+    ASTNode input = (ASTNode) ast.getChild(0);
+    BaseSemanticAnalyzer sem = SemanticAnalyzerFactory.get(conf, input);
+    sem.analyze(input, ctx);
     sem.validate();
 
-    ctx.setResFile(new Path(ctx.getLocalTmpFileURI()));
+    ctx.setResFile(ctx.getLocalTmpPath());
     List<Task<? extends Serializable>> tasks = sem.getRootTasks();
     Task<? extends Serializable> fetchTask = sem.getFetchTask();
     if (tasks == null) {
-      if (fetchTask != null) {
-        tasks = new ArrayList<Task<? extends Serializable>>();
-        tasks.add(fetchTask);
-      }
-    } else if (fetchTask != null) {
-      tasks.add(fetchTask);
+      tasks = Collections.emptyList();
     }
 
     ParseContext pCtx = null;
@@ -82,17 +76,21 @@ public class ExplainSemanticAnalyzer extends BaseSemanticAnalyzer {
       pCtx = ((SemanticAnalyzer)sem).getParseContext();
     }
 
-    Task<? extends Serializable> explTask =
-        TaskFactory.get(new ExplainWork(ctx.getResFile().toString(),
+    ExplainWork work = new ExplainWork(ctx.getResFile(),
         pCtx,
         tasks,
-        ((ASTNode) ast.getChild(0)).toStringTree(),
+        fetchTask,
+        input.dump(),
         sem.getInputs(),
         extended,
         formatted,
         dependency,
-        logical),
-      conf);
+        logical);
+
+    work.setAppendTaskType(
+        HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVEEXPLAINDEPENDENCYAPPENDTASKTYPES));
+
+    Task<? extends Serializable> explTask = TaskFactory.get(work, conf);
 
     fieldList = explTask.getResultSchema();
     rootTasks.add(explTask);

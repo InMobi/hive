@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -194,17 +195,17 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
     }
   }
 
-
   @Override
   public int execute(DriverContext driverContext) {
 
     try {
+
       // Do any hive related operations like moving tables and files
       // to appropriate locations
       LoadFileDesc lfd = work.getLoadFileWork();
       if (lfd != null) {
-        Path targetPath = new Path(lfd.getTargetDir());
-        Path sourcePath = new Path(lfd.getSourceDir());
+        Path targetPath = lfd.getTargetDir();
+        Path sourcePath = lfd.getSourcePath();
         moveFile(sourcePath, targetPath, lfd.getIsDfsDir());
       }
 
@@ -215,8 +216,8 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         boolean isDfsDir = lmfd.getIsDfsDir();
         int i = 0;
         while (i <lmfd.getSourceDirs().size()) {
-          Path srcPath = new Path(lmfd.getSourceDirs().get(i));
-          Path destPath = new Path(lmfd.getTargetDirs().get(i));
+          Path srcPath = lmfd.getSourceDirs().get(i);
+          Path destPath = lmfd.getTargetDirs().get(i);
           FileSystem fs = destPath.getFileSystem(conf);
           if (!fs.exists(destPath.getParent())) {
             fs.mkdirs(destPath.getParent());
@@ -240,7 +241,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           mesg.setLength(mesg.length()-2);
           mesg.append(')');
         }
-        String mesg_detail = " from " + tbd.getSourceDir();
+        String mesg_detail = " from " + tbd.getSourcePath();
         console.printInfo(mesg.toString(), mesg_detail);
         Table table = db.getTable(tbd.getTable().getTableName());
 
@@ -250,8 +251,8 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           ArrayList<FileStatus> files;
           FileSystem fs;
           try {
-            fs = FileSystem.get(table.getDataLocation(), conf);
-            dirs = fs.globStatus(new Path(tbd.getSourceDir()));
+            fs = table.getDataLocation().getFileSystem(conf);
+            dirs = fs.globStatus(tbd.getSourcePath());
             files = new ArrayList<FileStatus>();
             for (int i = 0; (dirs != null && i < dirs.length); i++) {
               files.addAll(Arrays.asList(fs.listStatus(dirs[i].getPath())));
@@ -280,10 +281,10 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         DataContainer dc = null;
         if (tbd.getPartitionSpec().size() == 0) {
           dc = new DataContainer(table.getTTable());
-          db.loadTable(new Path(tbd.getSourceDir()), tbd.getTable()
+          db.loadTable(tbd.getSourcePath(), tbd.getTable()
               .getTableName(), tbd.getReplace(), tbd.getHoldDDLTime());
           if (work.getOutputs() != null) {
-            work.getOutputs().add(new WriteEntity(table, true));
+            work.getOutputs().add(new WriteEntity(table));
           }
         } else {
           LOG.info("Partition is: " + tbd.getPartitionSpec().toString());
@@ -293,7 +294,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           List<SortCol> sortCols = null;
           int numBuckets = -1;
           Task task = this;
-          String path = tbd.getSourceDir();
+          String path = tbd.getSourcePath().toUri().toString();
           // Find the first ancestor of this MoveTask which is some form of map reduce task
           // (Either standard, local, or a merge)
           while (task.getParentTasks() != null && task.getParentTasks().size() == 1) {
@@ -329,7 +330,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             // condition for merging is not met, see GenMRFileSink1.
             if (task instanceof MoveTask) {
               if (((MoveTask)task).getWork().getLoadFileWork() != null) {
-                path = ((MoveTask)task).getWork().getLoadFileWork().getSourceDir();
+                path = ((MoveTask)task).getWork().getLoadFileWork().getSourcePath().toUri().toString();
               }
             }
           }
@@ -353,7 +354,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             // want to isolate any potential issue it may introduce.
             ArrayList<LinkedHashMap<String, String>> dp =
               db.loadDynamicPartitions(
-                  new Path(tbd.getSourceDir()),
+                  tbd.getSourcePath(),
                   tbd.getTable().getTableName(),
                 	tbd.getPartitionSpec(),
                 	tbd.getReplace(),
@@ -375,7 +376,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
                 updatePartitionBucketSortColumns(table, partn, bucketCols, numBuckets, sortCols);
               }
 
-              WriteEntity enty = new WriteEntity(partn, true);
+              WriteEntity enty = new WriteEntity(partn);
               if (work.getOutputs() != null) {
                 work.getOutputs().add(enty);
               }
@@ -393,7 +394,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
               dc = new DataContainer(table.getTTable(), partn.getTPartition());
 
               if (SessionState.get() != null) {
-                SessionState.get().getLineageState().setLineage(tbd.getSourceDir(), dc,
+                SessionState.get().getLineageState().setLineage(tbd.getSourcePath(), dc,
                     table.getCols());
               }
 
@@ -404,7 +405,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             List<String> partVals = MetaStoreUtils.getPvals(table.getPartCols(),
                 tbd.getPartitionSpec());
             db.validatePartitionNameCharacters(partVals);
-            db.loadPartition(new Path(tbd.getSourceDir()), tbd.getTable().getTableName(),
+            db.loadPartition(tbd.getSourcePath(), tbd.getTable().getTableName(),
                 tbd.getPartitionSpec(), tbd.getReplace(), tbd.getHoldDDLTime(),
                 tbd.getInheritTableSpecs(), isSkewedStoredAsDirs(tbd));
           	Partition partn = db.getPartition(table, tbd.getPartitionSpec(), false);
@@ -416,12 +417,12 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           	dc = new DataContainer(table.getTTable(), partn.getTPartition());
           	// add this partition to post-execution hook
           	if (work.getOutputs() != null) {
-          	  work.getOutputs().add(new WriteEntity(partn, true));
+          	  work.getOutputs().add(new WriteEntity(partn));
           	}
          }
         }
         if (SessionState.get() != null && dc != null) {
-          SessionState.get().getLineageState().setLineage(tbd.getSourceDir(), dc,
+          SessionState.get().getLineageState().setLineage(tbd.getSourcePath(), dc,
               table.getCols());
         }
         releaseLocks(tbd);
@@ -459,9 +460,9 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
 
     boolean updateBucketCols = false;
     if (bucketCols != null) {
-      FileSystem fileSys = partn.getPartitionPath().getFileSystem(conf);
-      FileStatus[] fileStatus = Utilities.getFileStatusRecurse(
-          partn.getPartitionPath(), 1, fileSys);
+      FileSystem fileSys = partn.getDataLocation().getFileSystem(conf);
+      FileStatus[] fileStatus = HiveStatsUtils.getFileStatusRecurse(
+          partn.getDataLocation(), 1, fileSys);
       // Verify the number of buckets equals the number of files
       // This will not hold for dynamic partitions where not every reducer produced a file for
       // those partitions.  In this case the table is not bucketed as Hive requires a files for

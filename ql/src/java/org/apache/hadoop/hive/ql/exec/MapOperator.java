@@ -33,6 +33,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.hadoop.hive.ql.io.IOContext;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
@@ -80,8 +81,9 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
   private final Map<Operator<? extends OperatorDesc>, MapOpCtx> childrenOpToOpCtxMap =
     new HashMap<Operator<? extends OperatorDesc>, MapOpCtx>();
 
-  private transient MapOpCtx current;
+  protected transient MapOpCtx current;
   private transient List<Operator<? extends OperatorDesc>> extraChildrenToClose = null;
+  private final Map<String, Path> normalizedPaths = new HashMap<String, Path>();
 
   private static class MapInputPath {
     String path;
@@ -121,7 +123,7 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
     }
   }
 
-  private static class MapOpCtx {
+  protected static class MapOpCtx {
 
     StructObjectInspector tblRawRowObjectInspector;  // columns
     StructObjectInspector partObjectInspector;    // partition columns
@@ -149,6 +151,10 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
 
     private Object readRow(Writable value) throws SerDeException {
       return partTblObjectInspectorConverter.convert(deserializer.deserialize(value));
+    }
+
+    public StructObjectInspector getRowObjectInspector() {
+      return rowObjectInspector;
     }
   }
 
@@ -186,12 +192,7 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
     opCtx.tableName = String.valueOf(partProps.getProperty("name"));
     opCtx.partName = String.valueOf(partSpec);
 
-    Class serdeclass = pd.getDeserializerClass();
-    if (serdeclass == null) {
-      String className = checkSerdeClassName(pd.getSerdeClassName(), opCtx.tableName);
-      serdeclass = hconf.getClassByName(className);
-    }
-
+    Class serdeclass = hconf.getClassByName(pd.getSerdeClassName());
     opCtx.deserializer = (Deserializer) serdeclass.newInstance();
     opCtx.deserializer.initialize(hconf, partProps);
 
@@ -277,20 +278,15 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
         new HashMap<TableDesc, StructObjectInspector>();
     Set<TableDesc> identityConverterTableDesc = new HashSet<TableDesc>();
     try {
+      Map<ObjectInspector, Boolean> oiSettableProperties = new HashMap<ObjectInspector, Boolean>();
+
       for (String onefile : conf.getPathToAliases().keySet()) {
         PartitionDesc pd = conf.getPathToPartitionInfo().get(onefile);
         TableDesc tableDesc = pd.getTableDesc();
         Properties tblProps = tableDesc.getProperties();
         // If the partition does not exist, use table properties
         Properties partProps = isPartitioned(pd) ? pd.getOverlayedProperties() : tblProps;
-
-        Class sdclass = pd.getDeserializerClass();
-        if (sdclass == null) {
-          String className = checkSerdeClassName(pd.getSerdeClassName(),
-              pd.getProperties().getProperty("name"));
-          sdclass = hconf.getClassByName(className);
-        }
-
+        Class sdclass = hconf.getClassByName(pd.getSerdeClassName());
         Deserializer partDeserializer = (Deserializer) sdclass.newInstance();
         partDeserializer.initialize(hconf, partProps);
         StructObjectInspector partRawRowObjectInspector = (StructObjectInspector) partDeserializer
@@ -299,18 +295,13 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
         StructObjectInspector tblRawRowObjectInspector = tableDescOI.get(tableDesc);
         if ((tblRawRowObjectInspector == null) ||
             (identityConverterTableDesc.contains(tableDesc))) {
-          sdclass = tableDesc.getDeserializerClass();
-          if (sdclass == null) {
-            String className = checkSerdeClassName(tableDesc.getSerdeClassName(),
-                tableDesc.getProperties().getProperty("name"));
-            sdclass = hconf.getClassByName(className);
-          }
-          Deserializer tblDeserializer = (Deserializer) sdclass.newInstance();
+            sdclass = hconf.getClassByName(tableDesc.getSerdeClassName());
+            Deserializer tblDeserializer = (Deserializer) sdclass.newInstance();
           tblDeserializer.initialize(hconf, tblProps);
           tblRawRowObjectInspector =
               (StructObjectInspector) ObjectInspectorConverters.getConvertedOI(
                   partRawRowObjectInspector,
-                  tblDeserializer.getObjectInspector(), true);
+                  tblDeserializer.getObjectInspector(), oiSettableProperties);
 
           if (identityConverterTableDesc.contains(tableDesc)) {
             if (!partRawRowObjectInspector.equals(tblRawRowObjectInspector)) {
@@ -334,18 +325,9 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
     return pd.getPartSpec() != null && !pd.getPartSpec().isEmpty();
   }
 
-  private String checkSerdeClassName(String className, String tableName) throws HiveException {
-    if (className == null || className.isEmpty()) {
-      throw new HiveException(
-          "SerDe class or the SerDe class name is not set for table: " + tableName);
-    }
-    return className;
-  }
-
   public void setChildren(Configuration hconf) throws HiveException {
 
-    Path fpath = new Path(HiveConf.getVar(hconf,
-        HiveConf.ConfVars.HADOOPMAPFILENAME));
+    Path fpath = IOContext.get().getInputPath();
 
     boolean schemeless = fpath.toUri().getScheme() == null;
 
@@ -363,12 +345,15 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
         if (schemeless) {
           onepath = new Path(onepath.toUri().getPath());
         }
+
         PartitionDesc partDesc = conf.getPathToPartitionInfo().get(onefile);
 
         for (String onealias : aliases) {
           Operator<? extends OperatorDesc> op = conf.getAliasToWork().get(onealias);
-          LOG.info("Adding alias " + onealias + " to work list for file "
-            + onefile);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Adding alias " + onealias + " to work list for file "
+               + onefile);
+          }
           MapInputPath inp = new MapInputPath(onefile, onealias, op, partDesc);
           if (opCtxMap.containsKey(inp)) {
             continue;
@@ -459,7 +444,7 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
   // Find context for current input file
   @Override
   public void cleanUpInputFileChangedOp() throws HiveException {
-    Path fpath = normalizePath(getExecContext().getCurrentInputFile());
+    Path fpath = getExecContext().getCurrentInputPath();
 
     for (String onefile : conf.getPathToAliases().keySet()) {
       Path onepath = normalizePath(onefile);
@@ -485,7 +470,14 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
   }
 
   private Path normalizePath(String onefile) {
-    return new Path(onefile);
+    //creating Path is expensive, so cache the corresponding
+    //Path object in normalizedPaths
+    Path path = normalizedPaths.get(onefile);
+    if(path == null){
+      path = new Path(onefile);
+      normalizedPaths.put(onefile, path);
+    }
+    return path;
   }
 
   public void process(Writable value) throws HiveException {
@@ -496,7 +488,6 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
       // The child operators cleanup if input file has changed
       cleanUpInputFileChanged();
     }
-
     Object row;
     try {
       row = current.readRow(value);
@@ -556,7 +547,7 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
       VirtualColumn vc = vcs.get(i);
       if (vc.equals(VirtualColumn.FILENAME)) {
         if (ctx.inputFileChanged()) {
-          vcValues[i] = new Text(ctx.getCurrentInputFile());
+          vcValues[i] = new Text(ctx.getCurrentInputPath().toString());
         }
       } else if (vc.equals(VirtualColumn.BLOCKOFFSET)) {
         long current = ctx.getIoCxt().getCurrentBlockStart();
@@ -619,9 +610,4 @@ public class MapOperator extends Operator<MapWork> implements Serializable, Clon
     return null;
   }
 
-  public static void main(String[] args) {
-    Path path = new Path("hdfs://qa14:9000/user/hive/warehouse/data_type");
-    Path path2 = new Path("/user/hive/warehouse/data_type/000000_0");
-    System.err.println("[MapOperator/main] " + path.toUri().relativize(path2.toUri()));
-  }
 }

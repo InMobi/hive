@@ -3,10 +3,10 @@ PREHOOK: type: CREATETABLE
 POSTHOOK: query: create table exim_department ( dep_id int) stored as textfile
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: default@exim_department
-PREHOOK: query: load data local inpath "../data/files/test.dat" into table exim_department
+PREHOOK: query: load data local inpath "../../data/files/test.dat" into table exim_department
 PREHOOK: type: LOAD
 PREHOOK: Output: default@exim_department
-POSTHOOK: query: load data local inpath "../data/files/test.dat" into table exim_department
+POSTHOOK: query: load data local inpath "../../data/files/test.dat" into table exim_department
 POSTHOOK: type: LOAD
 POSTHOOK: Output: default@exim_department
 #### A masked pattern was here ####
@@ -81,6 +81,10 @@ POSTHOOK: Input: importer@exim_department
 POSTHOOK: Output: importer@exim_department
 PREHOOK: query: drop database importer
 PREHOOK: type: DROPDATABASE
+PREHOOK: Input: database:importer
+PREHOOK: Output: database:importer
 POSTHOOK: query: drop database importer
 POSTHOOK: type: DROPDATABASE
+POSTHOOK: Input: database:importer
+POSTHOOK: Output: database:importer
 #### A masked pattern was here ####

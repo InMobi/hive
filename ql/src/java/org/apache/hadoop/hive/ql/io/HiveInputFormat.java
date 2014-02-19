@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -32,16 +33,20 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
+import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
-import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
+import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.Writable;
@@ -65,8 +70,8 @@ import org.apache.hadoop.util.ReflectionUtils;
 public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     implements InputFormat<K, V>, JobConfigurable {
 
-  public static final Log LOG = LogFactory
-      .getLog("org.apache.hadoop.hive.ql.io.HiveInputFormat");
+  public static final String CLASS_NAME = HiveInputFormat.class.getName();
+  public static final Log LOG = LogFactory.getLog(CLASS_NAME);
 
   /**
    * HiveInputSplit encapsulates an InputSplit with its corresponding
@@ -217,9 +222,6 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       throw new IOException("cannot find class " + inputFormatClassName, e);
     }
 
-    // clone a jobConf for setting needed columns for reading
-    JobConf cloneJobConf = new JobConf(job);
-
     if (this.mrwork == null) {
       init(job);
     }
@@ -227,22 +229,20 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     boolean nonNative = false;
     PartitionDesc part = pathToPartitionInfo.get(hsplit.getPath().toString());
     if ((part != null) && (part.getTableDesc() != null)) {
-      Utilities.copyTableJobPropertiesToConf(part.getTableDesc(), cloneJobConf);
+      Utilities.copyTableJobPropertiesToConf(part.getTableDesc(), job);
       nonNative = part.getTableDesc().isNonNative();
     }
 
-    pushProjectionsAndFilters(cloneJobConf, inputFormatClass, hsplit.getPath()
+    pushProjectionsAndFilters(job, inputFormatClass, hsplit.getPath()
       .toString(), hsplit.getPath().toUri().getPath(), nonNative);
 
-    InputFormat inputFormat = getInputFormatFromCache(inputFormatClass,
-        cloneJobConf);
+    InputFormat inputFormat = getInputFormatFromCache(inputFormatClass, job);
     RecordReader innerReader = null;
     try {
-      innerReader = inputFormat.getRecordReader(inputSplit,
-        cloneJobConf, reporter);
+      innerReader = inputFormat.getRecordReader(inputSplit, job, reporter);
     } catch (Exception e) {
       innerReader = HiveIOExceptionHandlerUtil
-          .handleRecordReaderCreationException(e, cloneJobConf);
+          .handleRecordReaderCreationException(e, job);
     }
     HiveRecordReader<K,V> rr = new HiveRecordReader(innerReader, job);
     rr.initIOContext(hsplit, job, inputFormatClass, innerReader);
@@ -257,73 +257,129 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     pathToPartitionInfo = mrwork.getPathToPartitionInfo();
   }
 
+  /*
+   * AddSplitsForGroup collects separate calls to setInputPaths into one where possible.
+   * The reason for this is that this is faster on some InputFormats. E.g.: Orc will start
+   * a threadpool to do the work and calling it multiple times unnecessarily will create a lot
+   * of unnecessary thread pools.
+   */
+  private void addSplitsForGroup(List<Path> dirs, TableScanOperator tableScan, JobConf conf,
+      InputFormat inputFormat, Class<? extends InputFormat> inputFormatClass, int splits,
+      TableDesc table, List<InputSplit> result) throws IOException {
+
+    Utilities.copyTableJobPropertiesToConf(table, conf);
+
+    if (tableScan != null) {
+      pushFilters(conf, tableScan);
+    }
+
+    FileInputFormat.setInputPaths(conf, dirs.toArray(new Path[dirs.size()]));
+    conf.setInputFormat(inputFormat.getClass());
+
+    int headerCount = 0;
+    int footerCount = 0;
+    if (table != null) {
+      headerCount = Utilities.getHeaderCount(table);
+      footerCount = Utilities.getFooterCount(table, conf);
+      if (headerCount != 0 || footerCount != 0) {
+        
+        // Input file has header or footer, cannot be splitted.
+        conf.setLong("mapred.min.split.size", Long.MAX_VALUE);
+      }
+    }
+
+    InputSplit[] iss = inputFormat.getSplits(conf, splits);
+    for (InputSplit is : iss) {
+      result.add(new HiveInputSplit(is, inputFormatClass.getName()));
+    }
+  }
+
   public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
     PerfLogger perfLogger = PerfLogger.getPerfLogger();
-    perfLogger.PerfLogBegin(LOG, PerfLogger.GET_SPLITS);
+    perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.GET_SPLITS);
     init(job);
 
     Path[] dirs = FileInputFormat.getInputPaths(job);
     if (dirs.length == 0) {
-      throw new IOException("No input paths specified in job");
+      // on tez we're avoiding to duplicate the file info in FileInputFormat.
+      if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) {
+        try {
+          List<Path> paths = Utilities.getInputPathsTez(job, mrwork);
+          dirs = paths.toArray(new Path[paths.size()]);
+          if (dirs.length == 0) {
+            // if we still don't have any files it's time to fail.
+            throw new IOException("No input paths specified in job");
+          }
+        } catch (Exception e) {
+          throw new IOException("Could not create input files", e);
+        }
+      } else {
+        throw new IOException("No input paths specified in job");
+      }
     }
     JobConf newjob = new JobConf(job);
-    ArrayList<InputSplit> result = new ArrayList<InputSplit>();
+    List<InputSplit> result = new ArrayList<InputSplit>();
+
+    List<Path> currentDirs = new ArrayList<Path>();
+    Class<? extends InputFormat> currentInputFormatClass = null;
+    TableDesc currentTable = null;
+    TableScanOperator currentTableScan = null;
 
     // for each dir, get the InputFormat, and do getSplits.
     for (Path dir : dirs) {
       PartitionDesc part = getPartitionDescFromPath(pathToPartitionInfo, dir);
-      // create a new InputFormat instance if this is the first time to see this
-      // class
-      Class inputFormatClass = part.getInputFileFormatClass();
-      InputFormat inputFormat = getInputFormatFromCache(inputFormatClass, job);
-      Utilities.copyTableJobPropertiesToConf(part.getTableDesc(), newjob);
+      Class<? extends InputFormat> inputFormatClass = part.getInputFileFormatClass();
+      TableDesc table = part.getTableDesc();
+      TableScanOperator tableScan = null;
+
+      List<String> aliases =
+          mrwork.getPathToAliases().get(dir.toUri().toString());
 
       // Make filter pushdown information available to getSplits.
-      ArrayList<String> aliases =
-        mrwork.getPathToAliases().get(dir.toUri().toString());
       if ((aliases != null) && (aliases.size() == 1)) {
         Operator op = mrwork.getAliasToWork().get(aliases.get(0));
         if ((op != null) && (op instanceof TableScanOperator)) {
-          TableScanOperator tableScan = (TableScanOperator) op;
+          tableScan = (TableScanOperator) op;
+          // push down projections.
+          ColumnProjectionUtils.appendReadColumns(
+              newjob, tableScan.getNeededColumnIDs(), tableScan.getNeededColumns());
+          // push down filters
           pushFilters(newjob, tableScan);
         }
       }
 
-      FileInputFormat.setInputPaths(newjob, dir);
-      newjob.setInputFormat(inputFormat.getClass());
-      InputSplit[] iss = inputFormat.getSplits(newjob, numSplits / dirs.length);
-      for (InputSplit is : iss) {
-        result.add(new HiveInputSplit(is, inputFormatClass.getName()));
+      if (!currentDirs.isEmpty() &&
+          inputFormatClass.equals(currentInputFormatClass) &&
+          table.equals(currentTable) &&
+          tableScan == currentTableScan) {
+        currentDirs.add(dir);
+        continue;
       }
+
+      if (!currentDirs.isEmpty()) {
+        LOG.info("Generating splits");
+        addSplitsForGroup(currentDirs, currentTableScan, newjob,
+            getInputFormatFromCache(currentInputFormatClass, job),
+            currentInputFormatClass, currentDirs.size()*(numSplits / dirs.length),
+            currentTable, result);
+      }
+
+      currentDirs.clear();
+      currentDirs.add(dir);
+      currentTableScan = tableScan;
+      currentTable = table;
+      currentInputFormatClass = inputFormatClass;
     }
+
+    LOG.info("Generating splits");
+    addSplitsForGroup(currentDirs, currentTableScan, newjob,
+        getInputFormatFromCache(currentInputFormatClass, job),
+        currentInputFormatClass, currentDirs.size()*(numSplits / dirs.length),
+        currentTable, result);
 
     LOG.info("number of splits " + result.size());
-    perfLogger.PerfLogEnd(LOG, PerfLogger.GET_SPLITS);
+    perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.GET_SPLITS);
     return result.toArray(new HiveInputSplit[result.size()]);
-  }
-
-  public void validateInput(JobConf job) throws IOException {
-
-    init(job);
-
-    Path[] dirs = FileInputFormat.getInputPaths(job);
-    if (dirs.length == 0) {
-      throw new IOException("No input paths specified in job");
-    }
-    JobConf newjob = new JobConf(job);
-
-    // for each dir, get the InputFormat, and do validateInput.
-    for (Path dir : dirs) {
-      PartitionDesc part = getPartitionDescFromPath(pathToPartitionInfo, dir);
-      // create a new InputFormat instance if this is the first time to see this
-      // class
-      InputFormat inputFormat = getInputFormatFromCache(part
-          .getInputFileFormatClass(), job);
-
-      FileInputFormat.setInputPaths(newjob, dir);
-      newjob.setInputFormat(inputFormat.getClass());
-      ShimLoader.getHadoopShims().inputFormatValidateInput(inputFormat, newjob);
-    }
   }
 
   protected static PartitionDesc getPartitionDescFromPath(
@@ -352,7 +408,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     Utilities.setColumnNameList(jobConf, tableScan);
     Utilities.setColumnTypeList(jobConf, tableScan);
     // push down filters
-    ExprNodeDesc filterExpr = scanDesc.getFilterExpr();
+    ExprNodeGenericFuncDesc filterExpr = (ExprNodeGenericFuncDesc)scanDesc.getFilterExpr();
     if (filterExpr == null) {
       return;
     }
@@ -420,20 +476,13 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     for (String alias : aliases) {
       Operator<? extends OperatorDesc> op = this.mrwork.getAliasToWork().get(
         alias);
-      if (op != null && op instanceof TableScanOperator) {
-        TableScanOperator tableScan = (TableScanOperator) op;
-
-        // push down projections
-        ArrayList<Integer> list = tableScan.getNeededColumnIDs();
-        if (list != null) {
-          ColumnProjectionUtils.appendReadColumnIDs(jobConf, list);
-        } else {
-          ColumnProjectionUtils.setFullyReadColumns(jobConf);
-        }
-        ColumnProjectionUtils.appendReadColumnNames(jobConf,
-            tableScan.getNeededColumns());
-
-        pushFilters(jobConf, tableScan);
+      if (op instanceof TableScanOperator) {
+        TableScanOperator ts = (TableScanOperator) op;
+        // push down projections.
+        ColumnProjectionUtils.appendReadColumns(
+            jobConf, ts.getNeededColumnIDs(), ts.getNeededColumns());
+        // push down filters
+        pushFilters(jobConf, ts);
       }
     }
   }

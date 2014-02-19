@@ -28,23 +28,34 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import javax.security.auth.login.LoginException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.metastore.api.AddPartitionsRequest;
+import org.apache.hadoop.hive.metastore.api.AddPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsExpr;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
@@ -58,11 +69,16 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
+import org.apache.hadoop.hive.metastore.api.PartitionsByExprRequest;
+import org.apache.hadoop.hive.metastore.api.PartitionsByExprResult;
+import org.apache.hadoop.hive.metastore.api.PartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
+import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.api.Type;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
@@ -73,6 +89,7 @@ import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.thrift.TApplicationException;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TFramedTransport;
@@ -317,7 +334,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
         }
       }
       // Wait before launching the next round of connection retries.
-      if (retryDelaySeconds > 0) {
+      if (!isConnected && retryDelaySeconds > 0) {
         try {
           LOG.info("Waiting " + retryDelaySeconds + " seconds before next connection attempt.");
           Thread.sleep(retryDelaySeconds * 1000);
@@ -385,6 +402,21 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
       throws InvalidObjectException, AlreadyExistsException, MetaException,
       TException {
     return client.add_partitions(new_parts);
+  }
+
+  @Override
+  public List<Partition> add_partitions(
+      List<Partition> parts, boolean ifNotExists, boolean needResults)
+      throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
+    if (parts.isEmpty()) {
+      return needResults ? new ArrayList<Partition>() : null;
+    }
+    Partition part = parts.get(0);
+    AddPartitionsRequest req = new AddPartitionsRequest(
+        part.getDbName(), part.getTableName(), parts, ifNotExists);
+    req.setNeedResult(needResults);
+    AddPartitionsResult result = client.add_partitions_req(req);
+    return needResults ? result.getPartitions() : null;
   }
 
   /**
@@ -607,6 +639,27 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
         envContext);
   }
 
+  @Override
+  public List<Partition> dropPartitions(String dbName, String tblName,
+      List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ignoreProtection,
+      boolean ifExists) throws NoSuchObjectException, MetaException, TException {
+    RequestPartsSpec rps = new RequestPartsSpec();
+    List<DropPartitionsExpr> exprs = new ArrayList<DropPartitionsExpr>(partExprs.size());
+    for (ObjectPair<Integer, byte[]> partExpr : partExprs) {
+      DropPartitionsExpr dpe = new DropPartitionsExpr();
+      dpe.setExpr(partExpr.getSecond());
+      dpe.setPartArchiveLevel(partExpr.getFirst());
+      exprs.add(dpe);
+    }
+    rps.setExprs(exprs);
+    DropPartitionsRequest req = new DropPartitionsRequest(dbName, tblName, rps);
+    req.setDeleteData(deleteData);
+    req.setIgnoreProtection(ignoreProtection);
+    req.setNeedResult(true);
+    req.setIfExists(ifExists);
+    return client.drop_partitions_req(req).getPartitions();
+  }
+
   /**
    * @param name
    * @param dbname
@@ -796,6 +849,37 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     return deepCopyPartitions(
         client.get_partitions_by_filter(db_name, tbl_name, filter, max_parts));
   }
+
+  @Override
+  public boolean listPartitionsByExpr(String db_name, String tbl_name, byte[] expr,
+      String default_partition_name, short max_parts, List<Partition> result)
+          throws TException {
+    assert result != null;
+    PartitionsByExprRequest req = new PartitionsByExprRequest(
+        db_name, tbl_name, ByteBuffer.wrap(expr));
+    if (default_partition_name != null) {
+      req.setDefaultPartitionName(default_partition_name);
+    }
+    if (max_parts >= 0) {
+      req.setMaxParts(max_parts);
+    }
+    PartitionsByExprResult r = null;
+    try {
+      r = client.get_partitions_by_expr(req);
+    } catch (TApplicationException te) {
+      // TODO: backward compat for Hive <= 0.12. Can be removed later.
+      if (te.getType() != TApplicationException.UNKNOWN_METHOD
+          && te.getType() != TApplicationException.WRONG_METHOD_NAME) {
+        throw te;
+      }
+      throw new IncompatibleMetastoreException(
+          "Metastore doesn't support listPartitionsByExpr: " + te.getMessage());
+    }
+    // TODO: in these methods, do we really need to deepcopy?
+    deepCopyPartitions(r.getPartitions(), result);
+    return !r.isSetHasUnknownPartitions() || r.isHasUnknownPartitions(); // Assume the worst.
+  }
+
 
   /**
    * Get number of partitions matching specified filter
@@ -1076,17 +1160,19 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   }
 
   /** {@inheritDoc} */
-  public ColumnStatistics getTableColumnStatistics(String dbName, String tableName,String colName)
-    throws NoSuchObjectException, MetaException, TException, InvalidInputException,
-    InvalidObjectException {
-    return client.get_table_column_statistics(dbName, tableName, colName);
+  public List<ColumnStatisticsObj> getTableColumnStatistics(String dbName, String tableName,
+      List<String> colNames) throws NoSuchObjectException, MetaException, TException,
+      InvalidInputException, InvalidObjectException {
+    return client.get_table_statistics_req(
+        new TableStatsRequest(dbName, tableName, colNames)).getTableStats();
   }
 
   /** {@inheritDoc} */
-  public ColumnStatistics getPartitionColumnStatistics(String dbName, String tableName,
-    String partName, String colName) throws NoSuchObjectException, MetaException, TException,
-    InvalidInputException, InvalidObjectException {
-    return client.get_partition_column_statistics(dbName, tableName, partName, colName);
+  public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(
+      String dbName, String tableName, List<String> partNames, List<String> colNames)
+          throws NoSuchObjectException, MetaException, TException {
+    return client.get_partitions_statistics_req(
+        new PartitionsStatsRequest(dbName, tableName, colNames, partNames)).getPartStats();
   }
 
   /** {@inheritDoc} */
@@ -1225,14 +1311,21 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   }
 
   private List<Partition> deepCopyPartitions(List<Partition> partitions) {
-    List<Partition> copy = null;
-    if (partitions != null) {
-      copy = new ArrayList<Partition>();
-      for (Partition part : partitions) {
-        copy.add(deepCopy(part));
-      }
+    return deepCopyPartitions(partitions, null);
+  }
+
+  private List<Partition> deepCopyPartitions(
+      Collection<Partition> src, List<Partition> dest) {
+    if (src == null) {
+      return dest;
     }
-    return copy;
+    if (dest == null) {
+      dest = new ArrayList<Partition>(src.size());
+    }
+    for (Partition part : src) {
+      dest.add(deepCopy(part));
+    }
+    return dest;
   }
 
   private List<Table> deepCopyTables(List<Table> tables) {
@@ -1419,5 +1512,4 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     assert partKVs != null;
     return client.isPartitionMarkedForEvent(db_name, tbl_name, partKVs, eventType);
   }
-
 }

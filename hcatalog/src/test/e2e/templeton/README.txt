@@ -87,14 +87,14 @@ Tips:
 3. Copy contents of src/test/e2e/templeton/inpdir to hdfs
 (e.g. ./bin/hadoop fs -put ~/dev/hive/hcatalog/src/test/e2e/templeton/inpdir/ webhcate2e)
 
-4. You will need to two jars in the same HDFS directory as the contents of inpdir.  piggybank.jar, which can
-be obtained from Pig.  The second is the hadoop-examples.jar, which can be obtained from your Hadoop distribution.
-This should be called hexamples.jar when it is uploaded to HDFS.
+4. You will need to copy three jars in the same HDFS directory as the contents of inpdir.  piggybank.jar, which can
+be obtained from Pig and the other two are obtained from your Hadoop distribution.
+For Hadoop 1.x you would need to upload hadoop-examples.jar twice to HDFS one as hclient.jar and other as hexamples.jar.
+For Hadoop 2.x you would need to upload hadoop-mapreduce-client-jobclient.jar to HDFS as hclient.jar and hadoop-mapreduce-examples.jar to HDFS as hexamples.jar. 
 Also see http://hive.apache.org/docs/hcat_r0.5.0/rest_server_install.html#Hadoop+Distributed+Cache for notes on
 additional JAR files to copy to HDFS.
 
 5. Make sure TEMPLETON_HOME evnironment variable is set
-
 
 6. hadoop/conf/core-site.xml should have items described in
 http://hive.apache.org/docs/hcat_r0.5.0/rest_server_install.html#Permissions
@@ -111,12 +111,13 @@ If you want to run specific test group you can specify the group, for example:  
 If you want to run specific test in a group group you can specify the test, for example:  -Dtests.to.run='-t TestHive_1'
 For example, tests/ddl.conf has several groups such as 'name' => 'REST_DDL_TABLE_BASIC'; use REST_DDL_TABLE_BASIC as the name
 
+If you are running with Hadoop 2, please use the flag: -Dhadoopversion=23
 
-Running the hcat authorization tests
-------------------------------------
-Hcat authorization tests run commands as different users to test if authorization is done right.
 
-ant test-hcat-authorization -Dkeytab.dir=<keytab files dir> 
+Running the multi users tests
+-----------------------------
+Multi user tests comprise of Hcat authorization tests and job status tests which run commands as different users.
+ant test-multi-users -Dkeytab.dir=<keytab files dir> 
   -Dsecure.mode=<yes/no>  -Dtest.group.name=<common group> -Dinpdir.hdfs=<location of inpdir on hdfs>  
   -Dtest.user.name=<user 1 belonging to common group> -Dtest.group.user.name=<user 2 belonging to common group>  
   -Dtest.other.user.name=<user 3 who does not belong to common group> 
@@ -138,8 +139,10 @@ In order for this test suite to work, webhcat-site.xml should have webhcat.proxy
 and webhcat.proxyuser.hue.hosts defined, i.e. 'hue' should be allowed to impersonate 'joe'.
 [Of course, 'hcat' proxyuser should be configured in core-site.xml for the command to succeed.]
 
-Furthermore, metastore side file based security should be enabled.  To do this 3 properties in
-hive-site.xml should be configured:
+Furthermore, metastore side file based security should be enabled. 
+(See https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Authorization#LanguageManualAuthorization-MetastoreServerSecurity for more info) 
+
+To do this 3 properties in hive-site.xml should be configured:
 1) hive.security.metastore.authorization.manager set to 
     org.apache.hadoop.hive.ql.security.authorization.StorageBasedAuthorizationProvider
 2) hive.security.metastore.authenticator.manager set to 

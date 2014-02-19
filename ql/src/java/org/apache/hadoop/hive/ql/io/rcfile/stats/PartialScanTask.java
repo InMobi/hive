@@ -184,7 +184,7 @@ public class PartialScanTask extends Task<PartialScanWork> implements
 
       MapredWork mrWork = new MapredWork();
       mrWork.setMapWork(work);
-      Utilities.setMapRedWork(job, mrWork, ctx.getMRTmpFileURI());
+      Utilities.setMapRedWork(job, mrWork, ctx.getMRTmpPath());
 
       // remove the pwd from conf file so that job tracker doesn't show this
       // logs
@@ -205,9 +205,9 @@ public class PartialScanTask extends Task<PartialScanWork> implements
       if (work.isGatheringStats()) {
         // initialize stats publishing table
         StatsPublisher statsPublisher;
-        String statsImplementationClass = HiveConf.getVar(job, HiveConf.ConfVars.HIVESTATSDBCLASS);
-        if (StatsFactory.setImplementation(statsImplementationClass, job)) {
-          statsPublisher = StatsFactory.getStatsPublisher();
+        StatsFactory factory = StatsFactory.newFactory(job);
+        if (factory != null) {
+          statsPublisher = factory.getStatsPublisher();
           if (!statsPublisher.init(job)) { // creating stats table if not exists
             if (HiveConf.getBoolVar(job, HiveConf.ConfVars.HIVE_STATS_RELIABLE)) {
               throw
@@ -259,8 +259,8 @@ public class PartialScanTask extends Task<PartialScanWork> implements
   }
 
   private void addInputPaths(JobConf job, PartialScanWork work) {
-    for (String path : work.getInputPaths()) {
-      FileInputFormat.addInputPath(job, new Path(path));
+    for (Path path : work.getInputPaths()) {
+      FileInputFormat.addInputPath(job, path);
     }
   }
 
@@ -296,7 +296,7 @@ public class PartialScanTask extends Task<PartialScanWork> implements
       printUsage();
     }
 
-    List<String> inputPaths = new ArrayList<String>();
+    List<Path> inputPaths = new ArrayList<Path>();
     String[] paths = inputPathStr.split(INPUT_SEPERATOR);
     if (paths == null || paths.length == 0) {
       printUsage();
@@ -314,10 +314,10 @@ public class PartialScanTask extends Task<PartialScanWork> implements
         if (fstatus.isDir()) {
           FileStatus[] fileStatus = fs.listStatus(pathObj);
           for (FileStatus st : fileStatus) {
-            inputPaths.add(st.getPath().toString());
+            inputPaths.add(st.getPath());
           }
         } else {
-          inputPaths.add(fstatus.getPath().toString());
+          inputPaths.add(fstatus.getPath());
         }
       } catch (IOException e) {
         e.printStackTrace(System.err);
@@ -375,11 +375,6 @@ public class PartialScanTask extends Task<PartialScanWork> implements
 
   @Override
   public void logPlanProgress(SessionState ss) throws IOException {
-    // no op
-  }
-
-  @Override
-  public void updateCounters(Counters ctrs, RunningJob rj) throws IOException {
     // no op
   }
 }

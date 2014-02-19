@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hive.ql.io;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.session.SessionState;
+
 
 /**
  * IOContext basically contains the position information of the current
@@ -35,12 +38,19 @@ public class IOContext {
     protected synchronized IOContext initialValue() { return new IOContext(); }
  };
 
+ private static IOContext ioContext = new IOContext();
+
   public static IOContext get() {
+    if (SessionState.get() == null) {
+      // this happens on the backend. only one io context needed.
+      return ioContext;
+    }
     return IOContext.threadLocal.get();
   }
 
   public static void clear() {
     IOContext.threadLocal.remove();
+    ioContext = new IOContext();
   }
 
   long currentBlockStart;
@@ -67,7 +77,7 @@ public class IOContext {
     UNKNOWN
   }
 
-  String inputFile;
+  Path inputPath;
 
   public IOContext() {
     this.currentBlockStart = 0;
@@ -109,12 +119,12 @@ public class IOContext {
     this.isBlockPointer = isBlockPointer;
   }
 
-  public String getInputFile() {
-    return inputFile;
+  public Path getInputPath() {
+    return inputPath;
   }
 
-  public void setInputFile(String inputFile) {
-    this.inputFile = inputFile;
+  public void setInputPath(Path inputPath) {
+    this.inputPath = inputPath;
   }
 
   public void setIOExceptions(boolean ioe) {

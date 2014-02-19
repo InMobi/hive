@@ -30,6 +30,14 @@ public class ShowGrantDesc {
 
   private String resFile;
 
+  /**
+   * thrift ddl for the result of show grant.
+   */
+  private static final String tabularSchema =
+      "database,table,partition,column,principal_name,principal_type,privilege," +
+      "grant_option,grant_time,grantor#" +
+      "string:string:string:string:string:string:string:boolean:bigint:string";
+
   public ShowGrantDesc(){
   }
   
@@ -40,7 +48,11 @@ public class ShowGrantDesc {
     this.hiveObj = subjectObj;
     this.columns = columns;
   }
-  
+
+  public static String getSchema() {
+    return tabularSchema;
+  }
+
   @Explain(displayName="principal desc")
   public PrincipalDesc getPrincipalDesc() {
     return principalDesc;
@@ -74,5 +86,4 @@ public class ShowGrantDesc {
   public void setColumns(List<String> columns) {
     this.columns = columns;
   }
-  
 }

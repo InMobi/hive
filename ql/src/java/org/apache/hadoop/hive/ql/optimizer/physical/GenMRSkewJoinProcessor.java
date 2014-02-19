@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.hive.ql.optimizer.physical;
 
-import java.io.ByteArrayInputStream;
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -29,6 +27,7 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.ConditionalTask;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
@@ -40,9 +39,11 @@ import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
+import org.apache.hadoop.hive.ql.optimizer.GenMapRedUtils;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.ConditionalResolverSkewJoin;
+import org.apache.hadoop.hive.ql.plan.ConditionalResolverSkewJoin.ConditionalResolverSkewJoinCtx;
 import org.apache.hadoop.hive.ql.plan.ConditionalWork;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -56,7 +57,6 @@ import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
-import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 
@@ -115,21 +115,28 @@ public final class GenMRSkewJoinProcessor {
       return;
     }
 
-    String baseTmpDir = parseCtx.getContext().getMRTmpFileURI();
+    List<Task<? extends Serializable>> children = currTask.getChildTasks();
+    if (children != null && children.size() > 1) {
+      throw new SemanticException("Should not happened");
+    }
+
+    Task<? extends Serializable> child =
+        children != null && children.size() == 1 ? children.get(0) : null;
+
+    Path baseTmpDir = parseCtx.getContext().getMRTmpPath();
 
     JoinDesc joinDescriptor = joinOp.getConf();
     Map<Byte, List<ExprNodeDesc>> joinValues = joinDescriptor.getExprs();
     int numAliases = joinValues.size();
 
-    Map<Byte, String> bigKeysDirMap = new HashMap<Byte, String>();
-    Map<Byte, Map<Byte, String>> smallKeysDirMap = new HashMap<Byte, Map<Byte, String>>();
-    Map<Byte, String> skewJoinJobResultsDir = new HashMap<Byte, String>();
+    Map<Byte, Path> bigKeysDirMap = new HashMap<Byte, Path>();
+    Map<Byte, Map<Byte, Path>> smallKeysDirMap = new HashMap<Byte, Map<Byte, Path>>();
+    Map<Byte, Path> skewJoinJobResultsDir = new HashMap<Byte, Path>();
     Byte[] tags = joinDescriptor.getTagOrder();
     for (int i = 0; i < numAliases; i++) {
       Byte alias = tags[i];
-      String bigKeysDir = getBigKeysDir(baseTmpDir, alias);
-      bigKeysDirMap.put(alias, bigKeysDir);
-      Map<Byte, String> smallKeysMap = new HashMap<Byte, String>();
+      bigKeysDirMap.put(alias, getBigKeysDir(baseTmpDir, alias));
+      Map<Byte, Path> smallKeysMap = new HashMap<Byte, Path>();
       smallKeysDirMap.put(alias, smallKeysMap);
       for (Byte src2 : tags) {
         if (!src2.equals(alias)) {
@@ -146,8 +153,8 @@ public final class GenMRSkewJoinProcessor {
     joinDescriptor.setSkewKeyDefinition(HiveConf.getIntVar(parseCtx.getConf(),
         HiveConf.ConfVars.HIVESKEWJOINKEY));
 
-    HashMap<String, Task<? extends Serializable>> bigKeysDirToTaskMap =
-      new HashMap<String, Task<? extends Serializable>>();
+    HashMap<Path, Task<? extends Serializable>> bigKeysDirToTaskMap =
+      new HashMap<Path, Task<? extends Serializable>>();
     List<Serializable> listWorks = new ArrayList<Serializable>();
     List<Task<? extends Serializable>> listTasks = new ArrayList<Task<? extends Serializable>>();
     MapredWork currPlan = (MapredWork) currTask.getWork();
@@ -159,6 +166,7 @@ public final class GenMRSkewJoinProcessor {
         .getProperties());
 
     Map<Byte, TableDesc> tableDescList = new HashMap<Byte, TableDesc>();
+    Map<Byte, RowSchema> rowSchemaList = new HashMap<Byte, RowSchema>();
     Map<Byte, List<ExprNodeDesc>> newJoinValues = new HashMap<Byte, List<ExprNodeDesc>>();
     Map<Byte, List<ExprNodeDesc>> newJoinKeys = new HashMap<Byte, List<ExprNodeDesc>>();
     // used for create mapJoinDesc, should be in order
@@ -176,13 +184,17 @@ public final class GenMRSkewJoinProcessor {
       int columnSize = valueCols.size();
       List<ExprNodeDesc> newValueExpr = new ArrayList<ExprNodeDesc>();
       List<ExprNodeDesc> newKeyExpr = new ArrayList<ExprNodeDesc>();
+      ArrayList<ColumnInfo> columnInfos = new ArrayList<ColumnInfo>();
 
       boolean first = true;
       for (int k = 0; k < columnSize; k++) {
         TypeInfo type = valueCols.get(k).getTypeInfo();
         String newColName = i + "_VALUE_" + k; // any name, it does not matter.
-        newValueExpr
-            .add(new ExprNodeColumnDesc(type, newColName, "" + i, false));
+        ColumnInfo columnInfo = new ColumnInfo(newColName, type, alias.toString(), false);
+        columnInfos.add(columnInfo);
+        newValueExpr.add(new ExprNodeColumnDesc(
+            columnInfo.getType(), columnInfo.getInternalName(),
+            columnInfo.getTabAlias(), false));
         if (!first) {
           colNames = colNames + ",";
           colTypes = colTypes + ",";
@@ -201,14 +213,18 @@ public final class GenMRSkewJoinProcessor {
         first = false;
         colNames = colNames + joinKeys.get(k);
         colTypes = colTypes + joinKeyTypes.get(k);
-        newKeyExpr.add(new ExprNodeColumnDesc(TypeInfoFactory
-            .getPrimitiveTypeInfo(joinKeyTypes.get(k)), joinKeys.get(k),
-            "" + i, false));
+        ColumnInfo columnInfo = new ColumnInfo(joinKeys.get(k), TypeInfoFactory
+            .getPrimitiveTypeInfo(joinKeyTypes.get(k)), alias.toString(), false);
+        columnInfos.add(columnInfo);
+        newKeyExpr.add(new ExprNodeColumnDesc(
+            columnInfo.getType(), columnInfo.getInternalName(),
+            columnInfo.getTabAlias(), false));
       }
 
       newJoinValues.put(alias, newValueExpr);
       newJoinKeys.put(alias, newKeyExpr);
       tableDescList.put(alias, Utilities.getTableDesc(colNames, colTypes));
+      rowSchemaList.put(alias, new RowSchema(columnInfos));
 
       // construct value table Desc
       String valueColNames = "";
@@ -245,8 +261,8 @@ public final class GenMRSkewJoinProcessor {
 
       Operator<? extends OperatorDesc>[] parentOps = new TableScanOperator[tags.length];
       for (int k = 0; k < tags.length; k++) {
-        Operator<? extends OperatorDesc> ts = OperatorFactory.get(
-            TableScanDesc.class, (RowSchema) null);
+        Operator<? extends OperatorDesc> ts =
+            GenMapRedUtils.createTemporaryTableScanOperator(rowSchemaList.get((byte)k));
         ((TableScanOperator)ts).setTableDesc(tableDescList.get((byte)k));
         parentOps[k] = ts;
       }
@@ -255,17 +271,13 @@ public final class GenMRSkewJoinProcessor {
       ArrayList<String> aliases = new ArrayList<String>();
       String alias = src.toString();
       aliases.add(alias);
-      String bigKeyDirPath = bigKeysDirMap.get(src);
-      newPlan.getPathToAliases().put(bigKeyDirPath, aliases);
-
-
-
+      Path bigKeyDirPath = bigKeysDirMap.get(src);
+      newPlan.getPathToAliases().put(bigKeyDirPath.toString(), aliases);
 
       newPlan.getAliasToWork().put(alias, tblScan_op);
       PartitionDesc part = new PartitionDesc(tableDescList.get(src), null);
 
-
-      newPlan.getPathToPartitionInfo().put(bigKeyDirPath, part);
+      newPlan.getPathToPartitionInfo().put(bigKeyDirPath.toString(), part);
       newPlan.getAliasToPartnInfo().put(alias, part);
 
       Operator<? extends OperatorDesc> reducer = clonePlan.getReduceWork().getReducer();
@@ -284,7 +296,7 @@ public final class GenMRSkewJoinProcessor {
       MapredLocalWork localPlan = new MapredLocalWork(
           new LinkedHashMap<String, Operator<? extends OperatorDesc>>(),
           new LinkedHashMap<String, FetchWork>());
-      Map<Byte, String> smallTblDirs = smallKeysDirMap.get(src);
+      Map<Byte, Path> smallTblDirs = smallKeysDirMap.get(src);
 
       for (int j = 0; j < numAliases; j++) {
         if (j == i) {
@@ -293,9 +305,9 @@ public final class GenMRSkewJoinProcessor {
         Byte small_alias = tags[j];
         Operator<? extends OperatorDesc> tblScan_op2 = parentOps[j];
         localPlan.getAliasToWork().put(small_alias.toString(), tblScan_op2);
-        Path tblDir = new Path(smallTblDirs.get(small_alias));
+        Path tblDir = smallTblDirs.get(small_alias);
         localPlan.getAliasToFetchWork().put(small_alias.toString(),
-            new FetchWork(tblDir.toString(), tableDescList.get(small_alias)));
+            new FetchWork(tblDir, tableDescList.get(small_alias)));
       }
 
       newPlan.setMapLocalWork(localPlan);
@@ -329,25 +341,27 @@ public final class GenMRSkewJoinProcessor {
       listWorks.add(skewJoinMapJoinTask.getWork());
       listTasks.add(skewJoinMapJoinTask);
     }
+    if (children != null) {
+      for (Task<? extends Serializable> tsk : listTasks) {
+        for (Task<? extends Serializable> oldChild : children) {
+          tsk.addDependentTask(oldChild);
+        }
+      }
+    }
+    if (child != null) {
+      listTasks.add(child);
+    }
+    ConditionalResolverSkewJoinCtx context =
+        new ConditionalResolverSkewJoinCtx(bigKeysDirToTaskMap, child);
 
     ConditionalWork cndWork = new ConditionalWork(listWorks);
     ConditionalTask cndTsk = (ConditionalTask) TaskFactory.get(cndWork, parseCtx.getConf());
     cndTsk.setListTasks(listTasks);
     cndTsk.setResolver(new ConditionalResolverSkewJoin());
-    cndTsk
-        .setResolverCtx(new ConditionalResolverSkewJoin.ConditionalResolverSkewJoinCtx(
-        bigKeysDirToTaskMap));
-    List<Task<? extends Serializable>> oldChildTasks = currTask.getChildTasks();
+    cndTsk.setResolverCtx(context);
     currTask.setChildTasks(new ArrayList<Task<? extends Serializable>>());
     currTask.addDependentTask(cndTsk);
 
-    if (oldChildTasks != null) {
-      for (Task<? extends Serializable> tsk : cndTsk.getListTasks()) {
-        for (Task<? extends Serializable> oldChild : oldChildTasks) {
-          tsk.addDependentTask(oldChild);
-        }
-      }
-    }
     return;
   }
 
@@ -378,20 +392,19 @@ public final class GenMRSkewJoinProcessor {
   private static String SMALLKEYS = "smallkeys";
   private static String RESULTS = "results";
 
-  static String getBigKeysDir(String baseDir, Byte srcTbl) {
-    return baseDir + Path.SEPARATOR + skewJoinPrefix + UNDERLINE + BIGKEYS
-        + UNDERLINE + srcTbl;
+  static Path getBigKeysDir(Path baseDir, Byte srcTbl) {
+    return new Path(baseDir, skewJoinPrefix + UNDERLINE + BIGKEYS + UNDERLINE + srcTbl);
   }
 
-  static String getBigKeysSkewJoinResultDir(String baseDir, Byte srcTbl) {
-    return baseDir + Path.SEPARATOR + skewJoinPrefix + UNDERLINE + BIGKEYS
-        + UNDERLINE + RESULTS + UNDERLINE + srcTbl;
+  static Path getBigKeysSkewJoinResultDir(Path baseDir, Byte srcTbl) {
+    return new Path(baseDir, skewJoinPrefix + UNDERLINE + BIGKEYS
+        + UNDERLINE + RESULTS + UNDERLINE + srcTbl);
   }
 
-  static String getSmallKeysDir(String baseDir, Byte srcTblBigTbl,
+  static Path getSmallKeysDir(Path baseDir, Byte srcTblBigTbl,
       Byte srcTblSmallTbl) {
-    return baseDir + Path.SEPARATOR + skewJoinPrefix + UNDERLINE + SMALLKEYS
-        + UNDERLINE + srcTblBigTbl + UNDERLINE + srcTblSmallTbl;
+    return new Path(baseDir, skewJoinPrefix + UNDERLINE + SMALLKEYS
+        + UNDERLINE + srcTblBigTbl + UNDERLINE + srcTblSmallTbl);
   }
 
 }

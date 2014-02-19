@@ -53,6 +53,17 @@ public class PerfLogger {
   public static final String FAILURE_HOOK = "FailureHook.";
   public static final String DRIVER_RUN = "Driver.run";
   public static final String TIME_TO_SUBMIT = "TimeToSubmit";
+  public static final String TEZ_SUBMIT_TO_RUNNING = "TezSubmitToRunningDag";
+  public static final String TEZ_BUILD_DAG = "TezBuildDag";
+  public static final String TEZ_SUBMIT_DAG = "TezSubmitDag";
+  public static final String TEZ_RUN_DAG = "TezRunDag";
+  public static final String TEZ_CREATE_VERTEX = "TezCreateVertex.";
+  public static final String TEZ_RUN_VERTEX = "TezRunVertex.";
+  public static final String TEZ_INITIALIZE_PROCESSOR = "TezInitializeProcessor";
+  public static final String TEZ_RUN_PROCESSOR = "TezRunProcessor";
+  public static final String TEZ_INIT_OPERATORS = "TezInitializeOperators";
+  public static final String LOAD_HASHTABLE = "LoadHashtable";
+  public static final String ORC_GET_SPLITS = "OrcGetSplits";
 
   protected static final ThreadLocal<PerfLogger> perfLogger = new ThreadLocal<PerfLogger>();
 
@@ -92,9 +103,9 @@ public class PerfLogger {
    * @param _log the logging object to be used.
    * @param method method or ID that identifies this perf log element.
    */
-  public void PerfLogBegin(Log _log, String method) {
+  public void PerfLogBegin(String callerName, String method) {
     long startTime = System.currentTimeMillis();
-    _log.info("<PERFLOG method=" + method + ">");
+    LOG.info("<PERFLOG method=" + method + " from=" + callerName + ">");
     startTimes.put(method, new Long(startTime));
   }
 
@@ -104,7 +115,7 @@ public class PerfLogger {
    * @param method
    * @return long duration  the difference between now and startTime, or -1 if startTime is null
    */
-  public long PerfLogEnd(Log _log, String method) {
+  public long PerfLogEnd(String callerName, String method) {
     Long startTime = startTimes.get(method);
     long endTime = System.currentTimeMillis();
     long duration = -1;
@@ -120,8 +131,8 @@ public class PerfLogger {
       duration = endTime - startTime.longValue();
       sb.append(" duration=").append(duration);
     }
-    sb.append(">");
-    _log.info(sb);
+    sb.append(" from=").append(callerName).append(">");
+    LOG.info(sb);
 
     return duration;
   }

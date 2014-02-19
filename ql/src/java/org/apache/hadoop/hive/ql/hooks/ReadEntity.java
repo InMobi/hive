@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
@@ -34,9 +35,15 @@ public class ReadEntity extends Entity implements Serializable {
   // Consider a query like: select * from V, where the view V is defined as:
   // select * from T
   // The inputs will contain V and T (parent: V)
+  // T will be marked as an indirect entity using isDirect flag.
+  // This will help in distinguishing from the case where T is a direct dependency
+  // For example in the case of "select * from V join T ..." T would be direct dependency
+  private boolean isDirect = true;
 
   // For views, the entities can be nested - by default, entities are at the top level
   private final Set<ReadEntity> parents = new HashSet<ReadEntity>();
+
+
 
   /**
    * For serialization only.
@@ -46,13 +53,20 @@ public class ReadEntity extends Entity implements Serializable {
   }
 
   /**
+   * Constructor for a database.
+   */
+  public ReadEntity(Database database) {
+    super(database, true);
+  }
+
+  /**
    * Constructor.
    *
    * @param t
    *          The Table that the query reads from.
    */
   public ReadEntity(Table t) {
-    super(t);
+    super(t, true);
   }
 
   private void initParent(ReadEntity parent) {
@@ -62,8 +76,13 @@ public class ReadEntity extends Entity implements Serializable {
   }
 
   public ReadEntity(Table t, ReadEntity parent) {
-    super(t);
+    super(t, true);
     initParent(parent);
+  }
+
+  public ReadEntity(Table t, ReadEntity parent, boolean isDirect) {
+    this(t, parent);
+    this.isDirect = isDirect;
   }
 
   /**
@@ -73,13 +92,19 @@ public class ReadEntity extends Entity implements Serializable {
    *          The partition that the query reads from.
    */
   public ReadEntity(Partition p) {
-    super(p);
+    super(p, true);
   }
 
   public ReadEntity(Partition p, ReadEntity parent) {
-    super(p);
+    super(p, true);
     initParent(parent);
   }
+
+  public ReadEntity(Partition p, ReadEntity parent, boolean isDirect) {
+    this(p, parent);
+    this.isDirect = isDirect;
+  }
+
 
   public Set<ReadEntity> getParents() {
     return parents;
@@ -101,4 +126,14 @@ public class ReadEntity extends Entity implements Serializable {
       return false;
     }
   }
+
+  public boolean isDirect() {
+    return isDirect;
+  }
+
+  public void setDirect(boolean isDirect) {
+    this.isDirect = isDirect;
+  }
+
+
 }

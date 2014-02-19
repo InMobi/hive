@@ -37,6 +37,8 @@ const string LINE_DELIM = "line.delim"
 const string MAPKEY_DELIM = "mapkey.delim"
 const string QUOTE_CHAR = "quote.delim"
 const string ESCAPE_CHAR = "escape.delim"
+const string HEADER_COUNT = "skip.header.line.count"
+const string FOOTER_COUNT = "skip.footer.line.count"
 
 typedef string PrimitiveType
 typedef string CollectionType
@@ -68,5 +70,6 @@ const string LIST_COLUMN_TYPES = "columns.types";
 
 const set<string> PrimitiveTypes  = [ VOID_TYPE_NAME BOOLEAN_TYPE_NAME TINYINT_TYPE_NAME SMALLINT_TYPE_NAME INT_TYPE_NAME BIGINT_TYPE_NAME FLOAT_TYPE_NAME DOUBLE_TYPE_NAME STRING_TYPE_NAME  VARCHAR_TYPE_NAME CHAR_TYPE_NAME DATE_TYPE_NAME DATETIME_TYPE_NAME TIMESTAMP_TYPE_NAME DECIMAL_TYPE_NAME BINARY_TYPE_NAME],
 const set<string> CollectionTypes = [ LIST_TYPE_NAME MAP_TYPE_NAME ],
+const set<string> IntegralTypes = [ TINYINT_TYPE_NAME SMALLINT_TYPE_NAME INT_TYPE_NAME BIGINT_TYPE_NAME ],
 
 

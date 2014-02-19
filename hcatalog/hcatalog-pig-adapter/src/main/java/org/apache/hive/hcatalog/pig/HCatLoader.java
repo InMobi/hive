@@ -27,6 +27,8 @@ import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.classification.InterfaceAudience;
+import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.mapreduce.InputFormat;
@@ -45,12 +47,16 @@ import org.apache.pig.PigException;
 import org.apache.pig.ResourceSchema;
 import org.apache.pig.ResourceStatistics;
 import org.apache.pig.impl.util.UDFContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Pig {@link org.apache.pig.LoadFunc} to read data from HCat
  */
-
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class HCatLoader extends HCatBaseLoader {
+  private static final Logger LOG = LoggerFactory.getLogger(HCatLoader.class);
 
   private static final String PARTITION_FILTER = "partition.filter"; // for future use
 
@@ -116,7 +122,7 @@ public class HCatLoader extends HCatBaseLoader {
       }
     } else {
       Job clone = new Job(job.getConfiguration());
-      HCatInputFormat.setInput(job, dbName, tableName).setFilter(getPartitionFilterString());
+      HCatInputFormat.setInput(job, dbName, tableName, getPartitionFilterString());
 
       // We will store all the new /changed properties in the job in the
       // udf context, so the the HCatInputFormat.setInput method need not
@@ -167,6 +173,9 @@ public class HCatLoader extends HCatBaseLoader {
           throw new IOException(e);
         }
       }
+    }
+    if(LOG.isDebugEnabled()) {
+      LOG.debug("outputSchema=" + outputSchema);
     }
 
   }

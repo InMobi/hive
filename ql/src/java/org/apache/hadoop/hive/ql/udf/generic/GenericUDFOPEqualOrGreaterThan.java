@@ -19,15 +19,33 @@
 package org.apache.hadoop.hive.ql.udf.generic;
 
 import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.*;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.Text;
 
 /**
  * GenericUDF Class for operation EqualOrGreaterThan.
  */
 @Description(name = ">=", value = "a _FUNC_ b - Returns TRUE if a is not smaller than b")
+@VectorizedExpressions({LongColGreaterEqualLongColumn.class, LongColGreaterEqualDoubleColumn.class,
+  DoubleColGreaterEqualLongColumn.class, DoubleColGreaterEqualDoubleColumn.class,
+  LongColGreaterEqualLongScalar.class, LongColGreaterEqualDoubleScalar.class,
+  DoubleColGreaterEqualLongScalar.class, DoubleColGreaterEqualDoubleScalar.class,
+  LongScalarGreaterEqualLongColumn.class, LongScalarGreaterEqualDoubleColumn.class,
+  DoubleScalarGreaterEqualLongColumn.class, DoubleScalarGreaterEqualDoubleColumn.class,
+  StringColGreaterEqualStringColumn.class, StringColGreaterEqualStringScalar.class,
+  StringScalarGreaterEqualStringColumn.class, FilterStringColGreaterEqualStringColumn.class,
+  FilterStringColGreaterEqualStringScalar.class, FilterStringScalarGreaterEqualStringColumn.class,
+  FilterLongColGreaterEqualLongColumn.class, FilterLongColGreaterEqualDoubleColumn.class,
+  FilterDoubleColGreaterEqualLongColumn.class, FilterDoubleColGreaterEqualDoubleColumn.class,
+  FilterLongColGreaterEqualLongScalar.class, FilterLongColGreaterEqualDoubleScalar.class,
+  FilterDoubleColGreaterEqualLongScalar.class, FilterDoubleColGreaterEqualDoubleScalar.class,
+  FilterLongScalarGreaterEqualLongColumn.class, FilterLongScalarGreaterEqualDoubleColumn.class,
+  FilterDoubleScalarGreaterEqualLongColumn.class, FilterDoubleScalarGreaterEqualDoubleColumn.class,
+  FilterDecimalColGreaterEqualDecimalColumn.class, FilterDecimalColGreaterEqualDecimalScalar.class,
+  FilterDecimalScalarGreaterEqualDecimalColumn.class})
 public class GenericUDFOPEqualOrGreaterThan extends GenericUDFBaseCompare {
   public GenericUDFOPEqualOrGreaterThan(){
     this.opName = "EQUAL OR GREATER THAN";
@@ -51,7 +69,7 @@ public class GenericUDFOPEqualOrGreaterThan extends GenericUDFBaseCompare {
       Text t0, t1;
       t0 = soi0.getPrimitiveWritableObject(o0);
       t1 = soi1.getPrimitiveWritableObject(o1);
-      result.set(ShimLoader.getHadoopShims().compareText(t0, t1) >= 0);
+      result.set(t0.compareTo(t1) >= 0);
       break;
     case COMPARE_INT:
       result.set(ioi0.get(o0) >= ioi1.get(o1));
@@ -91,6 +109,11 @@ public class GenericUDFOPEqualOrGreaterThan extends GenericUDFBaseCompare {
           converted_o1, compareOI) >= 0);
     }
     return result;
+  }
+
+  @Override
+  public GenericUDF flip() {
+    return new GenericUDFOPEqualOrLessThan();
   }
 
 }

@@ -168,6 +168,7 @@ PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
+alltypesorc
 src
 src1
 src_json
@@ -362,5 +363,9 @@ POSTHOOK: query: USE default
 POSTHOOK: type: SWITCHDATABASE
 PREHOOK: query: DROP DATABASE alter1_db
 PREHOOK: type: DROPDATABASE
+PREHOOK: Input: database:alter1_db
+PREHOOK: Output: database:alter1_db
 POSTHOOK: query: DROP DATABASE alter1_db
 POSTHOOK: type: DROPDATABASE
+POSTHOOK: Input: database:alter1_db
+POSTHOOK: Output: database:alter1_db

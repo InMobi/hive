@@ -42,7 +42,7 @@ ERROR_LOG=${WEBHCAT_LOG_DIR}/webhcat-console-error.log
 CONSOLE_LOG=${WEBHCAT_LOG_DIR}/webhcat-console.log
 
 # The name of the webhcat jar file
-WEBHCAT_JAR='webhcat-*.jar'
+WEBHCAT_JAR='hive-webhcat-*.jar'
 
 # How long to wait before testing that the process started correctly
 SLEEP_TIME_AFTER_START=10
@@ -75,7 +75,7 @@ elif [ -e "${WEBHCAT_PREFIX}/conf/webhcat-env.sh" -o -e "${WEBHCAT_PREFIX}/etc/w
 else
   DEFAULT_CONF_DIR="/etc/webhcat"
 fi
-WEBHCAT_CONF_DIR="${WEBHCAT_CONF_DIR:-$DEFAULT_CONF_DIR}"
+export WEBHCAT_CONF_DIR="${WEBHCAT_CONF_DIR:-$DEFAULT_CONF_DIR}"
 
 #users can add various env vars to webhcat-env.sh in the conf
 #rather than having to export them before running the command
@@ -110,6 +110,9 @@ export TEMPLETON_HOME="${TEMPLETON_HOME:-$DEFAULT_TEMPLETON_HOME}"
 if [ ! -d ${TEMPLETON_HOME}/share/webhcat ]; then
     die "TEMPLETON_HOME=${TEMPLETON_HOME} is invalid";
 fi
+
+source $WEBHCAT_PREFIX/bin/common.sh
+find_hadoop_home
 
 #====================================
 #determine where hadoop is

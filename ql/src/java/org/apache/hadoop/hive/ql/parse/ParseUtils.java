@@ -20,17 +20,20 @@ package org.apache.hadoop.hive.ql.parse;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.typeinfo.BaseTypeParams;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
 
 /**
@@ -110,49 +113,107 @@ public final class ParseUtils {
    */
   static ExprNodeDesc createConversionCast(ExprNodeDesc column, PrimitiveTypeInfo tableFieldTypeInfo)
       throws SemanticException {
-    ExprNodeDesc ret;
-
     // Get base type, since type string may be parameterized
     String baseType = TypeInfoUtils.getBaseName(tableFieldTypeInfo.getTypeName());
-    BaseTypeParams typeParams = null;
-    // If TypeInfo is parameterized, provide the params to the UDF factory method.
-    typeParams = tableFieldTypeInfo.getTypeParams();
-    if (typeParams != null) {
-      switch (tableFieldTypeInfo.getPrimitiveCategory()) {
-        case VARCHAR:
-          // Nothing to do here - the parameter will be passed to the UDF factory method below
-          break;
-        default:
-          throw new SemanticException("Type cast for " + tableFieldTypeInfo.getPrimitiveCategory() +
-              " does not take type parameters");
-      }
-    }
 
     // If the type cast UDF is for a parameterized type, then it should implement
     // the SettableUDF interface so that we can pass in the params.
     // Not sure if this is the cleanest solution, but there does need to be a way
     // to provide the type params to the type cast.
-    ret = TypeCheckProcFactory.DefaultExprProcessor
-        .getFuncExprNodeDescWithUdfData(baseType, typeParams, column);
-
-    return ret;
+    return TypeCheckProcFactory.DefaultExprProcessor.getFuncExprNodeDescWithUdfData(baseType,
+        tableFieldTypeInfo, column);
   }
 
-  public static VarcharTypeParams getVarcharParams(String typeName, ASTNode node)
+  public static VarcharTypeInfo getVarcharTypeInfo(ASTNode node)
       throws SemanticException {
     if (node.getChildCount() != 1) {
-      throw new SemanticException("Bad params for type " + typeName);
+      throw new SemanticException("Bad params for type varchar");
     }
 
-    try {
-      VarcharTypeParams typeParams = new VarcharTypeParams();
-      String lengthStr = node.getChild(0).getText();
-      Integer length = Integer.valueOf(lengthStr);
-      typeParams.setLength(length.intValue());
-      typeParams.validateParams();
-      return typeParams;
-    } catch (SerDeException err) {
-      throw new SemanticException(err);
+    String lengthStr = node.getChild(0).getText();
+    return TypeInfoFactory.getVarcharTypeInfo(Integer.valueOf(lengthStr));
+  }
+
+  public static CharTypeInfo getCharTypeInfo(ASTNode node)
+      throws SemanticException {
+    if (node.getChildCount() != 1) {
+      throw new SemanticException("Bad params for type char");
+    }
+
+    String lengthStr = node.getChild(0).getText();
+    return TypeInfoFactory.getCharTypeInfo(Integer.valueOf(lengthStr));
+  }
+
+  static int getIndex(String[] list, String elem) {
+    for(int i=0; i < list.length; i++) {
+      if (list[i].toLowerCase().equals(elem)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /*
+   * if the given filterCondn refers to only 1 table alias in the QBJoinTree,
+   * we return that alias's position. Otherwise we return -1
+   */
+  static int checkJoinFilterRefersOneAlias(String[] tabAliases, ASTNode filterCondn) {
+
+    switch(filterCondn.getType()) {
+    case HiveParser.TOK_TABLE_OR_COL:
+      String tableOrCol = SemanticAnalyzer.unescapeIdentifier(filterCondn.getChild(0).getText()
+          .toLowerCase());
+      return getIndex(tabAliases, tableOrCol);
+    case HiveParser.Identifier:
+    case HiveParser.Number:
+    case HiveParser.StringLiteral:
+    case HiveParser.BigintLiteral:
+    case HiveParser.SmallintLiteral:
+    case HiveParser.TinyintLiteral:
+    case HiveParser.DecimalLiteral:
+    case HiveParser.TOK_STRINGLITERALSEQUENCE:
+    case HiveParser.TOK_CHARSETLITERAL:
+    case HiveParser.TOK_DATELITERAL:
+    case HiveParser.KW_TRUE:
+    case HiveParser.KW_FALSE:
+    case HiveParser.TOK_NULL:
+      return -1;
+    default:
+      int idx = -1;
+      int i = filterCondn.getType() == HiveParser.TOK_FUNCTION ? 1 : 0;
+      for (; i < filterCondn.getChildCount(); i++) {
+        int cIdx = checkJoinFilterRefersOneAlias(tabAliases, (ASTNode) filterCondn.getChild(i));
+        if ( cIdx != idx ) {
+          if ( idx != -1 && cIdx != -1 ) {
+            return -1;
+          }
+          idx = idx == -1 ? cIdx : idx;
+        }
+      }
+      return idx;
     }
   }
+
+  public static DecimalTypeInfo getDecimalTypeTypeInfo(ASTNode node)
+      throws SemanticException {
+    if (node.getChildCount() > 2) {
+        throw new SemanticException("Bad params for type decimal");
+      }
+
+      int precision = HiveDecimal.USER_DEFAULT_PRECISION;
+      int scale = HiveDecimal.USER_DEFAULT_SCALE;
+
+      if (node.getChildCount() >= 1) {
+        String precStr = node.getChild(0).getText();
+        precision = Integer.valueOf(precStr);
+      }
+
+      if (node.getChildCount() == 2) {
+        String scaleStr = node.getChild(1).getText();
+        scale = Integer.valueOf(scaleStr);
+      }
+
+      return TypeInfoFactory.getDecimalTypeInfo(precision, scale);
+  }
+
 }

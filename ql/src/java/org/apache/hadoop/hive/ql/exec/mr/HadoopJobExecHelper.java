@@ -34,11 +34,12 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.MapRedStats;
+import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskHandle;
 import org.apache.hadoop.hive.ql.exec.Utilities;
-import org.apache.hadoop.hive.ql.exec.Operator.ProgressCounter;
 import org.apache.hadoop.hive.ql.history.HiveHistory.Keys;
 import org.apache.hadoop.hive.ql.plan.ReducerTimeStatsPerJob;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -49,6 +50,7 @@ import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.TaskCompletionEvent;
 import org.apache.hadoop.mapred.TaskReport;
@@ -79,14 +81,6 @@ public class HadoopJobExecHelper {
     reduceProgress = reduceProgress == 100 ? (int)Math.floor(rj.reduceProgress() * 100) : reduceProgress;
     task.taskCounters.put("CNTR_NAME_" + task.getId() + "_MAP_PROGRESS", Long.valueOf(mapProgress));
     task.taskCounters.put("CNTR_NAME_" + task.getId() + "_REDUCE_PROGRESS", Long.valueOf(reduceProgress));
-    if (ctrs == null) {
-      // hadoop might return null if it cannot locate the job.
-      // we may still be able to retrieve the job status - so ignore
-      return;
-    }
-    if(callBackObj != null) {
-      callBackObj.updateCounters(ctrs, rj);
-    }
   }
 
   /**
@@ -134,16 +128,18 @@ public class HadoopJobExecHelper {
     this.jobId = jobId;
   }
 
-
-  public HadoopJobExecHelper() {
-  }
-
   public HadoopJobExecHelper(JobConf job, LogHelper console,
       Task<? extends Serializable> task, HadoopJobExecHook hookCallBack) {
     this.job = job;
     this.console = console;
     this.task = task;
     this.callBackObj = hookCallBack;
+
+    if (job != null) {
+      // even with tez on some jobs are run as MR. disable the flag in
+      // the conf, so that the backend runs fully as MR.
+      HiveConf.setVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE, "mr");
+    }
   }
 
 
@@ -197,6 +193,7 @@ public class HadoopJobExecHelper {
     }
   }
 
+  @SuppressWarnings("deprecation")
   public boolean checkFatalErrors(Counters ctrs, StringBuilder errMsg) {
     if (ctrs == null) {
       // hadoop might return null if it cannot locate the job.
@@ -204,7 +201,9 @@ public class HadoopJobExecHelper {
       return false;
     }
     // check for number of created files
-    long numFiles = ctrs.getCounter(ProgressCounter.CREATED_FILES);
+    Counters.Counter cntr = ctrs.findCounter(HiveConf.getVar(job, ConfVars.HIVECOUNTERGROUP),
+        Operator.HIVECOUNTERCREATEDFILES);
+    long numFiles = cntr != null ? cntr.getValue() : 0;
     long upperLimit = HiveConf.getLongVar(job, HiveConf.ConfVars.MAXCREATEDFILES);
     if (numFiles > upperLimit) {
       errMsg.append("total number of created files now is " + numFiles + ", which exceeds ").append(upperLimit);
@@ -238,7 +237,7 @@ public class HadoopJobExecHelper {
       } catch (InterruptedException e) {
       }
 
-      if (initializing && ShimLoader.getHadoopShims().isJobPreparing(rj)) {
+      if (initializing && rj.getJobState() == JobStatus.PREP) {
         // No reason to poll untill the job is initialized
         continue;
       } else {
@@ -503,7 +502,7 @@ public class HadoopJobExecHelper {
       }
     } else {
       console.printInfo("Execution completed successfully");
-      console.printInfo("Mapred Local Task Succeeded . Convert the Join into MapJoin");
+      console.printInfo("MapredLocal task succeeded");
     }
     return exitVal;
   }
@@ -588,12 +587,6 @@ public class HadoopJobExecHelper {
     List<Integer> reducersRunTimes = new ArrayList<Integer>();
 
     for (TaskCompletionEvent taskCompletion : taskCompletions) {
-      String[] taskJobIds = ShimLoader.getHadoopShims().getTaskJobIDs(taskCompletion);
-      if (taskJobIds == null) {
-        // Task attempt info is unavailable in this Hadoop version");
-        continue;
-      }
-      String taskId = taskJobIds[0];
       if (!taskCompletion.isMapTask()) {
         reducersRunTimes.add(new Integer(taskCompletion.getTaskRunTime()));
       }

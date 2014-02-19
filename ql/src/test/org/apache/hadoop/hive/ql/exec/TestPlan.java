@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 
 import junit.framework.TestCase;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.parse.TypeCheckProcFactory;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -79,17 +80,18 @@ public class TestPlan extends TestCase {
       mrwork.getMapWork().setPathToPartitionInfo(pt);
       mrwork.getMapWork().setAliasToWork(ao);
 
+      JobConf job = new JobConf(TestPlan.class);
       // serialize the configuration once ..
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      Utilities.serializeObject(mrwork, baos);
+      Utilities.serializePlan(mrwork, baos, job);
       baos.close();
       String v1 = baos.toString();
 
       // store into configuration
-      JobConf job = new JobConf(TestPlan.class);
+
       job.set("fs.default.name", "file:///");
-      Utilities.setMapRedWork(job, mrwork, System.getProperty("java.io.tmpdir") + File.separator +
-        System.getProperty("user.name") + File.separator + "hive");
+      Utilities.setMapRedWork(job, mrwork, new Path(System.getProperty("java.io.tmpdir") + File.separator +
+        System.getProperty("user.name") + File.separator + "hive"));
       MapredWork mrwork2 = Utilities.getMapRedWork(job);
       Utilities.clearWork(job);
 
@@ -99,7 +101,7 @@ public class TestPlan extends TestCase {
 
       // serialize again
       baos.reset();
-      Utilities.serializeObject(mrwork2, baos);
+      Utilities.serializePlan(mrwork2, baos, job);
       baos.close();
 
       // verify that the two are equal

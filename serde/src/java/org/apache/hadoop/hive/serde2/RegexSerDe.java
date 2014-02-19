@@ -29,20 +29,21 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitiveJavaObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.ParameterizedPrimitiveTypeUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
@@ -126,41 +127,16 @@ public class RegexSerDe extends AbstractSerDe {
     List<ObjectInspector> columnOIs = new ArrayList<ObjectInspector>(columnNames.size());
     for (int c = 0; c < numColumns; c++) {
       TypeInfo typeInfo = columnTypes.get(c);
-      String typeName = typeInfo.getTypeName();
-      if (typeName.equals(serdeConstants.STRING_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
-      } else if (typeName.equals(serdeConstants.TINYINT_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaByteObjectInspector);
-      } else if (typeName.equals(serdeConstants.SMALLINT_TYPE_NAME)) {
-       columnOIs.add(PrimitiveObjectInspectorFactory.javaShortObjectInspector);
-      } else if (typeName.equals(serdeConstants.INT_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaIntObjectInspector);
-      } else if (typeName.equals(serdeConstants.BIGINT_TYPE_NAME)) {
-       columnOIs.add(PrimitiveObjectInspectorFactory.javaLongObjectInspector);
-      } else if (typeName.equals(serdeConstants.FLOAT_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaFloatObjectInspector);
-      } else if (typeName.equals(serdeConstants.DOUBLE_TYPE_NAME)) {
-       columnOIs.add(PrimitiveObjectInspectorFactory.javaDoubleObjectInspector);
-      } else if (typeName.equals(serdeConstants.BOOLEAN_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaBooleanObjectInspector);
-      } else if (typeName.equals(serdeConstants.TIMESTAMP_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaTimestampObjectInspector);
-      } else if (typeName.equals(serdeConstants.DATE_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaDateObjectInspector);
-      } else if (typeName.equals(serdeConstants.DECIMAL_TYPE_NAME)) {
-        columnOIs.add(PrimitiveObjectInspectorFactory.javaHiveDecimalObjectInspector);
-      }  else if (typeInfo instanceof PrimitiveTypeInfo
-          &&
-          ((PrimitiveTypeInfo) typeInfo).getPrimitiveCategory() == PrimitiveCategory.VARCHAR) {
-        VarcharTypeParams varcharParams = (VarcharTypeParams)
-            ParameterizedPrimitiveTypeUtils.getTypeParamsFromTypeInfo(typeInfo);
-        columnOIs.add(PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(
-            (PrimitiveTypeInfo) typeInfo));
+      if (typeInfo instanceof PrimitiveTypeInfo) {
+        PrimitiveTypeInfo pti = (PrimitiveTypeInfo) columnTypes.get(c);
+        AbstractPrimitiveJavaObjectInspector oi =
+            PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(pti);
+        columnOIs.add(oi);
       } else {
-         throw new SerDeException(getClass().getName()
-         + " doesn't allow column [" + c + "] named "
-         + columnNames.get(c) + " with type " + columnTypes.get(c));
-       }
+        throw new SerDeException(getClass().getName()
+            + " doesn't allow column [" + c + "] named "
+            + columnNames.get(c) + " with type " + columnTypes.get(c));
+      }
      }
 
     // StandardStruct uses ArrayList to store the row.
@@ -217,58 +193,72 @@ public class RegexSerDe extends AbstractSerDe {
       try {
         String t = m.group(c+1);
         TypeInfo typeInfo = columnTypes.get(c);
-        String typeName = typeInfo.getTypeName();
 
         // Convert the column to the correct type when needed and set in row obj
-        if (typeName.equals(serdeConstants.STRING_TYPE_NAME)) {
+        PrimitiveTypeInfo pti = (PrimitiveTypeInfo) typeInfo;
+        switch (pti.getPrimitiveCategory()) {
+        case STRING:
           row.set(c, t);
-        } else if (typeName.equals(serdeConstants.TINYINT_TYPE_NAME)) {
+          break;
+        case BYTE:
           Byte b;
           b = Byte.valueOf(t);
           row.set(c,b);
-        } else if (typeName.equals(serdeConstants.SMALLINT_TYPE_NAME)) {
+          break;
+        case SHORT:
           Short s;
           s = Short.valueOf(t);
           row.set(c,s);
-        } else if (typeName.equals(serdeConstants.INT_TYPE_NAME)) {
+          break;
+        case INT:
           Integer i;
           i = Integer.valueOf(t);
           row.set(c, i);
-        } else if (typeName.equals(serdeConstants.BIGINT_TYPE_NAME)) {
+          break;
+        case LONG:
           Long l;
           l = Long.valueOf(t);
           row.set(c, l);
-        } else if (typeName.equals(serdeConstants.FLOAT_TYPE_NAME)) {
+          break;
+        case FLOAT:
           Float f;
           f = Float.valueOf(t);
           row.set(c,f);
-        } else if (typeName.equals(serdeConstants.DOUBLE_TYPE_NAME)) {
+          break;
+        case DOUBLE:
           Double d;
           d = Double.valueOf(t);
           row.set(c,d);
-        } else if (typeName.equals(serdeConstants.BOOLEAN_TYPE_NAME)) {
-          Boolean b;
-          b = Boolean.valueOf(t);
-          row.set(c, b);
-        } else if (typeName.equals(serdeConstants.TIMESTAMP_TYPE_NAME)) {
+          break;
+        case BOOLEAN:
+          Boolean bool;
+          bool = Boolean.valueOf(t);
+          row.set(c, bool);
+          break;
+        case TIMESTAMP:
           Timestamp ts;
           ts = Timestamp.valueOf(t);
           row.set(c, ts);
-        } else if (typeName.equals(serdeConstants.DATE_TYPE_NAME)) {
-          Date d;
-          d = Date.valueOf(t);
-          row.set(c, d);
-        } else if (typeName.equals(serdeConstants.DECIMAL_TYPE_NAME)) {
-          HiveDecimal bd;
-          bd = new HiveDecimal(t);
+          break;
+        case DATE:
+          Date date;
+          date = Date.valueOf(t);
+          row.set(c, date);
+          break;
+        case DECIMAL:
+          HiveDecimal bd = HiveDecimal.create(t);
           row.set(c, bd);
-        } else if (typeInfo instanceof PrimitiveTypeInfo
-            &&
-            ((PrimitiveTypeInfo) typeInfo).getPrimitiveCategory() == PrimitiveCategory.VARCHAR) {
-          VarcharTypeParams varcharParams = (VarcharTypeParams)
-              ParameterizedPrimitiveTypeUtils.getTypeParamsFromTypeInfo(typeInfo);
-          HiveVarchar hv = new HiveVarchar(t, varcharParams != null ? varcharParams.length : -1);
+          break;
+        case CHAR:
+          HiveChar hc = new HiveChar(t, ((CharTypeInfo) typeInfo).getLength());
+          row.set(c, hc);
+          break;
+        case VARCHAR:
+          HiveVarchar hv = new HiveVarchar(t, ((VarcharTypeInfo)typeInfo).getLength());
           row.set(c, hv);
+          break;
+        default:
+          throw new SerDeException("Unsupported type " + typeInfo);
         }
       } catch (RuntimeException e) {
          partialMatchedRowsCount++;

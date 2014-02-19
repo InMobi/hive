@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hive.ql.optimizer.physical;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -191,7 +189,8 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
 
     // optimize this newWork given the big table position
     String bigTableAlias =
-        MapJoinProcessor.genMapJoinOpAndLocalWork(newWork, newJoinOp, bigTablePosition);
+        MapJoinProcessor.genMapJoinOpAndLocalWork(physicalContext.getParseContext().getConf(),
+            newWork, newJoinOp, bigTablePosition);
     return new ObjectPair<MapRedTask, String>(newTask, bigTableAlias);
   }
 
@@ -247,12 +246,27 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
     }
 
     // The mapJoinTaskFileSinkOperator writes to a different directory
-    String childMRPath = mapJoinTaskFileSinkOperator.getConf().getDirName();
+    String childMRPath = mapJoinTaskFileSinkOperator.getConf().getDirName().toString();
     List<String> childMRAliases = childMapWork.getPathToAliases().get(childMRPath);
     if (childMRAliases == null || childMRAliases.size() != 1) {
       return;
     }
     String childMRAlias = childMRAliases.get(0);
+
+    // Sanity check to make sure there is no alias conflict after merge.
+    for (Entry<String, ArrayList<String>> entry : childMapWork.getPathToAliases().entrySet()) {
+      String path = entry.getKey();
+      List<String> aliases = entry.getValue();
+
+      if (path.equals(childMRPath)) {
+        continue;
+      }
+
+      if (aliases.contains(mapJoinAlias)) {
+        // alias confict should not happen here.
+        return;
+      }
+    }
 
     MapredLocalWork mapJoinLocalWork = mapJoinMapWork.getMapLocalWork();
     MapredLocalWork childLocalWork = childMapWork.getMapLocalWork();
@@ -421,13 +435,13 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
           .getConds());
 
       // no table could be the big table; there is no need to convert
-      if (bigTableCandidates == null) {
+      if (bigTableCandidates.isEmpty()) {
         return null;
       }
 
       Configuration conf = context.getConf();
 
-      // If sizes of atleast n-1 tables in a n-way join is known, and their sum is smaller than
+      // If sizes of at least n-1 tables in a n-way join is known, and their sum is smaller than
       // the threshold size, convert the join into map-join and don't create a conditional task
       boolean convertJoinMapJoin = HiveConf.getBoolVar(conf,
           HiveConf.ConfVars.HIVECONVERTJOINNOCONDITIONALTASK);
@@ -437,47 +451,32 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
         long mapJoinSize = HiveConf.getLongVar(conf,
             HiveConf.ConfVars.HIVECONVERTJOINNOCONDITIONALTASKTHRESHOLD);
 
-        boolean bigTableFound = false;
-        long largestBigTableCandidateSize = -1;
-        long sumTableSizes = 0;
-        for (String alias : aliasToWork.keySet()) {
+        Long bigTableSize = null;
+        Set<String> aliases = aliasToWork.keySet();
+        for (String alias : aliases) {
           int tablePosition = getPosition(currWork, joinOp, alias);
-          boolean bigTableCandidate = bigTableCandidates.contains(tablePosition);
-          Long size = aliasToSize.get(alias);
-          // The size is not available at compile time if the input is a sub-query.
-          // If the size of atleast n-1 inputs for a n-way join are available at compile time,
-          // and the sum of them is less than the specified threshold, then convert the join
-          // into a map-join without the conditional task.
-          if ((size == null) || (size > mapJoinSize)) {
-            sumTableSizes += largestBigTableCandidateSize;
-            if (bigTableFound || (sumTableSizes > mapJoinSize) || !bigTableCandidate) {
-              convertJoinMapJoin = false;
-              break;
-            }
-            bigTableFound = true;
+          if (!bigTableCandidates.contains(tablePosition)) {
+            continue;
+          }
+          long sumOfOthers = Utilities.sumOfExcept(aliasToSize, aliases, alias);
+          if (sumOfOthers < 0 || sumOfOthers > mapJoinSize) {
+            continue; // some small alias is not known or too big
+          }
+          if (bigTableSize == null && bigTablePosition >= 0 && tablePosition < bigTablePosition) {
+            continue; // prefer right most alias
+          }
+          Long aliasSize = aliasToSize.get(alias);
+          if (bigTableSize == null || (aliasSize != null && aliasSize > bigTableSize)) {
             bigTablePosition = tablePosition;
-            largestBigTableCandidateSize = mapJoinSize + 1;
-          } else {
-            if (bigTableCandidate && size > largestBigTableCandidateSize) {
-              bigTablePosition = tablePosition;
-              sumTableSizes += largestBigTableCandidateSize;
-              largestBigTableCandidateSize = size;
-            } else {
-              sumTableSizes += size;
-            }
-            if (sumTableSizes > mapJoinSize) {
-              convertJoinMapJoin = false;
-              break;
-            }
+            bigTableSize = aliasSize;
           }
         }
       }
 
-      String bigTableAlias = null;
       currWork.setOpParseCtxMap(parseCtx.getOpParseCtx());
       currWork.setJoinTree(joinTree);
 
-      if (convertJoinMapJoin) {
+      if (bigTablePosition >= 0) {
         // create map join task and set big table as bigTablePosition
         MapRedTask newTask = convertTaskToMapJoinTask(currTask.getWork(), bigTablePosition).getFirst();
 
@@ -507,7 +506,7 @@ public class CommonJoinTaskDispatcher extends AbstractJoinTaskDispatcher impleme
         // create map join task and set big table as i
         ObjectPair<MapRedTask, String> newTaskAlias = convertTaskToMapJoinTask(newWork, i);
         MapRedTask newTask = newTaskAlias.getFirst();
-        bigTableAlias = newTaskAlias.getSecond();
+        String bigTableAlias = newTaskAlias.getSecond();
 
         if (cannotConvert(bigTableAlias, aliasToSize,
             aliasTotalKnownInputSize, ThresholdOfSmallTblSizeSum)) {

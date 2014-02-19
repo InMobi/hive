@@ -11,17 +11,17 @@ PREHOOK: type: CREATETABLE
 POSTHOOK: query: CREATE TABLE db1.sourceTable (one string,two string) PARTITIONED BY (ds string)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: db1@sourceTable
-PREHOOK: query: load data local inpath '../data/files/kv1.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
+PREHOOK: query: load data local inpath '../../data/files/kv1.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
 PREHOOK: type: LOAD
 PREHOOK: Output: db1@sourcetable
-POSTHOOK: query: load data local inpath '../data/files/kv1.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
+POSTHOOK: query: load data local inpath '../../data/files/kv1.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
 POSTHOOK: type: LOAD
 POSTHOOK: Output: db1@sourcetable
 POSTHOOK: Output: db1@sourcetable@ds=2011-11-11
-PREHOOK: query: load data local inpath '../data/files/kv3.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
+PREHOOK: query: load data local inpath '../../data/files/kv3.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
 PREHOOK: type: LOAD
 PREHOOK: Output: db1@sourcetable@ds=2011-11-11
-POSTHOOK: query: load data local inpath '../data/files/kv3.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
+POSTHOOK: query: load data local inpath '../../data/files/kv3.txt' INTO TABLE db1.sourceTable partition(ds='2011-11-11')
 POSTHOOK: type: LOAD
 POSTHOOK: Output: db1@sourcetable@ds=2011-11-11
 PREHOOK: query: CREATE TABLE db2.destinTable (one string,two string) PARTITIONED BY (ds string)
@@ -35,9 +35,6 @@ PREHOOK: type: QUERY
 POSTHOOK: query: EXPLAIN INSERT OVERWRITE TABLE db2.destinTable PARTITION (ds='2011-11-11')
 SELECT one,two FROM db1.sourceTable WHERE ds='2011-11-11' order by one desc, two desc limit 5
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME db1 sourceTable))) (TOK_INSERT (TOK_DESTINATION (TOK_TAB (TOK_TABNAME db2 destinTable) (TOK_PARTSPEC (TOK_PARTVAL ds '2011-11-11')))) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL one)) (TOK_SELEXPR (TOK_TABLE_OR_COL two))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '2011-11-11')) (TOK_ORDERBY (TOK_TABSORTCOLNAMEDESC (TOK_TABLE_OR_COL one)) (TOK_TABSORTCOLNAMEDESC (TOK_TABLE_OR_COL two))) (TOK_LIMIT 5)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -46,36 +43,28 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        sourcetable 
+      Map Operator Tree:
           TableScan
             alias: sourcetable
+            Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: one
-                    type: string
-                    expr: two
-                    type: string
+              expressions: one (type: string), two (type: string)
               outputColumnNames: _col0, _col1
+              Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
-                key expressions:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: string
+                key expressions: _col0 (type: string), _col1 (type: string)
                 sort order: --
-                tag: -1
-                value expressions:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: string
+                Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
+                value expressions: _col0 (type: string), _col1 (type: string)
       Reduce Operator Tree:
         Extract
+          Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
           Limit
+            Number of rows: 5
+            Statistics: Num rows: 5 Data size: 1000 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 1
+              Statistics: Num rows: 5 Data size: 1000 Basic stats: COMPLETE Column stats: NONE
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -96,7 +85,6 @@ STAGE PLANS:
 
   Stage: Stage-2
     Stats-Aggr Operator
-
 
 PREHOOK: query: INSERT OVERWRITE TABLE db2.destinTable PARTITION (ds='2011-11-11')
 SELECT one,two FROM db1.sourceTable WHERE ds='2011-11-11' order by one desc, two desc limit 5
@@ -137,9 +125,6 @@ SELECT one,two FROM db1.sourceTable WHERE ds='2011-11-11' order by one desc, two
 POSTHOOK: type: QUERY
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).one SIMPLE [(sourcetable)sourcetable.FieldSchema(name:one, type:string, comment:null), ]
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).two SIMPLE [(sourcetable)sourcetable.FieldSchema(name:two, type:string, comment:null), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME db1 sourceTable))) (TOK_INSERT (TOK_DESTINATION (TOK_TAB (TOK_TABNAME db2 destinTable) (TOK_PARTSPEC (TOK_PARTVAL ds '2011-11-11')))) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL one)) (TOK_SELEXPR (TOK_TABLE_OR_COL two))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '2011-11-11')) (TOK_ORDERBY (TOK_TABSORTCOLNAMEDESC (TOK_TABLE_OR_COL one)) (TOK_TABSORTCOLNAMEDESC (TOK_TABLE_OR_COL two))) (TOK_LIMIT 5)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -148,36 +133,28 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        sourcetable 
+      Map Operator Tree:
           TableScan
             alias: sourcetable
+            Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: one
-                    type: string
-                    expr: two
-                    type: string
+              expressions: one (type: string), two (type: string)
               outputColumnNames: _col0, _col1
+              Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
-                key expressions:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: string
+                key expressions: _col0 (type: string), _col1 (type: string)
                 sort order: --
-                tag: -1
-                value expressions:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: string
+                Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
+                value expressions: _col0 (type: string), _col1 (type: string)
       Reduce Operator Tree:
         Extract
+          Statistics: Num rows: 30 Data size: 6028 Basic stats: COMPLETE Column stats: NONE
           Limit
+            Number of rows: 5
+            Statistics: Num rows: 5 Data size: 1000 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 1
+              Statistics: Num rows: 5 Data size: 1000 Basic stats: COMPLETE Column stats: NONE
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
@@ -198,7 +175,6 @@ STAGE PLANS:
 
   Stage: Stage-2
     Stats-Aggr Operator
-
 
 PREHOOK: query: INSERT OVERWRITE TABLE db2.destinTable PARTITION (ds='2011-11-11')
 SELECT one,two FROM db1.sourceTable WHERE ds='2011-11-11' order by one desc, two desc limit 5
@@ -255,16 +231,24 @@ POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).one SIMPLE [(sourcetable
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).two SIMPLE [(sourcetable)sourcetable.FieldSchema(name:two, type:string, comment:null), ]
 PREHOOK: query: DROP DATABASE db1
 PREHOOK: type: DROPDATABASE
+PREHOOK: Input: database:db1
+PREHOOK: Output: database:db1
 POSTHOOK: query: DROP DATABASE db1
 POSTHOOK: type: DROPDATABASE
+POSTHOOK: Input: database:db1
+POSTHOOK: Output: database:db1
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).one SIMPLE [(sourcetable)sourcetable.FieldSchema(name:one, type:string, comment:null), ]
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).two SIMPLE [(sourcetable)sourcetable.FieldSchema(name:two, type:string, comment:null), ]
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).one SIMPLE [(sourcetable)sourcetable.FieldSchema(name:one, type:string, comment:null), ]
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).two SIMPLE [(sourcetable)sourcetable.FieldSchema(name:two, type:string, comment:null), ]
 PREHOOK: query: DROP DATABASE db2
 PREHOOK: type: DROPDATABASE
+PREHOOK: Input: database:db2
+PREHOOK: Output: database:db2
 POSTHOOK: query: DROP DATABASE db2
 POSTHOOK: type: DROPDATABASE
+POSTHOOK: Input: database:db2
+POSTHOOK: Output: database:db2
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).one SIMPLE [(sourcetable)sourcetable.FieldSchema(name:one, type:string, comment:null), ]
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).two SIMPLE [(sourcetable)sourcetable.FieldSchema(name:two, type:string, comment:null), ]
 POSTHOOK: Lineage: destintable PARTITION(ds=2011-11-11).one SIMPLE [(sourcetable)sourcetable.FieldSchema(name:one, type:string, comment:null), ]

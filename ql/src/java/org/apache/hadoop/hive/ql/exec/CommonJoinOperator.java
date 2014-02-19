@@ -113,6 +113,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
   int joinEmitInterval = -1;
   int joinCacheSize = 0;
   long nextSz = 0;
+  transient Byte lastAlias = null;
 
   transient boolean handleSkewJoin = false;
 
@@ -131,8 +132,6 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.nextSz = clone.nextSz;
     this.childOperators = clone.childOperators;
     this.parentOperators = clone.parentOperators;
-    this.counterNames = clone.counterNames;
-    this.counterNameToEnum = clone.counterNameToEnum;
     this.done = clone.done;
     this.operatorId = clone.operatorId;
     this.storage = clone.storage;
@@ -140,12 +139,9 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.conf = clone.getConf();
     this.setSchema(clone.getSchema());
     this.alias = clone.alias;
-    this.beginTime = clone.beginTime;
-    this.inputRows = clone.inputRows;
     this.childOperatorsArray = clone.childOperatorsArray;
     this.childOperatorsTag = clone.childOperatorsTag;
     this.colExprMap = clone.colExprMap;
-    this.counters = clone.counters;
     this.dummyObj = clone.dummyObj;
     this.dummyObjVectors = clone.dummyObjVectors;
     this.forwardCache = clone.forwardCache;
@@ -154,7 +150,6 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.hconf = clone.hconf;
     this.id = clone.id;
     this.inputObjInspectors = clone.inputObjInspectors;
-    this.inputRows = clone.inputRows;
     this.noOuterJoin = clone.noOuterJoin;
     this.numAliases = clone.numAliases;
     this.operatorId = clone.operatorId;
@@ -183,7 +178,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     return joinOutputObjectInspector;
   }
 
-  Configuration hconf;
+  protected Configuration hconf;
 
   @Override
   @SuppressWarnings("unchecked")
@@ -250,7 +245,6 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
 
     joinEmitInterval = HiveConf.getIntVar(hconf,
         HiveConf.ConfVars.HIVEJOINEMITINTERVAL);
-    nextSz = joinEmitInterval;
     joinCacheSize = HiveConf.getIntVar(hconf,
         HiveConf.ConfVars.HIVEJOINCACHESIZE);
 
@@ -407,9 +401,9 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
   //
   // for MapJoin, filter tag is pre-calculated in MapredLocalTask and stored with value.
   // when reading the hashtable, MapJoinObjectValue calculates alias filter and provide it to join
-  protected ArrayList<Object> getFilteredValue(byte alias, Object row) throws HiveException {
+  protected List<Object> getFilteredValue(byte alias, Object row) throws HiveException {
     boolean hasFilter = hasFilter(alias);
-    ArrayList<Object> nr = JoinUtil.computeValues(row, joinValues[alias],
+    List<Object> nr = JoinUtil.computeValues(row, joinValues[alias],
         joinValuesObjectInspectors[alias], hasFilter);
     if (hasFilter) {
       short filterTag = JoinUtil.isFiltered(row, joinFilters[alias],
@@ -434,7 +428,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
       }
     }
     if (forward) {
-      forward(forwardCache, null);
+      internalForward(forwardCache, outputObjInspector);
       countAfterReport = 0;
     }
   }
@@ -639,6 +633,10 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     checkAndGenObject();
   }
 
+  protected void internalForward(Object row, ObjectInspector outputOI) throws HiveException {
+    forward(row, outputOI);
+  }
+
   private void genUniqueJoinObject(int aliasNum, int forwardCachePos)
       throws HiveException {
     AbstractRowContainer<List<Object>> alias = storage[order[aliasNum]];
@@ -649,7 +647,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
         forwardCache[p++] = row.get(j);
       }
       if (aliasNum == numAliases - 1) {
-        forward(forwardCache, outputObjInspector);
+        internalForward(forwardCache, outputObjInspector);
         countAfterReport = 0;
       } else {
         genUniqueJoinObject(aliasNum + 1, p);
@@ -668,7 +666,7 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
       }
     }
 
-    forward(forwardCache, outputObjInspector);
+    internalForward(forwardCache, outputObjInspector);
     countAfterReport = 0;
   }
 

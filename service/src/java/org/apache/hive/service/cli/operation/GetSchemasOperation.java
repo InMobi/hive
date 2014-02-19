@@ -24,6 +24,7 @@ import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.OperationType;
 import org.apache.hive.service.cli.RowSet;
+import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.HiveSession;
 
@@ -46,6 +47,7 @@ public class GetSchemasOperation extends MetadataOperation {
     super(parentSession, OperationType.GET_SCHEMAS);
     this.catalogName = catalogName;
     this.schemaName = schemaName;
+    this.rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion());
   }
 
   /* (non-Javadoc)
@@ -55,12 +57,11 @@ public class GetSchemasOperation extends MetadataOperation {
   public void run() throws HiveSQLException {
     setState(OperationState.RUNNING);
     markOperationStartTime();
-    rowSet = new RowSet();
     try {
       IMetaStoreClient metastoreClient = getParentSession().getMetaStoreClient();
       String schemaPattern = convertSchemaPattern(schemaName);
       for (String dbName : metastoreClient.getDatabases(schemaPattern)) {
-        rowSet.addRow(RESULT_SET_SCHEMA, new Object[] {dbName, DEFAULT_HIVE_CATALOG});
+        rowSet.addRow(new Object[] {dbName, DEFAULT_HIVE_CATALOG});
       }
       setState(OperationState.FINISHED);
     } catch (Exception e) {
@@ -87,6 +88,10 @@ public class GetSchemasOperation extends MetadataOperation {
   @Override
   public RowSet getNextRowSet(FetchOrientation orientation, long maxRows) throws HiveSQLException {
     assertState(OperationState.FINISHED);
+    validateDefaultFetchOrientation(orientation);
+    if (orientation.equals(FetchOrientation.FETCH_FIRST)) {
+      rowSet.setStartOffset(0);
+    }
     return rowSet.extractSubset((int)maxRows);
   }
 }

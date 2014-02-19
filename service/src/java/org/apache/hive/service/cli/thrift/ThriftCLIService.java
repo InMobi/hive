@@ -59,7 +59,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   protected int portNum;
   protected InetSocketAddress serverAddress;
   protected TServer server;
-  protected org.mortbay.jetty.Server httpServer;
+  protected org.eclipse.jetty.server.Server httpServer;
 
   private boolean isStarted = false;
   protected boolean isEmbedded = false;
@@ -117,7 +117,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
     LOG.info("Client protocol version: " + req.getClient_protocol());
     TOpenSessionResp resp = new TOpenSessionResp();
     try {
-      SessionHandle sessionHandle = getSessionHandle(req);
+      SessionHandle sessionHandle = getSessionHandle(req, resp);
       resp.setSessionHandle(sessionHandle.toTSessionHandle());
       // TODO: set real configuration map
       resp.setConfiguration(new HashMap<String, String>());
@@ -138,33 +138,46 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
     }
   }
 
-  SessionHandle getSessionHandle(TOpenSessionReq req)
+  SessionHandle getSessionHandle(TOpenSessionReq req, TOpenSessionResp res)
       throws HiveSQLException, LoginException, IOException {
 
     String userName = getUserName(req);
+    TProtocolVersion protocol = getMinVersion(CLIService.SERVER_VERSION, req.getClient_protocol());
 
-    SessionHandle sessionHandle = null;
-    if (
-        cliService.getHiveConf().getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION)
-        .equals(HiveAuthFactory.AuthTypes.KERBEROS.toString())
-        &&
-        cliService.getHiveConf().
-        getBoolVar(ConfVars.HIVE_SERVER2_ENABLE_DOAS)
-        )
-    {
+    SessionHandle sessionHandle;
+    if (cliService.getHiveConf().getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION)
+        .equals(HiveAuthFactory.AuthTypes.KERBEROS.toString()) &&
+        cliService.getHiveConf().getBoolVar(ConfVars.HIVE_SERVER2_ENABLE_DOAS)) {
       String delegationTokenStr = null;
       try {
         delegationTokenStr = cliService.getDelegationTokenFromMetaStore(userName);
       } catch (UnsupportedOperationException e) {
         // The delegation token is not applicable in the given deployment mode
       }
-      sessionHandle = cliService.openSessionWithImpersonation(userName, req.getPassword(),
-          req.getConfiguration(), delegationTokenStr);
+      sessionHandle = cliService.openSessionWithImpersonation(protocol, userName,
+          req.getPassword(), req.getConfiguration(), delegationTokenStr);
     } else {
-      sessionHandle = cliService.openSession(userName, req.getPassword(),
+      sessionHandle = cliService.openSession(protocol, userName, req.getPassword(),
           req.getConfiguration());
     }
+    res.setServerProtocolVersion(protocol);
     return sessionHandle;
+  }
+
+  private TProtocolVersion getMinVersion(TProtocolVersion... versions) {
+    TProtocolVersion[] values = TProtocolVersion.values();
+    int current = values[values.length - 1].getValue();
+    for (TProtocolVersion version : versions) {
+      if (current > version.getValue()) {
+        current = version.getValue();
+      }
+    }
+    for (TProtocolVersion version : values) {
+      if (version.getValue() == current) {
+        return version;
+      }
+    }
+    throw new IllegalArgumentException("never");
   }
 
   @Override
@@ -225,7 +238,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(operationHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error executing statement: ", e);
+      LOG.warn("Error getting type info: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -239,7 +252,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting type info: ", e);
+      LOG.warn("Error getting catalogs: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -254,7 +267,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting catalogs: ", e);
+      LOG.warn("Error getting schemas: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -270,7 +283,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting schemas: ", e);
+      LOG.warn("Error getting tables: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -284,7 +297,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting tables: ", e);
+      LOG.warn("Error getting table types: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -303,7 +316,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting table types: ", e);
+      LOG.warn("Error getting columns: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -319,7 +332,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationHandle(opHandle.toTOperationHandle());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting columns: ", e);
+      LOG.warn("Error getting functions: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -343,7 +356,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setOperationStarted(operationStatus.getOperationStarted());
       resp.setOperationCompleted(operationStatus.getOperationCompleted());
     } catch (Exception e) {
-      LOG.warn("Error getting functions: ", e);
+      LOG.warn("Error getting operation status: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -356,7 +369,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       cliService.cancelOperation(new OperationHandle(req.getOperationHandle()));
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting operation status: ", e);
+      LOG.warn("Error cancelling operation: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -369,7 +382,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       cliService.closeOperation(new OperationHandle(req.getOperationHandle()));
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error canceling operation: ", e);
+      LOG.warn("Error closing operation: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -384,7 +397,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setSchema(schema.toTTableSchema());
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error closing operation: ", e);
+      LOG.warn("Error getting result set metadata: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -402,7 +415,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setHasMoreRows(false);
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      LOG.warn("Error getting result set metadata: ", e);
+      LOG.warn("Error fetching results: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;
@@ -420,7 +433,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       resp.setPlan(query);
       resp.setStatus(OK_STATUS);
     } catch (Exception e) {
-      e.printStackTrace();
+      LOG.warn("Error getting query plan", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }
     return resp;

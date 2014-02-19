@@ -130,8 +130,8 @@ public class ColumnTruncateTask extends Task<ColumnTruncateWork> implements Seri
       throw new RuntimeException(e.getMessage());
     }
 
-    String outputPath = this.work.getOutputDir();
-    Path tempOutPath = Utilities.toTempPath(new Path(outputPath));
+    Path outputPath = this.work.getOutputDir();
+    Path tempOutPath = Utilities.toTempPath(outputPath);
     try {
       FileSystem fs = tempOutPath.getFileSystem(job);
       if (!fs.exists(tempOutPath)) {
@@ -168,7 +168,7 @@ public class ColumnTruncateTask extends Task<ColumnTruncateWork> implements Seri
 
       MapredWork mrWork = new MapredWork();
       mrWork.setMapWork(work);
-      Utilities.setMapRedWork(job, mrWork, ctx.getMRTmpFileURI());
+      Utilities.setMapRedWork(job, mrWork, ctx.getMRTmpPath());
 
       // remove the pwd from conf file so that job tracker doesn't show this
       // logs
@@ -230,7 +230,7 @@ public class ColumnTruncateTask extends Task<ColumnTruncateWork> implements Seri
   }
 
   private void addInputPaths(JobConf job, ColumnTruncateWork work) {
-    FileInputFormat.addInputPath(job, new Path(work.getInputDir()));
+    FileInputFormat.addInputPath(job, work.getInputDir());
   }
 
   @Override
@@ -250,11 +250,6 @@ public class ColumnTruncateTask extends Task<ColumnTruncateWork> implements Seri
 
   @Override
   public void logPlanProgress(SessionState ss) throws IOException {
-    // no op
-  }
-
-  @Override
-  public void updateCounters(Counters ctrs, RunningJob rj) throws IOException {
     // no op
   }
 }

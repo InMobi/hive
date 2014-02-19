@@ -41,13 +41,17 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -55,7 +59,6 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
@@ -66,6 +69,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
+import org.apache.hadoop.util.ReflectionUtils;
 
 public class MetaStoreUtils {
 
@@ -75,21 +79,6 @@ public class MetaStoreUtils {
   public static final String DEFAULT_DATABASE_COMMENT = "Default Hive database";
 
   public static final String DATABASE_WAREHOUSE_SUFFIX = ".db";
-
-  /**
-   * printStackTrace
-   *
-   * Helper function to print an exception stack trace to the log and not stderr
-   *
-   * @param e
-   *          the exception
-   *
-   */
-  static public void printStackTrace(Exception e) {
-    for (StackTraceElement s : e.getStackTrace()) {
-      LOG.error(s);
-    }
-  }
 
   public static Table createColumnsetSchema(String name, List<String> columns,
       List<String> partCols, Configuration conf) throws MetaException {
@@ -155,37 +144,167 @@ public class MetaStoreUtils {
   }
 
   /**
-   * getDeserializer
-   *
-   * Get the Deserializer for a table given its name and properties.
-   *
-   * @param conf
-   *          hadoop config
-   * @param schema
-   *          the properties to use to instantiate the deserializer
-   * @return
-   *   Returns instantiated deserializer by looking up class name of deserializer stored in passed
-   *   in properties. Also, initializes the deserializer with schema stored in passed in properties.
-   * @exception MetaException
-   *              if any problems instantiating the Deserializer
-   *
-   *              todo - this should move somewhere into serde.jar
-   *
+   * @param partParams
+   * @return True if the passed Parameters Map contains values for all "Fast Stats".
    */
-  static public Deserializer getDeserializer(Configuration conf,
-      Properties schema) throws MetaException {
-    String lib = schema
-        .getProperty(org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB);
-    try {
-      Deserializer deserializer = SerDeUtils.lookupDeserializer(lib);
-      (deserializer).initialize(conf, schema);
-      return deserializer;
-    } catch (Exception e) {
-      LOG.error("error in initSerDe: " + e.getClass().getName() + " "
-          + e.getMessage());
-      MetaStoreUtils.printStackTrace(e);
-      throw new MetaException(e.getClass().getName() + " " + e.getMessage());
+  public static boolean containsAllFastStats(Map<String, String> partParams) {
+    for (String stat : StatsSetupConst.fastStats) {
+      if (!partParams.containsKey(stat)) {
+        return false;
+      }
     }
+    return true;
+  }
+
+  public static boolean updateUnpartitionedTableStatsFast(Database db, Table tbl, Warehouse wh,
+      boolean madeDir) throws MetaException {
+    return updateUnpartitionedTableStatsFast(db, tbl, wh, madeDir, false);
+  }
+
+  /**
+   * Updates the numFiles and totalSize parameters for the passed unpartitioned Table by querying
+   * the warehouse if the passed Table does not already have values for these parameters.
+   * @param db
+   * @param tbl
+   * @param wh
+   * @param newDir if true, the directory was just created and can be assumed to be empty
+   * @param forceRecompute Recompute stats even if the passed Table already has
+   * these parameters set
+   * @return true if the stats were updated, false otherwise
+   */
+  public static boolean updateUnpartitionedTableStatsFast(Database db, Table tbl, Warehouse wh,
+      boolean newDir, boolean forceRecompute) throws MetaException {
+    Map<String,String> params = tbl.getParameters();
+    boolean updated = false;
+    if (forceRecompute ||
+        params == null ||
+        !containsAllFastStats(params)) {
+      if (params == null) {
+        params = new HashMap<String,String>();
+      }
+      if (!newDir) {
+        // The table location already exists and may contain data.
+        // Let's try to populate those stats that don't require full scan.
+        LOG.info("Updating table stats fast for " + tbl.getTableName());
+        FileStatus[] fileStatus = wh.getFileStatusesForUnpartitionedTable(db, tbl);
+        params.put(StatsSetupConst.NUM_FILES, Integer.toString(fileStatus.length));
+        long tableSize = 0L;
+        for (FileStatus status : fileStatus) {
+          tableSize += status.getLen();
+        }
+        params.put(StatsSetupConst.TOTAL_SIZE, Long.toString(tableSize));
+        LOG.info("Updated size of table " + tbl.getTableName() +" to "+ Long.toString(tableSize));
+        if(!params.containsKey(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK)) {
+          // invalidate stats requiring scan since this is a regular ddl alter case
+          for (String stat : StatsSetupConst.statsRequireCompute) {
+            params.put(stat, "-1");
+          }
+          params.put(StatsSetupConst.COLUMN_STATS_ACCURATE, StatsSetupConst.FALSE);
+        } else {
+          params.remove(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK);	
+          params.put(StatsSetupConst.COLUMN_STATS_ACCURATE, StatsSetupConst.TRUE);
+        }
+      }
+      tbl.setParameters(params);
+      updated = true;
+    }
+    return updated;
+  }
+
+  // check if stats need to be (re)calculated
+  public static boolean requireCalStats(Configuration hiveConf, Partition oldPart,
+    Partition newPart, Table tbl) {
+
+    if (MetaStoreUtils.isView(tbl)) {
+      return false;
+    }
+
+    if  (oldPart == null && newPart == null) {
+      return true;
+    }
+
+    // requires to calculate stats if new partition doesn't have it
+    if ((newPart == null) || (newPart.getParameters() == null)
+        || !containsAllFastStats(newPart.getParameters())) {
+      return true;
+    }
+
+    if(newPart.getParameters().containsKey(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK)) {
+      return true;
+    }
+    
+    // requires to calculate stats if new and old have different fast stats
+    if ((oldPart != null) && (oldPart.getParameters() != null)) {
+      for (String stat : StatsSetupConst.fastStats) {
+        if (oldPart.getParameters().containsKey(stat)) {
+          Long oldStat = Long.parseLong(oldPart.getParameters().get(stat));
+          Long newStat = Long.parseLong(newPart.getParameters().get(stat));
+          if (oldStat != newStat) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  public static boolean updatePartitionStatsFast(Partition part, Warehouse wh)
+      throws MetaException {
+    return updatePartitionStatsFast(part, wh, false, false);
+  }
+
+  public static boolean updatePartitionStatsFast(Partition part, Warehouse wh, boolean madeDir)
+      throws MetaException {
+    return updatePartitionStatsFast(part, wh, madeDir, false);
+  }
+
+  /**
+   * Updates the numFiles and totalSize parameters for the passed Partition by querying
+   *  the warehouse if the passed Partition does not already have values for these parameters.
+   * @param part
+   * @param wh
+   * @param madeDir if true, the directory was just created and can be assumed to be empty
+   * @param forceRecompute Recompute stats even if the passed Partition already has
+   * these parameters set
+   * @return true if the stats were updated, false otherwise
+   */
+  public static boolean updatePartitionStatsFast(Partition part, Warehouse wh,
+      boolean madeDir, boolean forceRecompute) throws MetaException {
+    Map<String,String> params = part.getParameters();
+    boolean updated = false;
+    if (forceRecompute ||
+        params == null ||
+        !containsAllFastStats(params)) {
+      if (params == null) {
+        params = new HashMap<String,String>();
+      }
+      if (!madeDir) {
+        // The partitition location already existed and may contain data. Lets try to
+        // populate those statistics that don't require a full scan of the data.
+        LOG.warn("Updating partition stats fast for: " + part.getTableName());
+        FileStatus[] fileStatus = wh.getFileStatusesForSD(part.getSd());
+        params.put(StatsSetupConst.NUM_FILES, Integer.toString(fileStatus.length));
+        long partSize = 0L;
+        for (int i = 0; i < fileStatus.length; i++) {
+          partSize += fileStatus[i].getLen();
+        }
+        params.put(StatsSetupConst.TOTAL_SIZE, Long.toString(partSize));
+        LOG.warn("Updated size to " + Long.toString(partSize));
+        if(!params.containsKey(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK)) {
+          // invalidate stats requiring scan since this is a regular ddl alter case
+          for (String stat : StatsSetupConst.statsRequireCompute) {
+            params.put(stat, "-1");
+          }
+          params.put(StatsSetupConst.COLUMN_STATS_ACCURATE, StatsSetupConst.FALSE);
+        } else {
+          params.remove(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK);
+          params.put(StatsSetupConst.COLUMN_STATS_ACCURATE, StatsSetupConst.TRUE);
+        }
+      }
+      part.setParameters(params);
+      updated = true;
+    }
+    return updated;
   }
 
   /**
@@ -214,15 +333,15 @@ public class MetaStoreUtils {
       return null;
     }
     try {
-      Deserializer deserializer = SerDeUtils.lookupDeserializer(lib);
+      Deserializer deserializer = ReflectionUtils.newInstance(conf.getClassByName(lib).
+        asSubclass(Deserializer.class), conf);
       deserializer.initialize(conf, MetaStoreUtils.getTableMetadata(table));
       return deserializer;
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
       LOG.error("error in initSerDe: " + e.getClass().getName() + " "
-          + e.getMessage());
-      MetaStoreUtils.printStackTrace(e);
+          + e.getMessage(), e);
       throw new MetaException(e.getClass().getName() + " " + e.getMessage());
     }
   }
@@ -250,15 +369,15 @@ public class MetaStoreUtils {
       org.apache.hadoop.hive.metastore.api.Table table) throws MetaException {
     String lib = part.getSd().getSerdeInfo().getSerializationLib();
     try {
-      Deserializer deserializer = SerDeUtils.lookupDeserializer(lib);
+      Deserializer deserializer = ReflectionUtils.newInstance(conf.getClassByName(lib).
+        asSubclass(Deserializer.class), conf);
       deserializer.initialize(conf, MetaStoreUtils.getPartitionMetadata(part, table));
       return deserializer;
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
       LOG.error("error in initSerDe: " + e.getClass().getName() + " "
-          + e.getMessage());
-      MetaStoreUtils.printStackTrace(e);
+          + e.getMessage(), e);
       throw new MetaException(e.getClass().getName() + " " + e.getMessage());
     }
   }
@@ -352,10 +471,17 @@ public class MetaStoreUtils {
     }
     return false;
   }
-
+  
+  /*
+   * At the Metadata level there are no restrictions on Column Names.
+   */
+  public static final boolean validateColumnName(String name) {
+    return true;
+  }
+  
   static public String validateTblColumns(List<FieldSchema> cols) {
     for (FieldSchema fieldSchema : cols) {
-      if (!validateName(fieldSchema.getName())) {
+      if (!validateColumnName(fieldSchema.getName())) {
         return "name: " + fieldSchema.getName();
       }
       if (!validateColumnType(fieldSchema.getType())) {
@@ -440,7 +566,7 @@ public class MetaStoreUtils {
       return null;
     }
     for (String col : cols) {
-      if (!validateName(col)) {
+      if (!validateColumnName(col)) {
         return col;
       }
     }
@@ -1135,6 +1261,13 @@ public class MetaStoreUtils {
     return filter.toString();
   }
 
+  public static boolean isView(Table table) {
+    if (table == null) {
+      return false;
+    }
+    return TableType.VIRTUAL_VIEW.toString().equals(table.getTableType());
+  }
+
   /**
    * create listener instances as per the configuration.
    *
@@ -1291,4 +1424,43 @@ public class MetaStoreUtils {
     return null;
   }
 
+  public static ProtectMode getProtectMode(Partition partition) {
+    return getProtectMode(partition.getParameters());
+  }
+
+  public static ProtectMode getProtectMode(Table table) {
+    return getProtectMode(table.getParameters());
+  }
+
+  private static ProtectMode getProtectMode(Map<String, String> parameters) {
+    if (parameters == null) {
+      return null;
+    }
+
+    if (!parameters.containsKey(ProtectMode.PARAMETER_NAME)) {
+      return new ProtectMode();
+    } else {
+      return ProtectMode.getProtectModeFromString(parameters.get(ProtectMode.PARAMETER_NAME));
+    }
+  }
+
+  public static boolean canDropPartition(Table table, Partition partition) {
+    ProtectMode mode = getProtectMode(partition);
+    ProtectMode parentMode = getProtectMode(table);
+    return (!mode.noDrop && !mode.offline && !mode.readOnly && !parentMode.noDropCascade);
+  }
+
+  public static String ARCHIVING_LEVEL = "archiving_level";
+  public static int getArchivingLevel(Partition part) throws MetaException {
+    if (!isArchived(part)) {
+      throw new MetaException("Getting level of unarchived partition");
+    }
+
+    String lv = part.getParameters().get(ARCHIVING_LEVEL);
+    if (lv != null) {
+      return Integer.parseInt(lv);
+    } else {  // partitions archived before introducing multiple archiving
+      return part.getValues().size();
+    }
+  }
 }

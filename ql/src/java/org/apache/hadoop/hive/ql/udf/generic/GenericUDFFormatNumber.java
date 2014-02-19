@@ -61,13 +61,13 @@ import org.apache.hadoop.io.Text;
     + "  '12332.123'")
 public class GenericUDFFormatNumber extends GenericUDF {
   private transient ObjectInspector[] argumentOIs;
-  private final Text resultText = new Text();
-  private final StringBuilder pattern = new StringBuilder("");
-  private final DecimalFormat numberFormat = new DecimalFormat("");
-  private int lastDValue = -1;
-  private String lastFValue = "";
-  private PrimitiveCategory dType;
-  private StringConverter stringConverter;
+  private transient final Text resultText = new Text();
+  private transient final StringBuilder pattern = new StringBuilder("");
+  private transient final DecimalFormat numberFormat = new DecimalFormat("");
+  private transient int lastDValue = -1;
+  private transient String lastFValue = "";
+  private transient PrimitiveCategory dType;
+  private transient StringConverter stringConverter;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments)

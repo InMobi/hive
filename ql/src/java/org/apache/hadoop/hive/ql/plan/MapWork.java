@@ -24,7 +24,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -52,13 +54,13 @@ import org.apache.hadoop.mapred.JobConf;
  * distributed on the cluster. The ExecMapper will ultimately deserialize this
  * class on the data nodes and setup it's operator pipeline accordingly.
  *
- * This class is also used in the explain command any property with the 
+ * This class is also used in the explain command any property with the
  * appropriate annotation will be displayed in the explain output.
  */
 @SuppressWarnings({"serial", "deprecation"})
 public class MapWork extends BaseWork {
 
-  private static transient final Log LOG = LogFactory.getLog(MapWork.class);
+  private static final Log LOG = LogFactory.getLog(MapWork.class);
 
   private boolean hadoopSupportsSplittable;
 
@@ -83,7 +85,7 @@ public class MapWork extends BaseWork {
       new HashMap<String, List<SortCol>>();
 
   private MapredLocalWork mapLocalWork;
-  private String tmpHDFSFileURI;
+  private Path tmpHDFSPath;
 
   private String inputformat;
 
@@ -110,9 +112,16 @@ public class MapWork extends BaseWork {
   // used to indicate the input is sorted, and so a BinarySearchRecordReader shoudl be used
   private boolean inputFormatSorted = false;
 
-  private transient boolean useBucketizedHiveInputFormat;
+  private boolean useBucketizedHiveInputFormat;
 
-  public MapWork() {
+  private Map<String, Map<Integer, String>> scratchColumnVectorTypes = null;
+  private Map<String, Map<String, Integer>> scratchColumnMap = null;
+  private boolean vectorMode = false;
+
+  public MapWork() {}
+
+  public MapWork(String name) {
+    super(name);
   }
 
   @Explain(displayName = "Path -> Alias", normalExplain = false)
@@ -192,7 +201,6 @@ public class MapWork extends BaseWork {
     this.aliasToPartnInfo = aliasToPartnInfo;
   }
 
-  @Explain(displayName = "Alias -> Map Operator Tree")
   public LinkedHashMap<String, Operator<? extends OperatorDesc>> getAliasToWork() {
     return aliasToWork;
   }
@@ -219,7 +227,7 @@ public class MapWork extends BaseWork {
   }
 
 
-  @Explain(displayName = "Split Sample")
+  @Explain(displayName = "Split Sample", normalExplain = false)
   public HashMap<String, SplitSample> getNameToSplitSample() {
     return nameToSplitSample;
   }
@@ -291,9 +299,15 @@ public class MapWork extends BaseWork {
     }
   }
 
+  @Explain(displayName = "Execution mode")
+  public String getVectorModeOn() {
+    return vectorMode ? "vectorized" : null;
+  }
+
   @Override
-  protected List<Operator<?>> getAllRootOperators() {
-    ArrayList<Operator<?>> opList = new ArrayList<Operator<?>>();
+  @Explain(displayName = "Map Operator Tree")
+  public Set<Operator<?>> getAllRootOperators() {
+    Set<Operator<?>> opSet = new LinkedHashSet<Operator<?>>();
 
     Map<String, ArrayList<String>> pa = getPathToAliases();
     if (pa != null) {
@@ -301,12 +315,12 @@ public class MapWork extends BaseWork {
         for (String a : ls) {
           Operator<?> op = getAliasToWork().get(a);
           if (op != null ) {
-            opList.add(op);
+            opSet.add(op);
           }
         }
       }
     }
-    return opList;
+    return opSet;
   }
 
   public void mergeAliasedInput(String alias, String pathDir, PartitionDesc partitionInfo) {
@@ -425,12 +439,12 @@ public class MapWork extends BaseWork {
     this.opParseCtxMap = opParseCtxMap;
   }
 
-  public String getTmpHDFSFileURI() {
-    return tmpHDFSFileURI;
+  public Path getTmpHDFSPath() {
+    return tmpHDFSPath;
   }
 
-  public void setTmpHDFSFileURI(String tmpHDFSFileURI) {
-    this.tmpHDFSFileURI = tmpHDFSFileURI;
+  public void setTmpHDFSPath(Path tmpHDFSPath) {
+    this.tmpHDFSPath = tmpHDFSPath;
   }
 
   public void mergingInto(MapWork mapWork) {
@@ -464,7 +478,7 @@ public class MapWork extends BaseWork {
     this.samplingType = samplingType;
   }
 
-  @Explain(displayName = "Sampling")
+  @Explain(displayName = "Sampling", normalExplain = false)
   public String getSamplingTypeString() {
     return samplingType == 1 ? "SAMPLING_ON_PREV_MR" :
         samplingType == 2 ? "SAMPLING_ON_START" : null;
@@ -479,4 +493,31 @@ public class MapWork extends BaseWork {
       PlanUtils.configureJobConf(fs.getConf().getTableInfo(), job);
     }
   }
+
+  public Map<String, Map<Integer, String>> getScratchColumnVectorTypes() {
+    return scratchColumnVectorTypes;
+  }
+
+  public void setScratchColumnVectorTypes(
+      Map<String, Map<Integer, String>> scratchColumnVectorTypes) {
+    this.scratchColumnVectorTypes = scratchColumnVectorTypes;
+  }
+
+  public Map<String, Map<String, Integer>> getScratchColumnMap() {
+    return scratchColumnMap;
+  }
+
+  public void setScratchColumnMap(Map<String, Map<String, Integer>> scratchColumnMap) {
+    this.scratchColumnMap = scratchColumnMap;
+  }
+
+  public boolean getVectorMode() {
+    return vectorMode;
+  }
+
+  @Override
+  public void setVectorMode(boolean vectorMode) {
+    this.vectorMode = vectorMode;
+  }
+
 }

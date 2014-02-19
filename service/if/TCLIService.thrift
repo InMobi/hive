@@ -31,6 +31,7 @@
 // Services
 // * Service names begin with the letter "T", use a capital letter for each
 //   new word (with no underscores), and end with the word "Service".
+
 namespace java org.apache.hive.service.cli.thrift
 namespace cpp apache.hive.service.cli.thrift
 
@@ -50,6 +51,9 @@ enum TProtocolVersion {
 
   // V5 adds error details when GetOperationStatus returns in error state
   HIVE_CLI_SERVICE_PROTOCOL_V5
+
+  // V6 uses binary type for binary payload (was string) and uses columnar result set
+  HIVE_CLI_SERVICE_PROTOCOL_V6
 }
 
 enum TTypeId {
@@ -71,7 +75,8 @@ enum TTypeId {
   DECIMAL_TYPE,
   NULL_TYPE,
   DATE_TYPE,
-  VARCHAR_TYPE
+  VARCHAR_TYPE,
+  CHAR_TYPE
 }
   
 const set<TTypeId> PRIMITIVE_TYPES = [
@@ -86,9 +91,10 @@ const set<TTypeId> PRIMITIVE_TYPES = [
   TTypeId.TIMESTAMP_TYPE,
   TTypeId.BINARY_TYPE,
   TTypeId.DECIMAL_TYPE,
-  TTypeId.NULL_TYPE
-  TTypeId.DATE_TYPE
-  TTypeId.VARCHAR_TYPE
+  TTypeId.NULL_TYPE,
+  TTypeId.DATE_TYPE,
+  TTypeId.VARCHAR_TYPE,
+  TTypeId.CHAR_TYPE
 ]
 
 const set<TTypeId> COMPLEX_TYPES = [
@@ -123,6 +129,7 @@ const map<TTypeId,string> TYPE_NAMES = {
   TTypeId.NULL_TYPE: "NULL"
   TTypeId.DATE_TYPE: "DATE"
   TTypeId.VARCHAR_TYPE: "VARCHAR"
+  TTypeId.CHAR_TYPE: "CHAR"
 }
 
 // Thrift does not support recursively defined types or forward declarations,
@@ -172,6 +179,10 @@ typedef i32 TTypeEntryPtr
 
 // Valid TTypeQualifiers key names
 const string CHARACTER_MAXIMUM_LENGTH = "characterMaximumLength"
+
+// Type qualifier key name for decimal
+const string PRECISION = "precision"
+const string SCALE = "scale"
 
 union TTypeQualifierValue {
   1: optional i32 i32Value
@@ -296,16 +307,6 @@ struct TStringValue {
   1: optional string value
 }
 
-union TColumn {
-  1: list<TBoolValue> boolColumn
-  2: list<TByteValue> byteColumn
-  3: list<TI16Value> i16Column
-  4: list<TI32Value> i32Column
-  5: list<TI64Value> i64Column
-  6: list<TDoubleValue> doubleColumn
-  7: list<TStringValue> stringColumn
-}
-
 // A single column value in a result set.
 // Note that Hive's type system is richer than Thrift's,
 // so in some cases we have to map multiple Hive types
@@ -325,6 +326,62 @@ union TColumnValue {
 // Represents a row in a rowset.
 struct TRow {
   1: required list<TColumnValue> colVals
+}
+
+struct TBoolColumn {
+  1: required list<bool> values
+  2: required binary nulls
+}
+
+struct TByteColumn {
+  1: required list<byte> values
+  2: required binary nulls
+}
+
+struct TI16Column {
+  1: required list<i16> values
+  2: required binary nulls
+}
+
+struct TI32Column {
+  1: required list<i32> values
+  2: required binary nulls
+}
+
+struct TI64Column {
+  1: required list<i64> values
+  2: required binary nulls
+}
+
+struct TDoubleColumn {
+  1: required list<double> values
+  2: required binary nulls
+}
+
+struct TStringColumn {
+  1: required list<string> values
+  2: required binary nulls
+}
+
+struct TBinaryColumn {
+  1: required list<binary> values
+  2: required binary nulls
+}
+
+// Note that Hive's type system is richer than Thrift's,
+// so in some cases we have to map multiple Hive types
+// to the same Thrift type. On the client-side this is
+// disambiguated by looking at the Schema of the
+// result set.
+union TColumn {
+  1: TBoolColumn   boolVal      // BOOLEAN
+  2: TByteColumn   byteVal      // TINYINT
+  3: TI16Column    i16Val       // SMALLINT
+  4: TI32Column    i32Val       // INT
+  5: TI64Column    i64Val       // BIGINT, TIMESTAMP
+  6: TDoubleColumn doubleVal    // FLOAT, DOUBLE
+  7: TStringColumn stringVal    // STRING, LIST, MAP, STRUCT, UNIONTYPE, DECIMAL, NULL
+  8: TBinaryColumn binaryVal    // BINARY
 }
 
 // Represents a rowset
@@ -482,7 +539,7 @@ struct TOperationHandle {
 // which operations may be executed.
 struct TOpenSessionReq {
   // The version of the HiveServer2 protocol that the client is using.
-  1: required TProtocolVersion client_protocol = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V5
+  1: required TProtocolVersion client_protocol = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
   // Username and password for authentication.
   // Depending on the authentication scheme being used,
@@ -501,7 +558,7 @@ struct TOpenSessionResp {
   1: required TStatus status
 
   // The protocol version that the server is using.
-  2: required TProtocolVersion serverProtocolVersion = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V5
+  2: required TProtocolVersion serverProtocolVersion = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
   // Session Handle
   3: optional TSessionHandle sessionHandle
@@ -895,11 +952,8 @@ struct TGetOperationStatusReq {
   1: required TOperationHandle operationHandle
 }
 
-
-
 struct TGetOperationStatusResp {
   1: required TStatus status
-  // State of the whole operation
   2: optional TOperationState operationState
   // List of statuses of sub tasks
   3: optional string taskStatus

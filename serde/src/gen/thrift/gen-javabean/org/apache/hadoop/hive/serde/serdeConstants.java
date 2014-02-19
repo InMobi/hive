@@ -61,6 +61,10 @@ public class serdeConstants {
 
   public static final String ESCAPE_CHAR = "escape.delim";
 
+  public static final String HEADER_COUNT = "skip.header.line.count";
+
+  public static final String FOOTER_COUNT = "skip.footer.line.count";
+
   public static final String VOID_TYPE_NAME = "void";
 
   public static final String BOOLEAN_TYPE_NAME = "boolean";
@@ -129,6 +133,14 @@ public class serdeConstants {
   static {
     CollectionTypes.add("array");
     CollectionTypes.add("map");
+  }
+
+  public static final Set<String> IntegralTypes = new HashSet<String>();
+  static {
+    IntegralTypes.add("tinyint");
+    IntegralTypes.add("smallint");
+    IntegralTypes.add("int");
+    IntegralTypes.add("bigint");
   }
 
 }

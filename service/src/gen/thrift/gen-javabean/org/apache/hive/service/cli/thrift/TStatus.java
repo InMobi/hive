@@ -694,6 +694,7 @@ public class TStatus implements org.apache.thrift.TBase<TStatus, TStatus._Fields
           case 2: // INFO_MESSAGES
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
+<<<<<<< HEAD
                 org.apache.thrift.protocol.TList _list126 = iprot.readListBegin();
                 struct.infoMessages = new ArrayList<String>(_list126.size);
                 for (int _i127 = 0; _i127 < _list126.size; ++_i127)
@@ -701,6 +702,15 @@ public class TStatus implements org.apache.thrift.TBase<TStatus, TStatus._Fields
                   String _elem128; // optional
                   _elem128 = iprot.readString();
                   struct.infoMessages.add(_elem128);
+=======
+                org.apache.thrift.protocol.TList _list134 = iprot.readListBegin();
+                struct.infoMessages = new ArrayList<String>(_list134.size);
+                for (int _i135 = 0; _i135 < _list134.size; ++_i135)
+                {
+                  String _elem136; // required
+                  _elem136 = iprot.readString();
+                  struct.infoMessages.add(_elem136);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
                 }
                 iprot.readListEnd();
               }
@@ -756,9 +766,15 @@ public class TStatus implements org.apache.thrift.TBase<TStatus, TStatus._Fields
           oprot.writeFieldBegin(INFO_MESSAGES_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.infoMessages.size()));
+<<<<<<< HEAD
             for (String _iter129 : struct.infoMessages)
             {
               oprot.writeString(_iter129);
+=======
+            for (String _iter137 : struct.infoMessages)
+            {
+              oprot.writeString(_iter137);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
             }
             oprot.writeListEnd();
           }
@@ -819,9 +835,15 @@ public class TStatus implements org.apache.thrift.TBase<TStatus, TStatus._Fields
       if (struct.isSetInfoMessages()) {
         {
           oprot.writeI32(struct.infoMessages.size());
+<<<<<<< HEAD
           for (String _iter130 : struct.infoMessages)
           {
             oprot.writeString(_iter130);
+=======
+          for (String _iter138 : struct.infoMessages)
+          {
+            oprot.writeString(_iter138);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           }
         }
       }
@@ -844,6 +866,7 @@ public class TStatus implements org.apache.thrift.TBase<TStatus, TStatus._Fields
       BitSet incoming = iprot.readBitSet(4);
       if (incoming.get(0)) {
         {
+<<<<<<< HEAD
           org.apache.thrift.protocol.TList _list131 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
           struct.infoMessages = new ArrayList<String>(_list131.size);
           for (int _i132 = 0; _i132 < _list131.size; ++_i132)
@@ -851,6 +874,15 @@ public class TStatus implements org.apache.thrift.TBase<TStatus, TStatus._Fields
             String _elem133; // optional
             _elem133 = iprot.readString();
             struct.infoMessages.add(_elem133);
+=======
+          org.apache.thrift.protocol.TList _list139 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.infoMessages = new ArrayList<String>(_list139.size);
+          for (int _i140 = 0; _i140 < _list139.size; ++_i140)
+          {
+            String _elem141; // required
+            _elem141 = iprot.readString();
+            struct.infoMessages.add(_elem141);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           }
         }
         struct.setInfoMessagesIsSet(true);

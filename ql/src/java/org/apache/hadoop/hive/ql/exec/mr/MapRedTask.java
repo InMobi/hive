@@ -39,14 +39,11 @@ import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.Utilities.StreamPrinter;
-import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hadoop.mapred.JobConf;
 /**
  * Extension of ExecDriver:
  * - can optionally spawn a map-reduce task from a separate jvm
@@ -64,12 +61,11 @@ public class MapRedTask extends ExecDriver implements Serializable {
   static final String HIVE_DEBUG_RECURSIVE = "HIVE_DEBUG_RECURSIVE";
   static final String HIVE_MAIN_CLIENT_DEBUG_OPTS = "HIVE_MAIN_CLIENT_DEBUG_OPTS";
   static final String HIVE_CHILD_CLIENT_DEBUG_OPTS = "HIVE_CHILD_CLIENT_DEBUG_OPTS";
-  static final String[] HIVE_SYS_PROP = {"build.dir", "build.dir.hive"};
+  static final String[] HIVE_SYS_PROP = {"build.dir", "build.dir.hive", "hive.query.id"};
 
   private transient ContentSummary inputSummary = null;
   private transient boolean runningViaChild = false;
 
-  private transient boolean inputSizeEstimated = false;
   private transient long totalInputFileSize;
   private transient long totalInputNumFiles;
 
@@ -77,10 +73,6 @@ public class MapRedTask extends ExecDriver implements Serializable {
 
   public MapRedTask() {
     super();
-  }
-
-  public MapRedTask(MapredWork plan, JobConf job, boolean isSilent) throws HiveException {
-    throw new RuntimeException("Illegal Constructor call");
   }
 
   @Override
@@ -177,21 +169,16 @@ public class MapRedTask extends ExecDriver implements Serializable {
       String hiveConfArgs = generateCmdLine(conf, ctx);
 
       // write out the plan to a local file
-      Path planPath = new Path(ctx.getLocalTmpFileURI(), "plan.xml");
+      Path planPath = new Path(ctx.getLocalTmpPath(), "plan.xml");
       OutputStream out = FileSystem.getLocal(conf).create(planPath);
       MapredWork plan = getWork();
       LOG.info("Generating plan file " + planPath.toString());
-      Utilities.serializePlan(plan, out);
+      Utilities.serializePlan(plan, out, conf);
 
       String isSilent = "true".equalsIgnoreCase(System
           .getProperty("test.silent")) ? "-nolog" : "";
 
-      String jarCmd;
-      if (ShimLoader.getHadoopShims().usesJobShell()) {
-        jarCmd = libJarsOption + hiveJar + " " + ExecDriver.class.getName();
-      } else {
-        jarCmd = hiveJar + " " + ExecDriver.class.getName() + libJarsOption;
-      }
+      String jarCmd = hiveJar + " " + ExecDriver.class.getName() + libJarsOption;
 
       String cmdLine = hadoopExec + " jar " + jarCmd + " -plan "
           + planPath.toString() + " " + isSilent + " " + hiveConfArgs;
@@ -201,7 +188,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
       if (!files.isEmpty()) {
         cmdLine = cmdLine + " -files " + files;
 
-        workDir = (new Path(ctx.getLocalTmpFileURI())).toUri().getPath();
+        workDir = ctx.getLocalTmpPath().toUri().getPath();
 
         if (! (new File(workDir)).mkdir()) {
           throw new IOException ("Cannot create tmp working dir: " + workDir);
@@ -339,7 +326,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
     if (environmentVariables.get(HIVE_DEBUG_RECURSIVE).equals("y")) {
       // swap debug options in HADOOP_CLIENT_OPTS to those that the child JVM should have
       assert environmentVariables.containsKey(HIVE_CHILD_CLIENT_DEBUG_OPTS)
-          && environmentVariables.get(HIVE_MAIN_CLIENT_DEBUG_OPTS) != null : HIVE_CHILD_CLIENT_DEBUG_OPTS
+          && environmentVariables.get(HIVE_CHILD_CLIENT_DEBUG_OPTS) != null : HIVE_CHILD_CLIENT_DEBUG_OPTS
           + " environment variable must be set when JVM in debug mode";
       String newHadoopClientOpts = hadoopClientOpts.replace(
           environmentVariables.get(HIVE_MAIN_CLIENT_DEBUG_OPTS),
@@ -408,7 +395,7 @@ public class MapRedTask extends ExecDriver implements Serializable {
         if (inputSummary == null) {
           inputSummary =  Utilities.getInputSummary(driverContext.getCtx(), work.getMapWork(), null);
         }
-        int reducers = Utilities.estimateNumberOfReducers(conf, inputSummary, work.getMapWork(), 
+        int reducers = Utilities.estimateNumberOfReducers(conf, inputSummary, work.getMapWork(),
                                                           work.isFinalMapRed());
         rWork.setNumReduceTasks(reducers);
         console

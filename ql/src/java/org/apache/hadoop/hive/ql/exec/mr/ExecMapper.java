@@ -31,8 +31,12 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.FetchOperator;
 import org.apache.hadoop.hive.ql.exec.MapOperator;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
+import org.apache.hadoop.hive.ql.exec.ObjectCache;
+import org.apache.hadoop.hive.ql.exec.ObjectCacheFactory;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.OperatorUtils;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.vector.VectorMapOperator;
 import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.MapredLocalWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -57,6 +61,7 @@ import org.apache.hadoop.util.StringUtils;
  */
 public class ExecMapper extends MapReduceBase implements Mapper {
 
+  private static final String PLAN_KEY = "__MAP_PLAN__";
   private MapOperator mo;
   private Map<String, FetchOperator> fetchOperators;
   private OutputCollector oc;
@@ -92,12 +97,27 @@ public class ExecMapper extends MapReduceBase implements Mapper {
     } catch (Exception e) {
       l4j.info("cannot get classpath: " + e.getMessage());
     }
+
+    setDone(false);
+
+    ObjectCache cache = ObjectCacheFactory.getCache(job);
+
     try {
       jc = job;
       execContext.setJc(jc);
       // create map and fetch operators
-      MapWork mrwork = Utilities.getMapWork(job);
-      mo = new MapOperator();
+      MapWork mrwork = (MapWork) cache.retrieve(PLAN_KEY);
+      if (mrwork == null) {
+        mrwork = Utilities.getMapWork(job);
+        cache.cache(PLAN_KEY, mrwork);
+      } else {
+        Utilities.setMapWork(job, mrwork);
+      }
+      if (mrwork.getVectorMode()) {
+        mo = new VectorMapOperator();
+      } else {
+        mo = new MapOperator();
+      }
       mo.setConf(mrwork);
       // initialize map operator
       mo.setChildren(job);
@@ -141,7 +161,7 @@ public class ExecMapper extends MapReduceBase implements Mapper {
     if (oc == null) {
       oc = output;
       rp = reporter;
-      mo.setOutputCollector(oc);
+      OperatorUtils.setChildrenCollector(mo.getChildOperators(), output);
       mo.setReporter(rp);
       MapredContext.get().setReporter(reporter);
     }
@@ -241,6 +261,7 @@ public class ExecMapper extends MapReduceBase implements Mapper {
       }
     } finally {
       MapredContext.close();
+      Utilities.clearWorkMap();
     }
   }
 

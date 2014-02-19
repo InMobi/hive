@@ -22,22 +22,19 @@ import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyHiveVarchar;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
-import org.apache.hadoop.hive.serde2.typeinfo.BaseTypeParams;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
-import org.apache.hadoop.hive.serde2.typeinfo.ParameterizedPrimitiveTypeUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharUtils;
 
 public class LazyHiveVarcharObjectInspector
     extends AbstractPrimitiveLazyObjectInspector<HiveVarcharWritable>
     implements HiveVarcharObjectInspector {
 
-  public LazyHiveVarcharObjectInspector(PrimitiveTypeEntry typeEntry) {
-    super(typeEntry);
-    if (typeEntry.primitiveCategory != PrimitiveCategory.VARCHAR) {
-      throw new RuntimeException(
-          "TypeEntry of type varchar expected, got " + typeEntry.primitiveCategory);
-    }
+  // no-arg ctor required for Kyro
+  public LazyHiveVarcharObjectInspector() {
+  }
+
+  public LazyHiveVarcharObjectInspector(VarcharTypeInfo typeInfo) {
+    super(typeInfo);
   }
 
   @Override
@@ -58,14 +55,15 @@ public class LazyHiveVarcharObjectInspector
     }
 
     HiveVarchar ret = ((LazyHiveVarchar) o).getWritableObject().getHiveVarchar();
-    if (!ParameterizedPrimitiveTypeUtils.doesPrimitiveMatchTypeParams(
-        ret, (VarcharTypeParams) typeParams)) {
-      HiveVarchar newValue = new HiveVarchar(ret, ((VarcharTypeParams) typeParams).length);
+    if (!BaseCharUtils.doesPrimitiveMatchTypeParams(
+        ret, (VarcharTypeInfo)typeInfo)) {
+      HiveVarchar newValue = new HiveVarchar(ret, ((VarcharTypeInfo)typeInfo).getLength());
       return newValue;
     }
     return ret;
   }
 
+  @Override
   public String toString() {
     return getTypeName();
   }

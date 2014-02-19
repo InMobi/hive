@@ -18,6 +18,9 @@
  */
 package org.apache.hive.hcatalog.data;
 
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,8 +30,12 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.HiveChar;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +91,11 @@ public class TestJsonSerDe extends TestCase {
     c1_1.add(i2);
     c1.add(c1_1);
     rlist.add(c1);
+    rlist.add(HiveDecimal.create(new BigDecimal("123.45")));//prec 5, scale 2
+    rlist.add(new HiveChar("hive_char", 10));
+    rlist.add(new HiveVarchar("hive_varchar", 20));
+    rlist.add(Date.valueOf("2014-01-07"));
+    rlist.add(new Timestamp(System.currentTimeMillis()));
 
     List<Object> nlist = new ArrayList<Object>(13);
     nlist.add(null); // tinyint
@@ -99,20 +111,26 @@ public class TestJsonSerDe extends TestCase {
     nlist.add(null); // map
     nlist.add(null); // bool
     nlist.add(null); // complex
+    nlist.add(null); //decimal(5,2)
+    nlist.add(null); //char(10)
+    nlist.add(null); //varchar(20)
+    nlist.add(null); //date
+    nlist.add(null); //timestamp
 
     String typeString =
         "tinyint,smallint,int,bigint,double,float,string,string,"
             + "struct<a:string,b:string>,array<int>,map<smallint,string>,boolean,"
-            + "array<struct<i1:int,i2:struct<ii1:array<int>,ii2:map<string,struct<iii1:int>>>>>";
+            + "array<struct<i1:int,i2:struct<ii1:array<int>,ii2:map<string,struct<iii1:int>>>>>," +
+                "decimal(5,2),char(10),varchar(20),date,timestamp";
     Properties props = new Properties();
 
-    props.put(serdeConstants.LIST_COLUMNS, "ti,si,i,bi,d,f,s,n,r,l,m,b,c1");
+    props.put(serdeConstants.LIST_COLUMNS, "ti,si,i,bi,d,f,s,n,r,l,m,b,c1,bd,hc,hvc,dt,ts");
     props.put(serdeConstants.LIST_COLUMN_TYPES, typeString);
 //    props.put(Constants.SERIALIZATION_NULL_FORMAT, "\\N");
 //    props.put(Constants.SERIALIZATION_FORMAT, "1");
 
-    data.add(new Pair(props, new DefaultHCatRecord(rlist)));
-    data.add(new Pair(props, new DefaultHCatRecord(nlist)));
+    data.add(new Pair<Properties, HCatRecord>(props, new DefaultHCatRecord(rlist)));
+    data.add(new Pair<Properties, HCatRecord>(props, new DefaultHCatRecord(nlist)));
     return data;
   }
 
@@ -136,14 +154,17 @@ public class TestJsonSerDe extends TestCase {
       LOG.info("ONE:{}", s);
 
       Object o1 = hrsd.deserialize(s);
-      assertTrue(HCatDataCheckUtil.recordsEqual(r, (HCatRecord) o1));
+      StringBuilder msg = new StringBuilder();
+      boolean isEqual = HCatDataCheckUtil.recordsEqual(r, (HCatRecord) o1); 
+      assertTrue(msg.toString(), isEqual);
 
       Writable s2 = jsde.serialize(o1, hrsd.getObjectInspector());
       LOG.info("TWO:{}", s2);
       Object o2 = jsde.deserialize(s2);
       LOG.info("deserialized TWO : {} ", o2);
-
-      assertTrue(HCatDataCheckUtil.recordsEqual(r, (HCatRecord) o2));
+      msg.setLength(0);
+      isEqual = HCatDataCheckUtil.recordsEqual(r, (HCatRecord) o2, msg);
+      assertTrue(msg.toString(), isEqual);
     }
 
   }
@@ -152,7 +173,7 @@ public class TestJsonSerDe extends TestCase {
     /**
      *  This test has been added to account for HCATALOG-436
      *  We write out columns with "internal column names" such
-     *  as "_col0", but try to read with retular column names.
+     *  as "_col0", but try to read with regular column names.
      */
 
     Configuration conf = new Configuration();
@@ -189,7 +210,9 @@ public class TestJsonSerDe extends TestCase {
 
       Object o2 = rjsd.deserialize(s);
       LOG.info("deserialized TWO : {} ", o2);
-      assertTrue(HCatDataCheckUtil.recordsEqual(r, (HCatRecord) o2));
+      StringBuilder msg = new StringBuilder();
+      boolean isEqual = HCatDataCheckUtil.recordsEqual(r, (HCatRecord) o2, msg);
+      assertTrue(msg.toString(), isEqual);
     }
 
   }
@@ -211,4 +234,56 @@ public class TestJsonSerDe extends TestCase {
     }
     return sb.toString();
   }
+
+  /**
+   * This test tests that our json deserialization is not too strict, as per HIVE-6166
+   *
+   * i.e, if our schema is "s:struct<a:int,b:string>,k:int", and we pass in
+   * data that looks like : {
+   *                            "x" : "abc" ,
+   *                            "t" : {
+   *                                "a" : "1",
+   *                                "b" : "2",
+   *                                "c" : [
+   *                                    { "x" : 2 , "y" : 3 } ,
+   *                                    { "x" : 3 , "y" : 2 }
+   *                                ]
+   *                            } ,
+   *                            "s" : {
+   *                                "a" : 2 ,
+   *                                "b" : "blah",
+   *                                "c": "woo"
+   *                            }
+   *                        }
+   *
+   * Then it should still work, and ignore the "x" and "t" field and "c" subfield of "s", and it
+   * should read k as null.
+   */
+  public void testLooseJsonReadability() throws Exception {
+    Configuration conf = new Configuration();
+    Properties props = new Properties();
+
+    props.put(serdeConstants.LIST_COLUMNS, "s,k");
+    props.put(serdeConstants.LIST_COLUMN_TYPES, "struct<a:int,b:string>,int");
+    JsonSerDe rjsd = new JsonSerDe();
+    rjsd.initialize(conf, props);
+
+    Text jsonText = new Text("{ \"x\" : \"abc\" , "
+        + " \"t\" : { \"a\":\"1\", \"b\":\"2\", \"c\":[ { \"x\":2 , \"y\":3 } , { \"x\":3 , \"y\":2 }] } ,"
+        +"\"s\" : { \"a\" : 2 , \"b\" : \"blah\", \"c\": \"woo\" } }");
+    List<Object> expected = new ArrayList<Object>();
+    List<Object> inner = new ArrayList<Object>();
+    inner.add(2);
+    inner.add("blah");
+    expected.add(inner);
+    expected.add(null);
+    HCatRecord expectedRecord = new DefaultHCatRecord(expected);
+
+    HCatRecord r = (HCatRecord) rjsd.deserialize(jsonText);
+    System.err.println("record : " + r.toString());
+
+    assertTrue(HCatDataCheckUtil.recordsEqual(r, expectedRecord));
+
+  }
+
 }

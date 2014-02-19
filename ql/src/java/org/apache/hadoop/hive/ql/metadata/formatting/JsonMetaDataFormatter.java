@@ -19,14 +19,15 @@
 package org.apache.hadoop.hive.ql.metadata.formatting;
 
 import java.io.DataOutputStream;
-import java.io.OutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,8 +40,6 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /**
@@ -260,7 +259,7 @@ public class JsonMetaDataFormatter implements MetaDataFormatter {
       // in case all files in locations do not exist
       try {
         FileStatus tmpStatus = fs.getFileStatus(tblPath);
-        lastAccessTime = ShimLoader.getHadoopShims().getAccessTime(tmpStatus);
+        lastAccessTime = tmpStatus.getAccessTime();
         lastUpdateTime = tmpStatus.getModificationTime();
       } catch (IOException e) {
         LOG.warn(
@@ -273,7 +272,7 @@ public class JsonMetaDataFormatter implements MetaDataFormatter {
           try {
             FileStatus status = fs.getFileStatus(tblPath);
             FileStatus[] files = fs.listStatus(loc);
-            long accessTime = ShimLoader.getHadoopShims().getAccessTime(status);
+            long accessTime = status.getAccessTime();
             long updateTime = status.getModificationTime();
             // no matter loc is the table location or part location, it must be a
             // directory.
@@ -299,8 +298,7 @@ public class JsonMetaDataFormatter implements MetaDataFormatter {
               if (fileLen < minFileSize) {
                 minFileSize = fileLen;
               }
-              accessTime = ShimLoader.getHadoopShims().getAccessTime(
-                  currentStatus);
+              accessTime = currentStatus.getAccessTime();
               updateTime = currentStatus.getModificationTime();
               if (accessTime > lastAccessTime) {
                 lastAccessTime = accessTime;
@@ -400,28 +398,20 @@ public class JsonMetaDataFormatter implements MetaDataFormatter {
      * Show the description of a database
      */
     @Override
-    public void showDatabaseDescription(DataOutputStream out,
-                                        String database,
-                                        String comment,
-                                        String location,
-                                        Map<String, String> params)
-        throws HiveException
-    {
-        if (params == null || params.isEmpty()) {
-            asJson(out, MapBuilder
-               .create()
-               .put("database", database)
-               .put("comment", comment)
-               .put("location", location)
-               .build());
-        } else {
-            asJson(out, MapBuilder
-               .create()
-               .put("database", database)
-               .put("comment", comment)
-               .put("location", location)
-               .put("params", params)
-               .build());
-        }
+    public void showDatabaseDescription(DataOutputStream out, String database, String comment,
+      String location, String ownerName, String ownerType, Map<String, String> params)
+      throws HiveException {
+      MapBuilder builder = MapBuilder.create().put("database", database).put("comment", comment)
+        .put("location", location);
+      if (null != ownerName) {
+        builder.put("owner", ownerName);
+      }
+      if (null != ownerType) {
+        builder.put("ownerType", ownerType);
+      }
+      if (null != params && !params.isEmpty()) {
+        builder.put("params", params);
+      }
+      asJson(out, builder.build());
     }
 }

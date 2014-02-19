@@ -18,45 +18,44 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.ObjectInputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.HashTableLoaderFactory;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinKey;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinObjectSerDeContext;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinRowContainer;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinTableContainer;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinTableContainerSerDe;
+import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * Map side Join operator implementation.
  */
 public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implements Serializable {
+
   private static final long serialVersionUID = 1L;
   private static final Log LOG = LogFactory.getLog(MapJoinOperator.class.getName());
+  private static final String CLASS_NAME = MapJoinOperator.class.getName();
+  private final PerfLogger perfLogger = PerfLogger.getPerfLogger();
 
-  private static final transient String[] FATAL_ERR_MSG = {
-      null, // counter value 0 means no error
-      "Mapside join exceeds available memory. "
-          + "Please try removing the mapjoin hint."};
+  private transient String tableKey;
+  private transient String serdeKey;
+  private transient ObjectCache cache;
 
-  private transient MapJoinTableContainer[] mapJoinTables;
+  private HashTableLoader loader;
+
+  protected transient MapJoinTableContainer[] mapJoinTables;
   private transient MapJoinTableContainerSerDe[] mapJoinTableSerdes;
   private transient boolean hashTblInitedOnce;
   private transient MapJoinKey key;
@@ -68,25 +67,50 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
     super(mjop);
   }
 
+  /*
+   * We need the base (operator.java) implementation of start/endGroup.
+   * The parent class has functionality in those that map join can't use.
+   * Note: The mapjoin can be run in the reducer only on Tez.
+   */
   @Override
-  protected void initializeOp(Configuration hconf) throws HiveException {
-    super.initializeOp(hconf);
-    int tagLen = conf.getTagLength();
-    mapJoinTables = new MapJoinTableContainer[tagLen];
-    mapJoinTableSerdes = new MapJoinTableContainerSerDe[tagLen];
-    hashTblInitedOnce = false;
+  public void endGroup() throws HiveException {
+    defaultEndGroup();
   }
 
   @Override
-  protected void fatalErrorMessage(StringBuilder errMsg, long counterCode) {
-    errMsg.append("Operator " + getOperatorId() + " (id=" + id + "): "
-        + FATAL_ERR_MSG[(int) counterCode]);
+  public void startGroup() throws HiveException {
+    defaultStartGroup();
+  }
+
+  @Override
+  protected void initializeOp(Configuration hconf) throws HiveException {
+    super.initializeOp(hconf);
+
+    int tagLen = conf.getTagLength();
+
+    // On Tez only: The hash map might already be cached in the container we run
+    // the task in. On MR: The cache is a no-op.
+    tableKey = "__HASH_MAP_"+this.getOperatorId()+"_container";
+    serdeKey = "__HASH_MAP_"+this.getOperatorId()+"_serde";
+
+    cache = ObjectCacheFactory.getCache(hconf);
+    loader = HashTableLoaderFactory.getLoader(hconf);
+
+    mapJoinTables = (MapJoinTableContainer[]) cache.retrieve(tableKey);
+    mapJoinTableSerdes = (MapJoinTableContainerSerDe[]) cache.retrieve(serdeKey);
+    hashTblInitedOnce = true;
+
+    if (mapJoinTables == null || mapJoinTableSerdes == null) {
+      mapJoinTables = new MapJoinTableContainer[tagLen];
+      mapJoinTableSerdes = new MapJoinTableContainerSerDe[tagLen];
+      hashTblInitedOnce = false;
+    }
   }
 
   public void generateMapMetaData() throws HiveException, SerDeException {
     // generate the meta data for key
     // index for key is -1
-    
+
     TableDesc keyTableDesc = conf.getKeyTblDesc();
     SerDe keySerializer = (SerDe) ReflectionUtils.newInstance(keyTableDesc.getDeserializerClass(),
         null);
@@ -111,58 +135,21 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
   }
 
   private void loadHashTable() throws HiveException {
-    if (!this.getExecContext().getLocalWork().getInputFileChangeSensitive()) {
+
+    if (this.getExecContext().getLocalWork() == null
+        || !this.getExecContext().getLocalWork().getInputFileChangeSensitive()) {
       if (hashTblInitedOnce) {
         return;
       } else {
         hashTblInitedOnce = true;
       }
     }
-
-    String baseDir = null;
-    String currentInputFile = getExecContext().getCurrentInputFile();
-    LOG.info("******* Load from HashTable File: input : " + currentInputFile);
-    String fileName = getExecContext().getLocalWork().getBucketFileName(currentInputFile);
-    try {
-      if (ShimLoader.getHadoopShims().isLocalMode(hconf)) {
-        baseDir = this.getExecContext().getLocalWork().getTmpFileURI();
-      } else {
-        Path[] localArchives;
-        String stageID = this.getExecContext().getLocalWork().getStageID();
-        String suffix = Utilities.generateTarFileName(stageID);
-        FileSystem localFs = FileSystem.getLocal(hconf);
-        localArchives = DistributedCache.getLocalCacheArchives(this.hconf);
-        Path archive;
-        for (int j = 0; j < localArchives.length; j++) {
-          archive = localArchives[j];
-          if (!archive.getName().endsWith(suffix)) {
-            continue;
-          }
-          Path archiveLocalLink = archive.makeQualified(localFs);
-          baseDir = archiveLocalLink.toUri().getPath();
-        }
-      }
-      for (int pos = 0; pos < mapJoinTables.length; pos++) {
-        if (pos == posBigTable) {
-          continue;
-        }
-        if(baseDir == null) {
-          throw new IllegalStateException("baseDir cannot be null");
-        }
-        String filePath = Utilities.generatePath(baseDir, conf.getDumpFilePrefix(), (byte)pos, fileName);
-        Path path = new Path(filePath);
-        LOG.info("\tLoad back 1 hashtable file from tmp file uri:" + path);
-        ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(
-            new FileInputStream(path.toUri().getPath()), 4096));
-        try{ 
-          mapJoinTables[pos] = mapJoinTableSerdes[pos].load(in);
-        } finally {
-          in.close();
-        }
-      }
-    } catch (Exception e) {
-      throw new HiveException(e);
-    }
+    perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.LOAD_HASHTABLE);
+    loader.init(getExecContext(), hconf, this);
+    loader.load(mapJoinTables, mapJoinTableSerdes);
+    cache.cache(tableKey, mapJoinTables);
+    cache.cache(serdeKey, mapJoinTableSerdes);
+    perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.LOAD_HASHTABLE);
   }
 
   // Load the hash table
@@ -180,19 +167,23 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
     }
   }
 
+  protected MapJoinKey computeMapJoinKey(Object row, byte alias) throws HiveException {
+    return JoinUtil.computeMapJoinKeys(key, row, joinKeys[alias],
+        joinKeysObjectInspectors[alias]);
+  }
+
   @Override
   public void processOp(Object row, int tag) throws HiveException {
     try {
       if (firstRow) {
-        // generate the map metadata
         generateMapMetaData();
+        loadHashTable();
         firstRow = false;
       }
       alias = (byte)tag;
 
       // compute keys and values as StandardObjects
-      key = JoinUtil.computeMapJoinKeys(key, row, joinKeys[alias],
-          joinKeysObjectInspectors[alias]);
+      key = computeMapJoinKey(row, alias);
       boolean joinNeeded = false;
       for (byte pos = 0; pos < order.length; pos++) {
         if (pos != alias) {
@@ -213,7 +204,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
         }
       }
       if (joinNeeded) {
-        ArrayList<Object> value = getFilteredValue(alias, row);
+        List<Object> value = getFilteredValue(alias, row);
         // Add the value to the ArrayList
         storage[alias].add(value);
         // generate the output records
@@ -233,7 +224,9 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
 
   @Override
   public void closeOp(boolean abort) throws HiveException {
-    if (mapJoinTables != null) {
+    if ((this.getExecContext().getLocalWork() != null
+        && this.getExecContext().getLocalWork().getInputFileChangeSensitive())
+        && mapJoinTables != null) {
       for (MapJoinTableContainer tableContainer : mapJoinTables) {
         if (tableContainer != null) {
           tableContainer.clear();

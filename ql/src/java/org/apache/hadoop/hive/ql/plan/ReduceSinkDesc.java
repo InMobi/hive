@@ -60,6 +60,12 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   private int numDistributionKeys;
 
   /**
+   * Used in tez. Holds the name of the output
+   * that this reduce sink is writing to.
+   */
+  private String outputName;
+
+  /**
    * The partition columns (CLUSTER BY or DISTRIBUTE BY in Hive language).
    * Partition columns decide the reducer that the current row goes to.
    * Partition columns are not passed to reducer.
@@ -138,6 +144,10 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   }
 
   @Explain(displayName = "key expressions")
+  public String getKeyColString() {
+    return PlanUtils.getExprListString(keyCols);
+  }
+
   public java.util.ArrayList<ExprNodeDesc> getKeyCols() {
     return keyCols;
   }
@@ -155,6 +165,10 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   }
 
   @Explain(displayName = "value expressions")
+  public String getValueColsString() {
+    return PlanUtils.getExprListString(valueCols);
+  }
+
   public java.util.ArrayList<ExprNodeDesc> getValueCols() {
     return valueCols;
   }
@@ -164,6 +178,10 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   }
 
   @Explain(displayName = "Map-reduce partition columns")
+  public String getParitionColsString() {
+    return PlanUtils.getExprListString(partitionCols);
+  }
+
   public java.util.ArrayList<ExprNodeDesc> getPartitionCols() {
     return partitionCols;
   }
@@ -173,7 +191,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     this.partitionCols = partitionCols;
   }
 
-  @Explain(displayName = "tag")
+  @Explain(displayName = "tag", normalExplain = false)
   public int getTag() {
     return tag;
   }
@@ -190,7 +208,7 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
     this.topN = topN;
   }
 
-  @Explain(displayName = "TopN")
+  @Explain(displayName = "TopN", normalExplain = false)
   public Integer getTopNExplain() {
     return topN > 0 ? topN : null;
   }
@@ -272,5 +290,13 @@ public class ReduceSinkDesc extends AbstractOperatorDesc {
   public void setDistinctColumnIndices(
       List<List<Integer>> distinctColumnIndices) {
     this.distinctColumnIndices = distinctColumnIndices;
+  }
+
+  public String getOutputName() {
+    return outputName;
+  }
+
+  public void setOutputName(String outputName) {
+    this.outputName = outputName;
   }
 }

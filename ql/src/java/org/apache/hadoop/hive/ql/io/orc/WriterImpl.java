@@ -27,19 +27,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-
-import com.google.protobuf.ByteString;
-import com.google.protobuf.CodedOutputStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.orc.OrcProto.RowIndexEntry;
+import org.apache.hadoop.hive.ql.io.orc.OrcProto.StripeStatistics;
 import org.apache.hadoop.hive.ql.io.orc.OrcProto.Type;
+import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
@@ -54,6 +53,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspect
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
@@ -61,10 +61,15 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspect
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
-import org.apache.hadoop.hive.serde2.typeinfo.ParameterizedPrimitiveTypeUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
+
+import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedOutputStream;
 
 /**
  * An ORC file writer. The file is divided into stripes, which is the natural
@@ -111,6 +116,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
   private int columnCount;
   private long rowCount = 0;
   private long rowsInStripe = 0;
+  private long rawDataSize = 0;
   private int rowsInIndex = 0;
   private final List<OrcProto.StripeInformation> stripes =
     new ArrayList<OrcProto.StripeInformation>();
@@ -123,7 +129,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
   private final boolean buildIndex;
   private final MemoryManager memoryManager;
   private final OrcFile.Version version;
-
   private final Configuration conf;
 
   WriterImpl(FileSystem fs,
@@ -409,6 +414,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     private final BitFieldWriter isPresent;
     private final boolean isCompressed;
     protected final ColumnStatisticsImpl indexStatistics;
+    protected final ColumnStatisticsImpl stripeColStatistics;
     private final ColumnStatisticsImpl fileStatistics;
     protected TreeWriter[] childrenWriters;
     protected final RowIndexPositionRecorder rowIndexPosition;
@@ -417,7 +423,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     private final PositionedOutputStream rowIndexStream;
     private boolean foundNulls;
     private OutStream isPresentOutStream;
-    protected final boolean useDirectV2Encoding;
+    private final List<StripeStatistics.Builder> stripeStatsBuilders;
 
     /**
      * Create a tree writer.
@@ -433,7 +439,6 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       this.isCompressed = streamFactory.isCompressed();
       this.id = columnId;
       this.inspector = inspector;
-      this.useDirectV2Encoding = true;
       if (nullable) {
         isPresentOutStream = streamFactory.createStream(id,
             OrcProto.Stream.Kind.PRESENT);
@@ -443,11 +448,13 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       }
       this.foundNulls = false;
       indexStatistics = ColumnStatisticsImpl.create(inspector);
+      stripeColStatistics = ColumnStatisticsImpl.create(inspector);
       fileStatistics = ColumnStatisticsImpl.create(inspector);
       childrenWriters = new TreeWriter[0];
       rowIndex = OrcProto.RowIndex.newBuilder();
       rowIndexEntry = OrcProto.RowIndexEntry.newBuilder();
       rowIndexPosition = new RowIndexPositionRecorder(rowIndexEntry);
+      stripeStatsBuilders = Lists.newArrayList();
       if (streamFactory.buildIndex()) {
         rowIndexStream = streamFactory.createStream(id,
             OrcProto.Stream.Kind.ROW_INDEX);
@@ -458,6 +465,10 @@ class WriterImpl implements Writer, MemoryManager.Callback {
 
     protected OrcProto.RowIndex.Builder getRowIndex() {
       return rowIndex;
+    }
+
+    protected ColumnStatisticsImpl getStripeStatistics() {
+      return stripeColStatistics;
     }
 
     protected ColumnStatisticsImpl getFileStatistics() {
@@ -535,6 +546,12 @@ class WriterImpl implements Writer, MemoryManager.Callback {
         }
       }
 
+      // merge stripe-level column statistics to file statistics and write it to
+      // stripe statistics
+      OrcProto.StripeStatistics.Builder stripeStatsBuilder = OrcProto.StripeStatistics.newBuilder();
+      writeStripeStatistics(stripeStatsBuilder, this);
+      stripeStatsBuilders.add(stripeStatsBuilder);
+
       // reset the flag for next stripe
       foundNulls = false;
 
@@ -550,6 +567,16 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       }
       rowIndex.clear();
       rowIndexEntry.clear();
+    }
+
+    private void writeStripeStatistics(OrcProto.StripeStatistics.Builder builder,
+        TreeWriter treeWriter) {
+      treeWriter.fileStatistics.merge(treeWriter.stripeColStatistics);
+      builder.addColStats(treeWriter.stripeColStatistics.serialize().build());
+      treeWriter.stripeColStatistics.reset();
+      for (TreeWriter child : treeWriter.getChildrenWriters()) {
+        writeStripeStatistics(builder, child);
+      }
     }
 
     TreeWriter[] getChildrenWriters() {
@@ -573,7 +600,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
      * @throws IOException
      */
     void createRowIndexEntry() throws IOException {
-      fileStatistics.merge(indexStatistics);
+      stripeColStatistics.merge(indexStatistics);
       rowIndexEntry.setStatistics(indexStatistics.serialize());
       indexStatistics.reset();
       rowIndex.addEntry(rowIndexEntry);
@@ -1011,7 +1038,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
      */
     @Override
     void createRowIndexEntry() throws IOException {
-      getFileStatistics().merge(indexStatistics);
+      getStripeStatistics().merge(indexStatistics);
       OrcProto.RowIndexEntry.Builder rowIndexEntry = getRowIndexEntry();
       rowIndexEntry.setStatistics(indexStatistics.serialize());
       indexStatistics.reset();
@@ -1024,6 +1051,28 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     @Override
     long estimateMemory() {
       return rows.getSizeInBytes() + dictionary.getSizeInBytes();
+    }
+  }
+
+  /**
+   * Under the covers, char is written to ORC the same way as string.
+   */
+  private static class CharTreeWriter extends StringTreeWriter {
+
+    CharTreeWriter(int columnId,
+        ObjectInspector inspector,
+        StreamFactory writer,
+        boolean nullable) throws IOException {
+      super(columnId, inspector, writer, nullable);
+    }
+
+    /**
+     * Override base class implementation to support char values.
+     */
+    @Override
+    String getStringValue(Object obj) {
+      return (((HiveCharObjectInspector) inspector)
+          .getPrimitiveJavaObject(obj)).getValue();
     }
   }
 
@@ -1085,6 +1134,7 @@ class WriterImpl implements Writer, MemoryManager.Callback {
             ((BinaryObjectInspector) inspector).getPrimitiveWritableObject(obj);
         stream.write(val.getBytes(), 0, val.getLength());
         length.write(val.getLength());
+        indexStatistics.updateBinary(val);
       }
     }
 
@@ -1267,6 +1317,9 @@ class WriterImpl implements Writer, MemoryManager.Callback {
       if (obj != null) {
         HiveDecimal decimal = ((HiveDecimalObjectInspector) inspector).
             getPrimitiveJavaObject(obj);
+        if (decimal == null) {
+          return;
+        }
         SerializationUtils.writeBigInteger(valueStream,
             decimal.unscaledValue());
         scaleStream.write(decimal.scale());
@@ -1535,6 +1588,9 @@ class WriterImpl implements Writer, MemoryManager.Callback {
           case STRING:
             return new StringTreeWriter(streamFactory.getNextColumnId(),
                 inspector, streamFactory, nullable);
+          case CHAR:
+            return new CharTreeWriter(streamFactory.getNextColumnId(),
+                inspector, streamFactory, nullable);
           case VARCHAR:
             return new VarcharTreeWriter(streamFactory.getNextColumnId(),
                 inspector, streamFactory, nullable);
@@ -1603,17 +1659,19 @@ class WriterImpl implements Writer, MemoryManager.Callback {
           case STRING:
             type.setKind(OrcProto.Type.Kind.STRING);
             break;
+          case CHAR:
+            // The char length needs to be written to file and should be available
+            // from the object inspector
+            CharTypeInfo charTypeInfo = (CharTypeInfo) ((PrimitiveObjectInspector) treeWriter.inspector).getTypeInfo();
+            type.setKind(Type.Kind.CHAR);
+            type.setMaximumLength(charTypeInfo.getLength());
+            break;
           case VARCHAR:
             // The varchar length needs to be written to file and should be available
             // from the object inspector
-            VarcharTypeParams varcharParams = (VarcharTypeParams)
-                ParameterizedPrimitiveTypeUtils.getTypeParamsFromPrimitiveObjectInspector(
-                    (PrimitiveObjectInspector) treeWriter.inspector);
-            if (varcharParams == null) {
-              throw new IllegalArgumentException("No varchar length specified in ORC type");
-            }
+            VarcharTypeInfo typeInfo = (VarcharTypeInfo) ((PrimitiveObjectInspector) treeWriter.inspector).getTypeInfo();
             type.setKind(Type.Kind.VARCHAR);
-            type.setMaximumLength(varcharParams.getLength());
+            type.setMaximumLength(typeInfo.getLength());
             break;
           case BINARY:
             type.setKind(OrcProto.Type.Kind.BINARY);
@@ -1625,7 +1683,10 @@ class WriterImpl implements Writer, MemoryManager.Callback {
             type.setKind(OrcProto.Type.Kind.DATE);
             break;
           case DECIMAL:
+            DecimalTypeInfo decTypeInfo = (DecimalTypeInfo)((PrimitiveObjectInspector)treeWriter.inspector).getTypeInfo();
             type.setKind(OrcProto.Type.Kind.DECIMAL);
+            type.setPrecision(decTypeInfo.precision());
+            type.setScale(decTypeInfo.scale());
             break;
           default:
             throw new IllegalArgumentException("Unknown primitive category: " +
@@ -1760,6 +1821,76 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     }
   }
 
+  private long computeRawDataSize() {
+    long result = 0;
+    for (TreeWriter child : treeWriter.getChildrenWriters()) {
+      result += getRawDataSizeFromInspectors(child, child.inspector);
+    }
+    return result;
+  }
+
+  private long getRawDataSizeFromInspectors(TreeWriter child, ObjectInspector oi) {
+    long total = 0;
+    switch (oi.getCategory()) {
+    case PRIMITIVE:
+      total += getRawDataSizeFromPrimitives(child, oi);
+      break;
+    case LIST:
+    case MAP:
+    case UNION:
+    case STRUCT:
+      for (TreeWriter tw : child.childrenWriters) {
+        total += getRawDataSizeFromInspectors(tw, tw.inspector);
+      }
+      break;
+    default:
+      LOG.debug("Unknown object inspector category.");
+      break;
+    }
+    return total;
+  }
+
+  private long getRawDataSizeFromPrimitives(TreeWriter child, ObjectInspector oi) {
+    long result = 0;
+    long numVals = child.fileStatistics.getNumberOfValues();
+    switch (((PrimitiveObjectInspector) oi).getPrimitiveCategory()) {
+    case BOOLEAN:
+    case BYTE:
+    case SHORT:
+    case INT:
+    case FLOAT:
+      return numVals * JavaDataModel.get().primitive1();
+    case LONG:
+    case DOUBLE:
+      return numVals * JavaDataModel.get().primitive2();
+    case STRING:
+    case VARCHAR:
+    case CHAR:
+      // ORC strings are converted to java Strings. so use JavaDataModel to
+      // compute the overall size of strings
+      child = (StringTreeWriter) child;
+      StringColumnStatistics scs = (StringColumnStatistics) child.fileStatistics;
+      numVals = numVals == 0 ? 1 : numVals;
+      int avgStringLen = (int) (scs.getSum() / numVals);
+      return numVals * JavaDataModel.get().lengthForStringOfLength(avgStringLen);
+    case DECIMAL:
+      return numVals * JavaDataModel.get().lengthOfDecimal();
+    case DATE:
+      return numVals * JavaDataModel.get().lengthOfDate();
+    case BINARY:
+      // get total length of binary blob
+      BinaryColumnStatistics bcs = (BinaryColumnStatistics) child.fileStatistics;
+      return bcs.getSum();
+    case TIMESTAMP:
+      return numVals * JavaDataModel.get().lengthOfTimestamp();
+    default:
+      LOG.debug("Unknown primitive category.");
+      break;
+    }
+
+    return result;
+  }
+
   private OrcProto.CompressionKind writeCompressionKind(CompressionKind kind) {
     switch (kind) {
       case NONE: return OrcProto.CompressionKind.NONE;
@@ -1779,6 +1910,21 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     }
   }
 
+  private int writeMetadata(long bodyLength) throws IOException {
+    ensureWriter();
+    OrcProto.Metadata.Builder builder = OrcProto.Metadata.newBuilder();
+    for(OrcProto.StripeStatistics.Builder ssb : treeWriter.stripeStatsBuilders) {
+      builder.addStripeStats(ssb.build());
+    }
+
+    long startPosn = rawWriter.getPos();
+    OrcProto.Metadata metadata = builder.build();
+    metadata.writeTo(protobufWriter);
+    protobufWriter.flush();
+    writer.flush();
+    return (int) (rawWriter.getPos() - startPosn);
+  }
+
   private int writeFooter(long bodyLength) throws IOException {
     ensureWriter();
     OrcProto.Footer.Builder builder = OrcProto.Footer.newBuilder();
@@ -1786,6 +1932,8 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     builder.setHeaderLength(headerLength);
     builder.setNumberOfRows(rowCount);
     builder.setRowIndexStride(rowIndexStride);
+    // populate raw data size
+    rawDataSize = computeRawDataSize();
     // serialize the types
     writeTypes(builder, treeWriter);
     // add the stripe information
@@ -1807,11 +1955,12 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     return (int) (rawWriter.getPos() - startPosn);
   }
 
-  private int writePostScript(int footerLength) throws IOException {
+  private int writePostScript(int footerLength, int metadataLength) throws IOException {
     OrcProto.PostScript.Builder builder =
       OrcProto.PostScript.newBuilder()
         .setCompression(writeCompressionKind(compress))
         .setFooterLength(footerLength)
+        .setMetadataLength(metadataLength)
         .setMagic(OrcFile.MAGIC)
         .addVersion(version.getMajor())
         .addVersion(version.getMinor());
@@ -1866,9 +2015,28 @@ class WriterImpl implements Writer, MemoryManager.Callback {
     // actually close the file
     synchronized (this) {
       flushStripe();
-      int footerLength = writeFooter(rawWriter.getPos());
-      rawWriter.writeByte(writePostScript(footerLength));
+      int metadataLength = writeMetadata(rawWriter.getPos());
+      int footerLength = writeFooter(rawWriter.getPos() - metadataLength);
+      rawWriter.writeByte(writePostScript(footerLength, metadataLength));
       rawWriter.close();
     }
+  }
+
+  /**
+   * Raw data size will be compute when writing the file footer. Hence raw data
+   * size value will be available only after closing the writer.
+   */
+  @Override
+  public long getRawDataSize() {
+    return rawDataSize;
+  }
+
+  /**
+   * Row count gets updated when flushing the stripes. To get accurate row
+   * count call this method after writer is closed.
+   */
+  @Override
+  public long getNumberOfRows() {
+    return rowCount;
   }
 }

@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.cli.CliSessionState;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.hbase.ResultWritable;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -63,7 +64,7 @@ import org.apache.hcatalog.cli.HCatDriver;
 import org.apache.hcatalog.cli.SemanticAnalysis.HCatSemanticAnalyzer;
 import org.apache.hcatalog.common.HCatConstants;
 import org.apache.hcatalog.common.HCatException;
-import org.apache.hcatalog.common.HCatUtil;
+import org.apache.hive.hcatalog.common.HCatUtil;
 import org.apache.hcatalog.data.HCatRecord;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
@@ -73,6 +74,7 @@ import org.apache.hcatalog.hbase.snapshot.Transaction;
 import org.apache.hcatalog.mapreduce.HCatInputFormat;
 import org.apache.hcatalog.mapreduce.InputJobInfo;
 import org.apache.hcatalog.mapreduce.PartInfo;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestHCatHBaseInputFormat extends SkeletonHBaseTest {
@@ -82,6 +84,11 @@ public class TestHCatHBaseInputFormat extends SkeletonHBaseTest {
   private final byte[] FAMILY = Bytes.toBytes("testFamily");
   private final byte[] QUALIFIER1 = Bytes.toBytes("testQualifier1");
   private final byte[] QUALIFIER2 = Bytes.toBytes("testQualifier2");
+
+  @BeforeClass
+  public static void setup() throws Throwable {
+    setupSkeletonHBaseTest();
+  }
 
   public TestHCatHBaseInputFormat() throws Exception {
     hcatConf = getHiveConf();
@@ -181,7 +188,7 @@ public class TestHCatHBaseInputFormat extends SkeletonHBaseTest {
     String databaseName = newTableName("MyDatabase");
     //Table name will be lower case unless specified by hbase.table.name property
     String hbaseTableName = (databaseName + "." + tableName).toLowerCase();
-    String db_dir = getTestDir() + "/hbasedb";
+    String db_dir = HCatUtil.makePathASafeFileName(getTestDir() + "/hbasedb");
 
     String dbquery = "CREATE DATABASE IF NOT EXISTS " + databaseName + " LOCATION '"
         + db_dir + "'";
@@ -540,7 +547,7 @@ public class TestHCatHBaseInputFormat extends SkeletonHBaseTest {
   }
 
   static class MapReadProjectionHTable
-    implements org.apache.hadoop.mapred.Mapper<ImmutableBytesWritable, Result, WritableComparable<?>, Text> {
+    implements org.apache.hadoop.mapred.Mapper<ImmutableBytesWritable, Object, WritableComparable<?>, Text> {
 
     static boolean error = false;
     static int count = 0;
@@ -554,9 +561,17 @@ public class TestHCatHBaseInputFormat extends SkeletonHBaseTest {
     }
 
     @Override
-    public void map(ImmutableBytesWritable key, Result result,
+    public void map(ImmutableBytesWritable key, Object resultObj,
         OutputCollector<WritableComparable<?>, Text> output, Reporter reporter)
       throws IOException {
+      Result result;
+      if (resultObj instanceof Result){
+        result = (Result) resultObj;
+      } else if (resultObj instanceof ResultWritable) {
+        result = ((ResultWritable)resultObj).getResult();
+      } else {
+        throw new IllegalArgumentException("Illegal Argument " + (resultObj == null ? "null" : resultObj.getClass().getName()));
+      }
       System.out.println("Result " + result.toString());
       List<KeyValue> list = result.list();
       boolean correctValues = (list.size() == 1)

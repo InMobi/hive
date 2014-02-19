@@ -154,6 +154,39 @@ public class Server {
   }
 
   /**
+   * Get version of hadoop software being run by this WebHCat server
+   */
+  @GET
+  @Path("version/hadoop")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response hadoopVersion()  throws IOException {
+    VersionDelegator d = new VersionDelegator(appConf);
+    return d.getVersion("hadoop");
+  }
+
+  /**
+   * Get version of hive software being run by this WebHCat server
+   */
+  @GET
+  @Path("version/hive")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response hiveVersion()  throws IOException {
+    VersionDelegator d = new VersionDelegator(appConf);
+    return d.getVersion("hive");
+  }
+
+  /**
+   * Get version of hive software being run by this WebHCat server
+   */
+  @GET
+  @Path("version/pig")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response pigVersion()  throws IOException {
+    VersionDelegator d = new VersionDelegator(appConf);
+    return d.getVersion("pig");
+  }
+
+  /**
    * Execute an hcat ddl expression on the local box.  It is run
    * as the authenticated user and rate limited.
    */
@@ -186,8 +219,9 @@ public class Server {
     verifyDdlParam(db, ":db");
 
     HcatDelegator d = new HcatDelegator(appConf, execService);
-    if (!TempletonUtils.isset(tablePattern))
+    if (!TempletonUtils.isset(tablePattern)) {
       tablePattern = "*";
+    }
     return d.listTables(getDoAsUser(), db, tablePattern);
   }
 
@@ -252,10 +286,12 @@ public class Server {
     verifyDdlParam(table, ":table");
 
     HcatDelegator d = new HcatDelegator(appConf, execService);
-    if ("extended".equals(format))
+    if ("extended".equals(format)) {
       return d.descExtendedTable(getDoAsUser(), db, table);
-    else
+    }
+    else {
       return d.descTable(getDoAsUser(), db, table, false);
+    }
   }
 
   /**
@@ -455,8 +491,9 @@ public class Server {
     verifyUser();
 
     HcatDelegator d = new HcatDelegator(appConf, execService);
-    if (!TempletonUtils.isset(dbPattern))
+    if (!TempletonUtils.isset(dbPattern)) {
       dbPattern = "*";
+    }
     return d.listDatabases(getDoAsUser(), dbPattern);
   }
 
@@ -508,8 +545,9 @@ public class Server {
     BadParam, ExecuteException, IOException {
     verifyUser();
     verifyDdlParam(db, ":db");
-    if (TempletonUtils.isset(option))
+    if (TempletonUtils.isset(option)) {
       verifyDdlParam(option, "option");
+    }
     HcatDelegator d = new HcatDelegator(appConf, execService);
     return d.dropDatabase(getDoAsUser(), db, ifExists, option,
         group, permissions);
@@ -579,6 +617,7 @@ public class Server {
 
   /**
    * Run a MapReduce Streaming job.
+   * @param callback URL which WebHCat will call when the hive job finishes
    */
   @POST
   @Path("mapreduce/streaming")
@@ -628,6 +667,11 @@ public class Server {
 
   /**
    * Run a MapReduce Jar job.
+   * Params correspond to the REST api params
+   * @param  usesHcatalog if {@code true}, means the Jar uses HCat and thus needs to access 
+   *    metastore, which requires additional steps for WebHCat to perform in a secure cluster.  
+   * @param callback URL which WebHCat will call when the hive job finishes
+   * @see org.apache.hive.hcatalog.templeton.tool.TempletonControllerJob
    */
   @POST
   @Path("mapreduce/jar")
@@ -640,6 +684,7 @@ public class Server {
                   @FormParam("define") List<String> defines,
                   @FormParam("statusdir") String statusdir,
                   @FormParam("callback") String callback,
+                  @FormParam("usehcatalog") boolean usesHcatalog,
                   @FormParam("enablelog") boolean enablelog)
     throws NotAuthorizedException, BusyException, BadParam, QueueException,
     ExecuteException, IOException, InterruptedException {
@@ -665,11 +710,18 @@ public class Server {
     return d.run(getDoAsUser(), userArgs,
       jar, mainClass,
       libjars, files, args, defines,
-      statusdir, callback, getCompletedUrl(), enablelog, JobType.JAR);
+      statusdir, callback, usesHcatalog, getCompletedUrl(), enablelog, JobType.JAR);
   }
 
   /**
    * Run a Pig job.
+   * Params correspond to the REST api params.  If '-useHCatalog' is in the {@code pigArgs, usesHcatalog},
+   * is interpreted as true.
+   * @param  usesHcatalog if {@code true}, means the Pig script uses HCat and thus needs to access 
+   *    metastore, which requires additional steps for WebHCat to perform in a secure cluster.
+   *    This does nothing to ensure that Pig is installed on target node in the cluster.
+   * @param callback URL which WebHCat will call when the hive job finishes
+   * @see org.apache.hive.hcatalog.templeton.tool.TempletonControllerJob
    */
   @POST
   @Path("pig")
@@ -680,12 +732,14 @@ public class Server {
                @FormParam("files") String otherFiles,
                @FormParam("statusdir") String statusdir,
                @FormParam("callback") String callback,
+               @FormParam("usehcatalog") boolean usesHcatalog,
                @FormParam("enablelog") boolean enablelog)
     throws NotAuthorizedException, BusyException, BadParam, QueueException,
     ExecuteException, IOException, InterruptedException {
     verifyUser();
-    if (execute == null && srcFile == null)
+    if (execute == null && srcFile == null) {
       throw new BadParam("Either execute or file parameter required");
+    }
     
     //add all function arguments to a map
     Map<String, Object> userArgs = new HashMap<String, Object>();
@@ -704,7 +758,7 @@ public class Server {
     return d.run(getDoAsUser(), userArgs,
       execute, srcFile,
       pigArgs, otherFiles,
-      statusdir, callback, getCompletedUrl(), enablelog);
+      statusdir, callback, usesHcatalog, getCompletedUrl(), enablelog);
   }
 
   /**
@@ -719,7 +773,7 @@ public class Server {
    *                   used in "add jar" statement in hive script
    * @param defines    shortcut for command line arguments "--define"
    * @param statusdir  where the stderr/stdout of templeton controller job goes
-   * @param callback   callback url when the hive job finishes
+   * @param callback   URL which WebHCat will call when the hive job finishes
    * @param enablelog  whether to collect mapreduce log into statusdir/logs
    */
   @POST
@@ -736,8 +790,9 @@ public class Server {
     throws NotAuthorizedException, BusyException, BadParam, QueueException,
     ExecuteException, IOException, InterruptedException {
     verifyUser();
-    if (execute == null && srcFile == null)
+    if (execute == null && srcFile == null) {
       throw new BadParam("Either execute or file parameter required");
+    }
     
     //add all function arguments to a map
     Map<String, Object> userArgs = new HashMap<String, Object>();
@@ -833,15 +888,59 @@ public class Server {
   }
 
   /**
-   * Return all the known job ids for this user.
+   * Return all the known job ids for this user based on the optional filter conditions.
+   * <p>
+   * Example usages:
+   * 1. curl -s 'http://localhost:50111/templeton/v1/jobs?user.name=hsubramaniyan'
+   * Return all the Job IDs submitted by hsubramaniyan
+   * 2. curl -s 
+   * 'http://localhost:50111/templeton/v1/jobs?user.name=hsubramaniyan&showall=true'
+   * Return all the Job IDs that are visible to hsubramaniyan
+   * 3. curl -s
+   * 'http://localhost:50111/templeton/v1/jobs?user.name=hsubramaniyan&jobid=job_201312091733_0003'
+   * Return all the Job IDs for hsubramaniyan after job_201312091733_0003.
+   * 4. curl -s 'http://localhost:50111/templeton/v1/jobs? 
+   * user.name=hsubramaniyan&jobid=job_201312091733_0003&numrecords=5'
+   * Return the first 5(atmost) Job IDs submitted by hsubramaniyan after job_201312091733_0003.  
+   * 5.  curl -s 
+   * 'http://localhost:50111/templeton/v1/jobs?user.name=hsubramaniyan&numrecords=5'
+   * Return the first 5(atmost) Job IDs submitted by hsubramaniyan after sorting the Job ID list 
+   * lexicographically.
+   * </p>
+   * <p>
+   * Supporting pagination using "jobid" and "numrecords" parameters:
+   * Step 1: Get the start "jobid" = job_xxx_000, "numrecords" = n
+   * Step 2: Issue a curl command by specifying the user-defined "numrecords" and "jobid" 
+   * Step 3: If list obtained from Step 2 has size equal to "numrecords", retrieve the list's 
+   * last record and get the Job Id of the last record as job_yyy_k, else quit.
+   * Step 4: set "jobid"=job_yyy_k and go to step 2.
+   * </p> 
+   * @param fields If "fields" set to "*", the request will return full details of the job.
+   * If "fields" is missing, will only return the job ID. Currently the value can only
+   * be "*", other values are not allowed and will throw exception.
+   * @param showall If "showall" is set to "true", the request will return all jobs the user
+   * has permission to view, not only the jobs belonging to the user.
+   * @param jobid If "jobid" is present, the records whose Job Id is lexicographically greater 
+   * than "jobid" are only returned. For example, if "jobid" = "job_201312091733_0001", 
+   * the jobs whose Job ID is greater than "job_201312091733_0001" are returned. The number of 
+   * records returned depends on the value of "numrecords".
+   * @param numrecords If the "jobid" and "numrecords" parameters are present, the top #numrecords 
+   * records appearing after "jobid" will be returned after sorting the Job Id list 
+   * lexicographically. 
+   * If "jobid" parameter is missing and "numrecords" is present, the top #numrecords will 
+   * be returned after lexicographically sorting the Job Id list. If "jobid" parameter is present 
+   * and "numrecords" is missing, all the records whose Job Id is greater than "jobid" are returned.
+   * @return list of job items based on the filter conditions specified by the user.
    */
   @GET
   @Path("jobs")
   @Produces({MediaType.APPLICATION_JSON})
   public List<JobItemBean> showJobList(@QueryParam("fields") String fields,
-                                       @QueryParam("showall") boolean showall)
+                                       @QueryParam("showall") boolean showall,
+                                       @QueryParam("jobid") String jobid,
+                                       @QueryParam("numrecords") String numrecords)
     throws NotAuthorizedException, BadParam, IOException, InterruptedException {
-
+    
     verifyUser();
 
     boolean showDetails = false;
@@ -855,7 +954,46 @@ public class Server {
     ListDelegator ld = new ListDelegator(appConf);
     List<String> list = ld.run(getDoAsUser(), showall);
     List<JobItemBean> detailList = new ArrayList<JobItemBean>();
+    int currRecord = 0;
+    int numRecords;
+
+    // Parse numrecords to an integer
+    try {
+      if (numrecords != null) {
+        numRecords = Integer.parseInt(numrecords);
+	if (numRecords <= 0) {
+	  throw new BadParam("numrecords should be an integer > 0");
+	}    
+      }
+      else {
+        numRecords = -1;
+      }
+    }
+    catch(Exception e) {
+      throw new BadParam("Invalid numrecords format: numrecords should be an integer > 0");
+    }
+
+    // Sort the list lexicographically            
+    Collections.sort(list);
+
     for (String job : list) {
+      // If numRecords = -1, fetch all records.
+      // Hence skip all the below checks when numRecords = -1.
+      if (numRecords != -1) {
+        // If currRecord >= numRecords, we have already fetched the top #numRecords                                                                                                              
+        if (currRecord >= numRecords) {
+          break;
+        } 
+        // If the current record needs to be returned based on the 
+        // filter conditions specified by the user, increment the counter
+        else if ((jobid != null && job.compareTo(jobid) > 0) || jobid == null) {
+          currRecord++;
+        }
+        // The current record should not be included in the output detailList.
+        else {
+          continue;
+        }
+      }
       JobItemBean jobItem = new JobItemBean();
       jobItem.id = job;
       if (showDetails) {
@@ -874,10 +1012,12 @@ public class Server {
   @GET
   @Path("internal/complete/{jobid}")
   @Produces({MediaType.APPLICATION_JSON})
-  public CompleteBean completeJob(@PathParam("jobid") String jobid)
+  public CompleteBean completeJob(@PathParam("jobid") String jobid,
+                                  @QueryParam("status") String jobStatus)
     throws CallbackFailedException, IOException {
+    LOG.debug("Received callback " + theUriInfo.getRequestUri());
     CompleteDelegator d = new CompleteDelegator(appConf);
-    return d.run(jobid);
+    return d.run(jobid, jobStatus);
   }
 
   /**
@@ -887,8 +1027,9 @@ public class Server {
     String requestingUser = getRequestingUser();
     if (requestingUser == null) {
       String msg = "No user found.";
-      if (!UserGroupInformation.isSecurityEnabled())
+      if (!UserGroupInformation.isSecurityEnabled()) {
         msg += "  Missing " + PseudoAuthenticator.USER_NAME + " parameter.";
+      }
       throw new NotAuthorizedException(msg);
     }
     if(doAs != null && !doAs.equals(requestingUser)) {
@@ -897,9 +1038,10 @@ public class Server {
       ProxyUserSupport.validate(requestingUser, getRequestingHost(requestingUser, request), doAs);
     }
   }
+
   /**
    * All 'tasks' spawned by WebHCat should be run as this user.  W/o doAs query parameter
-   * this is just the user making the request (or 
+   * this is just the user making the request (or
    * {@link org.apache.hadoop.security.authentication.client.PseudoAuthenticator#USER_NAME}
    * query param).
    * @return value of doAs query parameter or {@link #getRequestingUser()}
@@ -912,8 +1054,9 @@ public class Server {
    */
   public void verifyParam(String param, String name)
     throws BadParam {
-    if (param == null)
+    if (param == null) {
       throw new BadParam("Missing " + name + " parameter");
+    }
   }
 
   /**
@@ -921,8 +1064,9 @@ public class Server {
    */
   public void verifyParam(List<String> param, String name)
     throws BadParam {
-    if (param == null || param.isEmpty())
+    if (param == null || param.isEmpty()) {
       throw new BadParam("Missing " + name + " parameter");
+    }
   }
 
   public static final Pattern DDL_ID = Pattern.compile("[a-zA-Z]\\w*");
@@ -937,8 +1081,9 @@ public class Server {
     throws BadParam {
     verifyParam(param, name);
     Matcher m = DDL_ID.matcher(param);
-    if (!m.matches())
+    if (!m.matches()) {
       throw new BadParam("Invalid DDL identifier " + name);
+    }
   }
   /**
    * Get the user name from the security context, i.e. the user making the HTTP request.
@@ -946,10 +1091,12 @@ public class Server {
    * value of user.name query param, in kerberos mode it's the kinit'ed user.
    */
   private String getRequestingUser() {
-    if (theSecurityContext == null)
+    if (theSecurityContext == null) { 
       return null;
-    if (theSecurityContext.getUserPrincipal() == null)
+    }
+    if (theSecurityContext.getUserPrincipal() == null) {
       return null;
+    }
     //map hue/foo.bar@something.com->hue since user group checks 
     // and config files are in terms of short name
     return UserGroupInformation.createRemoteUser(
@@ -960,16 +1107,18 @@ public class Server {
    * The callback url on this server when a task is completed.
    */
   public String getCompletedUrl() {
-    if (theUriInfo == null)
+    if (theUriInfo == null) {
       return null;
-    if (theUriInfo.getBaseUri() == null)
+    }
+    if (theUriInfo.getBaseUri() == null) {
       return null;
+    }
     return theUriInfo.getBaseUri() + VERSION
-      + "/internal/complete/$jobId";
+      + "/internal/complete/$jobId?status=$jobStatus";
   }
 
   /**
-   * Returns canonical host name from which the request is made; used for doAs validation  
+   * Returns canonical host name from which the request is made; used for doAs validation
    */
   private static String getRequestingHost(String requestingUser, HttpServletRequest request) {
     final String unkHost = "???";
@@ -998,7 +1147,7 @@ public class Server {
   }
   
   private void checkEnableLogPrerequisite(boolean enablelog, String statusdir) throws BadParam {
-    if (enablelog == true && !TempletonUtils.isset(statusdir))
+    if (enablelog && !TempletonUtils.isset(statusdir))
       throw new BadParam("enablelog is only applicable when statusdir is set");
   }
 }

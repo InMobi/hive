@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -32,21 +33,17 @@ import org.apache.hadoop.hive.serde2.objectinspector.SettableListObjectInspector
 import org.apache.hadoop.hive.serde2.objectinspector.SettableMapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.SettableStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.ParameterizedPrimitiveTypeUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.UnionTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
 import org.apache.hadoop.io.Writable;
 
-final class OrcStruct implements Writable {
+final public class OrcStruct implements Writable {
 
   private Object[] fields;
 
@@ -167,8 +164,11 @@ final class OrcStruct implements Writable {
   }
 
   static class OrcStructInspector extends SettableStructObjectInspector {
-    private final List<StructField> fields;
+    private List<StructField> fields;
 
+    protected OrcStructInspector() {
+      super();
+    }
     OrcStructInspector(StructTypeInfo info) {
       ArrayList<String> fieldNames = info.getAllStructFieldNames();
       ArrayList<TypeInfo> fieldTypes = info.getAllStructFieldTypeInfos();
@@ -287,9 +287,12 @@ final class OrcStruct implements Writable {
 
   static class OrcMapObjectInspector
       implements MapObjectInspector, SettableMapObjectInspector {
-    private final ObjectInspector key;
-    private final ObjectInspector value;
+    private ObjectInspector key;
+    private ObjectInspector value;
 
+    private OrcMapObjectInspector() {
+      super();
+    }
     OrcMapObjectInspector(MapTypeInfo info) {
       key = createObjectInspector(info.getMapKeyTypeInfo());
       value = createObjectInspector(info.getMapValueTypeInfo());
@@ -375,8 +378,11 @@ final class OrcStruct implements Writable {
 
   static class OrcListObjectInspector
       implements ListObjectInspector, SettableListObjectInspector {
-    private final ObjectInspector child;
+    private ObjectInspector child;
 
+    private OrcListObjectInspector() {
+      super();
+    }
     OrcListObjectInspector(ListTypeInfo info) {
       child = createObjectInspector(info.getListElementTypeInfo());
     }
@@ -455,7 +461,7 @@ final class OrcStruct implements Writable {
     }
   }
 
-  static ObjectInspector createObjectInspector(TypeInfo info) {
+  static public ObjectInspector createObjectInspector(TypeInfo info) {
     switch (info.getCategory()) {
       case PRIMITIVE:
         switch (((PrimitiveTypeInfo) info).getPrimitiveCategory()) {
@@ -477,13 +483,10 @@ final class OrcStruct implements Writable {
             return PrimitiveObjectInspectorFactory.writableBinaryObjectInspector;
           case STRING:
             return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
+          case CHAR:
+            return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+                (PrimitiveTypeInfo) info);
           case VARCHAR:
-            // For varchar we need to retrieve the string length from the TypeInfo.
-            VarcharTypeParams varcharParams = (VarcharTypeParams)
-                ParameterizedPrimitiveTypeUtils.getTypeParamsFromTypeInfo(info);
-            if (varcharParams == null) {
-              throw new IllegalArgumentException("varchar type used without type params");
-            }
             return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
                 (PrimitiveTypeInfo) info);
           case TIMESTAMP:
@@ -491,7 +494,8 @@ final class OrcStruct implements Writable {
           case DATE:
             return PrimitiveObjectInspectorFactory.javaDateObjectInspector;
           case DECIMAL:
-            return PrimitiveObjectInspectorFactory.javaHiveDecimalObjectInspector;
+            return PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(
+                (PrimitiveTypeInfo)info);
           default:
             throw new IllegalArgumentException("Unknown primitive type " +
               ((PrimitiveTypeInfo) info).getPrimitiveCategory());
@@ -532,22 +536,29 @@ final class OrcStruct implements Writable {
         return PrimitiveObjectInspectorFactory.writableBinaryObjectInspector;
       case STRING:
         return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
+      case CHAR:
+        if (!type.hasMaximumLength()) {
+          throw new UnsupportedOperationException(
+              "Illegal use of char type without length in ORC type definition.");
+        }
+        return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+            TypeInfoFactory.getCharTypeInfo(type.getMaximumLength()));
       case VARCHAR:
         if (!type.hasMaximumLength()) {
           throw new UnsupportedOperationException(
               "Illegal use of varchar type without length in ORC type definition.");
         }
-        VarcharTypeParams varcharParams = new VarcharTypeParams();
-        varcharParams.setLength(type.getMaximumLength());
         return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
-            PrimitiveObjectInspectorUtils.getTypeEntryFromTypeSpecs(
-                PrimitiveCategory.VARCHAR, varcharParams));
+            TypeInfoFactory.getVarcharTypeInfo(type.getMaximumLength()));
       case TIMESTAMP:
         return PrimitiveObjectInspectorFactory.javaTimestampObjectInspector;
       case DATE:
         return PrimitiveObjectInspectorFactory.javaDateObjectInspector;
       case DECIMAL:
-        return PrimitiveObjectInspectorFactory.javaHiveDecimalObjectInspector;
+        int precision = type.hasPrecision() ? type.getPrecision() : HiveDecimal.SYSTEM_DEFAULT_PRECISION;
+        int scale =  type.hasScale()? type.getScale() : HiveDecimal.SYSTEM_DEFAULT_SCALE;
+        return PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(
+            TypeInfoFactory.getDecimalTypeInfo(precision, scale));
       case STRUCT:
         return new OrcStructInspector(columnId, types);
       case UNION:

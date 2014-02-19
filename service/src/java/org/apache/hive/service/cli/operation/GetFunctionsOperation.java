@@ -29,6 +29,7 @@ import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.OperationType;
 import org.apache.hive.service.cli.RowSet;
+import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.Type;
 import org.apache.hive.service.cli.session.HiveSession;
@@ -56,7 +57,7 @@ public class GetFunctionsOperation extends MetadataOperation {
   private final String schemaName;
   private final String functionName;
 
-  private final RowSet rowSet = new RowSet();
+  private final RowSet rowSet;
 
   public GetFunctionsOperation(HiveSession parentSession,
       String catalogName, String schemaName, String functionName) {
@@ -64,6 +65,7 @@ public class GetFunctionsOperation extends MetadataOperation {
     this.catalogName = catalogName;
     this.schemaName = schemaName;
     this.functionName = functionName;
+    this.rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion());
   }
 
   /* (non-Javadoc)
@@ -90,7 +92,7 @@ public class GetFunctionsOperation extends MetadataOperation {
                   : DatabaseMetaData.functionNoTable), // FUNCTION_TYPE
              functionInfo.getClass().getCanonicalName()
           };
-          rowSet.addRow(RESULT_SET_SCHEMA, rowData);
+          rowSet.addRow(rowData);
         }
       }
       setState(OperationState.FINISHED);
@@ -118,6 +120,10 @@ public class GetFunctionsOperation extends MetadataOperation {
   @Override
   public RowSet getNextRowSet(FetchOrientation orientation, long maxRows) throws HiveSQLException {
     assertState(OperationState.FINISHED);
+    validateDefaultFetchOrientation(orientation);
+    if (orientation.equals(FetchOrientation.FETCH_FIRST)) {
+      rowSet.setStartOffset(0);
+    }
     return rowSet.extractSubset((int)maxRows);
   }
 }

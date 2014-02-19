@@ -20,9 +20,18 @@ package org.apache.hadoop.hive.ql.exec;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
+import org.apache.hadoop.mapred.OutputCollector;
+
 public class OperatorUtils {
+
+  private static final Log LOG = LogFactory.getLog(OperatorUtils.class);
 
   public static <T> Set<T> findOperators(Operator<?> start, Class<T> clazz) {
     return findOperators(start, clazz, new HashSet<T>());
@@ -52,5 +61,36 @@ public class OperatorUtils {
       }
     }
     return found;
+  }
+
+  public static void setChildrenCollector(List<Operator<? extends OperatorDesc>> childOperators, OutputCollector out) {
+    if (childOperators == null) {
+      return;
+    }
+    for (Operator<? extends OperatorDesc> op : childOperators) {
+      if(op.getName().equals(ReduceSinkOperator.getOperatorName())) {
+        ((ReduceSinkOperator)op).setOutputCollector(out);
+      } else {
+        setChildrenCollector(op.getChildOperators(), out);
+      }
+    }
+  }
+
+  public static void setChildrenCollector(List<Operator<? extends OperatorDesc>> childOperators, Map<String, OutputCollector> outMap) {
+    if (childOperators == null) {
+      return;
+    }
+    for (Operator<? extends OperatorDesc> op : childOperators) {
+      if(op.getName().equals(ReduceSinkOperator.getOperatorName())) {
+        ReduceSinkOperator rs = ((ReduceSinkOperator)op);
+        if (outMap.containsKey(rs.getConf().getOutputName())) {
+          LOG.info("Setting output collector: " + rs + " --> " 
+            + rs.getConf().getOutputName());
+          rs.setOutputCollector(outMap.get(rs.getConf().getOutputName()));
+        }
+      } else {
+        setChildrenCollector(op.getChildOperators(), outMap);
+      }
+    }
   }
 }

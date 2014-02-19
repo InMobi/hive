@@ -61,7 +61,8 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
    * exactly what we want.
    */
   private GenericUDF genericUDF;
-  private List<ExprNodeDesc> childExprs;
+  private List<ExprNodeDesc> chidren;
+  private transient String funcText;
   /**
    * This class uses a writableObjectInspector rather than a TypeInfo to store
    * the canonical type information for this NodeDesc.
@@ -73,20 +74,38 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
   public ExprNodeGenericFuncDesc() {
   }
 
+  /* If the function has an explicit name like func(args) then call a
+   * constructor that explicitly provides the function name in the
+   * funcText argument.
+   */
   public ExprNodeGenericFuncDesc(TypeInfo typeInfo, GenericUDF genericUDF,
+      String funcText,
       List<ExprNodeDesc> children) {
     this(TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(typeInfo),
-         genericUDF, children);
+         genericUDF, funcText, children);
   }
 
   public ExprNodeGenericFuncDesc(ObjectInspector oi, GenericUDF genericUDF,
+      String funcText,
       List<ExprNodeDesc> children) {
     super(TypeInfoUtils.getTypeInfoFromObjectInspector(oi));
     this.writableObjectInspector =
         ObjectInspectorUtils.getWritableObjectInspector(oi);
     assert (genericUDF != null);
     this.genericUDF = genericUDF;
-    this.childExprs = children;
+    this.chidren = children;
+    this.funcText = funcText;
+  }
+
+  // Backward-compatibility interfaces for functions without a user-visible name.
+  public ExprNodeGenericFuncDesc(TypeInfo typeInfo, GenericUDF genericUDF,
+      List<ExprNodeDesc> children) {
+    this(typeInfo, genericUDF, null, children);
+  }
+
+  public ExprNodeGenericFuncDesc(ObjectInspector oi, GenericUDF genericUDF,
+      List<ExprNodeDesc> children) {
+    this(oi, genericUDF, null, children);
   }
 
   @Override
@@ -102,42 +121,36 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
     this.genericUDF = genericUDF;
   }
 
-  public List<ExprNodeDesc> getChildExprs() {
-    return childExprs;
-  }
-
-  public void setChildExprs(List<ExprNodeDesc> children) {
-    childExprs = children;
+  public void setChildren(List<ExprNodeDesc> children) {
+    chidren = children;
   }
 
   @Override
   public List<ExprNodeDesc> getChildren() {
-    return childExprs;
+    return chidren;
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(genericUDF.getClass().toString());
+    sb.append(genericUDF.getClass().getSimpleName());
     sb.append("(");
-    for (int i = 0; i < childExprs.size(); i++) {
+    for (int i = 0; i < chidren.size(); i++) {
       if (i > 0) {
         sb.append(", ");
       }
-      sb.append(childExprs.get(i).toString());
+      sb.append(chidren.get(i).toString());
     }
-    sb.append("(");
     sb.append(")");
     return sb.toString();
   }
 
-  @Explain(displayName = "expr")
   @Override
   public String getExprString() {
     // Get the children expr strings
-    String[] childrenExprStrings = new String[childExprs.size()];
+    String[] childrenExprStrings = new String[chidren.size()];
     for (int i = 0; i < childrenExprStrings.length; i++) {
-      childrenExprStrings[i] = childExprs.get(i).getExprString();
+      childrenExprStrings[i] = chidren.get(i).getExprString();
     }
 
     return genericUDF.getDisplayString(childrenExprStrings);
@@ -146,10 +159,10 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
   @Override
   public List<String> getCols() {
     List<String> colList = new ArrayList<String>();
-    if (childExprs != null) {
+    if (chidren != null) {
       int pos = 0;
-      while (pos < childExprs.size()) {
-        List<String> colCh = childExprs.get(pos).getCols();
+      while (pos < chidren.size()) {
+        List<String> colCh = chidren.get(pos).getCols();
         colList = Utilities.mergeUniqElems(colList, colCh);
         pos++;
       }
@@ -160,22 +173,25 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
 
   @Override
   public ExprNodeDesc clone() {
-    List<ExprNodeDesc> cloneCh = new ArrayList<ExprNodeDesc>(childExprs.size());
-    for (ExprNodeDesc ch : childExprs) {
+    List<ExprNodeDesc> cloneCh = new ArrayList<ExprNodeDesc>(chidren.size());
+    for (ExprNodeDesc ch : chidren) {
       cloneCh.add(ch.clone());
     }
     ExprNodeGenericFuncDesc clone = new ExprNodeGenericFuncDesc(typeInfo,
-        FunctionRegistry.cloneGenericUDF(genericUDF), cloneCh);
+        FunctionRegistry.cloneGenericUDF(genericUDF), funcText, cloneCh);
     return clone;
   }
 
   /**
-   * Create a exprNodeGenericFuncDesc based on the genericUDFClass and the
-   * children parameters.
+   * Create a ExprNodeGenericFuncDesc based on the genericUDFClass and the
+   * children parameters. If the function has an explicit name, the
+   * newInstance method should be passed the function name in the funcText
+   * argument.
    *
    * @throws UDFArgumentException
    */
   public static ExprNodeGenericFuncDesc newInstance(GenericUDF genericUDF,
+      String funcText,
       List<ExprNodeDesc> children) throws UDFArgumentException {
     ObjectInspector[] childrenOIs = new ObjectInspector[children.size()];
     for (int i = 0; i < childrenOIs.length; i++) {
@@ -232,7 +248,15 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
       }
     }
 
-    return new ExprNodeGenericFuncDesc(oi, genericUDF, children);
+    return new ExprNodeGenericFuncDesc(oi, genericUDF, funcText, children);
+  }
+
+  /* Backward-compatibility interface for the case where there is no explicit
+   * name for the function.
+   */
+  public static ExprNodeGenericFuncDesc newInstance(GenericUDF genericUDF,
+    List<ExprNodeDesc> children) throws UDFArgumentException {
+    return newInstance(genericUDF, null, children);
   }
 
   @Override
@@ -249,19 +273,19 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
     if (genericUDF instanceof GenericUDFBridge) {
       GenericUDFBridge bridge = (GenericUDFBridge) genericUDF;
       GenericUDFBridge bridge2 = (GenericUDFBridge) dest.getGenericUDF();
-      if (!bridge.getUdfClass().equals(bridge2.getUdfClass())
+      if (!bridge.getUdfClassName().equals(bridge2.getUdfClassName())
           || !bridge.getUdfName().equals(bridge2.getUdfName())
           || bridge.isOperator() != bridge2.isOperator()) {
         return false;
       }
     }
 
-    if (childExprs.size() != dest.getChildExprs().size()) {
+    if (chidren.size() != dest.getChildren().size()) {
       return false;
     }
 
-    for (int pos = 0; pos < childExprs.size(); pos++) {
-      if (!childExprs.get(pos).isSame(dest.getChildExprs().get(pos))) {
+    for (int pos = 0; pos < chidren.size(); pos++) {
+      if (!chidren.get(pos).isSame(dest.getChildren().get(pos))) {
         return false;
       }
     }
@@ -274,7 +298,7 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
     int superHashCode = super.hashCode();
     HashCodeBuilder builder = new HashCodeBuilder();
     builder.appendSuper(superHashCode);
-    builder.append(childExprs);
+    builder.append(chidren);
     return builder.toHashCode();
   }
 
@@ -284,5 +308,9 @@ public class ExprNodeGenericFuncDesc extends ExprNodeDesc implements
 
   public void setSortedExpr(boolean isSortedExpr) {
     this.isSortedExpr = isSortedExpr;
+  }
+
+  public String getFuncText() {
+    return this.funcText;
   }
 }

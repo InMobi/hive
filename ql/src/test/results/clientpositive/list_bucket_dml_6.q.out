@@ -104,7 +104,47 @@ insert overwrite table list_bucketing_dynamic_part partition (ds = '2008-04-08',
 select key, value, if(key % 100 == 0, 'a1', 'b1') from srcpart where ds = '2008-04-08'
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME srcpart))) (TOK_INSERT (TOK_DESTINATION (TOK_TAB (TOK_TABNAME list_bucketing_dynamic_part) (TOK_PARTSPEC (TOK_PARTVAL ds '2008-04-08') (TOK_PARTVAL hr)))) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_TABLE_OR_COL value)) (TOK_SELEXPR (TOK_FUNCTION if (== (% (TOK_TABLE_OR_COL key) 100) 0) 'a1' 'b1'))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '2008-04-08'))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            srcpart
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_TAB
+            TOK_TABNAME
+               list_bucketing_dynamic_part
+            TOK_PARTSPEC
+               TOK_PARTVAL
+                  ds
+                  '2008-04-08'
+               TOK_PARTVAL
+                  hr
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               key
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               value
+         TOK_SELEXPR
+            TOK_FUNCTION
+               if
+               ==
+                  %
+                     TOK_TABLE_OR_COL
+                        key
+                     100
+                  0
+               'a1'
+               'b1'
+      TOK_WHERE
+         =
+            TOK_TABLE_OR_COL
+               ds
+            '2008-04-08'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -114,26 +154,22 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        srcpart 
+      Map Operator Tree:
           TableScan
             alias: srcpart
+            Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-                    expr: if(((key % 100) = 0), 'a1', 'b1')
-                    type: string
+              expressions: key (type: string), value (type: string), if(((key % 100) = 0), 'a1', 'b1') (type: string)
               outputColumnNames: _col0, _col1, _col2
+              Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 1
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
                 Static Partition Specification: ds=2008-04-08/
+                Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
@@ -166,6 +202,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -190,15 +227,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.srcpart
-                numFiles 4
-                numPartitions 4
-                numRows 0
                 partition_columns ds/hr
-                rawDataSize 0
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 23248
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.srcpart
@@ -212,6 +244,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -236,15 +269,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.srcpart
-                numFiles 4
-                numPartitions 4
-                numRows 0
                 partition_columns ds/hr
-                rawDataSize 0
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 23248
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.srcpart
@@ -277,12 +305,10 @@ STAGE PLANS:
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.list_bucketing_dynamic_part
-#### A masked pattern was here ####
 
   Stage: Stage-2
     Stats-Aggr Operator
 #### A masked pattern was here ####
-
 
 PREHOOK: query: insert overwrite table list_bucketing_dynamic_part partition (ds = '2008-04-08', hr)
 select key, value, if(key % 100 == 0, 'a1', 'b1') from srcpart where ds = '2008-04-08'
@@ -342,10 +368,11 @@ Table:              	list_bucketing_dynamic_part
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
-	numFiles            	2                   
+	COLUMN_STATS_ACCURATE	true                
+	numFiles            	1                   
 	numRows             	16                  
 	rawDataSize         	136                 
-	totalSize           	310                 
+	totalSize           	102                 
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -388,6 +415,7 @@ Table:              	list_bucketing_dynamic_part
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
 	numFiles            	6                   
 	numRows             	984                 
 	rawDataSize         	9488                
@@ -424,7 +452,47 @@ POSTHOOK: Lineage: list_bucketing_dynamic_part PARTITION(ds=2008-04-08,hr=a1).va
 POSTHOOK: Lineage: list_bucketing_dynamic_part PARTITION(ds=2008-04-08,hr=b1).key SIMPLE [(srcpart)srcpart.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: list_bucketing_dynamic_part PARTITION(ds=2008-04-08,hr=b1).value SIMPLE [(srcpart)srcpart.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME srcpart))) (TOK_INSERT (TOK_DESTINATION (TOK_TAB (TOK_TABNAME list_bucketing_dynamic_part) (TOK_PARTSPEC (TOK_PARTVAL ds '2008-04-08') (TOK_PARTVAL hr)))) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_TABLE_OR_COL value)) (TOK_SELEXPR (TOK_FUNCTION if (== (% (TOK_TABLE_OR_COL key) 100) 0) 'a1' 'b1'))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '2008-04-08'))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            srcpart
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_TAB
+            TOK_TABNAME
+               list_bucketing_dynamic_part
+            TOK_PARTSPEC
+               TOK_PARTVAL
+                  ds
+                  '2008-04-08'
+               TOK_PARTVAL
+                  hr
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               key
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               value
+         TOK_SELEXPR
+            TOK_FUNCTION
+               if
+               ==
+                  %
+                     TOK_TABLE_OR_COL
+                        key
+                     100
+                  0
+               'a1'
+               'b1'
+      TOK_WHERE
+         =
+            TOK_TABLE_OR_COL
+               ds
+            '2008-04-08'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -439,26 +507,22 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        srcpart 
+      Map Operator Tree:
           TableScan
             alias: srcpart
+            Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-                    expr: if(((key % 100) = 0), 'a1', 'b1')
-                    type: string
+              expressions: key (type: string), value (type: string), if(((key % 100) = 0), 'a1', 'b1') (type: string)
               outputColumnNames: _col0, _col1, _col2
+              Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 1
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
                 Static Partition Specification: ds=2008-04-08/
+                Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
@@ -469,15 +533,10 @@ STAGE PLANS:
                       columns.types string:string
 #### A masked pattern was here ####
                       name default.list_bucketing_dynamic_part
-                      numFiles 8
-                      numPartitions 2
-                      numRows 1000
                       partition_columns hr
-                      rawDataSize 9624
                       serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
                       serialization.format 1
                       serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                      totalSize 11044
 #### A masked pattern was here ####
                     serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
                     name: default.list_bucketing_dynamic_part
@@ -496,6 +555,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -520,15 +580,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.srcpart
-                numFiles 4
-                numPartitions 4
-                numRows 0
                 partition_columns ds/hr
-                rawDataSize 0
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 23248
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.srcpart
@@ -542,6 +597,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -566,15 +622,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.srcpart
-                numFiles 4
-                numPartitions 4
-                numRows 0
                 partition_columns ds/hr
-                rawDataSize 0
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 23248
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.srcpart
@@ -609,19 +660,13 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.list_bucketing_dynamic_part
-                numFiles 8
-                numPartitions 2
-                numRows 1000
                 partition_columns hr
-                rawDataSize 9624
                 serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                totalSize 11044
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.list_bucketing_dynamic_part
-#### A masked pattern was here ####
 
   Stage: Stage-2
     Stats-Aggr Operator
@@ -642,15 +687,10 @@ STAGE PLANS:
               columns.types string:string
 #### A masked pattern was here ####
               name default.list_bucketing_dynamic_part
-              numFiles 8
-              numPartitions 2
-              numRows 1000
               partition_columns hr
-              rawDataSize 9624
               serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-              totalSize 11044
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
           
@@ -662,15 +702,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.list_bucketing_dynamic_part
-                numFiles 8
-                numPartitions 2
-                numRows 1000
                 partition_columns hr
-                rawDataSize 9624
                 serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                totalSize 11044
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.list_bucketing_dynamic_part
@@ -693,15 +728,10 @@ STAGE PLANS:
               columns.types string:string
 #### A masked pattern was here ####
               name default.list_bucketing_dynamic_part
-              numFiles 8
-              numPartitions 2
-              numRows 1000
               partition_columns hr
-              rawDataSize 9624
               serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-              totalSize 11044
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
           
@@ -713,15 +743,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.list_bucketing_dynamic_part
-                numFiles 8
-                numPartitions 2
-                numRows 1000
                 partition_columns hr
-                rawDataSize 9624
                 serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                totalSize 11044
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.list_bucketing_dynamic_part
@@ -734,7 +759,6 @@ STAGE PLANS:
       files:
           hdfs directory: true
 #### A masked pattern was here ####
-
 
 PREHOOK: query: insert overwrite table list_bucketing_dynamic_part partition (ds = '2008-04-08', hr)
 select key, value, if(key % 100 == 0, 'a1', 'b1') from srcpart where ds = '2008-04-08'
@@ -806,10 +830,11 @@ Table:              	list_bucketing_dynamic_part
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
 	numFiles            	1                   
 	numRows             	16                  
 	rawDataSize         	136                 
-	totalSize           	254                 
+	totalSize           	102                 
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -856,6 +881,7 @@ Table:              	list_bucketing_dynamic_part
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
 	numFiles            	4                   
 	numRows             	984                 
 	rawDataSize         	9488                
@@ -934,7 +960,30 @@ POSTHOOK: Lineage: list_bucketing_dynamic_part PARTITION(ds=2008-04-08,hr=b1).va
 POSTHOOK: Lineage: list_bucketing_dynamic_part PARTITION(ds=2008-04-08,hr=b1).key SIMPLE [(srcpart)srcpart.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: list_bucketing_dynamic_part PARTITION(ds=2008-04-08,hr=b1).value SIMPLE [(srcpart)srcpart.FieldSchema(name:value, type:string, comment:default), ]
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME list_bucketing_dynamic_part))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_WHERE (and (= (TOK_TABLE_OR_COL key) '484') (= (TOK_TABLE_OR_COL value) 'val_484')))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            list_bucketing_dynamic_part
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_ALLCOLREF
+      TOK_WHERE
+         and
+            =
+               TOK_TABLE_OR_COL
+                  key
+               '484'
+            =
+               TOK_TABLE_OR_COL
+                  value
+               'val_484'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -943,32 +992,25 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        list_bucketing_dynamic_part 
+      Map Operator Tree:
           TableScan
             alias: list_bucketing_dynamic_part
+            Statistics: Num rows: 1000 Data size: 9624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: ((key = '484') and (value = 'val_484'))
-                  type: boolean
+              predicate: ((key = '484') and (value = 'val_484')) (type: boolean)
+              Statistics: Num rows: 250 Data size: 2406 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-                      expr: ds
-                      type: string
-                      expr: hr
-                      type: string
+                expressions: key (type: string), value (type: string), ds (type: string), hr (type: string)
                 outputColumnNames: _col0, _col1, _col2, _col3
+                Statistics: Num rows: 250 Data size: 2406 Basic stats: COMPLETE Column stats: NONE
                 File Output Operator
                   compressed: false
                   GlobalTableId: 0
 #### A masked pattern was here ####
                   NumFilesPerFileSink: 1
+                  Statistics: Num rows: 250 Data size: 2406 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                   table:
                       input format: org.apache.hadoop.mapred.TextInputFormat
@@ -979,6 +1021,8 @@ STAGE PLANS:
                         escape.delim \
                         hive.serialization.extend.nesting.levels true
                         serialization.format 1
+                        serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                   TotalFiles: 1
                   GatherStats: false
                   MultiFileSpray: false
@@ -994,6 +1038,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr a1
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -1006,7 +1051,7 @@ STAGE PLANS:
               serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-              totalSize 254
+              totalSize 102
 #### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
           
@@ -1018,15 +1063,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.list_bucketing_dynamic_part
-                numFiles 5
-                numPartitions 2
-                numRows 1000
                 partition_columns ds/hr
-                rawDataSize 9624
                 serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                totalSize 10876
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.list_bucketing_dynamic_part
@@ -1040,6 +1080,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr b1
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -1064,15 +1105,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.list_bucketing_dynamic_part
-                numFiles 5
-                numPartitions 2
-                numRows 1000
                 partition_columns ds/hr
-                rawDataSize 9624
                 serialization.ddl struct list_bucketing_dynamic_part { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                totalSize 10876
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
               name: default.list_bucketing_dynamic_part
@@ -1084,7 +1120,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: select * from list_bucketing_dynamic_part where key = '484' and value = 'val_484'
 PREHOOK: type: QUERY

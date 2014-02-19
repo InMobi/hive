@@ -39,7 +39,6 @@ import org.apache.hadoop.hive.ql.plan.DescTableDesc;
 import org.apache.hadoop.hive.ql.plan.DropDatabaseDesc;
 import org.apache.hadoop.hive.ql.plan.DropTableDesc;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
-import org.apache.hadoop.hive.ql.plan.PartitionSpec;
 import org.apache.hadoop.hive.ql.plan.ShowDatabasesDesc;
 import org.apache.hadoop.hive.ql.plan.ShowPartitionsDesc;
 import org.apache.hadoop.hive.ql.plan.ShowTableStatusDesc;
@@ -78,7 +77,7 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
     case HiveParser.TOK_ALTERTABLE_PARTITION:
       if (((ASTNode) ast.getChild(1)).getToken().getType() == HiveParser.TOK_ALTERTABLE_FILEFORMAT) {
         return ast;
-      } else if (((ASTNode) ast.getChild(1)).getToken().getType() == HiveParser.TOK_ALTERTABLE_ALTERPARTS_MERGEFILES) {
+      } else if (((ASTNode) ast.getChild(1)).getToken().getType() == HiveParser.TOK_ALTERTABLE_MERGEFILES) {
         // unsupported
         throw new SemanticException("Operation not supported.");
       } else {
@@ -314,12 +313,12 @@ public class HCatSemanticAnalyzer extends HCatSemanticAnalyzerBase {
         // table is partitioned.
       } else {
         //this is actually a ALTER TABLE DROP PARITITION statement
-        for (PartitionSpec partSpec : dropTable.getPartSpecs()) {
+        for (DropTableDesc.PartSpec partSpec : dropTable.getPartSpecs()) {
           // partitions are not added as write entries in drop partitions in Hive
           Table table = hive.getTable(SessionState.get().getCurrentDatabase(), dropTable.getTableName());
           List<Partition> partitions = null;
           try {
-            partitions = hive.getPartitionsByFilter(table, partSpec.toString());
+            partitions = hive.getPartitionsByFilter(table, partSpec.getPartSpec().getExprString());
           } catch (Exception e) {
             throw new HiveException(e);
           }

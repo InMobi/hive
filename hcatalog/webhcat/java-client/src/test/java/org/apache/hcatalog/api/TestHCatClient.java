@@ -30,13 +30,16 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStore;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
-import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat;
+import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
+import org.apache.hadoop.hive.ql.metadata.DefaultStorageHandler;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hcatalog.cli.SemanticAnalysis.HCatSemanticAnalyzer;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hcatalog.common.HCatConstants;
 import org.apache.hcatalog.common.HCatException;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
@@ -49,9 +52,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.fail;
 
 /**
  * @deprecated Use/modify {@link org.apache.hive.hcatalog.api.TestHCatClient} instead
@@ -109,6 +114,7 @@ public class TestHCatClient {
     String db = "testdb";
     String tableOne = "testTable1";
     String tableTwo = "testTable2";
+    String tableThree = "testTable3";
     HCatClient client = HCatClient.create(new Configuration(hcatConf));
     client.dropDatabase(db, true, HCatClient.DropDBMode.CASCADE);
 
@@ -123,9 +129,10 @@ public class TestHCatClient {
     assertTrue(testDb.getComment() == null);
     assertTrue(testDb.getProperties().size() == 0);
     String warehouseDir = System
-      .getProperty(ConfVars.METASTOREWAREHOUSE.varname, "/user/hive/warehouse");
-    assertTrue(testDb.getLocation().equals(
-      "file:" + warehouseDir + "/" + db + ".db"));
+      .getProperty("test.warehouse.dir", "/user/hive/warehouse");
+    String expectedDir = org.apache.hive.hcatalog.api.TestHCatClient.fixPath(warehouseDir).
+            replaceFirst("pfile:///", "pfile:/");
+    assertEquals(expectedDir + "/" + db + ".db", testDb.getLocation());
     ArrayList<HCatFieldSchema> cols = new ArrayList<HCatFieldSchema>();
     cols.add(new HCatFieldSchema("id", Type.INT, "id comment"));
     cols.add(new HCatFieldSchema("value", Type.STRING, "value comment"));
@@ -145,6 +152,7 @@ public class TestHCatClient {
     // will result in an exception.
     try {
       client.createTable(tableDesc);
+      fail("Expected exception");
     } catch (HCatException e) {
       assertTrue(e.getMessage().contains(
         "AlreadyExistsException while creating table."));
@@ -158,9 +166,39 @@ public class TestHCatClient {
     assertTrue(table2.getInputFileFormat().equalsIgnoreCase(
       TextInputFormat.class.getName()));
     assertTrue(table2.getOutputFileFormat().equalsIgnoreCase(
-      IgnoreKeyTextOutputFormat.class.getName()));
-    assertTrue(table2.getLocation().equalsIgnoreCase(
-      "file:" + warehouseDir + "/" + db + ".db/" + tableTwo));
+      HiveIgnoreKeyTextOutputFormat.class.getName()));
+    assertEquals((expectedDir + "/" + db + ".db/" + tableTwo).toLowerCase(), table2.getLocation().toLowerCase());
+
+    HCatCreateTableDesc tableDesc3 = HCatCreateTableDesc.create(db,
+      tableThree, cols).fileFormat("orcfile").build();
+    client.createTable(tableDesc3);
+    HCatTable table3 = client.getTable(db, tableThree);
+    assertTrue(table3.getInputFileFormat().equalsIgnoreCase(
+      OrcInputFormat.class.getName()));
+    assertTrue(table3.getOutputFileFormat().equalsIgnoreCase(
+      OrcOutputFormat.class.getName()));
+    assertTrue(table3.getSerdeLib().equalsIgnoreCase(
+      OrcSerde.class.getName()));
+    assertTrue(table1.getCols().equals(cols));
+
+    // Check that serDe settings stick.
+    String tableFour = "table4";
+    String nonDefaultSerDe = "com.my.custom.SerDe";
+    HCatCreateTableDesc tableDesc4 = 
+        HCatCreateTableDesc.create(db, tableFour, cols).serDe(nonDefaultSerDe).build();
+    client.createTable(tableDesc4);
+    HCatTable table4 = client.getTable(db, tableFour);
+    assertEquals("SerDe libraries don't match!", nonDefaultSerDe, table4.getSerdeLib());
+    client.dropTable(db, tableFour, true);
+
+    // Check that serDe settings don't stick when a storageHandler is used.
+    tableDesc4 = HCatCreateTableDesc.create(db, tableFour, cols).
+        serDe(nonDefaultSerDe).storageHandler(DefaultStorageHandler.class.getName()).build();
+    client.createTable(tableDesc4);
+    table4 = client.getTable(db, tableFour);
+    assertNotSame("SerDe libraries shouldn't have matched!", nonDefaultSerDe, table4.getSerdeLib());
+    client.dropTable(db, tableFour, true);
+
     client.close();
   }
 

@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.hive.ql.udf.generic;
 
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.StringConcatColCol;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.StringConcatColScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.StringConcatScalarCol;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
@@ -29,8 +34,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.Pr
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorConverter.StringConverter;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.BytesWritable;
 
 /**
@@ -44,6 +49,8 @@ extended = "Returns NULL if any argument is NULL.\n"
 + "Example:\n"
 + "  > SELECT _FUNC_('abc', 'def') FROM src LIMIT 1;\n"
 + "  'abcdef'")
+@VectorizedExpressions({StringConcatColCol.class, StringConcatColScalar.class,
+    StringConcatScalarCol.class})
 public class GenericUDFConcat extends GenericUDF {
   private transient ObjectInspector[] argumentOIs;
   private transient StringConverter[] stringConverters;
@@ -55,9 +62,10 @@ public class GenericUDFConcat extends GenericUDF {
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
 
     // Loop through all the inputs to determine the appropriate return type/length.
-    // Either all arguments are binary, or all columns are non-binary.
     // Return type:
+    //  All CHAR inputs: return CHAR
     //  All VARCHAR inputs: return VARCHAR
+    //  All CHAR/VARCHAR inputs: return VARCHAR
     //  All BINARY inputs: return BINARY
     //  Otherwise return STRING
     argumentOIs = arguments;
@@ -79,21 +87,20 @@ public class GenericUDFConcat extends GenericUDF {
         case BINARY:
           fixedLengthReturnValue = false;
           if (returnType != currentCategory) {
-            throw new UDFArgumentException(
-                "CONCAT cannot take a mix of binary and non-binary arguments");
+            // mix of binary/non-binary args
+            returnType = PrimitiveCategory.STRING;
           }
           break;
+        case CHAR:
         case VARCHAR:
-          if (returnType == PrimitiveCategory.BINARY) {
-            throw new UDFArgumentException(
-                "CONCAT cannot take a mix of binary and non-binary arguments");
+          if (!fixedLengthReturnValue) {
+            returnType = PrimitiveCategory.STRING;
+          }
+          if (fixedLengthReturnValue && currentCategory == PrimitiveCategory.VARCHAR) {
+            returnType = PrimitiveCategory.VARCHAR;
           }
           break;
         default:
-          if (returnType == PrimitiveCategory.BINARY) {
-            throw new UDFArgumentException(
-                "CONCAT cannot take a mix of binary and non-binary arguments");
-          }
           returnType = PrimitiveCategory.STRING;
           fixedLengthReturnValue = false;
           break;
@@ -104,8 +111,10 @@ public class GenericUDFConcat extends GenericUDF {
       // max length for the char/varchar, then the return type reverts to string.
       if (fixedLengthReturnValue) {
         returnLength += GenericUDFUtils.StringHelper.getFixedStringSizeForType(poi);
-        if (returnType == PrimitiveCategory.VARCHAR
-            && returnLength > HiveVarchar.MAX_VARCHAR_LENGTH) {
+        if ((returnType == PrimitiveCategory.VARCHAR
+                && returnLength > HiveVarchar.MAX_VARCHAR_LENGTH)
+            || (returnType == PrimitiveCategory.CHAR
+                && returnLength > HiveChar.MAX_CHAR_LENGTH)) {
           returnType = PrimitiveCategory.STRING;
           fixedLengthReturnValue = false;
         }
@@ -119,14 +128,16 @@ public class GenericUDFConcat extends GenericUDF {
       // treat all inputs as string, the return value will be converted to the appropriate type.
       createStringConverters();
       returnHelper = new GenericUDFUtils.StringHelper(returnType);
+      BaseCharTypeInfo typeInfo;
       switch (returnType) {
         case STRING:
           return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
+        case CHAR:
+          typeInfo = TypeInfoFactory.getCharTypeInfo(returnLength);
+          return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(typeInfo);
         case VARCHAR:
-          VarcharTypeParams varcharParams = new VarcharTypeParams();
-          varcharParams.setLength(returnLength);
-          return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
-              PrimitiveObjectInspectorUtils.getTypeEntryFromTypeSpecs(returnType, varcharParams));
+          typeInfo = TypeInfoFactory.getVarcharTypeInfo(returnLength);
+          return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(typeInfo);
         default:
           throw new UDFArgumentException("Unexpected CONCAT return type of " + returnType);
       }

@@ -39,14 +39,14 @@ import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationState;
 import org.apache.hive.service.cli.RowSet;
+import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.HiveSession;
 
 /**
- * HiveCommandOperation.
- *
+ * Executes a HiveCommand
  */
-public abstract class HiveCommandOperation extends ExecuteStatementOperation {
+public class HiveCommandOperation extends ExecuteStatementOperation {
   private CommandProcessorResponse response;
   private CommandProcessor commandProcessor;
   private TableSchema resultSchema = null;
@@ -58,8 +58,10 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
   private BufferedReader resultReader;
 
 
-  protected HiveCommandOperation(HiveSession parentSession, String statement, Map<String, String> confOverlay) {
+  protected HiveCommandOperation(HiveSession parentSession, String statement,
+      CommandProcessor commandProcessor, Map<String, String> confOverlay) {
     super(parentSession, statement, confOverlay);
+    this.commandProcessor = commandProcessor;
     setupSessionIO(parentSession.getSessionState());
   }
 
@@ -105,10 +107,12 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
       String[] tokens = statement.split("\\s");
       String commandArgs = command.substring(tokens[0].length()).trim();
 
-      response = getCommandProcessor().run(commandArgs);
+      response = commandProcessor.run(commandArgs);
       int returnCode = response.getResponseCode();
-      String sqlState = response.getSQLState();
-      String errorMessage = response.getErrorMessage();
+      if (returnCode != 0) {
+        throw new HiveSQLException("Error while processing statement: "
+            + response.getErrorMessage(), response.getSQLState(), response.getResponseCode());
+      }
       Schema schema = response.getSchema();
       if (schema != null) {
         setHasResultSet(true);
@@ -117,6 +121,9 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
         setHasResultSet(false);
         resultSchema = new TableSchema();
       }
+    } catch (HiveSQLException e) {
+      setState(OperationState.ERROR);
+      throw e;
     } catch (Exception e) {
       setState(OperationState.ERROR);
       throw new HiveSQLException("Error running query: " + e.toString(), e);
@@ -149,11 +156,15 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
    */
   @Override
   public RowSet getNextRowSet(FetchOrientation orientation, long maxRows) throws HiveSQLException {
+    validateDefaultFetchOrientation(orientation);
+    if (orientation.equals(FetchOrientation.FETCH_FIRST)) {
+      resetResultReader();
+    }
     List<String> rows = readResults((int) maxRows);
-    RowSet rowSet = new RowSet();
+    RowSet rowSet = RowSetFactory.create(resultSchema, getProtocolVersion());
 
     for (String row : rows) {
-      rowSet.addRow(resultSchema, new String[] {row});
+      rowSet.addRow(new String[] {row});
     }
     return rowSet;
   }
@@ -175,7 +186,6 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
         throw new HiveSQLException(e);
       }
     }
-
     List<String> results = new ArrayList<String>();
 
     for (int i = 0; i < nLines || nLines <= 0; ++i) {
@@ -196,20 +206,16 @@ public abstract class HiveCommandOperation extends ExecuteStatementOperation {
   }
 
   private void cleanTmpFile() {
+    resetResultReader();
+    SessionState sessionState = getParentSession().getSessionState();
+    File tmp = sessionState.getTmpOutputFile();
+    tmp.delete();
+  }
+
+  private void resetResultReader() {
     if (resultReader != null) {
-      SessionState sessionState = getParentSession().getSessionState();
-      File tmp = sessionState.getTmpOutputFile();
       IOUtils.cleanup(LOG, resultReader);
-      tmp.delete();
       resultReader = null;
     }
-  }
-
-  protected CommandProcessor getCommandProcessor() {
-    return commandProcessor;
-  }
-
-  protected void setCommandProcessor(CommandProcessor commandProcessor) {
-    this.commandProcessor = commandProcessor;
   }
 }

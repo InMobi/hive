@@ -869,6 +869,11 @@ class Role:
    - roleName
    - createTime
    - ownerName
+   - principalName
+   - principalType
+   - grantOption
+   - grantTime
+   - grantor
   """
 
   thrift_spec = (
@@ -876,12 +881,22 @@ class Role:
     (1, TType.STRING, 'roleName', None, None, ), # 1
     (2, TType.I32, 'createTime', None, None, ), # 2
     (3, TType.STRING, 'ownerName', None, None, ), # 3
+    (4, TType.STRING, 'principalName', None, None, ), # 4
+    (5, TType.STRING, 'principalType', None, None, ), # 5
+    (6, TType.BOOL, 'grantOption', None, None, ), # 6
+    (7, TType.I32, 'grantTime', None, None, ), # 7
+    (8, TType.STRING, 'grantor', None, None, ), # 8
   )
 
-  def __init__(self, roleName=None, createTime=None, ownerName=None,):
+  def __init__(self, roleName=None, createTime=None, ownerName=None, principalName=None, principalType=None, grantOption=None, grantTime=None, grantor=None,):
     self.roleName = roleName
     self.createTime = createTime
     self.ownerName = ownerName
+    self.principalName = principalName
+    self.principalType = principalType
+    self.grantOption = grantOption
+    self.grantTime = grantTime
+    self.grantor = grantor
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -907,6 +922,31 @@ class Role:
           self.ownerName = iprot.readString();
         else:
           iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.STRING:
+          self.principalName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.STRING:
+          self.principalType = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.BOOL:
+          self.grantOption = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.I32:
+          self.grantTime = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 8:
+        if ftype == TType.STRING:
+          self.grantor = iprot.readString();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -928,6 +968,26 @@ class Role:
     if self.ownerName is not None:
       oprot.writeFieldBegin('ownerName', TType.STRING, 3)
       oprot.writeString(self.ownerName)
+      oprot.writeFieldEnd()
+    if self.principalName is not None:
+      oprot.writeFieldBegin('principalName', TType.STRING, 4)
+      oprot.writeString(self.principalName)
+      oprot.writeFieldEnd()
+    if self.principalType is not None:
+      oprot.writeFieldBegin('principalType', TType.STRING, 5)
+      oprot.writeString(self.principalType)
+      oprot.writeFieldEnd()
+    if self.grantOption is not None:
+      oprot.writeFieldBegin('grantOption', TType.BOOL, 6)
+      oprot.writeBool(self.grantOption)
+      oprot.writeFieldEnd()
+    if self.grantTime is not None:
+      oprot.writeFieldBegin('grantTime', TType.I32, 7)
+      oprot.writeI32(self.grantTime)
+      oprot.writeFieldEnd()
+    if self.grantor is not None:
+      oprot.writeFieldBegin('grantor', TType.STRING, 8)
+      oprot.writeString(self.grantor)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -955,6 +1015,8 @@ class Database:
    - locationUri
    - parameters
    - privileges
+   - ownerName
+   - ownerType
   """
 
   thrift_spec = (
@@ -964,14 +1026,18 @@ class Database:
     (3, TType.STRING, 'locationUri', None, None, ), # 3
     (4, TType.MAP, 'parameters', (TType.STRING,None,TType.STRING,None), None, ), # 4
     (5, TType.STRUCT, 'privileges', (PrincipalPrivilegeSet, PrincipalPrivilegeSet.thrift_spec), None, ), # 5
+    (6, TType.STRING, 'ownerName', None, None, ), # 6
+    (7, TType.I32, 'ownerType', None, None, ), # 7
   )
 
-  def __init__(self, name=None, description=None, locationUri=None, parameters=None, privileges=None,):
+  def __init__(self, name=None, description=None, locationUri=None, parameters=None, privileges=None, ownerName=None, ownerType=None,):
     self.name = name
     self.description = description
     self.locationUri = locationUri
     self.parameters = parameters
     self.privileges = privileges
+    self.ownerName = ownerName
+    self.ownerType = ownerType
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -1014,6 +1080,16 @@ class Database:
           self.privileges.read(iprot)
         else:
           iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.STRING:
+          self.ownerName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.I32:
+          self.ownerType = iprot.readI32();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -1047,6 +1123,14 @@ class Database:
     if self.privileges is not None:
       oprot.writeFieldBegin('privileges', TType.STRUCT, 5)
       self.privileges.write(oprot)
+      oprot.writeFieldEnd()
+    if self.ownerName is not None:
+      oprot.writeFieldBegin('ownerName', TType.STRING, 6)
+      oprot.writeString(self.ownerName)
+      oprot.writeFieldEnd()
+    if self.ownerType is not None:
+      oprot.writeFieldBegin('ownerType', TType.I32, 7)
+      oprot.writeI32(self.ownerType)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -3199,6 +3283,1153 @@ class EnvironmentContext:
     oprot.writeStructEnd()
 
   def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class PartitionsByExprResult:
+  """
+  Attributes:
+   - partitions
+   - hasUnknownPartitions
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.LIST, 'partitions', (TType.STRUCT,(Partition, Partition.thrift_spec)), None, ), # 1
+    (2, TType.BOOL, 'hasUnknownPartitions', None, None, ), # 2
+  )
+
+  def __init__(self, partitions=None, hasUnknownPartitions=None,):
+    self.partitions = partitions
+    self.hasUnknownPartitions = hasUnknownPartitions
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.LIST:
+          self.partitions = []
+          (_etype230, _size227) = iprot.readListBegin()
+          for _i231 in xrange(_size227):
+            _elem232 = Partition()
+            _elem232.read(iprot)
+            self.partitions.append(_elem232)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.BOOL:
+          self.hasUnknownPartitions = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('PartitionsByExprResult')
+    if self.partitions is not None:
+      oprot.writeFieldBegin('partitions', TType.LIST, 1)
+      oprot.writeListBegin(TType.STRUCT, len(self.partitions))
+      for iter233 in self.partitions:
+        iter233.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.hasUnknownPartitions is not None:
+      oprot.writeFieldBegin('hasUnknownPartitions', TType.BOOL, 2)
+      oprot.writeBool(self.hasUnknownPartitions)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.partitions is None:
+      raise TProtocol.TProtocolException(message='Required field partitions is unset!')
+    if self.hasUnknownPartitions is None:
+      raise TProtocol.TProtocolException(message='Required field hasUnknownPartitions is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class PartitionsByExprRequest:
+  """
+  Attributes:
+   - dbName
+   - tblName
+   - expr
+   - defaultPartitionName
+   - maxParts
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'dbName', None, None, ), # 1
+    (2, TType.STRING, 'tblName', None, None, ), # 2
+    (3, TType.STRING, 'expr', None, None, ), # 3
+    (4, TType.STRING, 'defaultPartitionName', None, None, ), # 4
+    (5, TType.I16, 'maxParts', None, -1, ), # 5
+  )
+
+  def __init__(self, dbName=None, tblName=None, expr=None, defaultPartitionName=None, maxParts=thrift_spec[5][4],):
+    self.dbName = dbName
+    self.tblName = tblName
+    self.expr = expr
+    self.defaultPartitionName = defaultPartitionName
+    self.maxParts = maxParts
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.dbName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.tblName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.expr = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.STRING:
+          self.defaultPartitionName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.I16:
+          self.maxParts = iprot.readI16();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('PartitionsByExprRequest')
+    if self.dbName is not None:
+      oprot.writeFieldBegin('dbName', TType.STRING, 1)
+      oprot.writeString(self.dbName)
+      oprot.writeFieldEnd()
+    if self.tblName is not None:
+      oprot.writeFieldBegin('tblName', TType.STRING, 2)
+      oprot.writeString(self.tblName)
+      oprot.writeFieldEnd()
+    if self.expr is not None:
+      oprot.writeFieldBegin('expr', TType.STRING, 3)
+      oprot.writeString(self.expr)
+      oprot.writeFieldEnd()
+    if self.defaultPartitionName is not None:
+      oprot.writeFieldBegin('defaultPartitionName', TType.STRING, 4)
+      oprot.writeString(self.defaultPartitionName)
+      oprot.writeFieldEnd()
+    if self.maxParts is not None:
+      oprot.writeFieldBegin('maxParts', TType.I16, 5)
+      oprot.writeI16(self.maxParts)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.dbName is None:
+      raise TProtocol.TProtocolException(message='Required field dbName is unset!')
+    if self.tblName is None:
+      raise TProtocol.TProtocolException(message='Required field tblName is unset!')
+    if self.expr is None:
+      raise TProtocol.TProtocolException(message='Required field expr is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class TableStatsResult:
+  """
+  Attributes:
+   - tableStats
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.LIST, 'tableStats', (TType.STRUCT,(ColumnStatisticsObj, ColumnStatisticsObj.thrift_spec)), None, ), # 1
+  )
+
+  def __init__(self, tableStats=None,):
+    self.tableStats = tableStats
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.LIST:
+          self.tableStats = []
+          (_etype237, _size234) = iprot.readListBegin()
+          for _i238 in xrange(_size234):
+            _elem239 = ColumnStatisticsObj()
+            _elem239.read(iprot)
+            self.tableStats.append(_elem239)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('TableStatsResult')
+    if self.tableStats is not None:
+      oprot.writeFieldBegin('tableStats', TType.LIST, 1)
+      oprot.writeListBegin(TType.STRUCT, len(self.tableStats))
+      for iter240 in self.tableStats:
+        iter240.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.tableStats is None:
+      raise TProtocol.TProtocolException(message='Required field tableStats is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class PartitionsStatsResult:
+  """
+  Attributes:
+   - partStats
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.MAP, 'partStats', (TType.STRING,None,TType.LIST,(TType.STRUCT,(ColumnStatisticsObj, ColumnStatisticsObj.thrift_spec))), None, ), # 1
+  )
+
+  def __init__(self, partStats=None,):
+    self.partStats = partStats
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.MAP:
+          self.partStats = {}
+          (_ktype242, _vtype243, _size241 ) = iprot.readMapBegin() 
+          for _i245 in xrange(_size241):
+            _key246 = iprot.readString();
+            _val247 = []
+            (_etype251, _size248) = iprot.readListBegin()
+            for _i252 in xrange(_size248):
+              _elem253 = ColumnStatisticsObj()
+              _elem253.read(iprot)
+              _val247.append(_elem253)
+            iprot.readListEnd()
+            self.partStats[_key246] = _val247
+          iprot.readMapEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('PartitionsStatsResult')
+    if self.partStats is not None:
+      oprot.writeFieldBegin('partStats', TType.MAP, 1)
+      oprot.writeMapBegin(TType.STRING, TType.LIST, len(self.partStats))
+      for kiter254,viter255 in self.partStats.items():
+        oprot.writeString(kiter254)
+        oprot.writeListBegin(TType.STRUCT, len(viter255))
+        for iter256 in viter255:
+          iter256.write(oprot)
+        oprot.writeListEnd()
+      oprot.writeMapEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.partStats is None:
+      raise TProtocol.TProtocolException(message='Required field partStats is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class TableStatsRequest:
+  """
+  Attributes:
+   - dbName
+   - tblName
+   - colNames
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'dbName', None, None, ), # 1
+    (2, TType.STRING, 'tblName', None, None, ), # 2
+    (3, TType.LIST, 'colNames', (TType.STRING,None), None, ), # 3
+  )
+
+  def __init__(self, dbName=None, tblName=None, colNames=None,):
+    self.dbName = dbName
+    self.tblName = tblName
+    self.colNames = colNames
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.dbName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.tblName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.LIST:
+          self.colNames = []
+          (_etype260, _size257) = iprot.readListBegin()
+          for _i261 in xrange(_size257):
+            _elem262 = iprot.readString();
+            self.colNames.append(_elem262)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('TableStatsRequest')
+    if self.dbName is not None:
+      oprot.writeFieldBegin('dbName', TType.STRING, 1)
+      oprot.writeString(self.dbName)
+      oprot.writeFieldEnd()
+    if self.tblName is not None:
+      oprot.writeFieldBegin('tblName', TType.STRING, 2)
+      oprot.writeString(self.tblName)
+      oprot.writeFieldEnd()
+    if self.colNames is not None:
+      oprot.writeFieldBegin('colNames', TType.LIST, 3)
+      oprot.writeListBegin(TType.STRING, len(self.colNames))
+      for iter263 in self.colNames:
+        oprot.writeString(iter263)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.dbName is None:
+      raise TProtocol.TProtocolException(message='Required field dbName is unset!')
+    if self.tblName is None:
+      raise TProtocol.TProtocolException(message='Required field tblName is unset!')
+    if self.colNames is None:
+      raise TProtocol.TProtocolException(message='Required field colNames is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class PartitionsStatsRequest:
+  """
+  Attributes:
+   - dbName
+   - tblName
+   - colNames
+   - partNames
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'dbName', None, None, ), # 1
+    (2, TType.STRING, 'tblName', None, None, ), # 2
+    (3, TType.LIST, 'colNames', (TType.STRING,None), None, ), # 3
+    (4, TType.LIST, 'partNames', (TType.STRING,None), None, ), # 4
+  )
+
+  def __init__(self, dbName=None, tblName=None, colNames=None, partNames=None,):
+    self.dbName = dbName
+    self.tblName = tblName
+    self.colNames = colNames
+    self.partNames = partNames
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.dbName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.tblName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.LIST:
+          self.colNames = []
+          (_etype267, _size264) = iprot.readListBegin()
+          for _i268 in xrange(_size264):
+            _elem269 = iprot.readString();
+            self.colNames.append(_elem269)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.LIST:
+          self.partNames = []
+          (_etype273, _size270) = iprot.readListBegin()
+          for _i274 in xrange(_size270):
+            _elem275 = iprot.readString();
+            self.partNames.append(_elem275)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('PartitionsStatsRequest')
+    if self.dbName is not None:
+      oprot.writeFieldBegin('dbName', TType.STRING, 1)
+      oprot.writeString(self.dbName)
+      oprot.writeFieldEnd()
+    if self.tblName is not None:
+      oprot.writeFieldBegin('tblName', TType.STRING, 2)
+      oprot.writeString(self.tblName)
+      oprot.writeFieldEnd()
+    if self.colNames is not None:
+      oprot.writeFieldBegin('colNames', TType.LIST, 3)
+      oprot.writeListBegin(TType.STRING, len(self.colNames))
+      for iter276 in self.colNames:
+        oprot.writeString(iter276)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.partNames is not None:
+      oprot.writeFieldBegin('partNames', TType.LIST, 4)
+      oprot.writeListBegin(TType.STRING, len(self.partNames))
+      for iter277 in self.partNames:
+        oprot.writeString(iter277)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.dbName is None:
+      raise TProtocol.TProtocolException(message='Required field dbName is unset!')
+    if self.tblName is None:
+      raise TProtocol.TProtocolException(message='Required field tblName is unset!')
+    if self.colNames is None:
+      raise TProtocol.TProtocolException(message='Required field colNames is unset!')
+    if self.partNames is None:
+      raise TProtocol.TProtocolException(message='Required field partNames is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class AddPartitionsResult:
+  """
+  Attributes:
+   - partitions
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.LIST, 'partitions', (TType.STRUCT,(Partition, Partition.thrift_spec)), None, ), # 1
+  )
+
+  def __init__(self, partitions=None,):
+    self.partitions = partitions
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.LIST:
+          self.partitions = []
+          (_etype281, _size278) = iprot.readListBegin()
+          for _i282 in xrange(_size278):
+            _elem283 = Partition()
+            _elem283.read(iprot)
+            self.partitions.append(_elem283)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('AddPartitionsResult')
+    if self.partitions is not None:
+      oprot.writeFieldBegin('partitions', TType.LIST, 1)
+      oprot.writeListBegin(TType.STRUCT, len(self.partitions))
+      for iter284 in self.partitions:
+        iter284.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class AddPartitionsRequest:
+  """
+  Attributes:
+   - dbName
+   - tblName
+   - parts
+   - ifNotExists
+   - needResult
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'dbName', None, None, ), # 1
+    (2, TType.STRING, 'tblName', None, None, ), # 2
+    (3, TType.LIST, 'parts', (TType.STRUCT,(Partition, Partition.thrift_spec)), None, ), # 3
+    (4, TType.BOOL, 'ifNotExists', None, None, ), # 4
+    (5, TType.BOOL, 'needResult', None, True, ), # 5
+  )
+
+  def __init__(self, dbName=None, tblName=None, parts=None, ifNotExists=None, needResult=thrift_spec[5][4],):
+    self.dbName = dbName
+    self.tblName = tblName
+    self.parts = parts
+    self.ifNotExists = ifNotExists
+    self.needResult = needResult
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.dbName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.tblName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.LIST:
+          self.parts = []
+          (_etype288, _size285) = iprot.readListBegin()
+          for _i289 in xrange(_size285):
+            _elem290 = Partition()
+            _elem290.read(iprot)
+            self.parts.append(_elem290)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.BOOL:
+          self.ifNotExists = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.needResult = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('AddPartitionsRequest')
+    if self.dbName is not None:
+      oprot.writeFieldBegin('dbName', TType.STRING, 1)
+      oprot.writeString(self.dbName)
+      oprot.writeFieldEnd()
+    if self.tblName is not None:
+      oprot.writeFieldBegin('tblName', TType.STRING, 2)
+      oprot.writeString(self.tblName)
+      oprot.writeFieldEnd()
+    if self.parts is not None:
+      oprot.writeFieldBegin('parts', TType.LIST, 3)
+      oprot.writeListBegin(TType.STRUCT, len(self.parts))
+      for iter291 in self.parts:
+        iter291.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.ifNotExists is not None:
+      oprot.writeFieldBegin('ifNotExists', TType.BOOL, 4)
+      oprot.writeBool(self.ifNotExists)
+      oprot.writeFieldEnd()
+    if self.needResult is not None:
+      oprot.writeFieldBegin('needResult', TType.BOOL, 5)
+      oprot.writeBool(self.needResult)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.dbName is None:
+      raise TProtocol.TProtocolException(message='Required field dbName is unset!')
+    if self.tblName is None:
+      raise TProtocol.TProtocolException(message='Required field tblName is unset!')
+    if self.parts is None:
+      raise TProtocol.TProtocolException(message='Required field parts is unset!')
+    if self.ifNotExists is None:
+      raise TProtocol.TProtocolException(message='Required field ifNotExists is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class DropPartitionsResult:
+  """
+  Attributes:
+   - partitions
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.LIST, 'partitions', (TType.STRUCT,(Partition, Partition.thrift_spec)), None, ), # 1
+  )
+
+  def __init__(self, partitions=None,):
+    self.partitions = partitions
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.LIST:
+          self.partitions = []
+          (_etype295, _size292) = iprot.readListBegin()
+          for _i296 in xrange(_size292):
+            _elem297 = Partition()
+            _elem297.read(iprot)
+            self.partitions.append(_elem297)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('DropPartitionsResult')
+    if self.partitions is not None:
+      oprot.writeFieldBegin('partitions', TType.LIST, 1)
+      oprot.writeListBegin(TType.STRUCT, len(self.partitions))
+      for iter298 in self.partitions:
+        iter298.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class DropPartitionsExpr:
+  """
+  Attributes:
+   - expr
+   - partArchiveLevel
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'expr', None, None, ), # 1
+    (2, TType.I32, 'partArchiveLevel', None, None, ), # 2
+  )
+
+  def __init__(self, expr=None, partArchiveLevel=None,):
+    self.expr = expr
+    self.partArchiveLevel = partArchiveLevel
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.expr = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.I32:
+          self.partArchiveLevel = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('DropPartitionsExpr')
+    if self.expr is not None:
+      oprot.writeFieldBegin('expr', TType.STRING, 1)
+      oprot.writeString(self.expr)
+      oprot.writeFieldEnd()
+    if self.partArchiveLevel is not None:
+      oprot.writeFieldBegin('partArchiveLevel', TType.I32, 2)
+      oprot.writeI32(self.partArchiveLevel)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.expr is None:
+      raise TProtocol.TProtocolException(message='Required field expr is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class RequestPartsSpec:
+  """
+  Attributes:
+   - names
+   - exprs
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.LIST, 'names', (TType.STRING,None), None, ), # 1
+    (2, TType.LIST, 'exprs', (TType.STRUCT,(DropPartitionsExpr, DropPartitionsExpr.thrift_spec)), None, ), # 2
+  )
+
+  def __init__(self, names=None, exprs=None,):
+    self.names = names
+    self.exprs = exprs
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.LIST:
+          self.names = []
+          (_etype302, _size299) = iprot.readListBegin()
+          for _i303 in xrange(_size299):
+            _elem304 = iprot.readString();
+            self.names.append(_elem304)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.LIST:
+          self.exprs = []
+          (_etype308, _size305) = iprot.readListBegin()
+          for _i309 in xrange(_size305):
+            _elem310 = DropPartitionsExpr()
+            _elem310.read(iprot)
+            self.exprs.append(_elem310)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('RequestPartsSpec')
+    if self.names is not None:
+      oprot.writeFieldBegin('names', TType.LIST, 1)
+      oprot.writeListBegin(TType.STRING, len(self.names))
+      for iter311 in self.names:
+        oprot.writeString(iter311)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.exprs is not None:
+      oprot.writeFieldBegin('exprs', TType.LIST, 2)
+      oprot.writeListBegin(TType.STRUCT, len(self.exprs))
+      for iter312 in self.exprs:
+        iter312.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class DropPartitionsRequest:
+  """
+  Attributes:
+   - dbName
+   - tblName
+   - parts
+   - deleteData
+   - ifExists
+   - ignoreProtection
+   - environmentContext
+   - needResult
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'dbName', None, None, ), # 1
+    (2, TType.STRING, 'tblName', None, None, ), # 2
+    (3, TType.STRUCT, 'parts', (RequestPartsSpec, RequestPartsSpec.thrift_spec), None, ), # 3
+    (4, TType.BOOL, 'deleteData', None, None, ), # 4
+    (5, TType.BOOL, 'ifExists', None, True, ), # 5
+    (6, TType.BOOL, 'ignoreProtection', None, None, ), # 6
+    (7, TType.STRUCT, 'environmentContext', (EnvironmentContext, EnvironmentContext.thrift_spec), None, ), # 7
+    (8, TType.BOOL, 'needResult', None, True, ), # 8
+  )
+
+  def __init__(self, dbName=None, tblName=None, parts=None, deleteData=None, ifExists=thrift_spec[5][4], ignoreProtection=None, environmentContext=None, needResult=thrift_spec[8][4],):
+    self.dbName = dbName
+    self.tblName = tblName
+    self.parts = parts
+    self.deleteData = deleteData
+    self.ifExists = ifExists
+    self.ignoreProtection = ignoreProtection
+    self.environmentContext = environmentContext
+    self.needResult = needResult
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.dbName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.tblName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.parts = RequestPartsSpec()
+          self.parts.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.BOOL:
+          self.deleteData = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.ifExists = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.BOOL:
+          self.ignoreProtection = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.STRUCT:
+          self.environmentContext = EnvironmentContext()
+          self.environmentContext.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 8:
+        if ftype == TType.BOOL:
+          self.needResult = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('DropPartitionsRequest')
+    if self.dbName is not None:
+      oprot.writeFieldBegin('dbName', TType.STRING, 1)
+      oprot.writeString(self.dbName)
+      oprot.writeFieldEnd()
+    if self.tblName is not None:
+      oprot.writeFieldBegin('tblName', TType.STRING, 2)
+      oprot.writeString(self.tblName)
+      oprot.writeFieldEnd()
+    if self.parts is not None:
+      oprot.writeFieldBegin('parts', TType.STRUCT, 3)
+      self.parts.write(oprot)
+      oprot.writeFieldEnd()
+    if self.deleteData is not None:
+      oprot.writeFieldBegin('deleteData', TType.BOOL, 4)
+      oprot.writeBool(self.deleteData)
+      oprot.writeFieldEnd()
+    if self.ifExists is not None:
+      oprot.writeFieldBegin('ifExists', TType.BOOL, 5)
+      oprot.writeBool(self.ifExists)
+      oprot.writeFieldEnd()
+    if self.ignoreProtection is not None:
+      oprot.writeFieldBegin('ignoreProtection', TType.BOOL, 6)
+      oprot.writeBool(self.ignoreProtection)
+      oprot.writeFieldEnd()
+    if self.environmentContext is not None:
+      oprot.writeFieldBegin('environmentContext', TType.STRUCT, 7)
+      self.environmentContext.write(oprot)
+      oprot.writeFieldEnd()
+    if self.needResult is not None:
+      oprot.writeFieldBegin('needResult', TType.BOOL, 8)
+      oprot.writeBool(self.needResult)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.dbName is None:
+      raise TProtocol.TProtocolException(message='Required field dbName is unset!')
+    if self.tblName is None:
+      raise TProtocol.TProtocolException(message='Required field tblName is unset!')
+    if self.parts is None:
+      raise TProtocol.TProtocolException(message='Required field parts is unset!')
     return
 
 

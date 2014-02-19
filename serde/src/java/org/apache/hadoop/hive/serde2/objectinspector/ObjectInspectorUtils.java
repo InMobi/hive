@@ -31,6 +31,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
+import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritable;
@@ -43,14 +44,31 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspect
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.JavaStringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableBinaryObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableBooleanObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableDateObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableDoubleObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableFloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableHiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableHiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableHiveVarcharObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableIntObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableLongObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableShortObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableTimestampObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableStringObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.BytesWritable;
@@ -88,7 +106,8 @@ public final class ObjectInspectorUtils {
     if (oi.getCategory() == Category.PRIMITIVE) {
       PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
       if (!(poi instanceof AbstractPrimitiveWritableObjectInspector)) {
-        return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(poi);
+        return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+            (PrimitiveTypeInfo)poi.getTypeInfo());
       }
     }
     return oi;
@@ -112,22 +131,23 @@ public final class ObjectInspectorUtils {
       switch (objectInspectorOption) {
       case DEFAULT: {
         if (poi.preferWritable()) {
-          result = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(poi);
+          result = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+              poi.getTypeInfo());
         } else {
-          result = PrimitiveObjectInspectorFactory
-              .getPrimitiveJavaObjectInspector(poi);
+          result = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(
+              poi.getTypeInfo());
         }
         break;
       }
       case JAVA: {
-        result = PrimitiveObjectInspectorFactory
-            .getPrimitiveJavaObjectInspector(poi);
+        result = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(
+            poi.getTypeInfo());
         break;
       }
-      case WRITABLE: {
-        result = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(poi);
+      case WRITABLE:
+        result = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+            poi.getTypeInfo());
         break;
-      }
       }
       break;
     }
@@ -486,6 +506,8 @@ public final class ObjectInspectorUtils {
         }
         return r;
       }
+      case CHAR:
+        return ((HiveCharObjectInspector) poi).getPrimitiveWritableObject(o).hashCode();
       case VARCHAR:
         return ((HiveVarcharObjectInspector)poi).getPrimitiveWritableObject(o).hashCode();
       case BINARY:
@@ -675,13 +697,18 @@ public final class ObjectInspectorUtils {
           Text t1 = (Text) poi1.getPrimitiveWritableObject(o1);
           Text t2 = (Text) poi2.getPrimitiveWritableObject(o2);
           return t1 == null ? (t2 == null ? 0 : -1) : (t2 == null ? 1
-              : ShimLoader.getHadoopShims().compareText(t1, t2));
+              : t1.compareTo(t2));
         } else {
           String s1 = (String) poi1.getPrimitiveJavaObject(o1);
           String s2 = (String) poi2.getPrimitiveJavaObject(o2);
           return s1 == null ? (s2 == null ? 0 : -1) : (s2 == null ? 1 : s1
               .compareTo(s2));
         }
+      }
+      case CHAR: {
+        HiveCharWritable t1 = ((HiveCharObjectInspector)poi1).getPrimitiveWritableObject(o1);
+        HiveCharWritable t2 = ((HiveCharObjectInspector)poi2).getPrimitiveWritableObject(o2);
+        return t1.compareTo(t2);
       }
       case VARCHAR: {
         HiveVarcharWritable t1 = ((HiveVarcharObjectInspector)poi1).getPrimitiveWritableObject(o1);
@@ -957,7 +984,7 @@ public final class ObjectInspectorUtils {
       case PRIMITIVE:
         PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
         return PrimitiveObjectInspectorFactory.getPrimitiveWritableConstantObjectInspector(
-            poi, writableValue);
+            poi.getTypeInfo(), writableValue);
       case LIST:
         ListObjectInspector loi = (ListObjectInspector) oi;
         return ObjectInspectorFactory.getStandardConstantListObjectInspector(
@@ -1001,6 +1028,140 @@ public final class ObjectInspectorUtils {
 
   public static boolean isConstantObjectInspector(ObjectInspector oi) {
     return (oi instanceof ConstantObjectInspector);
+  }
+
+  private static boolean setOISettablePropertiesMap(ObjectInspector oi,
+      Map<ObjectInspector, Boolean> oiSettableProperties, boolean value) {
+    // Cache if the client asks for it, else just return the value
+    if (!(oiSettableProperties == null)) {
+      oiSettableProperties.put(oi, value);
+    }
+    return value;
+  }
+
+  private static boolean isInstanceOfSettablePrimitiveOI(PrimitiveObjectInspector oi) {
+    switch (oi.getPrimitiveCategory()) {
+    case BOOLEAN:
+      return oi instanceof SettableBooleanObjectInspector;
+    case BYTE:
+      return oi instanceof SettableByteObjectInspector;
+    case SHORT:
+      return oi instanceof SettableShortObjectInspector;
+    case INT:
+      return oi instanceof SettableIntObjectInspector;
+    case LONG:
+      return oi instanceof SettableLongObjectInspector ;
+    case FLOAT:
+      return oi instanceof SettableFloatObjectInspector;
+    case DOUBLE:
+      return oi instanceof SettableDoubleObjectInspector;
+    case STRING:
+      return oi instanceof WritableStringObjectInspector ||
+          oi instanceof JavaStringObjectInspector;
+    case CHAR:
+      return oi instanceof SettableHiveCharObjectInspector;
+    case VARCHAR:
+      return oi instanceof SettableHiveVarcharObjectInspector;
+    case DATE:
+      return oi instanceof SettableDateObjectInspector;
+    case TIMESTAMP:
+      return oi instanceof SettableTimestampObjectInspector;
+    case BINARY:
+      return oi instanceof SettableBinaryObjectInspector;
+    case DECIMAL:
+      return oi instanceof SettableHiveDecimalObjectInspector;
+    default:
+      throw new RuntimeException("Hive internal error inside isAssignableFromSettablePrimitiveOI "
+                          + oi.getTypeName() + " not supported yet.");
+    }
+  }
+
+  private static boolean isInstanceOfSettableOI(ObjectInspector oi)
+  {
+    switch (oi.getCategory()) {
+      case PRIMITIVE:
+        return isInstanceOfSettablePrimitiveOI((PrimitiveObjectInspector)oi);
+      case STRUCT:
+        return oi instanceof SettableStructObjectInspector;
+      case LIST:
+        return oi instanceof SettableListObjectInspector;
+      case MAP:
+        return oi instanceof SettableMapObjectInspector;
+      case UNION:
+        return oi instanceof SettableUnionObjectInspector;
+      default:
+        throw new RuntimeException("Hive internal error inside isAssignableFromSettableOI : "
+            + oi.getTypeName() + " not supported yet.");
+    }
+  }
+
+  /*
+   * hasAllFieldsSettable without any caching.
+   */
+  public static Boolean hasAllFieldsSettable(ObjectInspector oi) {
+    return hasAllFieldsSettable(oi, null);
+  }
+
+  /**
+   *
+   * @param oi - Input object inspector
+   * @param oiSettableProperties - Lookup map to cache the result.(If no caching, pass null)
+   * @return - true if : (1) oi is an instance of settable<DataType>OI.
+   *                     (2) All the embedded object inspectors are instances of settable<DataType>OI.
+   *           If (1) or (2) is false, return false.
+   */
+  public static boolean hasAllFieldsSettable(ObjectInspector oi,
+      Map<ObjectInspector, Boolean> oiSettableProperties) {
+    // If the result is already present in the cache, return it.
+    if (!(oiSettableProperties == null) &&
+        oiSettableProperties.containsKey(oi)) {
+      return oiSettableProperties.get(oi).booleanValue();
+    }
+    // If the top-level object inspector is non-settable return false
+    if (!(isInstanceOfSettableOI(oi))) {
+      return setOISettablePropertiesMap(oi, oiSettableProperties, false);
+    }
+
+    Boolean returnValue = true;
+
+    switch (oi.getCategory()) {
+    case PRIMITIVE:
+      break;
+    case STRUCT:
+      StructObjectInspector structOutputOI = (StructObjectInspector) oi;
+      List<? extends StructField> listFields = structOutputOI.getAllStructFieldRefs();
+      for (StructField listField : listFields) {
+        if (!hasAllFieldsSettable(listField.getFieldObjectInspector(), oiSettableProperties)) {
+          returnValue = false;
+          break;
+        }
+      }
+      break;
+    case LIST:
+      ListObjectInspector listOutputOI = (ListObjectInspector) oi;
+      returnValue = hasAllFieldsSettable(listOutputOI.getListElementObjectInspector(),
+          oiSettableProperties);
+      break;
+    case MAP:
+      MapObjectInspector mapOutputOI = (MapObjectInspector) oi;
+      returnValue = hasAllFieldsSettable(mapOutputOI.getMapKeyObjectInspector(), oiSettableProperties) &&
+          hasAllFieldsSettable(mapOutputOI.getMapValueObjectInspector(), oiSettableProperties);
+      break;
+    case UNION:
+      UnionObjectInspector unionOutputOI = (UnionObjectInspector) oi;
+      List<ObjectInspector> unionListFields = unionOutputOI.getObjectInspectors();
+      for (ObjectInspector listField : unionListFields) {
+        if (!hasAllFieldsSettable(listField, oiSettableProperties)) {
+          returnValue = false;
+          break;
+        }
+      }
+      break;
+    default:
+      throw new RuntimeException("Hive internal error inside hasAllFieldsSettable : "
+          + oi.getTypeName() + " not supported yet.");
+    }
+    return setOISettablePropertiesMap(oi, oiSettableProperties, returnValue);
   }
 
   private ObjectInspectorUtils() {

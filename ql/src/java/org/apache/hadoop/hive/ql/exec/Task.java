@@ -30,7 +30,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.ql.CommandNeedRetryException;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.lib.Node;
@@ -73,15 +72,16 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public static final int NO_TAG = 0;
   public static final int COMMON_JOIN = 1;
-  public static final int CONVERTED_MAPJOIN = 2;
-  public static final int CONVERTED_LOCAL_MAPJOIN = 3;
-  public static final int BACKUP_COMMON_JOIN = 4;
-  public static final int LOCAL_MAPJOIN = 5;
+  public static final int HINTED_MAPJOIN = 2;
+  public static final int HINTED_MAPJOIN_LOCAL = 3;
+  public static final int CONVERTED_MAPJOIN = 4;
+  public static final int CONVERTED_MAPJOIN_LOCAL = 5;
+  public static final int BACKUP_COMMON_JOIN = 6;
   // The join task is converted to a mapjoin task. This can only happen if
   // hive.auto.convert.join.noconditionaltask is set to true. No conditional task was
   // created in case the mapjoin failed.
-  public static final int MAPJOIN_ONLY_NOBACKUP = 6;
-  public static final int CONVERTED_SORTMERGEJOIN = 7;
+  public static final int MAPJOIN_ONLY_NOBACKUP = 7;
+  public static final int CONVERTED_SORTMERGEJOIN = 8;
 
   // Descendants tasks who subscribe feeds from this task
   protected transient List<Task<? extends Serializable>> feedSubscribers;
@@ -99,7 +99,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public static enum FeedType {
     DYNAMIC_PARTITIONS, // list of dynamic partitions
-  };
+  }
 
   public static enum TaskState {
     // Task data structures have been initialized
@@ -115,6 +115,8 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   }
 
   // Bean methods
+
+  protected boolean rootTask;
 
   protected List<Task<? extends Serializable>> childTasks;
   protected List<Task<? extends Serializable>> parentTasks;
@@ -154,6 +156,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
       throw new RuntimeException(e);
     }
     this.driverContext = driverContext;
+
     console = new LogHelper(LOG);
   }
 
@@ -188,10 +191,12 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
    */
   protected abstract int execute(DriverContext driverContext);
 
-  // dummy method - FetchTask overwrites this
-  public boolean fetch(ArrayList<String> res) throws IOException, CommandNeedRetryException {
-    assert false;
-    return false;
+  public boolean isRootTask() {
+    return rootTask;
+  }
+
+  public void setRootTask(boolean rootTask) {
+    this.rootTask = rootTask;
   }
 
   public void setChildTasks(List<Task<? extends Serializable>> childTasks) {
@@ -263,8 +268,6 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
         childTsk.removeFromChildrenTasks();
       }
     }
-
-    return;
   }
 
 
@@ -549,6 +552,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   Throwable getException() {
     return exception;
   }
+
   void setException(Throwable ex) {
     exception = ex;
   }
@@ -559,5 +563,14 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public void setLogRedirectionEnabled(boolean isLogRedirectionEnabled) {
     this.isLogRedirectionEnabled = isLogRedirectionEnabled;
+  }
+
+  public void setConsole(LogHelper console) {
+    this.console = console;
+  }
+
+  @Override
+  public String toString() {
+    return getId() + ":" + getType();
   }
 }

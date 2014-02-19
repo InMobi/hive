@@ -21,6 +21,7 @@ package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.charset.CharacterCodingException;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.HashMap;
@@ -28,13 +29,14 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
@@ -45,9 +47,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
-import org.apache.hadoop.hive.serde2.typeinfo.BaseTypeParams;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeSpec;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -71,7 +70,7 @@ public final class PrimitiveObjectInspectorUtils {
   /**
    * TypeEntry stores information about a Hive Primitive TypeInfo.
    */
-  public static class PrimitiveTypeEntry implements Writable, Cloneable, PrimitiveTypeSpec {
+  public static class PrimitiveTypeEntry implements Writable, Cloneable {
 
     /**
      * The category of the PrimitiveType.
@@ -96,18 +95,19 @@ public final class PrimitiveObjectInspectorUtils {
      * typeName is the name of the type as in DDL.
      */
     public String typeName;
-    public Class<?> typeParamsClass;
-    public BaseTypeParams typeParams;
+
+    protected PrimitiveTypeEntry() {
+      super();
+    }
 
     PrimitiveTypeEntry(
         PrimitiveObjectInspector.PrimitiveCategory primitiveCategory,
         String typeName, Class<?> primitiveType, Class<?> javaClass,
-        Class<?> hiveClass, Class<?>paramsClass) {
+        Class<?> hiveClass) {
       this.primitiveCategory = primitiveCategory;
       primitiveJavaType = primitiveType;
       primitiveJavaClass = javaClass;
       primitiveWritableClass = hiveClass;
-      typeParamsClass = paramsClass;
       this.typeName = typeName;
     }
 
@@ -116,71 +116,23 @@ public final class PrimitiveObjectInspectorUtils {
       primitiveCategory = WritableUtils.readEnum(in,
           PrimitiveObjectInspector.PrimitiveCategory.class);
       typeName = WritableUtils.readString(in);
-      int typeParamsIndicator = WritableUtils.readVInt(in);
       try {
         primitiveJavaType = Class.forName(WritableUtils.readString(in));
         primitiveJavaClass = Class.forName(WritableUtils.readString(in));
         primitiveWritableClass = Class.forName(WritableUtils.readString(in));
-        if (typeParamsIndicator == 1) {
-          typeParamsClass = Class.forName(WritableUtils.readString(in));
-          typeParams = (BaseTypeParams)typeParamsClass.newInstance();
-          typeParams.readFields(in);
-        } else {
-          typeParamsClass = null;
-          typeParams = null;
-        }
       } catch (ClassNotFoundException e) {
-        throw new IOException(e);
-      } catch (IllegalAccessException e) {
-        throw new IOException(e);
-      } catch (InstantiationException e) {
         throw new IOException(e);
       }
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-      int typeParamsIndicator = (isParameterized() && typeParams != null) ? 1 : 0;
 
       WritableUtils.writeEnum(out, primitiveCategory);
       WritableUtils.writeString(out, typeName);
-      WritableUtils.writeVInt(out, typeParamsIndicator);
       WritableUtils.writeString(out, primitiveJavaType.getName());
       WritableUtils.writeString(out, primitiveJavaClass.getName());
       WritableUtils.writeString(out, primitiveWritableClass.getName());
-      if (typeParamsIndicator == 1) {
-        WritableUtils.writeString(out,  typeParamsClass.getName());
-        typeParams.write(out);
-      }
-    }
-
-    public PrimitiveTypeEntry addParameters(String[] parameters) {
-      if (parameters == null || parameters.length == 0) {
-        return this;
-      }
-
-      PrimitiveTypeEntry result;
-      try {
-        BaseTypeParams newTypeParams = (BaseTypeParams)typeParamsClass.newInstance();
-        newTypeParams.set(parameters);
-        String typeNameWithParams = this.typeName + newTypeParams.toString();
-        if (typeNameToTypeEntry.containsKey(typeNameWithParams)) {
-          return typeNameToTypeEntry.get(typeNameWithParams);
-        }
-        result = (PrimitiveTypeEntry)this.clone();
-        result.typeParams = newTypeParams;
-
-        PrimitiveObjectInspectorUtils.addParameterizedType(result);
-
-        return result;
-      } catch (Exception err) {
-        LOG.error("Error while setting type parameters: " + err);
-        throw new RuntimeException(err);
-      }
-    }
-
-    public boolean isParameterized() {
-      return (null != typeParamsClass);
     }
 
     @Override
@@ -190,52 +142,24 @@ public final class PrimitiveObjectInspectorUtils {
           this.typeName,
           this.primitiveJavaType,
           this.primitiveJavaClass,
-          this.primitiveWritableClass,
-          this.typeParamsClass);
+          this.primitiveWritableClass);
       return result;
     }
 
     @Override
     public String toString() {
-      if (typeParams != null) {
-        return typeName + typeParams.toString();
-      }
       return typeName;
     }
 
-    public static BaseTypeParams createTypeParams(String typeName, String[] parameters)
-        throws SerDeException {
-      try {
-        PrimitiveTypeEntry typeEntry = getTypeEntryFromTypeName(typeName);
-        if (typeEntry != null && typeEntry.typeParamsClass != null) {
-          BaseTypeParams newTypeParams = (BaseTypeParams)typeEntry.typeParamsClass.newInstance();
-          newTypeParams.set(parameters);
-          return newTypeParams;
-        } else {
-          return null;
-        }
-      } catch (Exception err) {
-        throw new SerDeException("Error creating type params for " + typeName
-            + ": " + err, err);
-      }
-    }
-
-    @Override
-    public PrimitiveCategory getPrimitiveCategory() {
-      return primitiveCategory;
-    }
-
-    @Override
-    public BaseTypeParams getTypeParams() {
-      return typeParams;
-    }
   }
 
   static final Map<PrimitiveCategory, PrimitiveTypeEntry> primitiveCategoryToTypeEntry = new HashMap<PrimitiveCategory, PrimitiveTypeEntry>();
   static final Map<Class<?>, PrimitiveTypeEntry> primitiveJavaTypeToTypeEntry = new HashMap<Class<?>, PrimitiveTypeEntry>();
   static final Map<Class<?>, PrimitiveTypeEntry> primitiveJavaClassToTypeEntry = new HashMap<Class<?>, PrimitiveTypeEntry>();
   static final Map<Class<?>, PrimitiveTypeEntry> primitiveWritableClassToTypeEntry = new HashMap<Class<?>, PrimitiveTypeEntry>();
-  static final Map<String, PrimitiveTypeEntry> typeNameToTypeEntry = new HashMap<String, PrimitiveTypeEntry>();
+
+  // Base type name to PrimitiveTypeEntry map.
+  private static final Map<String, PrimitiveTypeEntry> typeNameToTypeEntry = new HashMap<String, PrimitiveTypeEntry>();
 
   static void addParameterizedType(PrimitiveTypeEntry t) {
     typeNameToTypeEntry.put(t.toString(), t);
@@ -261,56 +185,60 @@ public final class PrimitiveObjectInspectorUtils {
 
   public static final PrimitiveTypeEntry binaryTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.BINARY, serdeConstants.BINARY_TYPE_NAME, byte[].class,
-      byte[].class, BytesWritable.class, null);
+      byte[].class, BytesWritable.class);
   public static final PrimitiveTypeEntry stringTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.STRING, serdeConstants.STRING_TYPE_NAME, null, String.class,
-      Text.class, null);
+      Text.class);
   public static final PrimitiveTypeEntry booleanTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.BOOLEAN, serdeConstants.BOOLEAN_TYPE_NAME, Boolean.TYPE,
-      Boolean.class, BooleanWritable.class, null);
+      Boolean.class, BooleanWritable.class);
   public static final PrimitiveTypeEntry intTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.INT, serdeConstants.INT_TYPE_NAME, Integer.TYPE,
-      Integer.class, IntWritable.class, null);
+      Integer.class, IntWritable.class);
   public static final PrimitiveTypeEntry longTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.LONG, serdeConstants.BIGINT_TYPE_NAME, Long.TYPE,
-      Long.class, LongWritable.class, null);
+      Long.class, LongWritable.class);
   public static final PrimitiveTypeEntry floatTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.FLOAT, serdeConstants.FLOAT_TYPE_NAME, Float.TYPE,
-      Float.class, FloatWritable.class, null);
+      Float.class, FloatWritable.class);
   public static final PrimitiveTypeEntry voidTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.VOID, serdeConstants.VOID_TYPE_NAME, Void.TYPE, Void.class,
-      NullWritable.class, null);
+      NullWritable.class);
 
   // No corresponding Writable classes for the following 3 in hadoop 0.17.0
   public static final PrimitiveTypeEntry doubleTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.DOUBLE, serdeConstants.DOUBLE_TYPE_NAME, Double.TYPE,
-      Double.class, DoubleWritable.class, null);
+      Double.class, DoubleWritable.class);
   public static final PrimitiveTypeEntry byteTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.BYTE, serdeConstants.TINYINT_TYPE_NAME, Byte.TYPE,
-      Byte.class, ByteWritable.class, null);
+      Byte.class, ByteWritable.class);
   public static final PrimitiveTypeEntry shortTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.SHORT, serdeConstants.SMALLINT_TYPE_NAME, Short.TYPE,
-      Short.class, ShortWritable.class, null);
+      Short.class, ShortWritable.class);
   public static final PrimitiveTypeEntry dateTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.DATE, serdeConstants.DATE_TYPE_NAME, null,
-      Date.class, DateWritable.class, null);
+      Date.class, DateWritable.class);
   public static final PrimitiveTypeEntry timestampTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.TIMESTAMP, serdeConstants.TIMESTAMP_TYPE_NAME, null,
-      Timestamp.class, TimestampWritable.class, null);
+      Timestamp.class, TimestampWritable.class);
   public static final PrimitiveTypeEntry decimalTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.DECIMAL, serdeConstants.DECIMAL_TYPE_NAME, null,
-      HiveDecimal.class, HiveDecimalWritable.class, null);
+      HiveDecimal.class, HiveDecimalWritable.class);
   public static final PrimitiveTypeEntry varcharTypeEntry = new PrimitiveTypeEntry(
       PrimitiveCategory.VARCHAR, serdeConstants.VARCHAR_TYPE_NAME, null, HiveVarchar.class,
-      HiveVarcharWritable.class, VarcharTypeParams.class);
+      HiveVarcharWritable.class);
+  public static final PrimitiveTypeEntry charTypeEntry = new PrimitiveTypeEntry(
+      PrimitiveCategory.CHAR, serdeConstants.CHAR_TYPE_NAME, null, HiveChar.class,
+      HiveCharWritable.class);
 
   // The following is a complex type for special handling
   public static final PrimitiveTypeEntry unknownTypeEntry = new PrimitiveTypeEntry(
-      PrimitiveCategory.UNKNOWN, "unknown", null, Object.class, null, null);
+      PrimitiveCategory.UNKNOWN, "unknown", null, Object.class, null);
 
   static {
     registerType(binaryTypeEntry);
     registerType(stringTypeEntry);
+    registerType(charTypeEntry);
     registerType(varcharTypeEntry);
     registerType(booleanTypeEntry);
     registerType(intTypeEntry);
@@ -427,37 +355,10 @@ public final class PrimitiveObjectInspectorUtils {
   }
 
   /**
-   * Get the TypeEntry for a Primitive Writable Class.
+   * Get the TypeEntry for the given base type name (int, varchar, etc).
    */
   public static PrimitiveTypeEntry getTypeEntryFromTypeName(String typeName) {
     return typeNameToTypeEntry.get(typeName);
-  }
-
-  public static PrimitiveTypeEntry getTypeEntryFromTypeSpecs(
-      PrimitiveCategory primitiveCategory,
-      BaseTypeParams typeParams) {
-    if (typeParams == null) {
-      // No type params, can just use the primitive category
-      return getTypeEntryFromPrimitiveCategory(primitiveCategory);
-    }
-
-    // Type params were passed in. First check for cached version
-    String typeString = primitiveCategory.toString().toLowerCase();
-    typeString += typeParams.toString();
-    PrimitiveTypeEntry typeEntry = getTypeEntryFromTypeName(typeString);
-    if (typeEntry == null) {
-      // Parameterized type doesn't exist yet, create now.
-      typeEntry = 
-          (PrimitiveTypeEntry) getTypeEntryFromPrimitiveCategory(primitiveCategory).clone();
-      if (!typeEntry.isParameterized()) {
-        throw new IllegalArgumentException(
-            primitiveCategory + " type was being used with type parameters "
-            + typeParams + ", which should not be allowed");
-      }
-      typeEntry.typeParams = typeParams;
-      addParameterizedType(typeEntry);
-    }
-    return typeEntry;
   }
 
   /**
@@ -508,6 +409,10 @@ public final class PrimitiveObjectInspectorUtils {
       Writable t2 = ((StringObjectInspector) oi2)
           .getPrimitiveWritableObject(o2);
       return t1.equals(t2);
+    }
+    case CHAR: {
+      return ((HiveCharObjectInspector)oi1).getPrimitiveWritableObject(o1)
+          .equals(((HiveCharObjectInspector)oi2).getPrimitiveWritableObject(o2));
     }
     case VARCHAR: {
       return ((HiveVarcharObjectInspector)oi1).getPrimitiveWritableObject(o1)
@@ -716,6 +621,7 @@ public final class PrimitiveObjectInspectorUtils {
       }
       break;
     }
+    case CHAR:
     case VARCHAR: {
       result = Integer.parseInt(getString(o, oi));
       break;
@@ -779,6 +685,7 @@ public final class PrimitiveObjectInspectorUtils {
         result = Long.parseLong(s);
       }
       break;
+    case CHAR:
     case VARCHAR: {
       result = Long.parseLong(getString(o, oi));
       break;
@@ -836,6 +743,7 @@ public final class PrimitiveObjectInspectorUtils {
       String s = soi.getPrimitiveJavaObject(o);
       result = Double.parseDouble(s);
       break;
+    case CHAR:
     case VARCHAR:
       result = Double.parseDouble(getString(o, oi));
       break;
@@ -879,6 +787,16 @@ public final class PrimitiveObjectInspectorUtils {
     case VOID:
       result = null;
       break;
+    case BINARY:
+      try {
+        byte[] bytes = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o).getBytes();
+        int byteLen = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o).getLength();
+        result = Text.decode(bytes, 0, byteLen);
+      } catch (CharacterCodingException err) {
+        // we tried ..
+        result = null;
+      }
+      break;
     case BOOLEAN:
       result = String.valueOf((((BooleanObjectInspector) oi).get(o)));
       break;
@@ -904,6 +822,10 @@ public final class PrimitiveObjectInspectorUtils {
       StringObjectInspector soi = (StringObjectInspector) oi;
       result = soi.getPrimitiveJavaObject(o);
       break;
+    case CHAR:
+      // when converting from char to string/varchar, strip any trailing spaces
+      result = ((HiveCharObjectInspector) oi).getPrimitiveJavaObject(o).getStrippedValue();
+      break;
     case VARCHAR:
       HiveVarcharObjectInspector hcoi = (HiveVarcharObjectInspector) oi;
       result = hcoi.getPrimitiveJavaObject(o).toString();
@@ -921,6 +843,25 @@ public final class PrimitiveObjectInspectorUtils {
     default:
       throw new RuntimeException("Hive 2 Internal error: unknown type: "
           + oi.getTypeName());
+    }
+    return result;
+  }
+
+  public static HiveChar getHiveChar(Object o, PrimitiveObjectInspector oi) {
+    if (o == null) {
+      return null;
+    }
+
+    HiveChar result = null;
+    switch (oi.getPrimitiveCategory()) {
+      case CHAR:
+        result = ((HiveCharObjectInspector) oi).getPrimitiveJavaObject(o);
+        break;
+      default:
+        // No char length available, copy whole string value here.
+        result = new HiveChar();
+        result.setValue(getString(o, oi));
+        break;
     }
     return result;
   }
@@ -947,6 +888,12 @@ public final class PrimitiveObjectInspectorUtils {
     return result;
   }
 
+  public static BytesWritable getBinaryFromText(Text text) {
+    BytesWritable bw = new BytesWritable();
+    bw.set(text.getBytes(), 0, text.getLength());
+    return bw;
+  }
+
   public static BytesWritable getBinary(Object o, PrimitiveObjectInspector oi) {
 
     if (null == o) {
@@ -960,9 +907,14 @@ public final class PrimitiveObjectInspectorUtils {
 
     case STRING:
       Text text = ((StringObjectInspector) oi).getPrimitiveWritableObject(o);
-      BytesWritable bw = new BytesWritable();
-      bw.set(text.getBytes(), 0, text.getLength());
-      return bw;
+      return getBinaryFromText(text);
+    case CHAR:
+      // char to binary conversion: include trailing spaces?
+      return getBinaryFromText(
+          ((HiveCharObjectInspector) oi).getPrimitiveWritableObject(o).getPaddedValue());
+    case VARCHAR:
+      return getBinaryFromText(
+          ((HiveVarcharObjectInspector) oi).getPrimitiveWritableObject(o).getTextValue());
 
     case BINARY:
       return ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o);
@@ -988,35 +940,36 @@ public final class PrimitiveObjectInspectorUtils {
         HiveDecimal.ONE : HiveDecimal.ZERO;
       break;
     case BYTE:
-      result = new HiveDecimal(((ByteObjectInspector) oi).get(o));
+      result = HiveDecimal.create(((ByteObjectInspector) oi).get(o));
       break;
     case SHORT:
-      result = new HiveDecimal(((ShortObjectInspector) oi).get(o));
+      result = HiveDecimal.create(((ShortObjectInspector) oi).get(o));
       break;
     case INT:
-      result = new HiveDecimal(((IntObjectInspector) oi).get(o));
+      result = HiveDecimal.create(((IntObjectInspector) oi).get(o));
       break;
     case LONG:
-      result = new HiveDecimal(((LongObjectInspector) oi).get(o));
+      result = HiveDecimal.create(((LongObjectInspector) oi).get(o));
       break;
     case FLOAT:
       Float f = ((FloatObjectInspector) oi).get(o);
-      result = new HiveDecimal(f.toString());
+      result = HiveDecimal.create(f.toString());
       break;
     case DOUBLE:
       Double d = ((DoubleObjectInspector) oi).get(o);
-      result = new HiveDecimal(d.toString());
+      result = HiveDecimal.create(d.toString());
       break;
     case STRING:
-      result = new HiveDecimal(((StringObjectInspector) oi).getPrimitiveJavaObject(o));
+      result = HiveDecimal.create(((StringObjectInspector) oi).getPrimitiveJavaObject(o));
       break;
+    case CHAR:
     case VARCHAR:
-      result = new HiveDecimal(getString(o, oi));
+      result = HiveDecimal.create(getString(o, oi));
       break;
     case TIMESTAMP:
       Double ts = ((TimestampObjectInspector) oi).getPrimitiveWritableObject(o)
         .getDouble();
-      result = new HiveDecimal(ts.toString());
+      result = HiveDecimal.create(ts.toString());
       break;
     case DECIMAL:
       result = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o);
@@ -1048,6 +1001,7 @@ public final class PrimitiveObjectInspectorUtils {
         result = null;
       }
       break;
+    case CHAR:
     case VARCHAR: {
       try {
         String val = getString(o, oi).trim();
@@ -1112,6 +1066,7 @@ public final class PrimitiveObjectInspectorUtils {
       String s = soi.getPrimitiveJavaObject(o);
       result = getTimestampFromString(s);
       break;
+    case CHAR:
     case VARCHAR:
       result = getTimestampFromString(getString(o, oi));
       break;
@@ -1184,6 +1139,7 @@ public final class PrimitiveObjectInspectorUtils {
       case DECIMAL:
         return PrimitiveGrouping.NUMERIC_GROUP;
       case STRING:
+      case CHAR:
       case VARCHAR:
         return PrimitiveGrouping.STRING_GROUP;
       case BOOLEAN:
@@ -1204,37 +1160,4 @@ public final class PrimitiveObjectInspectorUtils {
     // prevent instantiation
   }
 
-  /**
-   * Helper class to store parameterized primitive object inspectors, which can be
-   * used by the various object inspector factory methods.
-   */
-  public static class ParameterizedObjectInspectorMap {
-    HashMap<PrimitiveCategory, HashMap<String, PrimitiveObjectInspector>> entries;
-
-    public ParameterizedObjectInspectorMap() {
-      entries =
-          new HashMap<PrimitiveCategory, HashMap<String, PrimitiveObjectInspector>>();
-    }
-
-    public PrimitiveObjectInspector getObjectInspector(
-        PrimitiveTypeSpec typeSpec) {
-      PrimitiveCategory category = typeSpec.getPrimitiveCategory();
-      BaseTypeParams params = typeSpec.getTypeParams();
-      HashMap<String, PrimitiveObjectInspector> entriesForCategory = entries.get(category);
-      if (entriesForCategory == null) {
-        return null;
-      }
-      return (PrimitiveObjectInspector)entriesForCategory.get(params.toString());
-    }
-
-    public void setObjectInspector(PrimitiveObjectInspector oi) {
-      PrimitiveCategory category = oi.getPrimitiveCategory();
-      HashMap<String, PrimitiveObjectInspector> entriesForCategory = entries.get(category);
-      if (entriesForCategory == null) {
-        entriesForCategory = new HashMap<String, PrimitiveObjectInspector>();
-        entries.put(category, entriesForCategory);
-      }
-      entriesForCategory.put(oi.getTypeParams().toString(), oi);
-    }
-  }
 }

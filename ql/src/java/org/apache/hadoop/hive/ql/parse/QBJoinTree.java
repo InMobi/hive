@@ -51,22 +51,22 @@ public class QBJoinTree implements Serializable{
 
   // keeps track of the right-hand-side table name of the left-semi-join, and
   // its list of join keys
-  private final HashMap<String, ArrayList<ASTNode>> rhsSemijoin;
+  private transient final HashMap<String, ArrayList<ASTNode>> rhsSemijoin;
 
   // join conditions
-  private ArrayList<ArrayList<ASTNode>> expressions;
+  private transient ArrayList<ArrayList<ASTNode>> expressions;
 
   // key index to nullsafe join flag
   private ArrayList<Boolean> nullsafes;
 
   // filters
-  private ArrayList<ArrayList<ASTNode>> filters;
+  private transient ArrayList<ArrayList<ASTNode>> filters;
 
   // outerjoin-pos = other-pos:filter-len, other-pos:filter-len, ...
   private int[][] filterMap;
 
   // filters for pushing
-  private ArrayList<ArrayList<ASTNode>> filtersForPushing;
+  private transient ArrayList<ArrayList<ASTNode>> filtersForPushing;
 
   // user asked for map-side join
   private boolean mapSideJoin;
@@ -74,6 +74,14 @@ public class QBJoinTree implements Serializable{
 
   // big tables that should be streamed
   private List<String> streamAliases;
+
+  /*
+   * when a QBJoinTree is merged into this one, its left(pos =0) filters can
+   * refer to any of the srces in this QBJoinTree. If a particular filterForPushing refers
+   * to multiple srces in this QBJoinTree, we collect them into 'postJoinFilters'
+   * We then add a Filter Operator after the Join Operator for this QBJoinTree.
+   */
+  private final List<ASTNode> postJoinFilters;
 
   /**
    * constructor.
@@ -84,6 +92,7 @@ public class QBJoinTree implements Serializable{
     noSemiJoin = true;
     rhsSemijoin = new HashMap<String, ArrayList<ASTNode>>();
     aliasToOpInfo = new HashMap<String, Operator<? extends OperatorDesc>>();
+    postJoinFilters = new ArrayList<ASTNode>();
   }
 
   /**
@@ -102,7 +111,11 @@ public class QBJoinTree implements Serializable{
    *          String
    */
   public void setLeftAlias(String leftAlias) {
-    this.leftAlias = leftAlias;
+    if ( this.leftAlias != null && !this.leftAlias.equals(leftAlias) ) {
+      this.leftAlias = null;
+    } else {
+      this.leftAlias = leftAlias;
+    }
   }
 
   public String[] getRightAliases() {
@@ -147,10 +160,6 @@ public class QBJoinTree implements Serializable{
 
   public int getNextTag() {
     return nextTag++;
-  }
-
-  public String getJoinStreamDesc() {
-    return "$INTNAME";
   }
 
   public JoinCond[] getJoinCond() {
@@ -345,5 +354,13 @@ public class QBJoinTree implements Serializable{
 
   public void setId(String id) {
     this.id = id;
+  }
+
+  public void addPostJoinFilter(ASTNode filter) {
+    postJoinFilters.add(filter);
+  }
+
+  public List<ASTNode> getPostJoinFilters() {
+    return postJoinFilters;
   }
 }

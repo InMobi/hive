@@ -18,17 +18,22 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import java.sql.Date;
-import java.sql.Timestamp;
-
 import static org.apache.hadoop.hive.ql.exec.Utilities.getFileExtension;
+
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 import junit.framework.TestCase;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFFromUtcTimestamp;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -64,10 +69,41 @@ public class TestUtilities extends TestCase {
   public void testSerializeTimestamp() {
     Timestamp ts = new Timestamp(1374554702000L);
     ts.setNanos(123456);
-    ExprNodeConstantDesc constant = new ExprNodeConstantDesc(
-        TypeInfoFactory.timestampTypeInfo, ts);
-    String serialized = Utilities.serializeExpression(constant);
-    ExprNodeDesc deserialized = Utilities.deserializeExpression(serialized, new Configuration());
-    assertEquals(constant.getExprString(), deserialized.getExprString());
+    ExprNodeConstantDesc constant = new ExprNodeConstantDesc(ts);
+    List<ExprNodeDesc> children = new ArrayList<ExprNodeDesc>(1);
+    children.add(constant);
+    ExprNodeGenericFuncDesc desc = new ExprNodeGenericFuncDesc(TypeInfoFactory.timestampTypeInfo,
+      new GenericUDFFromUtcTimestamp(), children);
+    assertEquals(desc.getExprString(), Utilities.deserializeExpression(
+      Utilities.serializeExpression(desc)).getExprString());
   }
+
+  public void testgetDbTableName() throws HiveException{
+    String tablename;
+    String [] dbtab;
+    SessionState.start(new HiveConf(this.getClass()));
+    String curDefaultdb = SessionState.get().getCurrentDatabase();
+
+    //test table without db portion
+    tablename = "tab1";
+    dbtab = Utilities.getDbTableName(tablename);
+    assertEquals("db name", curDefaultdb, dbtab[0]);
+    assertEquals("table name", tablename, dbtab[1]);
+
+    //test table with db portion
+    tablename = "dab1.tab1";
+    dbtab = Utilities.getDbTableName(tablename);
+    assertEquals("db name", "dab1", dbtab[0]);
+    assertEquals("table name", "tab1", dbtab[1]);
+
+    //test invalid table name
+    tablename = "dab1.tab1.x1";
+    try {
+      dbtab = Utilities.getDbTableName(tablename);
+      fail("exception was expected for invalid table name");
+    } catch(HiveException ex){
+      assertEquals("Invalid table name " + tablename, ex.getMessage());
+    }
+  }
+
 }

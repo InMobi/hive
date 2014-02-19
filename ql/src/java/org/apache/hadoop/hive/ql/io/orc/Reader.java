@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.hive.ql.io.orc;
 
-import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+
+import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 /**
  * The interface for reading ORC files.
@@ -37,6 +37,19 @@ public interface Reader {
    * @return the number of rows
    */
   long getNumberOfRows();
+
+  /**
+   * Get the deserialized data size of the file
+   * @return raw data size
+   */
+  long getRawDataSize();
+
+  /**
+   * Get the deserialized data size of the specified columns
+   * @param colNames
+   * @return raw data size of columns
+   */
+  long getRawDataSizeOfColumns(List<String> colNames);
 
   /**
    * Get the user metadata keys.
@@ -95,11 +108,42 @@ public interface Reader {
   ColumnStatistics[] getStatistics();
 
   /**
+   * Get the metadata information like stripe level column statistics etc.
+   * @return the information about the column
+   * @throws IOException
+   */
+  Metadata getMetadata() throws IOException;
+
+  /**
    * Get the list of types contained in the file. The root type is the first
    * type in the list.
    * @return the list of flattened types
    */
   List<OrcProto.Type> getTypes();
+
+  /**
+   * FileMetaInfo - represents file metadata stored in footer and postscript sections of the file
+   * that is useful for Reader implementation
+   *
+   */
+  class FileMetaInfo{
+    final String compressionType;
+    final int bufferSize;
+    final int metadataSize;
+    final ByteBuffer footerBuffer;
+    FileMetaInfo(String compressionType, int bufferSize, int metadataSize, ByteBuffer footerBuffer){
+      this.compressionType = compressionType;
+      this.bufferSize = bufferSize;
+      this.metadataSize = metadataSize;
+      this.footerBuffer = footerBuffer;
+    }
+  }
+
+  /**
+   * Get the metadata stored in footer and postscript sections of the file
+   * @return MetaInfo object with file metadata
+   */
+  FileMetaInfo getFileMetaInfo();
 
   /**
    * Create a RecordReader that will scan the entire file.
@@ -121,6 +165,7 @@ public interface Reader {
    * @throws IOException
    * @deprecated
    */
+  @Deprecated
   RecordReader rows(long offset, long length,
                     boolean[] include) throws IOException;
 

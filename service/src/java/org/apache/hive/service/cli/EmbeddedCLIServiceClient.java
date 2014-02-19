@@ -85,6 +85,7 @@ public class EmbeddedCLIServiceClient extends CLIServiceClient {
     return cliService.executeStatementAsync(sessionHandle, statement, confOverlay);
   }
 
+
   /* (non-Javadoc)
    * @see org.apache.hive.service.cli.CLIServiceClient#getTypeInfo(org.apache.hive.service.cli.SessionHandle)
    */

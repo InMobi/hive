@@ -33,23 +33,25 @@ import org.slf4j.LoggerFactory;
 
 public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("TColumn");
-  private static final org.apache.thrift.protocol.TField BOOL_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("boolColumn", org.apache.thrift.protocol.TType.LIST, (short)1);
-  private static final org.apache.thrift.protocol.TField BYTE_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("byteColumn", org.apache.thrift.protocol.TType.LIST, (short)2);
-  private static final org.apache.thrift.protocol.TField I16_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("i16Column", org.apache.thrift.protocol.TType.LIST, (short)3);
-  private static final org.apache.thrift.protocol.TField I32_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("i32Column", org.apache.thrift.protocol.TType.LIST, (short)4);
-  private static final org.apache.thrift.protocol.TField I64_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("i64Column", org.apache.thrift.protocol.TType.LIST, (short)5);
-  private static final org.apache.thrift.protocol.TField DOUBLE_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleColumn", org.apache.thrift.protocol.TType.LIST, (short)6);
-  private static final org.apache.thrift.protocol.TField STRING_COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("stringColumn", org.apache.thrift.protocol.TType.LIST, (short)7);
+  private static final org.apache.thrift.protocol.TField BOOL_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("boolVal", org.apache.thrift.protocol.TType.STRUCT, (short)1);
+  private static final org.apache.thrift.protocol.TField BYTE_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("byteVal", org.apache.thrift.protocol.TType.STRUCT, (short)2);
+  private static final org.apache.thrift.protocol.TField I16_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("i16Val", org.apache.thrift.protocol.TType.STRUCT, (short)3);
+  private static final org.apache.thrift.protocol.TField I32_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("i32Val", org.apache.thrift.protocol.TType.STRUCT, (short)4);
+  private static final org.apache.thrift.protocol.TField I64_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("i64Val", org.apache.thrift.protocol.TType.STRUCT, (short)5);
+  private static final org.apache.thrift.protocol.TField DOUBLE_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleVal", org.apache.thrift.protocol.TType.STRUCT, (short)6);
+  private static final org.apache.thrift.protocol.TField STRING_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("stringVal", org.apache.thrift.protocol.TType.STRUCT, (short)7);
+  private static final org.apache.thrift.protocol.TField BINARY_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("binaryVal", org.apache.thrift.protocol.TType.STRUCT, (short)8);
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    BOOL_COLUMN((short)1, "boolColumn"),
-    BYTE_COLUMN((short)2, "byteColumn"),
-    I16_COLUMN((short)3, "i16Column"),
-    I32_COLUMN((short)4, "i32Column"),
-    I64_COLUMN((short)5, "i64Column"),
-    DOUBLE_COLUMN((short)6, "doubleColumn"),
-    STRING_COLUMN((short)7, "stringColumn");
+    BOOL_VAL((short)1, "boolVal"),
+    BYTE_VAL((short)2, "byteVal"),
+    I16_VAL((short)3, "i16Val"),
+    I32_VAL((short)4, "i32Val"),
+    I64_VAL((short)5, "i64Val"),
+    DOUBLE_VAL((short)6, "doubleVal"),
+    STRING_VAL((short)7, "stringVal"),
+    BINARY_VAL((short)8, "binaryVal");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -64,20 +66,22 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
      */
     public static _Fields findByThriftId(int fieldId) {
       switch(fieldId) {
-        case 1: // BOOL_COLUMN
-          return BOOL_COLUMN;
-        case 2: // BYTE_COLUMN
-          return BYTE_COLUMN;
-        case 3: // I16_COLUMN
-          return I16_COLUMN;
-        case 4: // I32_COLUMN
-          return I32_COLUMN;
-        case 5: // I64_COLUMN
-          return I64_COLUMN;
-        case 6: // DOUBLE_COLUMN
-          return DOUBLE_COLUMN;
-        case 7: // STRING_COLUMN
-          return STRING_COLUMN;
+        case 1: // BOOL_VAL
+          return BOOL_VAL;
+        case 2: // BYTE_VAL
+          return BYTE_VAL;
+        case 3: // I16_VAL
+          return I16_VAL;
+        case 4: // I32_VAL
+          return I32_VAL;
+        case 5: // I64_VAL
+          return I64_VAL;
+        case 6: // DOUBLE_VAL
+          return DOUBLE_VAL;
+        case 7: // STRING_VAL
+          return STRING_VAL;
+        case 8: // BINARY_VAL
+          return BINARY_VAL;
         default:
           return null;
       }
@@ -120,27 +124,22 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.BOOL_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("boolColumn", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TBoolValue.class))));
-    tmpMap.put(_Fields.BYTE_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("byteColumn", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TByteValue.class))));
-    tmpMap.put(_Fields.I16_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("i16Column", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TI16Value.class))));
-    tmpMap.put(_Fields.I32_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("i32Column", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TI32Value.class))));
-    tmpMap.put(_Fields.I64_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("i64Column", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TI64Value.class))));
-    tmpMap.put(_Fields.DOUBLE_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("doubleColumn", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TDoubleValue.class))));
-    tmpMap.put(_Fields.STRING_COLUMN, new org.apache.thrift.meta_data.FieldMetaData("stringColumn", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TStringValue.class))));
+    tmpMap.put(_Fields.BOOL_VAL, new org.apache.thrift.meta_data.FieldMetaData("boolVal", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TBoolColumn.class)));
+    tmpMap.put(_Fields.BYTE_VAL, new org.apache.thrift.meta_data.FieldMetaData("byteVal", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TByteColumn.class)));
+    tmpMap.put(_Fields.I16_VAL, new org.apache.thrift.meta_data.FieldMetaData("i16Val", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TI16Column.class)));
+    tmpMap.put(_Fields.I32_VAL, new org.apache.thrift.meta_data.FieldMetaData("i32Val", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TI32Column.class)));
+    tmpMap.put(_Fields.I64_VAL, new org.apache.thrift.meta_data.FieldMetaData("i64Val", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TI64Column.class)));
+    tmpMap.put(_Fields.DOUBLE_VAL, new org.apache.thrift.meta_data.FieldMetaData("doubleVal", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TDoubleColumn.class)));
+    tmpMap.put(_Fields.STRING_VAL, new org.apache.thrift.meta_data.FieldMetaData("stringVal", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TStringColumn.class)));
+    tmpMap.put(_Fields.BINARY_VAL, new org.apache.thrift.meta_data.FieldMetaData("binaryVal", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TBinaryColumn.class)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TColumn.class, metaDataMap);
   }
@@ -160,45 +159,51 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
     return new TColumn(this);
   }
 
-  public static TColumn boolColumn(List<TBoolValue> value) {
+  public static TColumn boolVal(TBoolColumn value) {
     TColumn x = new TColumn();
-    x.setBoolColumn(value);
+    x.setBoolVal(value);
     return x;
   }
 
-  public static TColumn byteColumn(List<TByteValue> value) {
+  public static TColumn byteVal(TByteColumn value) {
     TColumn x = new TColumn();
-    x.setByteColumn(value);
+    x.setByteVal(value);
     return x;
   }
 
-  public static TColumn i16Column(List<TI16Value> value) {
+  public static TColumn i16Val(TI16Column value) {
     TColumn x = new TColumn();
-    x.setI16Column(value);
+    x.setI16Val(value);
     return x;
   }
 
-  public static TColumn i32Column(List<TI32Value> value) {
+  public static TColumn i32Val(TI32Column value) {
     TColumn x = new TColumn();
-    x.setI32Column(value);
+    x.setI32Val(value);
     return x;
   }
 
-  public static TColumn i64Column(List<TI64Value> value) {
+  public static TColumn i64Val(TI64Column value) {
     TColumn x = new TColumn();
-    x.setI64Column(value);
+    x.setI64Val(value);
     return x;
   }
 
-  public static TColumn doubleColumn(List<TDoubleValue> value) {
+  public static TColumn doubleVal(TDoubleColumn value) {
     TColumn x = new TColumn();
-    x.setDoubleColumn(value);
+    x.setDoubleVal(value);
     return x;
   }
 
-  public static TColumn stringColumn(List<TStringValue> value) {
+  public static TColumn stringVal(TStringColumn value) {
     TColumn x = new TColumn();
-    x.setStringColumn(value);
+    x.setStringVal(value);
+    return x;
+  }
+
+  public static TColumn binaryVal(TBinaryColumn value) {
+    TColumn x = new TColumn();
+    x.setBinaryVal(value);
     return x;
   }
 
@@ -206,41 +211,46 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
   @Override
   protected void checkType(_Fields setField, Object value) throws ClassCastException {
     switch (setField) {
-      case BOOL_COLUMN:
-        if (value instanceof List) {
+      case BOOL_VAL:
+        if (value instanceof TBoolColumn) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TBoolValue> for field 'boolColumn', but got " + value.getClass().getSimpleName());
-      case BYTE_COLUMN:
-        if (value instanceof List) {
+        throw new ClassCastException("Was expecting value of type TBoolColumn for field 'boolVal', but got " + value.getClass().getSimpleName());
+      case BYTE_VAL:
+        if (value instanceof TByteColumn) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TByteValue> for field 'byteColumn', but got " + value.getClass().getSimpleName());
-      case I16_COLUMN:
-        if (value instanceof List) {
+        throw new ClassCastException("Was expecting value of type TByteColumn for field 'byteVal', but got " + value.getClass().getSimpleName());
+      case I16_VAL:
+        if (value instanceof TI16Column) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TI16Value> for field 'i16Column', but got " + value.getClass().getSimpleName());
-      case I32_COLUMN:
-        if (value instanceof List) {
+        throw new ClassCastException("Was expecting value of type TI16Column for field 'i16Val', but got " + value.getClass().getSimpleName());
+      case I32_VAL:
+        if (value instanceof TI32Column) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TI32Value> for field 'i32Column', but got " + value.getClass().getSimpleName());
-      case I64_COLUMN:
-        if (value instanceof List) {
+        throw new ClassCastException("Was expecting value of type TI32Column for field 'i32Val', but got " + value.getClass().getSimpleName());
+      case I64_VAL:
+        if (value instanceof TI64Column) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TI64Value> for field 'i64Column', but got " + value.getClass().getSimpleName());
-      case DOUBLE_COLUMN:
-        if (value instanceof List) {
+        throw new ClassCastException("Was expecting value of type TI64Column for field 'i64Val', but got " + value.getClass().getSimpleName());
+      case DOUBLE_VAL:
+        if (value instanceof TDoubleColumn) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TDoubleValue> for field 'doubleColumn', but got " + value.getClass().getSimpleName());
-      case STRING_COLUMN:
-        if (value instanceof List) {
+        throw new ClassCastException("Was expecting value of type TDoubleColumn for field 'doubleVal', but got " + value.getClass().getSimpleName());
+      case STRING_VAL:
+        if (value instanceof TStringColumn) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<TStringValue> for field 'stringColumn', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type TStringColumn for field 'stringVal', but got " + value.getClass().getSimpleName());
+      case BINARY_VAL:
+        if (value instanceof TBinaryColumn) {
+          break;
+        }
+        throw new ClassCastException("Was expecting value of type TBinaryColumn for field 'binaryVal', but got " + value.getClass().getSimpleName());
       default:
         throw new IllegalArgumentException("Unknown field id " + setField);
     }
@@ -251,6 +261,7 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
     _Fields setField = _Fields.findByThriftId(field.id);
     if (setField != null) {
       switch (setField) {
+<<<<<<< HEAD
         case BOOL_COLUMN:
           if (field.type == BOOL_COLUMN_FIELD_DESC.type) {
             List<TBoolValue> boolColumn;
@@ -267,10 +278,19 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return boolColumn;
+=======
+        case BOOL_VAL:
+          if (field.type == BOOL_VAL_FIELD_DESC.type) {
+            TBoolColumn boolVal;
+            boolVal = new TBoolColumn();
+            boolVal.read(iprot);
+            return boolVal;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+<<<<<<< HEAD
         case BYTE_COLUMN:
           if (field.type == BYTE_COLUMN_FIELD_DESC.type) {
             List<TByteValue> byteColumn;
@@ -287,10 +307,19 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return byteColumn;
+=======
+        case BYTE_VAL:
+          if (field.type == BYTE_VAL_FIELD_DESC.type) {
+            TByteColumn byteVal;
+            byteVal = new TByteColumn();
+            byteVal.read(iprot);
+            return byteVal;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+<<<<<<< HEAD
         case I16_COLUMN:
           if (field.type == I16_COLUMN_FIELD_DESC.type) {
             List<TI16Value> i16Column;
@@ -307,10 +336,19 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return i16Column;
+=======
+        case I16_VAL:
+          if (field.type == I16_VAL_FIELD_DESC.type) {
+            TI16Column i16Val;
+            i16Val = new TI16Column();
+            i16Val.read(iprot);
+            return i16Val;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+<<<<<<< HEAD
         case I32_COLUMN:
           if (field.type == I32_COLUMN_FIELD_DESC.type) {
             List<TI32Value> i32Column;
@@ -327,10 +365,19 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return i32Column;
+=======
+        case I32_VAL:
+          if (field.type == I32_VAL_FIELD_DESC.type) {
+            TI32Column i32Val;
+            i32Val = new TI32Column();
+            i32Val.read(iprot);
+            return i32Val;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+<<<<<<< HEAD
         case I64_COLUMN:
           if (field.type == I64_COLUMN_FIELD_DESC.type) {
             List<TI64Value> i64Column;
@@ -347,10 +394,19 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return i64Column;
+=======
+        case I64_VAL:
+          if (field.type == I64_VAL_FIELD_DESC.type) {
+            TI64Column i64Val;
+            i64Val = new TI64Column();
+            i64Val.read(iprot);
+            return i64Val;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+<<<<<<< HEAD
         case DOUBLE_COLUMN:
           if (field.type == DOUBLE_COLUMN_FIELD_DESC.type) {
             List<TDoubleValue> doubleColumn;
@@ -367,10 +423,19 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return doubleColumn;
+=======
+        case DOUBLE_VAL:
+          if (field.type == DOUBLE_VAL_FIELD_DESC.type) {
+            TDoubleColumn doubleVal;
+            doubleVal = new TDoubleColumn();
+            doubleVal.read(iprot);
+            return doubleVal;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
           }
+<<<<<<< HEAD
         case STRING_COLUMN:
           if (field.type == STRING_COLUMN_FIELD_DESC.type) {
             List<TStringValue> stringColumn;
@@ -387,6 +452,24 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
               iprot.readListEnd();
             }
             return stringColumn;
+=======
+        case STRING_VAL:
+          if (field.type == STRING_VAL_FIELD_DESC.type) {
+            TStringColumn stringVal;
+            stringVal = new TStringColumn();
+            stringVal.read(iprot);
+            return stringVal;
+          } else {
+            org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
+            return null;
+          }
+        case BINARY_VAL:
+          if (field.type == BINARY_VAL_FIELD_DESC.type) {
+            TBinaryColumn binaryVal;
+            binaryVal = new TBinaryColumn();
+            binaryVal.read(iprot);
+            return binaryVal;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           } else {
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);
             return null;
@@ -402,6 +485,7 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
   @Override
   protected void standardSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
     switch (setField_) {
+<<<<<<< HEAD
       case BOOL_COLUMN:
         List<TBoolValue> boolColumn = (List<TBoolValue>)value_;
         {
@@ -478,6 +562,39 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
           }
           oprot.writeListEnd();
         }
+=======
+      case BOOL_VAL:
+        TBoolColumn boolVal = (TBoolColumn)value_;
+        boolVal.write(oprot);
+        return;
+      case BYTE_VAL:
+        TByteColumn byteVal = (TByteColumn)value_;
+        byteVal.write(oprot);
+        return;
+      case I16_VAL:
+        TI16Column i16Val = (TI16Column)value_;
+        i16Val.write(oprot);
+        return;
+      case I32_VAL:
+        TI32Column i32Val = (TI32Column)value_;
+        i32Val.write(oprot);
+        return;
+      case I64_VAL:
+        TI64Column i64Val = (TI64Column)value_;
+        i64Val.write(oprot);
+        return;
+      case DOUBLE_VAL:
+        TDoubleColumn doubleVal = (TDoubleColumn)value_;
+        doubleVal.write(oprot);
+        return;
+      case STRING_VAL:
+        TStringColumn stringVal = (TStringColumn)value_;
+        stringVal.write(oprot);
+        return;
+      case BINARY_VAL:
+        TBinaryColumn binaryVal = (TBinaryColumn)value_;
+        binaryVal.write(oprot);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
         return;
       default:
         throw new IllegalStateException("Cannot write union with unknown field " + setField_);
@@ -489,6 +606,7 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
     _Fields setField = _Fields.findByThriftId(fieldID);
     if (setField != null) {
       switch (setField) {
+<<<<<<< HEAD
         case BOOL_COLUMN:
           List<TBoolValue> boolColumn;
           {
@@ -594,6 +712,48 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
             iprot.readListEnd();
           }
           return stringColumn;
+=======
+        case BOOL_VAL:
+          TBoolColumn boolVal;
+          boolVal = new TBoolColumn();
+          boolVal.read(iprot);
+          return boolVal;
+        case BYTE_VAL:
+          TByteColumn byteVal;
+          byteVal = new TByteColumn();
+          byteVal.read(iprot);
+          return byteVal;
+        case I16_VAL:
+          TI16Column i16Val;
+          i16Val = new TI16Column();
+          i16Val.read(iprot);
+          return i16Val;
+        case I32_VAL:
+          TI32Column i32Val;
+          i32Val = new TI32Column();
+          i32Val.read(iprot);
+          return i32Val;
+        case I64_VAL:
+          TI64Column i64Val;
+          i64Val = new TI64Column();
+          i64Val.read(iprot);
+          return i64Val;
+        case DOUBLE_VAL:
+          TDoubleColumn doubleVal;
+          doubleVal = new TDoubleColumn();
+          doubleVal.read(iprot);
+          return doubleVal;
+        case STRING_VAL:
+          TStringColumn stringVal;
+          stringVal = new TStringColumn();
+          stringVal.read(iprot);
+          return stringVal;
+        case BINARY_VAL:
+          TBinaryColumn binaryVal;
+          binaryVal = new TBinaryColumn();
+          binaryVal.read(iprot);
+          return binaryVal;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
         default:
           throw new IllegalStateException("setField wasn't null, but didn't match any of the case statements!");
       }
@@ -605,6 +765,7 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
   @Override
   protected void tupleSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
     switch (setField_) {
+<<<<<<< HEAD
       case BOOL_COLUMN:
         List<TBoolValue> boolColumn = (List<TBoolValue>)value_;
         {
@@ -681,6 +842,39 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
           }
           oprot.writeListEnd();
         }
+=======
+      case BOOL_VAL:
+        TBoolColumn boolVal = (TBoolColumn)value_;
+        boolVal.write(oprot);
+        return;
+      case BYTE_VAL:
+        TByteColumn byteVal = (TByteColumn)value_;
+        byteVal.write(oprot);
+        return;
+      case I16_VAL:
+        TI16Column i16Val = (TI16Column)value_;
+        i16Val.write(oprot);
+        return;
+      case I32_VAL:
+        TI32Column i32Val = (TI32Column)value_;
+        i32Val.write(oprot);
+        return;
+      case I64_VAL:
+        TI64Column i64Val = (TI64Column)value_;
+        i64Val.write(oprot);
+        return;
+      case DOUBLE_VAL:
+        TDoubleColumn doubleVal = (TDoubleColumn)value_;
+        doubleVal.write(oprot);
+        return;
+      case STRING_VAL:
+        TStringColumn stringVal = (TStringColumn)value_;
+        stringVal.write(oprot);
+        return;
+      case BINARY_VAL:
+        TBinaryColumn binaryVal = (TBinaryColumn)value_;
+        binaryVal.write(oprot);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
         return;
       default:
         throw new IllegalStateException("Cannot write union with unknown field " + setField_);
@@ -690,20 +884,22 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
   @Override
   protected org.apache.thrift.protocol.TField getFieldDesc(_Fields setField) {
     switch (setField) {
-      case BOOL_COLUMN:
-        return BOOL_COLUMN_FIELD_DESC;
-      case BYTE_COLUMN:
-        return BYTE_COLUMN_FIELD_DESC;
-      case I16_COLUMN:
-        return I16_COLUMN_FIELD_DESC;
-      case I32_COLUMN:
-        return I32_COLUMN_FIELD_DESC;
-      case I64_COLUMN:
-        return I64_COLUMN_FIELD_DESC;
-      case DOUBLE_COLUMN:
-        return DOUBLE_COLUMN_FIELD_DESC;
-      case STRING_COLUMN:
-        return STRING_COLUMN_FIELD_DESC;
+      case BOOL_VAL:
+        return BOOL_VAL_FIELD_DESC;
+      case BYTE_VAL:
+        return BYTE_VAL_FIELD_DESC;
+      case I16_VAL:
+        return I16_VAL_FIELD_DESC;
+      case I32_VAL:
+        return I32_VAL_FIELD_DESC;
+      case I64_VAL:
+        return I64_VAL_FIELD_DESC;
+      case DOUBLE_VAL:
+        return DOUBLE_VAL_FIELD_DESC;
+      case STRING_VAL:
+        return STRING_VAL_FIELD_DESC;
+      case BINARY_VAL:
+        return BINARY_VAL_FIELD_DESC;
       default:
         throw new IllegalArgumentException("Unknown field id " + setField);
     }
@@ -724,136 +920,155 @@ public class TColumn extends org.apache.thrift.TUnion<TColumn, TColumn._Fields> 
   }
 
 
-  public List<TBoolValue> getBoolColumn() {
-    if (getSetField() == _Fields.BOOL_COLUMN) {
-      return (List<TBoolValue>)getFieldValue();
+  public TBoolColumn getBoolVal() {
+    if (getSetField() == _Fields.BOOL_VAL) {
+      return (TBoolColumn)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'boolColumn' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'boolVal' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setBoolColumn(List<TBoolValue> value) {
+  public void setBoolVal(TBoolColumn value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.BOOL_COLUMN;
+    setField_ = _Fields.BOOL_VAL;
     value_ = value;
   }
 
-  public List<TByteValue> getByteColumn() {
-    if (getSetField() == _Fields.BYTE_COLUMN) {
-      return (List<TByteValue>)getFieldValue();
+  public TByteColumn getByteVal() {
+    if (getSetField() == _Fields.BYTE_VAL) {
+      return (TByteColumn)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'byteColumn' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'byteVal' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setByteColumn(List<TByteValue> value) {
+  public void setByteVal(TByteColumn value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.BYTE_COLUMN;
+    setField_ = _Fields.BYTE_VAL;
     value_ = value;
   }
 
-  public List<TI16Value> getI16Column() {
-    if (getSetField() == _Fields.I16_COLUMN) {
-      return (List<TI16Value>)getFieldValue();
+  public TI16Column getI16Val() {
+    if (getSetField() == _Fields.I16_VAL) {
+      return (TI16Column)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'i16Column' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'i16Val' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setI16Column(List<TI16Value> value) {
+  public void setI16Val(TI16Column value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.I16_COLUMN;
+    setField_ = _Fields.I16_VAL;
     value_ = value;
   }
 
-  public List<TI32Value> getI32Column() {
-    if (getSetField() == _Fields.I32_COLUMN) {
-      return (List<TI32Value>)getFieldValue();
+  public TI32Column getI32Val() {
+    if (getSetField() == _Fields.I32_VAL) {
+      return (TI32Column)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'i32Column' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'i32Val' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setI32Column(List<TI32Value> value) {
+  public void setI32Val(TI32Column value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.I32_COLUMN;
+    setField_ = _Fields.I32_VAL;
     value_ = value;
   }
 
-  public List<TI64Value> getI64Column() {
-    if (getSetField() == _Fields.I64_COLUMN) {
-      return (List<TI64Value>)getFieldValue();
+  public TI64Column getI64Val() {
+    if (getSetField() == _Fields.I64_VAL) {
+      return (TI64Column)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'i64Column' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'i64Val' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setI64Column(List<TI64Value> value) {
+  public void setI64Val(TI64Column value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.I64_COLUMN;
+    setField_ = _Fields.I64_VAL;
     value_ = value;
   }
 
-  public List<TDoubleValue> getDoubleColumn() {
-    if (getSetField() == _Fields.DOUBLE_COLUMN) {
-      return (List<TDoubleValue>)getFieldValue();
+  public TDoubleColumn getDoubleVal() {
+    if (getSetField() == _Fields.DOUBLE_VAL) {
+      return (TDoubleColumn)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'doubleColumn' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'doubleVal' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setDoubleColumn(List<TDoubleValue> value) {
+  public void setDoubleVal(TDoubleColumn value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.DOUBLE_COLUMN;
+    setField_ = _Fields.DOUBLE_VAL;
     value_ = value;
   }
 
-  public List<TStringValue> getStringColumn() {
-    if (getSetField() == _Fields.STRING_COLUMN) {
-      return (List<TStringValue>)getFieldValue();
+  public TStringColumn getStringVal() {
+    if (getSetField() == _Fields.STRING_VAL) {
+      return (TStringColumn)getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringColumn' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringVal' because union is currently set to " + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringColumn(List<TStringValue> value) {
+  public void setStringVal(TStringColumn value) {
     if (value == null) throw new NullPointerException();
-    setField_ = _Fields.STRING_COLUMN;
+    setField_ = _Fields.STRING_VAL;
     value_ = value;
   }
 
-  public boolean isSetBoolColumn() {
-    return setField_ == _Fields.BOOL_COLUMN;
+  public TBinaryColumn getBinaryVal() {
+    if (getSetField() == _Fields.BINARY_VAL) {
+      return (TBinaryColumn)getFieldValue();
+    } else {
+      throw new RuntimeException("Cannot get field 'binaryVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+    }
+  }
+
+  public void setBinaryVal(TBinaryColumn value) {
+    if (value == null) throw new NullPointerException();
+    setField_ = _Fields.BINARY_VAL;
+    value_ = value;
+  }
+
+  public boolean isSetBoolVal() {
+    return setField_ == _Fields.BOOL_VAL;
   }
 
 
-  public boolean isSetByteColumn() {
-    return setField_ == _Fields.BYTE_COLUMN;
+  public boolean isSetByteVal() {
+    return setField_ == _Fields.BYTE_VAL;
   }
 
 
-  public boolean isSetI16Column() {
-    return setField_ == _Fields.I16_COLUMN;
+  public boolean isSetI16Val() {
+    return setField_ == _Fields.I16_VAL;
   }
 
 
-  public boolean isSetI32Column() {
-    return setField_ == _Fields.I32_COLUMN;
+  public boolean isSetI32Val() {
+    return setField_ == _Fields.I32_VAL;
   }
 
 
-  public boolean isSetI64Column() {
-    return setField_ == _Fields.I64_COLUMN;
+  public boolean isSetI64Val() {
+    return setField_ == _Fields.I64_VAL;
   }
 
 
-  public boolean isSetDoubleColumn() {
-    return setField_ == _Fields.DOUBLE_COLUMN;
+  public boolean isSetDoubleVal() {
+    return setField_ == _Fields.DOUBLE_VAL;
   }
 
 
-  public boolean isSetStringColumn() {
-    return setField_ == _Fields.STRING_COLUMN;
+  public boolean isSetStringVal() {
+    return setField_ == _Fields.STRING_VAL;
+  }
+
+
+  public boolean isSetBinaryVal() {
+    return setField_ == _Fields.BINARY_VAL;
   }
 
 

@@ -170,7 +170,7 @@ public class CompactIndexHandler extends TableBasedIndexHandler {
     // Build reentrant QL for index query
     StringBuilder qlCommand = new StringBuilder("INSERT OVERWRITE DIRECTORY ");
 
-    String tmpFile = pctx.getContext().getMRTmpFileURI();
+    String tmpFile = pctx.getContext().getMRTmpPath().toUri().toString();
     queryContext.setIndexIntermediateFile(tmpFile);
     qlCommand.append( "\"" + tmpFile + "\" ");            // QL includes " around file name
     qlCommand.append("SELECT `_bucketname` ,  `_offsets` FROM ");
@@ -316,7 +316,8 @@ public class CompactIndexHandler extends TableBasedIndexHandler {
     IndexPredicateAnalyzer analyzer = getIndexPredicateAnalyzer(index, queryPartitions);
     List<IndexSearchCondition> searchConditions = new ArrayList<IndexSearchCondition>();
     // split predicate into pushed (what we can handle), and residual (what we can't handle)
-    ExprNodeDesc residualPredicate = analyzer.analyzePredicate(predicate, searchConditions);
+    ExprNodeGenericFuncDesc residualPredicate = (ExprNodeGenericFuncDesc)analyzer.
+      analyzePredicate(predicate, searchConditions);
 
     if (searchConditions.size() == 0) {
       return null;

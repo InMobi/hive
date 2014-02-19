@@ -168,7 +168,7 @@ public class CorrelationOptimizer implements Transform {
       int numAliases = order.length;
       Set<Integer> bigTableCandidates =
           MapJoinProcessor.getBigTableCandidates(joinDesc.getConds());
-      if (bigTableCandidates == null) {
+      if (bigTableCandidates.isEmpty()) {
         continue;
       }
 
@@ -346,7 +346,7 @@ public class CorrelationOptimizer implements Transform {
             "involved in this operator");
         return correlatedReduceSinkOperators;
       }
-      if (current.getParentOperators() == null) {
+      if ((current.getParentOperators() == null) || (current.getParentOperators().isEmpty())) {
         return correlatedReduceSinkOperators;
       }
       if (current instanceof PTFOperator) {
@@ -397,24 +397,31 @@ public class CorrelationOptimizer implements Transform {
           }
         }
         if (current instanceof JoinOperator) {
-          LinkedHashSet<ReduceSinkOperator> correlatedRsOps =
-              new LinkedHashSet<ReduceSinkOperator>();
+          boolean isCorrelated = true;
+          int expectedNumCorrelatedRsops = current.getParentOperators().size();
+          LinkedHashSet<ReduceSinkOperator> correlatedRsops = null;
           for (Operator<? extends OperatorDesc> parent : current.getParentOperators()) {
             Set<String> tableNames =
                 pCtx.getOpParseCtx().get(parent).getRowResolver().getTableNames();
             for (String tbl : tableNames) {
               if (tableNeedToCheck.contains(tbl)) {
-                correlatedRsOps.addAll(findCorrelatedReduceSinkOperators(
-                    current, backtrackedKeyCols, backtrackedPartitionCols, childRSOrder,
-                    parent, correlation));
+                correlatedRsops = findCorrelatedReduceSinkOperators(current,
+                    backtrackedKeyCols, backtrackedPartitionCols,
+                    childRSOrder, parent, correlation);
+                if (correlatedRsops.size() != expectedNumCorrelatedRsops) {
+                  isCorrelated = false;
+                }
               }
+            }
+            if (!isCorrelated) {
+              break;
             }
           }
           // If current is JoinOperaotr, we will stop to traverse the tree
           // when any of parent ReduceSinkOperaotr of this JoinOperator is
           // not considered as a correlated ReduceSinkOperator.
-          if (correlatedRsOps.size() == current.getParentOperators().size()) {
-            correlatedReduceSinkOperators.addAll(correlatedRsOps);
+          if (isCorrelated && correlatedRsops != null) {
+            correlatedReduceSinkOperators.addAll(correlatedRsops);
           } else {
             correlatedReduceSinkOperators.clear();
           }

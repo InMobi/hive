@@ -104,10 +104,10 @@ public class TestHostExecutor {
     parallelWorkQueue = new LinkedBlockingQueue<TestBatch>();
     isolatedWorkQueue = new LinkedBlockingQueue<TestBatch>();
     failedTestResults = Sets.newHashSet();
-    testBatchParallel1 = new UnitTestBatch(DRIVER_PARALLEL_1, true);
-    testBatchParallel2 = new UnitTestBatch(DRIVER_PARALLEL_2, true);
-    testBatchIsolated1 = new UnitTestBatch(DRIVER_ISOLATED_1, false);
-    testBatchIsolated2 = new UnitTestBatch(DRIVER_ISOLATED_2, false);
+    testBatchParallel1 = new UnitTestBatch("testcase", DRIVER_PARALLEL_1, true);
+    testBatchParallel2 = new UnitTestBatch("testcase", DRIVER_PARALLEL_2, true);
+    testBatchIsolated1 = new UnitTestBatch("testcase", DRIVER_ISOLATED_1, false);
+    testBatchIsolated2 = new UnitTestBatch("testcase", DRIVER_ISOLATED_2, false);
     executor = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(2));
     localCommandFactory = new MockLocalCommandFactory(LOG);
     localCommand = mock(LocalCommand.class);
@@ -193,6 +193,20 @@ public class TestHostExecutor {
     Approvals.verify(getExecutedCommands());
   }
   @Test
+  public void testShutdownBeforeExec()
+      throws Exception {
+    rsyncCommandExecutor.putFailure("/tmp/hive-ptest-units/TestHostExecutor/scratch/hiveptest-driver-parallel-1.sh "
+        + "/some/local/dir/somehost-someuser-0/scratch/hiveptest-driver-parallel-1.sh", Constants.EXIT_CODE_UNKNOWN);
+    HostExecutor executor = createHostExecutor();
+    parallelWorkQueue.addAll(Lists.newArrayList(testBatchParallel1));
+    executor.shutdownNow();
+    executor.submitTests(parallelWorkQueue, isolatedWorkQueue, failedTestResults).get();
+    Assert.assertEquals(Collections.emptySet(),  failedTestResults);
+    Assert.assertEquals(parallelWorkQueue.toString(), 1, parallelWorkQueue.size());
+    Approvals.verify("EMPTY\n" + getExecutedCommands());
+    Assert.assertTrue(executor.isShutdown());
+  }
+  @Test
   public void testIsolatedFailsOnRsyncUnknown()
       throws Exception {
     rsyncCommandExecutor.putFailure("/tmp/hive-ptest-units/TestHostExecutor/scratch/hiveptest-driver-isolated-1.sh "+
@@ -201,7 +215,7 @@ public class TestHostExecutor {
     isolatedWorkQueue.addAll(Lists.newArrayList(testBatchIsolated1));
     executor.submitTests(parallelWorkQueue, isolatedWorkQueue, failedTestResults).get();
     Assert.assertEquals(Collections.emptySet(),  failedTestResults);
-    Assert.assertTrue(isolatedWorkQueue.toString(), parallelWorkQueue.isEmpty());
+    Assert.assertTrue(isolatedWorkQueue.toString(), isolatedWorkQueue.isEmpty());
     Approvals.verify(getExecutedCommands());
   }
   @Test

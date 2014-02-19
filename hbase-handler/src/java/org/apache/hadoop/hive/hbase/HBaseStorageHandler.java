@@ -32,11 +32,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.mapred.TableOutputFormat;
-import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapred.TableMapReduceUtil;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.hbase.HBaseSerDe.ColumnMapping;
@@ -50,10 +49,10 @@ import org.apache.hadoop.hive.ql.index.IndexSearchCondition;
 import org.apache.hadoop.hive.ql.metadata.DefaultStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.HiveStoragePredicateHandler;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDe;
-import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
@@ -153,9 +152,8 @@ public class HBaseStorageHandler extends DefaultStorageHandler
       String tableName = getHBaseTableName(tbl);
       Map<String, String> serdeParam = tbl.getSd().getSerdeInfo().getParameters();
       String hbaseColumnsMapping = serdeParam.get(HBaseSerDe.HBASE_COLUMNS_MAPPING);
-      List<ColumnMapping> columnsMapping = null;
 
-      columnsMapping = HBaseSerDe.parseColumnsMapping(hbaseColumnsMapping);
+      List<ColumnMapping> columnsMapping = HBaseSerDe.parseColumnsMapping(hbaseColumnsMapping);
 
       HTableDescriptor tableDesc;
 
@@ -208,11 +206,7 @@ public class HBaseStorageHandler extends DefaultStorageHandler
 
       // ensure the table is online
       new HTable(hbaseConf, tableDesc.getName());
-    } catch (MasterNotRunningException mnre) {
-      throw new MetaException(StringUtils.stringifyException(mnre));
-    } catch (IOException ie) {
-      throw new MetaException(StringUtils.stringifyException(ie));
-    } catch (SerDeException se) {
+    } catch (Exception se) {
       throw new MetaException(StringUtils.stringifyException(se));
     }
   }
@@ -337,8 +331,10 @@ public class HBaseStorageHandler extends DefaultStorageHandler
     // do this for reconciling HBaseStorageHandler for use in HCatalog
     // check to see if this an input job or an outputjob
     if (this.configureInputJobProps) {
+      for (String k : jobProperties.keySet()) {
+        jobConf.set(k, jobProperties.get(k));
+      }
       try {
-        HBaseConfiguration.addHbaseResources(jobConf);
         addHBaseDelegationToken(jobConf);
       }//try
       catch (IOException e) {
@@ -346,8 +342,6 @@ public class HBaseStorageHandler extends DefaultStorageHandler
       } //input job properties
     }
     else {
-      Configuration copyOfConf = new Configuration(jobConf);
-      HBaseConfiguration.addHbaseResources(copyOfConf);
       jobProperties.put(TableOutputFormat.OUTPUT_TABLE, tableName);
     } // output job properties
   }
@@ -410,8 +404,8 @@ public class HBaseStorageHandler extends DefaultStorageHandler
         hbaseSerde.getStorageFormatOfCol(keyColPos).get(0));
     List<IndexSearchCondition> searchConditions =
       new ArrayList<IndexSearchCondition>();
-    ExprNodeDesc residualPredicate =
-      analyzer.analyzePredicate(predicate, searchConditions);
+    ExprNodeGenericFuncDesc residualPredicate =
+      (ExprNodeGenericFuncDesc)analyzer.analyzePredicate(predicate, searchConditions);
     int scSize = searchConditions.size();
     if (scSize < 1 || 2 < scSize) {
       // Either there was nothing which could be pushed down (size = 0),

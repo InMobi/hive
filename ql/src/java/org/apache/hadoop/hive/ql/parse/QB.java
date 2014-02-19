@@ -65,6 +65,19 @@ public class QB {
    */
   private HashMap<String, WindowingSpec> destToWindowingSpec;
 
+  /*
+   * If this QB represents a SubQuery predicate then this will point to the SubQuery object.
+   */
+  private QBSubQuery subQueryPredicateDef;
+  
+	/*
+	 * used to give a unique name to each SubQuery QB Currently there can be at
+	 * most 2 SubQueries in a Query: 1 in the Where clause, and 1 in the Having
+	 * clause.
+	 */
+	private int numSubQueryPredicates;
+  
+
   // results
 
   public void print(String msg) {
@@ -222,6 +235,10 @@ public class QB {
     aliasToSubq.put(alias, qbexpr);
   }
 
+  public void rewriteCTEToSubq(String alias, String cteName, QBExpr qbexpr) {
+    rewriteViewToSubq(alias, cteName, qbexpr);
+  }
+
   public QBJoinTree getQbJoinTree() {
     return qbjoin;
   }
@@ -324,5 +341,20 @@ public class QB {
     return destToWindowingSpec;
   }
 
+  protected void setSubQueryDef(QBSubQuery subQueryPredicateDef) {
+    this.subQueryPredicateDef = subQueryPredicateDef;
+  }
+
+  protected QBSubQuery getSubQueryPredicateDef() {
+    return subQueryPredicateDef;
+  }
+  
+	protected int getNumSubQueryPredicates() {
+		return numSubQueryPredicates;
+	}
+
+	protected int incrNumSubQueryPredicates() {
+		return ++numSubQueryPredicates;
+	}
 
 }

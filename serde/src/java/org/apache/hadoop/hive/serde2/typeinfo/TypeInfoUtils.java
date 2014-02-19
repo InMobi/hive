@@ -29,7 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+<<<<<<< HEAD
 import org.apache.commons.lang.StringUtils;
+=======
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
@@ -392,6 +396,7 @@ public final class TypeInfoUtils {
       Token t = expect("type");
 
       // Is this a primitive type?
+<<<<<<< HEAD
       PrimitiveTypeEntry primitiveType = PrimitiveObjectInspectorUtils
           .getTypeEntryFromTypeName(t.text);
       if (primitiveType != null
@@ -401,6 +406,55 @@ public final class TypeInfoUtils {
         }
         // If type has qualifiers, the TypeInfo needs them in its type string
         return TypeInfoFactory.getPrimitiveTypeInfo(primitiveType.toString());
+=======
+      PrimitiveTypeEntry typeEntry =
+          PrimitiveObjectInspectorUtils.getTypeEntryFromTypeName(t.text);
+      if (typeEntry != null && typeEntry.primitiveCategory != PrimitiveCategory.UNKNOWN ) {
+        String[] params = parseParams();
+        switch (typeEntry.primitiveCategory) {
+        case CHAR:
+        case VARCHAR:
+          if (params == null || params.length == 0) {
+            throw new IllegalArgumentException(typeEntry.typeName
+                + " type is specified without length: " + typeInfoString);
+          }
+
+          int length = 1;
+          if (params.length == 1) {
+            length = Integer.valueOf(params[0]);
+            if (typeEntry.primitiveCategory == PrimitiveCategory.VARCHAR) {
+              BaseCharUtils.validateVarcharParameter(length);
+              return TypeInfoFactory.getVarcharTypeInfo(length);
+            } else {
+              BaseCharUtils.validateCharParameter(length);
+              return TypeInfoFactory.getCharTypeInfo(length);
+            }
+          } else if (params.length > 1) {
+            throw new IllegalArgumentException(
+                "Type " + typeEntry.typeName+ " only takes one parameter, but " +
+                params.length + " is seen");
+          }
+        case DECIMAL:
+          int precision = HiveDecimal.USER_DEFAULT_PRECISION;
+          int scale = HiveDecimal.USER_DEFAULT_SCALE;
+          if (params == null || params.length == 0) {
+            // It's possible that old metadata still refers to "decimal" as a column type w/o
+            // precision/scale. In this case, the default (10,0) is assumed. Thus, do nothing here.
+          } else if (params.length == 2) {
+            // New metadata always have two parameters.
+            precision = Integer.valueOf(params[0]);
+            scale = Integer.valueOf(params[1]);
+            HiveDecimalUtils.validateParameter(precision, scale);
+          } else if (params.length > 2) {
+            throw new IllegalArgumentException("Type decimal only takes two parameter, but " +
+                params.length + " is seen");
+          }
+
+          return TypeInfoFactory.getDecimalTypeInfo(precision, scale);
+        default:
+          return TypeInfoFactory.getPrimitiveTypeInfo(typeEntry.typeName);
+        }
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       }
 
       // Is this a list type?
@@ -665,7 +719,7 @@ public final class TypeInfoUtils {
     switch (oi.getCategory()) {
     case PRIMITIVE: {
       PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
-      result = TypeInfoFactory.getPrimitiveTypeInfo(poi.getTypeName());
+      result = poi.getTypeInfo();
       break;
     }
     case LIST: {
@@ -748,12 +802,19 @@ public final class TypeInfoUtils {
     switch (typeInfo.getPrimitiveCategory()) {
       case STRING:
         return HiveVarchar.MAX_VARCHAR_LENGTH;
+<<<<<<< HEAD
       case VARCHAR:
         VarcharTypeParams varcharParams = (VarcharTypeParams) typeInfo.getTypeParams();
         if (varcharParams == null) {
           throw new RuntimeException("varchar type used without type params");
         }
         return varcharParams.getLength();
+=======
+      case CHAR:
+      case VARCHAR:
+        BaseCharTypeInfo baseCharTypeInfo = (BaseCharTypeInfo) typeInfo;
+        return baseCharTypeInfo.getLength();
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       default:
         return 0;
     }

@@ -7,7 +7,7 @@ CREATE TABLE orc_pred(t tinyint,
            bo boolean,
            s string,
            ts timestamp,
-           dec decimal,
+           dec decimal(4,2),
            bin binary)
 STORED AS ORC;
 
@@ -22,12 +22,12 @@ CREATE TABLE staging(t tinyint,
            bo boolean,
            s string,
            ts timestamp,
-           dec decimal,
+           dec decimal(4,2),
            bin binary)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS TEXTFILE;
 
-LOAD DATA LOCAL INPATH '../data/files/over1k' OVERWRITE INTO TABLE staging;
+LOAD DATA LOCAL INPATH '../../data/files/over1k' OVERWRITE INTO TABLE staging;
 
 INSERT INTO TABLE orc_pred select * from staging;
 
@@ -48,6 +48,16 @@ SET hive.optimize.index.filter=false;
 -- all the following queries have predicates which are pushed down to table scan operator if
 -- hive.optimize.index.filter is set to true. the explain plan should show filter expression
 -- in table scan operator.
+
+SELECT * FROM orc_pred WHERE t<2 limit 1;
+SET hive.optimize.index.filter=true;
+SELECT * FROM orc_pred WHERE t<2 limit 1;
+SET hive.optimize.index.filter=false;
+
+SELECT * FROM orc_pred WHERE t>2 limit 1;
+SET hive.optimize.index.filter=true;
+SELECT * FROM orc_pred WHERE t>2 limit 1;
+SET hive.optimize.index.filter=false;
 
 SELECT SUM(HASH(t)) FROM orc_pred
   WHERE t IS NOT NULL

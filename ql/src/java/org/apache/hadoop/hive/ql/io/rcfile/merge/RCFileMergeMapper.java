@@ -32,7 +32,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.shims.CombineHiveKey;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.mapred.JobConf;
@@ -84,15 +83,13 @@ public class RCFileMergeMapper extends MapReduceBase implements
     listBucketingDepth = HiveConf.getIntVar(job,
         HiveConf.ConfVars.HIVEMERGECURRENTJOBCONCATENATELISTBUCKETINGDEPTH);
 
-    String specPath = RCFileBlockMergeOutputFormat.getMergeOutputPath(job)
-        .toString();
+    Path specPath = RCFileBlockMergeOutputFormat.getMergeOutputPath(job);
     Path tmpPath = Utilities.toTempPath(specPath);
     Path taskTmpPath = Utilities.toTaskTempPath(specPath);
     updatePaths(tmpPath, taskTmpPath);
     try {
-      fs = (new Path(specPath)).getFileSystem(job);
-      autoDelete = ShimLoader.getHadoopShims().fileSystemDeleteOnExit(fs,
-          outPath);
+      fs = specPath.getFileSystem(job);
+      autoDelete = fs.deleteOnExit(outPath);
     } catch (IOException e) {
       this.exception = true;
       throw new RuntimeException(e);
@@ -312,12 +309,11 @@ public class RCFileMergeMapper extends MapReduceBase implements
     }
   }
 
-  public static void jobClose(String outputPath, boolean success, JobConf job,
+  public static void jobClose(Path outputPath, boolean success, JobConf job,
       LogHelper console, DynamicPartitionCtx dynPartCtx, Reporter reporter
       ) throws HiveException, IOException {
-    Path outpath = new Path(outputPath);
-    FileSystem fs = outpath.getFileSystem(job);
-    Path backupPath = backupOutputPath(fs, outpath, job);
+    FileSystem fs = outputPath.getFileSystem(job);
+    Path backupPath = backupOutputPath(fs, outputPath, job);
     Utilities.mvFileToFinalPath(outputPath, job, success, LOG, dynPartCtx, null,
       reporter);
     fs.delete(backupPath, true);

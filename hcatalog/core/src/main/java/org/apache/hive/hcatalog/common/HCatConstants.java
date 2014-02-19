@@ -61,6 +61,10 @@ public final class HCatConstants {
 
   // hcatalog specific configurations, that can be put in hive-site.xml
   public static final String HCAT_HIVE_CLIENT_EXPIRY_TIME = "hcatalog.hive.client.cache.expiry.time";
+  // config parameter that suggests to hcat that metastore clients not be cached - default is false
+  // this parameter allows highly-parallel hcat usescases to not gobble up too many connections that
+  // sit in the cache, while not in use.
+  public static final String HCAT_HIVE_CLIENT_DISABLE_CACHE = "hcatalog.hive.client.cache.disabled";
 
   private HCatConstants() { // restrict instantiation
   }
@@ -117,6 +121,7 @@ public final class HCatConstants {
 
   public static final String HCAT_DYNAMIC_PTN_JOBID = HCAT_KEY_OUTPUT_BASE + "dynamic.jobid";
   public static final boolean HCAT_IS_DYNAMIC_MAX_PTN_CHECK_ENABLED = false;
+  public static final String HCAT_DYNAMIC_CUSTOM_PATTERN = "hcat.dynamic.partitioning.custom.pattern";
 
   // Message Bus related properties.
   public static final String HCAT_DEFAULT_TOPIC_PREFIX = "hcat";

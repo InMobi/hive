@@ -90,7 +90,7 @@ public enum OperationState {
     default:
       // fall-through
     }
-    throw new HiveSQLException("Illegal Operation state transition: " + oldState + "->" + newState);
+    throw new HiveSQLException("Illegal Operation state transition");
   }
 
   public void validateTransition(OperationState newState)

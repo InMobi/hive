@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hive.serde2.lazybinary;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -46,15 +44,15 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
@@ -372,6 +370,12 @@ public class LazyBinarySerDe extends AbstractSerDe {
         serializeText(byteStream, t, skipLengthPrefix);
         return warnedOnceNullMapKey;
       }
+      case CHAR: {
+        HiveCharObjectInspector hcoi = (HiveCharObjectInspector) poi;
+        Text t = hcoi.getPrimitiveWritableObject(obj).getTextValue();
+        serializeText(byteStream, t, skipLengthPrefix);
+        return warnedOnceNullMapKey;
+      }
       case VARCHAR: {
         HiveVarcharObjectInspector hcoi = (HiveVarcharObjectInspector) poi;
         Text t = hcoi.getPrimitiveWritableObject(obj).getTextValue();
@@ -409,6 +413,9 @@ public class LazyBinarySerDe extends AbstractSerDe {
       case DECIMAL: {
         HiveDecimalObjectInspector bdoi = (HiveDecimalObjectInspector) poi;
         HiveDecimalWritable t = bdoi.getPrimitiveWritableObject(obj);
+        if (t == null) {
+          return warnedOnceNullMapKey;
+        }
         t.writeToByteStream(byteStream);
         return warnedOnceNullMapKey;
       }

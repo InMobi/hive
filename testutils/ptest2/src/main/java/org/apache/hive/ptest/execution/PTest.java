@@ -43,6 +43,7 @@ import org.apache.hive.ptest.execution.conf.TestConfiguration;
 import org.apache.hive.ptest.execution.conf.TestParser;
 import org.apache.hive.ptest.execution.context.ExecutionContext;
 import org.apache.hive.ptest.execution.context.ExecutionContextProvider;
+import org.apache.hive.ptest.execution.ssh.NonZeroExitCodeException;
 import org.apache.hive.ptest.execution.ssh.RSyncCommandExecutor;
 import org.apache.hive.ptest.execution.ssh.SSHCommandExecutor;
 import org.apache.velocity.app.Velocity;
@@ -77,6 +78,8 @@ public class PTest {
   private final Logger mLogger;
   private final List<HostExecutor> mHostExecutors;
   private final String mBuildTag;
+  private final SSHCommandExecutor mSshCommandExecutor;
+  private final RSyncCommandExecutor mRsyncCommandExecutor;
 
   public PTest(final TestConfiguration configuration, final ExecutionContext executionContext,
       final String buildTag, final File logDir, final LocalCommandFactory localCommandFactory,
@@ -88,6 +91,8 @@ public class PTest {
     mExecutedTests = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
     mFailedTests = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
     mExecutionContext = executionContext;
+    mSshCommandExecutor = sshCommandExecutor;
+    mRsyncCommandExecutor = rsyncCommandExecutor;
     mExecutor = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
     final File failedLogDir = Dirs.create(new File(logDir, "failed"));
     final File succeededLogDir = Dirs.create(new File(logDir, "succeeded"));
@@ -103,16 +108,24 @@ public class PTest {
     put("repository", configuration.getRepository()).
     put("repositoryName", configuration.getRepositoryName()).
     put("repositoryType", configuration.getRepositoryType()).
+    put("buildTool", configuration.getBuildTool()).
     put("branch", configuration.getBranch()).
     put("clearLibraryCache", String.valueOf(configuration.isClearLibraryCache())).
     put("workingDir", mExecutionContext.getLocalWorkingDirectory()).
-    put("antArgs", configuration.getAntArgs()).
     put("buildTag", buildTag).
     put("logDir", logDir.getAbsolutePath()).
     put("javaHome", configuration.getJavaHome()).
-    put("antEnvOpts", configuration.getAntEnvOpts());
+    put("javaHomeForTests", configuration.getJavaHomeForTests()).
+    put("antEnvOpts", configuration.getAntEnvOpts()).
+    put("antArgs", configuration.getAntArgs()).
+    put("antTestArgs", configuration.getAntTestArgs()).
+    put("antTestTarget", configuration.getAntTestTarget()).
+    put("mavenEnvOpts", configuration.getMavenEnvOpts()).
+    put("mavenArgs", configuration.getMavenArgs()).
+    put("mavenBuildArgs", configuration.getMavenBuildArgs()).
+    put("mavenTestArgs", configuration.getMavenTestArgs());
     final ImmutableMap<String, String> templateDefaults = templateDefaultsBuilder.build();
-    TestParser testParser = new TestParser(configuration.getContext(),
+    TestParser testParser = new TestParser(configuration.getContext(), configuration.getTestCasePropertyName(),
         new File(mExecutionContext.getLocalWorkingDirectory(), configuration.getRepositoryName() + "-source"),
         logger);
 
@@ -160,14 +173,27 @@ public class PTest {
       }
     } catch(Throwable throwable) {
       mLogger.error("Test run exited with an unexpected error", throwable);
-      messages.add("Tests failed with: " + throwable.getClass().getSimpleName() + ": " + throwable.getMessage());
+      // NonZeroExitCodeExceptions can have long messages and should be
+      // trimmable when published to the JIRA via the JiraService
+      if(throwable instanceof NonZeroExitCodeException) {
+        messages.add("Tests exited with: " + throwable.getClass().getSimpleName());
+        for(String line : Strings.nullToEmpty(throwable.getMessage()).split("\n")) {
+          messages.add(line);
+        }
+      } else {
+        messages.add("Tests exited with: " + throwable.getClass().getSimpleName() +
+            ": " + throwable.getMessage());
+      }
       error = true;
     } finally {
       for(HostExecutor hostExecutor : mHostExecutors) {
+        hostExecutor.shutdownNow();
         if(hostExecutor.isBad()) {
           mExecutionContext.addBadHost(hostExecutor.getHost());
         }
       }
+      mSshCommandExecutor.shutdownNow();
+      mRsyncCommandExecutor.shutdownNow();
       mExecutor.shutdownNow();
       SortedSet<String> failedTests = new TreeSet<String>(mFailedTests);
       if(failedTests.isEmpty()) {
@@ -221,12 +247,15 @@ public class PTest {
   }
 
   private static final String PROPERTIES = "properties";
-  private static final String REPOSITORY = "repository";
-  private static final String REPOSITORY_NAME = "repositoryName";
-  private static final String BRANCH = "branch";
+  private static final String REPOSITORY = TestConfiguration.REPOSITORY;
+  private static final String REPOSITORY_NAME = TestConfiguration.REPOSITORY_NAME;
+  private static final String BRANCH = TestConfiguration.BRANCH;
   private static final String PATCH = "patch";
-  private static final String JAVA_HOME = "javaHome";
-  private static final String ANT_ENV_OPTS = "antEnvOpts";
+  private static final String JAVA_HOME = TestConfiguration.JAVA_HOME;
+  private static final String JAVA_HOME_TEST = TestConfiguration.JAVA_HOME_TEST;
+  private static final String ANT_TEST_ARGS = TestConfiguration.ANT_TEST_ARGS;
+  private static final String ANT_ENV_OPTS = TestConfiguration.ANT_ENV_OPTS;
+  private static final String ANT_TEST_TARGET = TestConfiguration.ANT_TEST_TARGET;
   /**
    * All args override properties file settings except
    * for this one which is additive.
@@ -243,8 +272,10 @@ public class PTest {
     options.addOption(null, BRANCH, true, "Overrides git branch in properties file");
     options.addOption(null, PATCH, true, "URI to patch, either file:/// or http(s)://");
     options.addOption(ANT_ARG, null, true, "Supplemntal ant arguments");
-    options.addOption(null, JAVA_HOME, true, "Java Home for compiling and running tests");
-    options.addOption(null, ANT_ENV_OPTS, true, "ANT_OPTS environemnt variable setting");
+    options.addOption(null, JAVA_HOME, true, "Java Home for compiling and running tests (unless " + JAVA_HOME_TEST + " is specified)");
+    options.addOption(null, JAVA_HOME_TEST, true, "Java Home for running tests (optional)");
+    options.addOption(null, ANT_TEST_ARGS, true, "Arguments to ant test on slave nodes only");
+    options.addOption(null, ANT_ENV_OPTS, true, "ANT_OPTS environment variable setting");
     CommandLine commandLine = parser.parse(options, args);
     if(!commandLine.hasOption(PROPERTIES)) {
       throw new IllegalArgumentException(Joiner.on(" ").
@@ -282,9 +313,21 @@ public class PTest {
         if(!javaHome.isEmpty()) {
           conf.setJavaHome(javaHome);
         }
+        String javaHomeForTests = Strings.nullToEmpty(commandLine.getOptionValue(JAVA_HOME_TEST)).trim();
+        if(!javaHomeForTests.isEmpty()) {
+          conf.setJavaHomeForTests(javaHomeForTests);
+        }
+        String antTestArgs = Strings.nullToEmpty(commandLine.getOptionValue(ANT_TEST_ARGS)).trim();
+        if(!antTestArgs.isEmpty()) {
+          conf.setAntTestArgs(antTestArgs);
+        }
         String antEnvOpts = Strings.nullToEmpty(commandLine.getOptionValue(ANT_ENV_OPTS)).trim();
         if(!antEnvOpts.isEmpty()) {
           conf.setAntEnvOpts(antEnvOpts);
+        }
+        String antTestTarget = Strings.nullToEmpty(commandLine.getOptionValue(ANT_TEST_TARGET)).trim();
+        if(!antTestTarget.isEmpty()) {
+          conf.setAntTestTarget(antTestTarget);
         }
         String[] supplementalAntArgs = commandLine.getOptionValues(ANT_ARG);
         if(supplementalAntArgs != null && supplementalAntArgs.length > 0) {

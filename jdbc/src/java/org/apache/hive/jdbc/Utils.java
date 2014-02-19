@@ -104,50 +104,6 @@ public class Utils {
     }
   }
 
-
-  /**
-   * Convert hive types to sql types.
-   * @param type
-   * @return Integer java.sql.Types values
-   * @throws SQLException
-   */
-  public static int hiveTypeToSqlType(String type) throws SQLException {
-    if ("string".equalsIgnoreCase(type)) {
-      return Types.VARCHAR;
-    } else if ("varchar".equalsIgnoreCase(type)) {
-      return Types.VARCHAR;
-    } else if ("float".equalsIgnoreCase(type)) {
-      return Types.FLOAT;
-    } else if ("double".equalsIgnoreCase(type)) {
-      return Types.DOUBLE;
-    } else if ("boolean".equalsIgnoreCase(type)) {
-      return Types.BOOLEAN;
-    } else if ("tinyint".equalsIgnoreCase(type)) {
-      return Types.TINYINT;
-    } else if ("smallint".equalsIgnoreCase(type)) {
-      return Types.SMALLINT;
-    } else if ("int".equalsIgnoreCase(type)) {
-      return Types.INTEGER;
-    } else if ("bigint".equalsIgnoreCase(type)) {
-      return Types.BIGINT;
-    } else if ("date".equalsIgnoreCase(type)) {
-      return Types.DATE;
-    } else if ("timestamp".equalsIgnoreCase(type)) {
-      return Types.TIMESTAMP;
-    } else if ("decimal".equalsIgnoreCase(type)) {
-      return Types.DECIMAL;
-    } else if ("binary".equalsIgnoreCase(type)) {
-      return Types.BINARY;
-    } else if (type.startsWith("map<")) {
-      return Types.VARCHAR;
-    } else if (type.startsWith("array<")) {
-      return Types.VARCHAR;
-    } else if (type.startsWith("struct<")) {
-      return Types.VARCHAR;
-    }
-    throw new SQLException("Unrecognized column type: " + type);
-  }
-
   // Verify success or success_with_info status, else throw SQLException
   public static void verifySuccessWithInfo(TStatus status) throws SQLException {
     verifySuccess(status, true);
@@ -227,17 +183,16 @@ public class Utils {
 
     // dbname and session settings
     String sessVars = jdbcURI.getPath();
-    if ((sessVars == null) || sessVars.isEmpty()) {
-      connParams.setDbName(DEFAULT_DATABASE);
-    } else {
+    if ((sessVars != null) && !sessVars.isEmpty()) {
+      String dbName = "";
       // removing leading '/' returned by getPath()
       sessVars = sessVars.substring(1);
       if (!sessVars.contains(";")) {
         // only dbname is provided
-        connParams.setDbName(sessVars);
+        dbName = sessVars;
       } else {
         // we have dbname followed by session parameters
-        connParams.setDbName(sessVars.substring(0, sessVars.indexOf(';')));
+        dbName = sessVars.substring(0, sessVars.indexOf(';'));
         sessVars = sessVars.substring(sessVars.indexOf(';')+1);
         if (sessVars != null) {
           Matcher sessMatcher = pattern.matcher(sessVars);
@@ -245,6 +200,9 @@ public class Utils {
             connParams.getSessionVars().put(sessMatcher.group(1), sessMatcher.group(2));
           }
         }
+      }
+      if (!dbName.isEmpty()) {
+        connParams.setDbName(dbName);
       }
     }
 
@@ -267,5 +225,31 @@ public class Utils {
     }
 
     return connParams;
+  }
+
+  /**
+   * Takes a version string delmited by '.' and '-' characters
+   * and returns a partial version.
+   *
+   * @param fullVersion
+   *          version string.
+   * @param tokenPosition
+   *          position of version string to get starting at 0. eg, for a X.x.xxx
+   *          string, 0 will return the major version, 1 will return minor
+   *          version.
+   * @return version part, or -1 if version string was malformed.
+   */
+  static int getVersionPart(String fullVersion, int position) {
+    int version = -1;
+    try {
+      String[] tokens = fullVersion.split("[\\.-]"); //$NON-NLS-1$
+
+      if (tokens != null && tokens.length > 1 && tokens[position] != null) {
+        version = Integer.parseInt(tokens[position]);
+      }
+    } catch (Exception e) {
+      version = -1;
+    }
+    return version;
   }
 }

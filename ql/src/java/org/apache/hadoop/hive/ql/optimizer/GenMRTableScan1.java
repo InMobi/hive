@@ -24,8 +24,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.lang.StringBuffer;
 import java.util.Stack;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
+import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
 import org.apache.hadoop.hive.ql.io.rcfile.stats.PartialScanWork;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.NodeProcessor;
@@ -74,7 +77,7 @@ public class GenMRTableScan1 implements NodeProcessor {
 
     // create a dummy MapReduce task
     MapredWork currWork = GenMapRedUtils.getMapRedWork(parseCtx);
-    Task<? extends Serializable> currTask = TaskFactory.get(currWork, parseCtx.getConf());
+    MapRedTask currTask = (MapRedTask) TaskFactory.get(currWork, parseCtx.getConf());
     Operator<? extends OperatorDesc> currTopOp = op;
     ctx.setCurrTask(currTask);
     ctx.setCurrTopOp(currTopOp);
@@ -95,6 +98,7 @@ public class GenMRTableScan1 implements NodeProcessor {
 
           StatsWork statsWork = new StatsWork(parseCtx.getQB().getParseInfo().getTableSpec());
           statsWork.setAggKey(op.getConf().getStatsAggPrefix());
+          statsWork.setSourceTask(currTask);
           statsWork.setStatsReliable(
             parseCtx.getConf().getBoolVar(HiveConf.ConfVars.HIVE_STATS_RELIABLE));
           Task<StatsWork> statsTask = TaskFactory.get(statsWork, parseCtx.getConf());
@@ -121,23 +125,10 @@ public class GenMRTableScan1 implements NodeProcessor {
           if (currWork.getReduceWork() != null) {
             currWork.getReduceWork().setGatheringStats(true);
           }
+
           // NOTE: here we should use the new partition predicate pushdown API to get a list of pruned list,
           // and pass it to setTaskPlan as the last parameter
-          Set<Partition> confirmedPartns = new HashSet<Partition>();
-          tableSpec tblSpec = parseInfo.getTableSpec();
-          if (tblSpec.specType == tableSpec.SpecType.STATIC_PARTITION) {
-            // static partition
-            if (tblSpec.partHandle != null) {
-              confirmedPartns.add(tblSpec.partHandle);
-            } else {
-              // partial partition spec has null partHandle
-              assert parseInfo.isNoScanAnalyzeCommand();
-              confirmedPartns.addAll(tblSpec.partitions);
-            }
-          } else if (tblSpec.specType == tableSpec.SpecType.DYNAMIC_PARTITION) {
-            // dynamic partition
-            confirmedPartns.addAll(tblSpec.partitions);
-          }
+          Set<Partition> confirmedPartns = GenMapRedUtils.getConfirmedPartitionsForScan(parseInfo);
           if (confirmedPartns.size() > 0) {
             List<Table> source = parseCtx.getQB().getMetaData().getTablesForAlias(alias);
             List<PrunedPartitionList> partList = new ArrayList<PrunedPartitionList>();
@@ -174,24 +165,9 @@ public class GenMRTableScan1 implements NodeProcessor {
       Task<? extends Serializable> currTask, QBParseInfo parseInfo, StatsWork statsWork,
       Task<StatsWork> statsTask) throws SemanticException {
     String aggregationKey = op.getConf().getStatsAggPrefix();
-    List<String> inputPaths = new ArrayList<String>();
-    switch (parseInfo.getTableSpec().specType) {
-    case TABLE_ONLY:
-      inputPaths.add(parseInfo.getTableSpec().tableHandle.getPath().toString());
-      break;
-    case STATIC_PARTITION:
-      Partition part = parseInfo.getTableSpec().partHandle;
-      try {
-        aggregationKey += Warehouse.makePartPath(part.getSpec());
-      } catch (MetaException e) {
-        throw new SemanticException(ErrorMsg.ANALYZE_TABLE_PARTIALSCAN_AGGKEY.getMsg(
-            part.getPartitionPath().toString() + e.getMessage()));
-      }
-      inputPaths.add(part.getPartitionPath().toString());
-      break;
-    default:
-      assert false;
-    }
+    StringBuffer aggregationKeyBuffer = new StringBuffer(aggregationKey);
+    List<Path> inputPaths = GenMapRedUtils.getInputPathsForPartialScan(parseInfo, aggregationKeyBuffer);
+    aggregationKey = aggregationKeyBuffer.toString();
 
     // scan work
     PartialScanWork scanWork = new PartialScanWork(inputPaths);

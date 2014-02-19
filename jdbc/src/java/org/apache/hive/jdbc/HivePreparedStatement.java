@@ -39,6 +39,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Scanner;
 
 import org.apache.hive.service.cli.thrift.TCLIService;
 import org.apache.hive.service.cli.thrift.TSessionHandle;
@@ -55,9 +56,9 @@ public class HivePreparedStatement extends HiveStatement implements PreparedStat
    */
   private final HashMap<Integer, String> parameters=new HashMap<Integer, String>();
 
-  public HivePreparedStatement(TCLIService.Iface client, TSessionHandle sessHandle,
-      String sql) {
-    super(client, sessHandle);
+  public HivePreparedStatement(HiveConnection connection, TCLIService.Iface client,
+      TSessionHandle sessHandle, String sql) {
+    super(connection, client, sessHandle);
     this.sql = sql;
   }
 
@@ -263,8 +264,8 @@ public class HivePreparedStatement extends HiveStatement implements PreparedStat
    */
 
   public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
-    // TODO Auto-generated method stub
-    throw new SQLException("Method not supported");
+    String str = new Scanner(x, "UTF-8").useDelimiter("\\A").next();
+    this.parameters.put(parameterIndex, str);
   }
 
   /*

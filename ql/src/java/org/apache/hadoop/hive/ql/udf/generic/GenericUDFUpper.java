@@ -21,6 +21,8 @@ package org.apache.hadoop.hive.ql.udf.generic;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentLengthException;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.StringUpper;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
@@ -29,7 +31,9 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.Pr
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorConverter;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorConverter.StringConverter;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 
 /**
  * UDFUpper.
@@ -39,6 +43,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
     value = "_FUNC_(str) - Returns str with all characters changed to uppercase",
     extended = "Example:\n"
     + "  > SELECT _FUNC_('Facebook') FROM src LIMIT 1;\n" + "  'FACEBOOK'")
+@VectorizedExpressions({StringUpper.class})
 public class GenericUDFUpper extends GenericUDF {
   private transient PrimitiveObjectInspector argumentOI;
   private transient StringConverter stringConverter;
@@ -61,15 +66,23 @@ public class GenericUDFUpper extends GenericUDF {
     stringConverter = new PrimitiveObjectInspectorConverter.StringConverter(argumentOI);
     PrimitiveCategory inputType = argumentOI.getPrimitiveCategory();
     ObjectInspector outputOI = null;
+    BaseCharTypeInfo typeInfo;
     switch (inputType) {
+      case CHAR:
+        // return type should have same length as the input.
+        returnType = inputType;
+        typeInfo = TypeInfoFactory.getCharTypeInfo(
+            GenericUDFUtils.StringHelper.getFixedStringSizeForType(argumentOI));
+        outputOI = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+            typeInfo);
+        break;
       case VARCHAR:
         // return type should have same length as the input.
         returnType = inputType;
-        VarcharTypeParams varcharParams = new VarcharTypeParams();
-        varcharParams.setLength(
+        typeInfo = TypeInfoFactory.getVarcharTypeInfo(
             GenericUDFUtils.StringHelper.getFixedStringSizeForType(argumentOI));
         outputOI = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
-            argumentOI);
+            typeInfo);
         break;
       default:
         returnType = PrimitiveCategory.STRING;

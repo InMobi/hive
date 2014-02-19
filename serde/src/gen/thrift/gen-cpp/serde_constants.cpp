@@ -39,6 +39,10 @@ serdeConstants::serdeConstants() {
 
   ESCAPE_CHAR = "escape.delim";
 
+  HEADER_COUNT = "skip.header.line.count";
+
+  FOOTER_COUNT = "skip.footer.line.count";
+
   VOID_TYPE_NAME = "void";
 
   BOOLEAN_TYPE_NAME = "boolean";
@@ -102,6 +106,11 @@ serdeConstants::serdeConstants() {
 
   CollectionTypes.insert("array");
   CollectionTypes.insert("map");
+
+  IntegralTypes.insert("tinyint");
+  IntegralTypes.insert("smallint");
+  IntegralTypes.insert("int");
+  IntegralTypes.insert("bigint");
 
 }
 

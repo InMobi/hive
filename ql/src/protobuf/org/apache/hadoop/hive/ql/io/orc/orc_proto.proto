@@ -33,6 +33,8 @@ message DoubleStatistics {
 message StringStatistics {
   optional string minimum = 1;
   optional string maximum = 2;
+  // sum will store the total length of all strings in a stripe
+  optional sint64 sum = 3;
 }
 
 message BucketStatistics {
@@ -51,6 +53,11 @@ message DateStatistics {
   optional sint32 maximum = 2;
 }
 
+message BinaryStatistics {
+  // sum will store the total binary blob length in a stripe
+  optional sint64 sum = 1;
+}
+
 message ColumnStatistics {
   optional uint64 numberOfValues = 1;
   optional IntegerStatistics intStatistics = 2;
@@ -59,6 +66,7 @@ message ColumnStatistics {
   optional BucketStatistics bucketStatistics = 5;
   optional DecimalStatistics decimalStatistics = 6;
   optional DateStatistics dateStatistics = 7;
+  optional BinaryStatistics binaryStatistics = 8;
 }
 
 message RowIndexEntry {
@@ -122,11 +130,14 @@ message Type {
     DECIMAL = 14;
     DATE = 15;
     VARCHAR = 16;
+    CHAR = 17;
   }
   required Kind kind = 1;
   repeated uint32 subtypes = 2 [packed=true];
   repeated string fieldNames = 3;
   optional uint32 maximumLength = 4;
+  optional uint32 precision = 5;
+  optional uint32 scale = 6;
 }
 
 message StripeInformation {
@@ -140,6 +151,14 @@ message StripeInformation {
 message UserMetadataItem {
   required string name = 1;
   required bytes value = 2;
+}
+
+message StripeStatistics {
+  repeated ColumnStatistics colStats = 1;
+}
+
+message Metadata {
+  repeated StripeStatistics stripeStats = 1;
 }
 
 message Footer {
@@ -166,6 +185,7 @@ message PostScript {
   optional CompressionKind compression = 2;
   optional uint64 compressionBlockSize = 3;
   repeated uint32 version = 4 [packed = true];
+  optional uint64 metadataLength = 5;
   // Leave this last in the record
   optional string magic = 8000;
 }

@@ -36,6 +36,7 @@ case
 ceil
 ceiling
 coalesce
+collect_list
 collect_set
 compute_stats
 concat
@@ -49,6 +50,7 @@ covar_pop
 covar_samp
 create_union
 cume_dist
+current_database
 date_add
 date_sub
 datediff
@@ -127,6 +129,7 @@ percentile
 percentile_approx
 pi
 pmod
+posexplode
 positive
 pow
 power
@@ -202,6 +205,7 @@ case
 ceil
 ceiling
 coalesce
+collect_list
 collect_set
 compute_stats
 concat
@@ -215,6 +219,7 @@ covar_pop
 covar_samp
 create_union
 cume_dist
+current_database
 PREHOOK: query: SHOW FUNCTIONS '.*e$'
 PREHOOK: type: SHOWFUNCTIONS
 POSTHOOK: query: SHOW FUNCTIONS '.*e$'
@@ -222,6 +227,7 @@ POSTHOOK: type: SHOWFUNCTIONS
 assert_true
 case
 coalesce
+current_database
 decode
 e
 encode
@@ -240,6 +246,7 @@ negative
 ntile
 parse_url_tuple
 percentile
+posexplode
 positive
 regexp_replace
 reverse

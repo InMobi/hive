@@ -20,6 +20,7 @@ package org.apache.hive.service.cli.thrift;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.service.cli.CLIService;
+import org.apache.hive.service.cli.ICLIService;
 
 
 /**
@@ -29,13 +30,13 @@ import org.apache.hive.service.cli.CLIService;
 public class EmbeddedThriftBinaryCLIService extends ThriftBinaryCLIService {
 
   public EmbeddedThriftBinaryCLIService() {
-    this(null);
-  }
-
-  public EmbeddedThriftBinaryCLIService(HiveConf conf) {
     super(new CLIService());
     isEmbedded = true;
-    cliService.init(conf == null ? new HiveConf() : conf);
+    cliService.init(new HiveConf());
     cliService.start();
+  }
+
+  public ICLIService getService() {
+    return cliService;
   }
 }

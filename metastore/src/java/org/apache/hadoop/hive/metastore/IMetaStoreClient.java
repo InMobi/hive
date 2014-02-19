@@ -21,8 +21,10 @@ package org.apache.hadoop.hive.metastore;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -330,8 +332,19 @@ public interface IMetaStoreClient {
    *           Thrift exception
    */
   public int add_partitions(List<Partition> partitions)
-      throws InvalidObjectException, AlreadyExistsException, MetaException,
-      TException;
+      throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
+
+  /**
+   * Add partitions to the table.
+   *
+   * @param partitions The partitions to add
+   * @param ifNotExists only add partitions if they don't exist
+   * @param needResults Whether the results are needed
+   * @return the partitions that were added, or null if !needResults
+   */
+  public List<Partition> add_partitions(
+      List<Partition> partitions, boolean ifNotExists, boolean needResults)
+      throws InvalidObjectException, AlreadyExistsException, MetaException, TException;
 
   /**
    * @param tblName
@@ -426,6 +439,23 @@ public interface IMetaStoreClient {
   public List<Partition> listPartitionsByFilter(String db_name, String tbl_name,
       String filter, short max_parts) throws MetaException,
          NoSuchObjectException, TException;
+
+
+  /**
+   * Get list of partitions matching specified serialized expression
+   * @param db_name the database name
+   * @param tbl_name the table name
+   * @param expr expression, serialized from ExprNodeDesc
+   * @param max_parts the maximum number of partitions to return,
+   *    all partitions are returned if -1 is passed
+   * @param default_partition_name Default partition name from configuration. If blank, the
+   *    metastore server-side configuration is used.
+   * @param result the resulting list of partitions
+   * @return whether the resulting list contains partitions which may or may not match the expr
+   */
+  public boolean listPartitionsByExpr(String db_name, String tbl_name,
+      byte[] expr, String default_partition_name, short max_parts, List<Partition> result)
+          throws TException;
 
   /**
    * Get number of partitions matching specified filter
@@ -574,6 +604,10 @@ public interface IMetaStoreClient {
   public boolean dropPartition(String db_name, String tbl_name,
       List<String> part_vals, boolean deleteData) throws NoSuchObjectException,
       MetaException, TException;
+
+  List<Partition> dropPartitions(String dbName, String tblName,
+      List<ObjectPair<Integer, byte[]>> partExprs, boolean deleteData, boolean ignoreProtection,
+      boolean ifExists) throws NoSuchObjectException, MetaException, TException;
 
   public boolean dropPartition(String db_name, String tbl_name,
       String name, boolean deleteData) throws NoSuchObjectException,
@@ -799,40 +833,20 @@ public interface IMetaStoreClient {
    throws NoSuchObjectException, InvalidObjectException, MetaException, TException,
    InvalidInputException;
 
- /**
-  * Get table level column statistics given dbName, tableName and colName
-  * @param dbName
-  * @param tableName
-  * @param colName
-  * @return ColumnStatistics struct for a given db, table and col
-  * @throws NoSuchObjectException
-  * @throws MetaException
-  * @throws TException
-  * @throws InvalidInputException
-  * @throws InvalidObjectException
-  */
-
-  public ColumnStatistics getTableColumnStatistics(String dbName, String tableName, String colName)
-      throws NoSuchObjectException, MetaException, TException,
-            InvalidInputException, InvalidObjectException;
+  /**
+   * Get table column statistics given dbName, tableName and multiple colName-s
+   * @return ColumnStatistics struct for a given db, table and columns
+   */
+  public List<ColumnStatisticsObj> getTableColumnStatistics(String dbName, String tableName,
+      List<String> colNames) throws NoSuchObjectException, MetaException, TException;
 
   /**
-   * Get partition level column statistics given dbName, tableName, partitionName and colName
-   * @param dbName
-   * @param tableName
-   * @param partitionName
-   * @param colName
-   * @return ColumnStatistics struct for a given db, table, partition and col
-   * @throws NoSuchObjectException
-   * @throws MetaException
-   * @throws TException
-   * @throws InvalidInputException
-   * @throws InvalidObjectException
+   * Get partitions column statistics given dbName, tableName, multiple partitions and colName-s
+   * @return ColumnStatistics struct for a given db, table and columns
    */
-
-  public ColumnStatistics getPartitionColumnStatistics(String dbName, String tableName,
-    String partitionName, String colName) throws NoSuchObjectException, MetaException, TException,
-            InvalidInputException, InvalidObjectException;
+  public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String dbName,
+      String tableName,  List<String> partNames, List<String> colNames)
+          throws NoSuchObjectException, MetaException, TException;
 
   /**
    * Delete partition level column statistics given dbName, tableName, partName and colName
@@ -938,6 +952,8 @@ public interface IMetaStoreClient {
       throws MetaException, TException;
 
   /**
+   * Return the privileges that the user, group have directly and indirectly through roles
+   * on the given hiveObject
    * @param hiveObject
    * @param user_name
    * @param group_names
@@ -950,6 +966,7 @@ public interface IMetaStoreClient {
       TException;
 
   /**
+   * Return the privileges that this principal has directly over the object (not through roles).
    * @param principal_name
    * @param principal_type
    * @param hiveObject
@@ -1004,4 +1021,13 @@ public interface IMetaStoreClient {
    */
   public void cancelDelegationToken(String tokenStrForm) throws MetaException, TException;
 
+<<<<<<< HEAD
+=======
+
+  public class IncompatibleMetastoreException extends MetaException {
+    public IncompatibleMetastoreException(String message) {
+      super(message);
+    }
+  }
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 }

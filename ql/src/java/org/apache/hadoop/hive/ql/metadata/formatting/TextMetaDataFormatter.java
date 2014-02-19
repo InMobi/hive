@@ -42,8 +42,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.session.SessionState;
-import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
-import org.apache.hadoop.hive.shims.ShimLoader;
 
 /**
  * Format table and index information for human readability using
@@ -130,7 +128,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
           } else {
             output = MetaDataFormatUtils.getAllColumnsInformation(cols, isFormatted);
           }
-          outStream.write(output.getBytes());
+          outStream.write(output.getBytes("UTF-8"));
 
           if (tableName.equals(colPath)) {
             if (isFormatted) {
@@ -139,7 +137,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
               } else {
                 output = MetaDataFormatUtils.getTableInformation(tbl);
               }
-              outStream.write(output.getBytes());
+              outStream.write(output.getBytes("UTF-8"));
             }
 
           // if extended desc table then show the complete details of the table
@@ -150,7 +148,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
                 // show partition information
                 outStream.writeBytes("Detailed Partition Information");
                 outStream.write(separator);
-                outStream.write(part.getTPartition().toString().getBytes());
+                outStream.write(part.getTPartition().toString().getBytes("UTF-8"));
                 outStream.write(separator);
                 // comment column is empty
                 outStream.write(terminator);
@@ -158,7 +156,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
                 // show table information
                 outStream.writeBytes("Detailed Table Information");
                 outStream.write(separator);
-                outStream.write(tbl.getTTable().toString().getBytes());
+                outStream.write(tbl.getTTable().toString().getBytes("UTF-8"));
                 outStream.write(separator);
                 outStream.write(terminator);
               }
@@ -278,7 +276,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
       // in case all files in locations do not exist
       try {
         FileStatus tmpStatus = fs.getFileStatus(tblPath);
-        lastAccessTime = ShimLoader.getHadoopShims().getAccessTime(tmpStatus);
+        lastAccessTime = tmpStatus.getAccessTime();
         lastUpdateTime = tmpStatus.getModificationTime();
         if (partSpecified) {
           // check whether the part exists or not in fs
@@ -295,7 +293,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
           try {
             FileStatus status = fs.getFileStatus(tblPath);
             FileStatus[] files = fs.listStatus(loc);
-            long accessTime = ShimLoader.getHadoopShims().getAccessTime(status);
+            long accessTime = status.getAccessTime();
             long updateTime = status.getModificationTime();
             // no matter loc is the table location or part location, it must be a
             // directory.
@@ -321,8 +319,7 @@ class TextMetaDataFormatter implements MetaDataFormatter {
               if (fileLen < minFileSize) {
                 minFileSize = fileLen;
               }
-              accessTime = ShimLoader.getHadoopShims().getAccessTime(
-                  currentStatus);
+              accessTime = currentStatus.getAccessTime();
               updateTime = currentStatus.getModificationTime();
               if (accessTime > lastAccessTime) {
                 lastAccessTime = accessTime;
@@ -433,22 +430,26 @@ class TextMetaDataFormatter implements MetaDataFormatter {
      * Describe a database
      */
     @Override
-    public void showDatabaseDescription(DataOutputStream outStream,
-                                        String database,
-                                        String comment,
-                                        String location,
-                                        Map<String, String> params)
-        throws HiveException
-    {
+    public void showDatabaseDescription(DataOutputStream outStream, String database, String comment,
+      String location, String ownerName, String ownerType, Map<String, String> params)
+      throws HiveException {
         try {
             outStream.writeBytes(database);
             outStream.write(separator);
             if (comment != null) {
-              outStream.write(comment.getBytes());
+              outStream.write(comment.getBytes("UTF-8"));
             }
             outStream.write(separator);
             if (location != null) {
               outStream.writeBytes(location);
+            }
+            outStream.write(separator);
+            if (ownerName != null) {
+              outStream.writeBytes(ownerName);
+            }
+            outStream.write(separator);
+            if (ownerType != null) {
+              outStream.writeBytes(ownerType);
             }
             outStream.write(separator);
             if (params != null && !params.isEmpty()) {

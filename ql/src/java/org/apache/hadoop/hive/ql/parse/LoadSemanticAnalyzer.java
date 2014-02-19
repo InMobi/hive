@@ -27,8 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.antlr.runtime.tree.Tree;
-import org.apache.commons.httpclient.URIException;
-import org.apache.commons.httpclient.util.URIUtil;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -84,7 +82,7 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     // directory
     if (!path.startsWith("/")) {
       if (isLocal) {
-        path = URIUtil.decode( new Path(System.getProperty("user.dir"), path).toUri().toString() );
+        path = new Path(System.getProperty("user.dir"), fromPath).toString();
       } else {
         path = new Path(new Path("/user/" + System.getProperty("user.name")),
           path).toString();
@@ -125,10 +123,7 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     try {
-      FileStatus[] srcs = matchFilesOrDir(FileSystem.get(fromURI, conf),
-          new Path(fromURI.getScheme(), fromURI.getAuthority(), fromURI
-          .getPath()));
-
+      FileStatus[] srcs = matchFilesOrDir(FileSystem.get(fromURI, conf), new Path(fromURI));
       if (srcs == null || srcs.length == 0) {
         throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(ast,
             "No files matching path " + fromURI));
@@ -211,8 +206,8 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
       throw new SemanticException(ErrorMsg.LOAD_INTO_STORED_AS_DIR.getMsg());
     }
 
-    URI toURI = (ts.partHandle != null) ? ts.partHandle.getDataLocation()
-        : ts.tableHandle.getDataLocation();
+    URI toURI = ((ts.partHandle != null) ? ts.partHandle.getDataLocation()
+        : ts.tableHandle.getDataLocation()).toUri();
 
     List<FieldSchema> parts = ts.tableHandle.getPartitionKeys();
     if ((parts != null && parts.size() > 0)
@@ -231,21 +226,14 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
       // might seem redundant in the case
       // that the hive warehouse is also located in the local file system - but
       // that's just a test case.
-      String copyURIStr = ctx.getExternalTmpFileURI(toURI);
+      String copyURIStr = ctx.getExternalTmpPath(toURI).toString();
       URI copyURI = URI.create(copyURIStr);
-      try {
-        rTask = TaskFactory.get(new CopyWork(URIUtil.decode(fromURI.toString()), copyURIStr),
-            conf);
-      } catch (URIException e) {
-        throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(fromTree, e
-            .getMessage()), e);
-      }
+      rTask = TaskFactory.get(new CopyWork(new Path(fromURI), new Path(copyURI)), conf);
       fromURI = copyURI;
     }
 
     // create final load/move work
 
-    String loadTmpPath = ctx.getExternalTmpFileURI(toURI);
     Map<String, String> partSpec = ts.getPartSpec();
     if (partSpec == null) {
       partSpec = new LinkedHashMap<String, String>();
@@ -269,13 +257,8 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
 
 
     LoadTableDesc loadTableWork;
-    try {
-      loadTableWork = new LoadTableDesc(URIUtil.decode(fromURI.toString()),
-          loadTmpPath, Utilities.getTableDesc(ts.tableHandle), partSpec, isOverWrite);
-    } catch (URIException e1) {
-      throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(fromTree, e1
-          .getMessage()), e1);
-    }
+    loadTableWork = new LoadTableDesc(new Path(fromURI),
+      Utilities.getTableDesc(ts.tableHandle), partSpec, isOverWrite);
 
     Task<? extends Serializable> childTask = TaskFactory.get(new MoveWork(getInputs(),
         getOutputs(), loadTableWork, null, true), conf);

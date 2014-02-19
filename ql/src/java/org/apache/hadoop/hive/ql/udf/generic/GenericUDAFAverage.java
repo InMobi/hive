@@ -40,8 +40,10 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObject
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.util.StringUtils;
 
@@ -65,7 +67,7 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
     if (parameters[0].getCategory() != ObjectInspector.Category.PRIMITIVE) {
       throw new UDFArgumentTypeException(0,
           "Only primitive type arguments are accepted but "
-          + parameters[0].getTypeName() + " is passed.");
+              + parameters[0].getTypeName() + " is passed.");
     }
     switch (((PrimitiveTypeInfo) parameters[0]).getPrimitiveCategory()) {
     case BYTE:
@@ -75,6 +77,8 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
     case FLOAT:
     case DOUBLE:
     case STRING:
+    case VARCHAR:
+    case CHAR:
     case TIMESTAMP:
       return new GenericUDAFAverageEvaluatorDouble();
     case DECIMAL:
@@ -84,7 +88,7 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
     default:
       throw new UDFArgumentTypeException(0,
           "Only numeric or string type arguments are accepted but "
-          + parameters[0].getTypeName() + " is passed.");
+              + parameters[0].getTypeName() + " is passed.");
     }
   }
 
@@ -160,11 +164,29 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
 
     @Override
     protected ObjectInspector getSumFieldJavaObjectInspector() {
-      return PrimitiveObjectInspectorFactory.javaHiveDecimalObjectInspector;
+      DecimalTypeInfo typeInfo = deriveResultDecimalTypeInfo();
+      return PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(typeInfo);
     }
+
     @Override
     protected ObjectInspector getSumFieldWritableObjectInspector() {
-      return PrimitiveObjectInspectorFactory.writableHiveDecimalObjectInspector;
+      DecimalTypeInfo typeInfo = deriveResultDecimalTypeInfo();
+      return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(typeInfo);
+    }
+
+    /**
+     * The result type has the same number of integer digits and 4 more decimal digits.
+     */
+    private DecimalTypeInfo deriveResultDecimalTypeInfo() {
+      if (mode == Mode.PARTIAL1 || mode == Mode.COMPLETE) {
+        int scale = inputOI.scale();
+        int intPart = inputOI.precision() - scale;
+        scale = Math.min(scale + 4, HiveDecimal.MAX_SCALE - intPart);
+        return TypeInfoFactory.getDecimalTypeInfo(intPart + scale, scale);
+      } else {
+        PrimitiveObjectInspector sfOI = (PrimitiveObjectInspector) sumFieldOI;
+        return (DecimalTypeInfo) sfOI.getTypeInfo();
+      }
     }
 
     @Override
@@ -173,11 +195,7 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
       HiveDecimal value = PrimitiveObjectInspectorUtils.getHiveDecimal(parameter, oi);
       aggregation.count++;
       if (aggregation.sum != null) {
-        try {
-          aggregation.sum = aggregation.sum.add(value);
-        } catch (NumberFormatException e) {
-          aggregation.sum = null;
-        }
+        aggregation.sum = aggregation.sum.add(value);
       }
     }
 
@@ -190,11 +208,7 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
       }
       aggregation.count += partialCount;
       if (aggregation.sum != null) {
-        try {
-          aggregation.sum = aggregation.sum.add(value);
-        } catch (NumberFormatException e) {
-          aggregation.sum = null;
-        }
+        aggregation.sum = aggregation.sum.add(value);
       }
     }
 
@@ -217,11 +231,7 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
         return null;
       } else {
         HiveDecimalWritable result = new HiveDecimalWritable(HiveDecimal.ZERO);
-        try {
-          result.set(aggregation.sum.divide(new HiveDecimal(aggregation.count)));
-        } catch (NumberFormatException e) {
-          result = null;
-        }
+        result.set(aggregation.sum.divide(HiveDecimal.create(aggregation.count)));
         return result;
       }
     }
@@ -243,13 +253,13 @@ public class GenericUDAFAverage extends AbstractGenericUDAFResolver {
   public static abstract class AbstractGenericUDAFAverageEvaluator<TYPE> extends GenericUDAFEvaluator {
 
     // For PARTIAL1 and COMPLETE
-    private transient PrimitiveObjectInspector inputOI;
+    protected transient PrimitiveObjectInspector inputOI;
     // For PARTIAL2 and FINAL
     private transient StructObjectInspector soi;
     private transient StructField countField;
     private transient StructField sumField;
     private LongObjectInspector countFieldOI;
-    private ObjectInspector sumFieldOI;
+    protected ObjectInspector sumFieldOI;
     // For PARTIAL1 and PARTIAL2
     protected transient Object[] partialResult;
 

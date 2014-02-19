@@ -31,21 +31,23 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.SerDeParameters;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.BytesWritable;
@@ -130,8 +132,8 @@ public final class LazyUtils {
     }
   }
 
-  private static byte[] trueBytes = {(byte) 't', 'r', 'u', 'e'};
-  private static byte[] falseBytes = {(byte) 'f', 'a', 'l', 's', 'e'};
+  public static byte[] trueBytes = {(byte) 't', 'r', 'u', 'e'};
+  public static byte[] falseBytes = {(byte) 'f', 'a', 'l', 's', 'e'};
 
   /**
    * Write the bytes with special characters escaped.
@@ -144,7 +146,7 @@ public final class LazyUtils {
    *          if escaped, whether a specific character needs escaping. This
    *          array should have size of 128.
    */
-  private static void writeEscaped(OutputStream out, byte[] bytes, int start,
+  public static void writeEscaped(OutputStream out, byte[] bytes, int start,
       int len, boolean escaped, byte escapeChar, boolean[] needsEscape)
       throws IOException {
     if (escaped) {
@@ -226,7 +228,13 @@ public final class LazyUtils {
           needsEscape);
       break;
     }
-
+    case CHAR: {
+      HiveCharWritable hc = ((HiveCharObjectInspector) oi).getPrimitiveWritableObject(o);
+      Text t = hc.getPaddedValue();
+      writeEscaped(out, t.getBytes(), 0, t.getLength(), escaped, escapeChar,
+          needsEscape);
+      break;
+    }
     case VARCHAR: {
       HiveVarcharWritable hc = ((HiveVarcharObjectInspector)oi).getPrimitiveWritableObject(o);
       Text t = hc.getTextValue();

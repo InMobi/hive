@@ -30,6 +30,7 @@ import org.apache.hive.service.cli.OperationHandle;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.SessionHandle;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -46,12 +47,12 @@ public class TestHiveServer2 {
 
   @Before
   public void setUp() throws Exception {
-    miniHS2.start();
     confOverlay = new HashMap<String, String>();
+    miniHS2.start(confOverlay);
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws Exception {
     miniHS2.stop();
   }
 
@@ -64,6 +65,16 @@ public class TestHiveServer2 {
     serviceClient.executeStatement(sessHandle, "CREATE TABLE " + tabName + " (id INT)", confOverlay);
     OperationHandle opHandle = serviceClient.executeStatement(sessHandle, "SHOW TABLES", confOverlay);
     RowSet rowSet = serviceClient.fetchResults(opHandle);
-    assertFalse(rowSet.getSize() == 0);
+    assertFalse(rowSet.numRows() == 0);
   }
+
+  @Test
+  public void testGetVariableValue() throws Exception {
+    CLIServiceClient serviceClient = miniHS2.getServiceClient();
+    SessionHandle sessHandle = serviceClient.openSession("foo", "bar");
+    OperationHandle opHandle = serviceClient.executeStatement(sessHandle, "set system:os.name", confOverlay);
+    RowSet rowSet = serviceClient.fetchResults(opHandle);
+    Assert.assertEquals(1, rowSet.numRows());
+  }
+
 }

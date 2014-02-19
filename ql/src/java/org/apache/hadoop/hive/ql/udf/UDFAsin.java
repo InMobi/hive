@@ -19,7 +19,9 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.Description;
-import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncASinDoubleToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncASinLongToDouble;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 
 /**
@@ -32,8 +34,9 @@ import org.apache.hadoop.hive.serde2.io.DoubleWritable;
     + "  > SELECT _FUNC_(0) FROM src LIMIT 1;\n"
     + "  0\n"
     + "  > SELECT _FUNC_(2) FROM src LIMIT 1;\n" + "  NULL")
-public class UDFAsin extends UDF {
-  private DoubleWritable result = new DoubleWritable();
+@VectorizedExpressions({FuncASinLongToDouble.class, FuncASinDoubleToDouble.class})
+public class UDFAsin extends UDFMath {
+  private final DoubleWritable result = new DoubleWritable();
 
   public UDFAsin() {
   }

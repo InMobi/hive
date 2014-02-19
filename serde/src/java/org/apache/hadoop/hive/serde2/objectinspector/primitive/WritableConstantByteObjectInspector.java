@@ -17,9 +17,10 @@
  */
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
-import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
+import java.math.BigDecimal;
 
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
+import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
 
 /**
  * A WritableConstantByteObjectInspector is a WritableByteObjectInspector
@@ -31,6 +32,10 @@ public class WritableConstantByteObjectInspector extends
 
   private ByteWritable value;
 
+  protected WritableConstantByteObjectInspector() {
+    super();
+  }
+
   WritableConstantByteObjectInspector(ByteWritable value) {
     super();
     this.value = value;
@@ -40,4 +45,10 @@ public class WritableConstantByteObjectInspector extends
   public ByteWritable getWritableConstantValue() {
     return value;
   }
+
+  @Override
+  public int precision() {
+    return BigDecimal.valueOf(value.get()).precision();
+  }
+
 }

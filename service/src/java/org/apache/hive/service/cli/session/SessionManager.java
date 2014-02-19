@@ -18,13 +18,9 @@
 
 package org.apache.hive.service.cli.session;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,7 +29,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -43,6 +38,7 @@ import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.SessionHandle;
 import org.apache.hive.service.cli.operation.OperationManager;
+import org.apache.hive.service.cli.thrift.TProtocolVersion;
 
 /**
  * SessionManager.
@@ -136,13 +132,14 @@ public class SessionManager extends CompositeService {
     }
   }
 
-  public SessionHandle openSession(String username, String password, Map<String, String> sessionConf)
-      throws HiveSQLException {
-    return openSession(username, password, sessionConf, false, null);
+  public SessionHandle openSession(TProtocolVersion protocol, String username, String password,
+      Map<String, String> sessionConf) throws HiveSQLException {
+    return openSession(protocol, username, password, sessionConf, false, null);
   }
 
-  public SessionHandle openSession(String username, String password, Map<String, String> sessionConf,
-      boolean withImpersonation, String delegationToken) throws HiveSQLException {
+  public SessionHandle openSession(TProtocolVersion protocol, String username, String password,
+      Map<String, String> sessionConf, boolean withImpersonation, String delegationToken)
+      throws HiveSQLException {
     if (username == null) {
       username = threadLocalUserName.get();
     }
@@ -150,14 +147,14 @@ public class SessionManager extends CompositeService {
     if (withImpersonation) {
       HiveSessionImplwithUGI hiveSessionUgi;
       if (sessionImplWithUGIclassName == null) {
-        hiveSessionUgi = new HiveSessionImplwithUGI(username, password,
+        hiveSessionUgi = new HiveSessionImplwithUGI(protocol, username, password,
             sessionConf, delegationToken);
       } else {
         try {
           Class<?> clazz = Class.forName(sessionImplWithUGIclassName);
-          Constructor<?> constructor = clazz.getConstructor(String.class, String.class, Map.class, String.class);
+          Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class, String.class, String.class, Map.class, String.class);
           hiveSessionUgi = (HiveSessionImplwithUGI) constructor.newInstance(new Object[]
-              {username, password, sessionConf, delegationToken});
+              {protocol, username, password, sessionConf, delegationToken});
         } catch (Exception e) {
           throw new HiveSQLException("Cannot initilize session class:" + sessionImplWithUGIclassName);
         }
@@ -166,13 +163,13 @@ public class SessionManager extends CompositeService {
       hiveSessionUgi.setProxySession(session);
     } else {
       if (sessionImplclassName == null) {
-        session = new HiveSessionImpl(username, password, sessionConf);
+        session = new HiveSessionImpl(protocol, username, password, sessionConf);
       } else {
         try {
           Class<?> clazz = Class.forName(sessionImplclassName);
-          Constructor<?> constructor = clazz.getConstructor(String.class, String.class, Map.class);
+          Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class, String.class, String.class, Map.class);
           session = (HiveSession) constructor.newInstance(new Object[]
-              {username, password, sessionConf});
+              {protocol, username, password, sessionConf});
         } catch (Exception e) {
           throw new HiveSQLException("Cannot initilize session class:" + sessionImplclassName);
         }
@@ -183,6 +180,8 @@ public class SessionManager extends CompositeService {
     if (isLogRedirectionEnabled) {
       session.setupLogRedirection(queryLogDir);
     }
+    session.setSessionManager(this);
+    session.setOperationManager(operationManager);
 
     handleToSession.put(session.getSessionHandle(), session);
 
@@ -346,4 +345,3 @@ public class SessionManager extends CompositeService {
     }
   }
 }
-

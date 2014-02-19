@@ -22,7 +22,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncSignDoubleToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncSignLongToDouble;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
+import org.apache.hadoop.io.IntWritable;
 
 @Description(
     name = "sign",
@@ -31,11 +36,13 @@ import org.apache.hadoop.hive.serde2.io.DoubleWritable;
     		"  > SELECT _FUNC_(40) FROM src LIMIT 1;\n" +
     		"  1"
     )
+@VectorizedExpressions({FuncSignLongToDouble.class, FuncSignDoubleToDouble.class})
 public class UDFSign extends UDF {
 
   @SuppressWarnings("unused")
   private static Log LOG = LogFactory.getLog(UDFSign.class.getName());
   DoubleWritable result = new DoubleWritable();
+  IntWritable intWritable = new IntWritable();
 
   public UDFSign() {
   }
@@ -57,6 +64,20 @@ public class UDFSign extends UDF {
       result.set(-1);
     }
     return result;
+  }
+
+  /**
+   * Get the sign of the decimal input
+   * @param dec decimal input
+   * @return -1, 0, or 1 representing the sign of the input decimal
+   */
+  public IntWritable evaluate(HiveDecimalWritable dec)  {
+    if (dec == null || dec.getHiveDecimal() == null) {
+      return null;
+    }
+
+    intWritable.set(dec.getHiveDecimal().signum());
+    return intWritable;
   }
 
 }

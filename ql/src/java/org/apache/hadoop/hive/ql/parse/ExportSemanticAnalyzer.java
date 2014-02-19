@@ -87,11 +87,10 @@ public class ExportSemanticAnalyzer extends BaseSemanticAnalyzer {
       if (ts.tableHandle.isPartitioned()) {
         partitions = (ts.partitions != null) ? ts.partitions : db.getPartitions(ts.tableHandle);
       }
-      String tmpfile = ctx.getLocalTmpFileURI();
-      Path path = new Path(tmpfile, "_metadata");
+      Path path = new Path(ctx.getLocalTmpPath(), "_metadata");
       EximUtil.createExportDump(FileSystem.getLocal(conf), path, ts.tableHandle, partitions);
       Task<? extends Serializable> rTask = TaskFactory.get(new CopyWork(
-          path.toString(), toURI.toString(), false), conf);
+          path, new Path(toURI), false), conf);
       rootTasks.add(rTask);
       LOG.debug("_metadata file written into " + path.toString()
           + " and then copied to " + toURI.toString());
@@ -101,25 +100,26 @@ public class ExportSemanticAnalyzer extends BaseSemanticAnalyzer {
               .getMsg("Exception while writing out the local file"), e);
     }
 
+    Path parentPath = new Path(toURI);
+
     if (ts.tableHandle.isPartitioned()) {
       for (Partition partition : partitions) {
-        URI fromURI = partition.getDataLocation();
-        Path toPartPath = new Path(toURI.toString(), partition.getName());
+        Path fromPath = partition.getDataLocation();
+        Path toPartPath = new Path(parentPath, partition.getName());
         Task<? extends Serializable> rTask = TaskFactory.get(
-            new CopyWork(fromURI.toString(), toPartPath.toString(), false),
+            new CopyWork(fromPath, toPartPath, false),
             conf);
         rootTasks.add(rTask);
         inputs.add(new ReadEntity(partition));
       }
     } else {
-      URI fromURI = ts.tableHandle.getDataLocation();
-      Path toDataPath = new Path(toURI.toString(), "data");
+      Path fromPath = ts.tableHandle.getDataLocation();
+      Path toDataPath = new Path(parentPath, "data");
       Task<? extends Serializable> rTask = TaskFactory.get(new CopyWork(
-          fromURI.toString(), toDataPath.toString(), false), conf);
+          fromPath, toDataPath, false), conf);
       rootTasks.add(rTask);
       inputs.add(new ReadEntity(ts.tableHandle));
     }
-    outputs.add(new WriteEntity(toURI.toString(),
-        toURI.getScheme().equals("hdfs") ? true : false));
+    outputs.add(new WriteEntity(parentPath, toURI.getScheme().equals("hdfs")));
   }
 }

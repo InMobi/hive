@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde2.ByteStream.Output;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinaryUtils;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinaryUtils.VInt;
+import org.apache.hadoop.hive.serde2.typeinfo.HiveDecimalUtils;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableUtils;
 
@@ -81,7 +82,19 @@ public class HiveDecimalWritable implements WritableComparable<HiveDecimalWritab
   }
 
   public HiveDecimal getHiveDecimal() {
-    return new HiveDecimal(new BigInteger(internalStorage), scale);
+    return HiveDecimal.create(new BigInteger(internalStorage), scale);
+  }
+
+  /**
+   * Get a HiveDecimal instance from the writable and constraint it with maximum precision/scale.
+   *
+   * @param maxPrecision maximum precision
+   * @param maxScale maximum scale
+   * @return HiveDecimal instance
+   */
+  public HiveDecimal getHiveDecimal(int maxPrecision, int maxScale) {
+     return HiveDecimalUtils.enforcePrecisionScale(HiveDecimal.create(new BigInteger(internalStorage), scale),
+         maxPrecision, maxScale);
   }
 
   @Override

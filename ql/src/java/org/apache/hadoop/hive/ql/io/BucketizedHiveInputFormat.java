@@ -28,7 +28,9 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.FileInputFormat;
@@ -66,29 +68,34 @@ public class BucketizedHiveInputFormat<K extends WritableComparable, V extends W
       throw new IOException("cannot find class " + inputFormatClassName);
     }
 
-    // clone a jobConf for setting needed columns for reading
-    JobConf cloneJobConf = new JobConf(job);
-    pushProjectionsAndFilters(cloneJobConf, inputFormatClass, hsplit.getPath()
+    pushProjectionsAndFilters(job, inputFormatClass, hsplit.getPath()
         .toString(), hsplit.getPath().toUri().getPath());
 
-    InputFormat inputFormat = getInputFormatFromCache(inputFormatClass,
-        cloneJobConf);
-    BucketizedHiveRecordReader<K, V> rr= new BucketizedHiveRecordReader(inputFormat, hsplit, cloneJobConf,
+    InputFormat inputFormat = getInputFormatFromCache(inputFormatClass, job);
+
+    BucketizedHiveRecordReader<K, V> rr= new BucketizedHiveRecordReader(inputFormat, hsplit, job,
         reporter);
-    rr.initIOContext(hsplit, cloneJobConf, inputFormatClass);
+    rr.initIOContext(hsplit, job, inputFormatClass);
     return rr;
   }
 
-  protected FileStatus[] listStatus(JobConf job, Path path) throws IOException {
+  /**
+   * Recursively lists status for all files starting from the directory dir
+   * @param job
+   * @param dir
+   * @return
+   * @throws IOException
+   */
+  protected FileStatus[] listStatus(JobConf job, Path dir) throws IOException {
     ArrayList<FileStatus> result = new ArrayList<FileStatus>();
     List<IOException> errors = new ArrayList<IOException>();
 
-    FileSystem fs = path.getFileSystem(job);
-    FileStatus[] matches = fs.globStatus(path);
+    FileSystem fs = dir.getFileSystem(job);
+    FileStatus[] matches = fs.globStatus(dir);
     if (matches == null) {
-      errors.add(new IOException("Input path does not exist: " + path));
+      errors.add(new IOException("Input path does not exist: " + dir));
     } else if (matches.length == 0) {
-      errors.add(new IOException("Input Pattern " + path + " matches 0 files"));
+      errors.add(new IOException("Input Pattern " + dir + " matches 0 files"));
     } else {
       for (FileStatus globStat : matches) {
         FileUtils.listStatusRecursively(fs, globStat, result);
@@ -109,8 +116,23 @@ public class BucketizedHiveInputFormat<K extends WritableComparable, V extends W
 
     Path[] dirs = FileInputFormat.getInputPaths(job);
     if (dirs.length == 0) {
-      throw new IOException("No input paths specified in job");
+      // on tez we're avoiding to duplicate the file info in FileInputFormat.
+      if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) {
+        try {
+          List<Path> paths = Utilities.getInputPathsTez(job, mrwork);
+          dirs = paths.toArray(new Path[paths.size()]);
+          if (dirs.length == 0) {
+            // if we still don't have any files it's time to fail.
+            throw new IOException("No input paths specified in job");
+          }
+        } catch (Exception e) {
+          throw new IOException("Could not create input paths", e);
+        }
+      } else {
+        throw new IOException("No input paths specified in job");
+      }
     }
+
     JobConf newjob = new JobConf(job);
     ArrayList<InputSplit> result = new ArrayList<InputSplit>();
 

@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.persistence.RowContainer;
+import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.BucketMapJoinContext;
 import org.apache.hadoop.hive.ql.plan.FetchWork;
@@ -125,8 +126,8 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
 
     int bucketSize;
 
-    // For backwards compatibility reasons we honor the older 
-    // HIVEMAPJOINBUCKETCACHESIZE if set different from default. 
+    // For backwards compatibility reasons we honor the older
+    // HIVEMAPJOINBUCKETCACHESIZE if set different from default.
     // By hive 0.13 we should remove this code.
     int oldVar = HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVEMAPJOINBUCKETCACHESIZE);
     if (oldVar != 100) {
@@ -186,34 +187,29 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
       String alias = entry.getKey();
       FetchWork fetchWork = entry.getValue();
 
-      Operator<? extends OperatorDesc> forwardOp = aliasToWork.get(alias);
-      forwardOp.setExecContext(getExecContext());
+      JobConf jobClone = new JobConf(hconf);
 
-      JobConf jobClone = cloneJobConf(hconf, forwardOp);
+      TableScanOperator ts = (TableScanOperator)aliasToWork.get(alias);
+      // push down projections
+      ColumnProjectionUtils.appendReadColumns(
+          jobClone, ts.getNeededColumnIDs(), ts.getNeededColumns());
+      // push down filters
+      HiveInputFormat.pushFilters(jobClone, ts);
+
+
+      ts.setExecContext(getExecContext());
+
       FetchOperator fetchOp = new FetchOperator(fetchWork, jobClone);
-      forwardOp.initialize(jobClone, new ObjectInspector[]{fetchOp.getOutputObjectInspector()});
+      ts.initialize(jobClone, new ObjectInspector[]{fetchOp.getOutputObjectInspector()});
       fetchOp.clearFetchContext();
 
       DummyStoreOperator sinkOp = aliasToSinkWork.get(alias);
 
-      MergeQueue mergeQueue = new MergeQueue(alias, fetchWork, jobClone, forwardOp, sinkOp);
+      MergeQueue mergeQueue = new MergeQueue(alias, fetchWork, jobClone, ts, sinkOp);
 
       aliasToMergeQueue.put(alias, mergeQueue);
       l4j.info("fetch operators for " + alias + " initialized");
     }
-  }
-
-  private JobConf cloneJobConf(Configuration hconf, Operator<?> op) {
-    JobConf jobClone = new JobConf(hconf);
-    if (op instanceof TableScanOperator) {
-      List<Integer> list = ((TableScanOperator)op).getNeededColumnIDs();
-      if (list != null) {
-        ColumnProjectionUtils.appendReadColumnIDs(jobClone, list);
-      }
-    } else {
-      ColumnProjectionUtils.setFullyReadColumns(jobClone);
-    }
-    return jobClone;
   }
 
   private byte tagForAlias(String alias) {
@@ -229,6 +225,11 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
   @Override
   public void cleanUpInputFileChangedOp() throws HiveException {
     inputFileChanged = true;
+  }
+  
+  protected List<Object> smbJoinComputeKeys(Object row, byte alias) throws HiveException {
+    return JoinUtil.computeKeys(row, joinKeys[alias],
+          joinKeysObjectInspectors[alias]);
   }
 
   @Override
@@ -264,9 +265,9 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
     byte alias = (byte) tag;
 
     // compute keys and values as StandardObjects
-    ArrayList<Object> key = JoinUtil.computeKeys(row, joinKeys[alias],
-        joinKeysObjectInspectors[alias]);
-    ArrayList<Object> value = getFilteredValue(alias, row);
+    List<Object> key = smbJoinComputeKeys(row, alias); 
+        
+    List<Object> value = getFilteredValue(alias, row);
 
 
     //have we reached a new key group?
@@ -499,7 +500,7 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
     return smallestOne == null ? null : result;
   }
 
-  private boolean processKey(byte alias, ArrayList<Object> key)
+  private boolean processKey(byte alias, List<Object> key)
       throws HiveException {
     List<Object> keyWritable = keyWritables[alias];
     if (keyWritable == null) {
@@ -519,19 +520,19 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
   private void setUpFetchContexts(String alias, MergeQueue mergeQueue) throws HiveException {
     mergeQueue.clearFetchContext();
 
-    String currentInputFile = getExecContext().getCurrentInputFile();
+    Path currentInputPath = getExecContext().getCurrentInputPath();
 
     BucketMapJoinContext bucketMatcherCxt = localWork.getBucketMapjoinContext();
     Class<? extends BucketMatcher> bucketMatcherCls = bucketMatcherCxt.getBucketMatcherClass();
     BucketMatcher bucketMatcher = ReflectionUtils.newInstance(bucketMatcherCls, null);
 
-    getExecContext().setFileId(bucketMatcherCxt.createFileId(currentInputFile));
+    getExecContext().setFileId(bucketMatcherCxt.createFileId(currentInputPath.toString()));
     LOG.info("set task id: " + getExecContext().getFileId());
 
     bucketMatcher.setAliasBucketFileNameMapping(bucketMatcherCxt
         .getAliasBucketFileNameMapping());
 
-    List<Path> aliasFiles = bucketMatcher.getAliasBucketFiles(currentInputFile,
+    List<Path> aliasFiles = bucketMatcher.getAliasBucketFiles(currentInputPath.toString(),
         bucketMatcherCxt.getMapJoinBigTableAlias(), alias);
 
     mergeQueue.setupContext(aliasFiles);
@@ -554,7 +555,7 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
         fetchDone[tag] = true;
         return;
       }
-      forwardOp.process(row.o, tag);
+      forwardOp.processOp(row.o, tag);
       // check if any operator had a fatal error or early exit during
       // execution
       if (forwardOp.getDone()) {
@@ -799,7 +800,7 @@ public class SMBMapJoinOperator extends AbstractMapJoinOperator<SMBJoinDesc> imp
 
         // Pass the row though the operator tree. It is guaranteed that not more than 1 row can
         // be produced from a input row.
-        forwardOp.process(nextRow.o, 0);
+        forwardOp.processOp(nextRow.o, 0);
         nextRow = sinkOp.getResult();
 
         // It is possible that the row got absorbed in the operator tree.

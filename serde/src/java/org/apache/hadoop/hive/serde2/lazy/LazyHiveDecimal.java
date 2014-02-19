@@ -24,18 +24,32 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyHiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.HiveDecimalUtils;
 import org.apache.hadoop.io.Text;
 
 public class LazyHiveDecimal extends LazyPrimitive<LazyHiveDecimalObjectInspector, HiveDecimalWritable> {
   static final private Log LOG = LogFactory.getLog(LazyHiveDecimal.class);
 
+  private final int precision;
+  private final int scale;
+
   public LazyHiveDecimal(LazyHiveDecimalObjectInspector oi) {
     super(oi);
+    DecimalTypeInfo typeInfo = (DecimalTypeInfo)oi.getTypeInfo();
+    if (typeInfo == null) {
+      throw new RuntimeException("Decimal type used without type params");
+    }
+
+    precision = typeInfo.precision();
+    scale = typeInfo.scale();
     data = new HiveDecimalWritable();
   }
 
   public LazyHiveDecimal(LazyHiveDecimal copy) {
     super(copy);
+    precision = copy.precision;
+    scale = copy.scale;
     data = new HiveDecimalWritable(copy.data);
   }
 
@@ -52,20 +66,31 @@ public class LazyHiveDecimal extends LazyPrimitive<LazyHiveDecimalObjectInspecto
     String byteData = null;
     try {
       byteData = Text.decode(bytes.getData(), start, length);
-      data.set(new HiveDecimal(byteData));
-      isNull = false;
-    } catch (NumberFormatException e) {
-      isNull = true;
-      LOG.debug("Data not in the HiveDecimal data type range so converted to null. Given data is :"
-          + byteData, e);
     } catch (CharacterCodingException e) {
       isNull = true;
       LOG.debug("Data not in the HiveDecimal data type range so converted to null.", e);
+      return;
     }
+
+    HiveDecimal dec = HiveDecimal.create(byteData);
+    dec = enforcePrecisionScale(dec);
+    if (dec != null) {
+      data.set(dec);
+      isNull = false;
+    } else {
+      LOG.debug("Data not in the HiveDecimal data type range so converted to null. Given data is :"
+          + byteData);
+      isNull = true;
+    }
+  }
+
+  private HiveDecimal enforcePrecisionScale(HiveDecimal dec) {
+    return HiveDecimalUtils.enforcePrecisionScale(dec, precision, scale);
   }
 
   @Override
   public HiveDecimalWritable getWritableObject() {
     return data;
   }
+
 }

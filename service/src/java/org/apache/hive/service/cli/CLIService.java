@@ -40,12 +40,20 @@ import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.session.HiveSession;
 import org.apache.hive.service.cli.session.SessionManager;
+import org.apache.hive.service.cli.thrift.TProtocolVersion;
 
 /**
  * CLIService.
  *
  */
 public class CLIService extends CompositeService implements ICLIService {
+
+  public static final TProtocolVersion SERVER_VERSION;
+
+  static {
+    TProtocolVersion[] protocols = TProtocolVersion.values();
+    SERVER_VERSION = protocols[protocols.length - 1];
+  }
 
   private final Log LOG = LogFactory.getLog(CLIService.class.getName());
 
@@ -111,14 +119,30 @@ public class CLIService extends CompositeService implements ICLIService {
     return sessionManager;
   }
 
+  public SessionHandle openSession(TProtocolVersion protocol, String username, String password,
+      Map<String, String> configuration) throws HiveSQLException {
+    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, configuration, false, null);
+    LOG.debug(sessionHandle + ": openSession()");
+    return sessionHandle;
+  }
+
+  public SessionHandle openSessionWithImpersonation(TProtocolVersion protocol, String username,
+      String password, Map<String, String> configuration, String delegationToken)
+      throws HiveSQLException {
+    SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, configuration,
+        true, delegationToken);
+    LOG.debug(sessionHandle + ": openSession()");
+    return sessionHandle;
+  }
+
   /* (non-Javadoc)
    * @see org.apache.hive.service.cli.ICLIService#openSession(java.lang.String, java.lang.String, java.util.Map)
    */
   @Override
   public SessionHandle openSession(String username, String password, Map<String, String> configuration)
       throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(username, password, configuration, false, null);
-    LOG.info(sessionHandle + ": openSession()");
+    SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, configuration, false, null);
+    LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
   }
 
@@ -127,10 +151,10 @@ public class CLIService extends CompositeService implements ICLIService {
    */
   @Override
   public SessionHandle openSessionWithImpersonation(String username, String password, Map<String, String> configuration,
-      String delegationToken) throws HiveSQLException {
-    SessionHandle sessionHandle = sessionManager.openSession(username, password, configuration,
-        true, delegationToken);
-    LOG.info(sessionHandle + ": openSession()");
+       String delegationToken) throws HiveSQLException {
+    SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, configuration,
+          true, delegationToken);
+    LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
   }
 
@@ -141,7 +165,7 @@ public class CLIService extends CompositeService implements ICLIService {
   public void closeSession(SessionHandle sessionHandle)
       throws HiveSQLException {
     sessionManager.closeSession(sessionHandle);
-    LOG.info(sessionHandle + ": closeSession()");
+    LOG.debug(sessionHandle + ": closeSession()");
   }
 
   /* (non-Javadoc)
@@ -152,7 +176,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     GetInfoValue infoValue = sessionManager.getSession(sessionHandle)
         .getInfo(getInfoType);
-    LOG.info(sessionHandle + ": getInfo()");
+    LOG.debug(sessionHandle + ": getInfo()");
     return infoValue;
   }
 
@@ -165,8 +189,8 @@ public class CLIService extends CompositeService implements ICLIService {
       Map<String, String> confOverlay)
           throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
-        .executeStatement(statement, confOverlay, false);
-    LOG.info(sessionHandle + ": executeStatement()");
+        .executeStatement(statement, confOverlay);
+    LOG.debug(sessionHandle + ": executeStatement()");
     return opHandle;
   }
 
@@ -179,9 +203,10 @@ public class CLIService extends CompositeService implements ICLIService {
       Map<String, String> confOverlay) throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .executeStatementAsync(statement, confOverlay);
-    LOG.info(sessionHandle + ": executeStatementAsync()");
+    LOG.debug(sessionHandle + ": executeStatementAsync()");
     return opHandle;
   }
+
 
   /* (non-Javadoc)
    * @see org.apache.hive.service.cli.ICLIService#getTypeInfo(org.apache.hive.service.cli.SessionHandle)
@@ -191,7 +216,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getTypeInfo();
-    LOG.info(sessionHandle + ": getTypeInfo()");
+    LOG.debug(sessionHandle + ": getTypeInfo()");
     return opHandle;
   }
 
@@ -203,7 +228,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getCatalogs();
-    LOG.info(sessionHandle + ": getCatalogs()");
+    LOG.debug(sessionHandle + ": getCatalogs()");
     return opHandle;
   }
 
@@ -216,7 +241,7 @@ public class CLIService extends CompositeService implements ICLIService {
           throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getSchemas(catalogName, schemaName);
-    LOG.info(sessionHandle + ": getSchemas()");
+    LOG.debug(sessionHandle + ": getSchemas()");
     return opHandle;
   }
 
@@ -229,7 +254,7 @@ public class CLIService extends CompositeService implements ICLIService {
           throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getTables(catalogName, schemaName, tableName, tableTypes);
-    LOG.info(sessionHandle + ": getTables()");
+    LOG.debug(sessionHandle + ": getTables()");
     return opHandle;
   }
 
@@ -241,7 +266,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getTableTypes();
-    LOG.info(sessionHandle + ": getTableTypes()");
+    LOG.debug(sessionHandle + ": getTableTypes()");
     return opHandle;
   }
 
@@ -254,7 +279,7 @@ public class CLIService extends CompositeService implements ICLIService {
           throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getColumns(catalogName, schemaName, tableName, columnName);
-    LOG.info(sessionHandle + ": getColumns()");
+    LOG.debug(sessionHandle + ": getColumns()");
     return opHandle;
   }
 
@@ -267,7 +292,7 @@ public class CLIService extends CompositeService implements ICLIService {
           throws HiveSQLException {
     OperationHandle opHandle = sessionManager.getSession(sessionHandle)
         .getFunctions(catalogName, schemaName, functionName);
-    LOG.info(sessionHandle + ": getFunctions()");
+    LOG.debug(sessionHandle + ": getFunctions()");
     return opHandle;
   }
 
@@ -279,7 +304,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     OperationStatus opStatus = sessionManager.getOperationManager()
         .getOperationStatus(opHandle);
-    LOG.info(opHandle + ": getOperationStatus()");
+    LOG.debug(opHandle + ": getOperationStatus()");
     return opStatus;
   }
 
@@ -291,7 +316,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     sessionManager.getOperationManager().getOperation(opHandle)
         .getParentSession().cancelOperation(opHandle);
-    LOG.info(opHandle + ": cancelOperation()");
+    LOG.debug(opHandle + ": cancelOperation()");
   }
 
   /* (non-Javadoc)
@@ -302,7 +327,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     sessionManager.getOperationManager().getOperation(opHandle)
         .getParentSession().closeOperation(opHandle);
-    LOG.info(opHandle + ": closeOperation");
+    LOG.debug(opHandle + ": closeOperation");
   }
 
   /* (non-Javadoc)
@@ -313,7 +338,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     TableSchema tableSchema = sessionManager.getOperationManager()
         .getOperation(opHandle).getParentSession().getResultSetMetadata(opHandle);
-    LOG.info(opHandle + ": getResultSetMetadata()");
+    LOG.debug(opHandle + ": getResultSetMetadata()");
     return tableSchema;
   }
 
@@ -325,7 +350,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     RowSet rowSet = sessionManager.getOperationManager().getOperation(opHandle)
         .getParentSession().fetchResults(opHandle, orientation, maxRows);
-    LOG.info(opHandle + ": fetchResults()");
+    LOG.debug(opHandle + ": fetchResults()");
     return rowSet;
   }
 
@@ -337,7 +362,7 @@ public class CLIService extends CompositeService implements ICLIService {
       throws HiveSQLException {
     RowSet rowSet = sessionManager.getOperationManager().getOperation(opHandle)
         .getParentSession().fetchResults(opHandle);
-    LOG.info(opHandle + ": fetchResults()");
+    LOG.debug(opHandle + ": fetchResults()");
     return rowSet;
   }
 
@@ -346,7 +371,7 @@ public class CLIService extends CompositeService implements ICLIService {
       Map<String, String> confOverlay) throws HiveSQLException {
     HiveSession session = sessionManager.getSession(sessionHandle);
     String plan = session.getQueryPlan(statement, confOverlay);
-    LOG.info(sessionHandle + " : getQueryPlan()");
+    LOG.debug(sessionHandle + " : getQueryPlan()");
     return plan;
   }
 

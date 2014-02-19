@@ -25,6 +25,7 @@ import java.util.NavigableMap;
 import java.util.TreeMap;
 
 import org.antlr.runtime.TokenRewriteStream;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
 
 /**
@@ -42,8 +43,10 @@ class UnparseTranslator {
   private final NavigableMap<Integer, Translation> translations;
   private final List<CopyTranslation> copyTranslations;
   private boolean enabled;
+  private Configuration conf;
 
-  public UnparseTranslator() {
+  public UnparseTranslator(Configuration conf) {
+    this.conf = conf;
     translations = new TreeMap<Integer, Translation>();
     copyTranslations = new ArrayList<CopyTranslation>();
   }
@@ -152,12 +155,12 @@ class UnparseTranslator {
     else {
       // transform the table reference to an absolute reference (i.e., "db.table")
       StringBuilder replacementText = new StringBuilder();
-      replacementText.append(HiveUtils.unparseIdentifier(currentDatabaseName));
+      replacementText.append(HiveUtils.unparseIdentifier(currentDatabaseName, conf));
       replacementText.append('.');
 
       ASTNode identifier = (ASTNode)tableName.getChild(0);
       String identifierText = BaseSemanticAnalyzer.unescapeIdentifier(identifier.getText());
-      replacementText.append(HiveUtils.unparseIdentifier(identifierText));
+      replacementText.append(HiveUtils.unparseIdentifier(identifierText, conf));
 
       addTranslation(identifier, replacementText.toString());
     }
@@ -176,7 +179,7 @@ class UnparseTranslator {
     assert (identifier.getToken().getType() == HiveParser.Identifier);
     String replacementText = identifier.getText();
     replacementText = BaseSemanticAnalyzer.unescapeIdentifier(replacementText);
-    replacementText = HiveUtils.unparseIdentifier(replacementText);
+    replacementText = HiveUtils.unparseIdentifier(replacementText, conf);
     addTranslation(identifier, replacementText);
   }
 
@@ -215,10 +218,13 @@ class UnparseTranslator {
    */
   void applyTranslations(TokenRewriteStream tokenRewriteStream) {
     for (Map.Entry<Integer, Translation> entry : translations.entrySet()) {
-      tokenRewriteStream.replace(
-        entry.getKey(),
-        entry.getValue().tokenStopIndex,
-        entry.getValue().replacementText);
+      if (entry.getKey() > 0) { // negative means the key didn't exist in the original 
+                                // stream (i.e.: we changed the tree)
+        tokenRewriteStream.replace(
+           entry.getKey(),
+           entry.getValue().tokenStopIndex,
+           entry.getValue().replacementText);
+      }
     }
     for (CopyTranslation copyTranslation : copyTranslations) {
       String replacementText = tokenRewriteStream.toString(

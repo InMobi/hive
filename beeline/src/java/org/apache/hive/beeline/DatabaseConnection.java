@@ -30,6 +30,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -37,6 +39,11 @@ import jline.ArgumentCompletor;
 import jline.Completor;
 
 class DatabaseConnection {
+  private static final String HIVE_AUTH_USER = "user";
+  private static final String HIVE_AUTH_PASSWD = "password";
+  private static final String HIVE_VAR_PREFIX = "hivevar:";
+  private static final String HIVE_CONF_PREFIX = "hiveconf:";
+
   private final BeeLine beeLine;
   private Connection connection;
   private DatabaseMetaData meta;
@@ -52,11 +59,10 @@ class DatabaseConnection {
       String username, String password) throws SQLException {
     this.beeLine = beeLine;
     this.driver = driver;
-    this.url = url;
     this.username = username;
     this.password = password;
+    this.url = url;
   }
-
 
   @Override
   public String toString() {
@@ -127,7 +133,20 @@ class DatabaseConnection {
       return beeLine.error(e);
     }
 
-    setConnection(DriverManager.getConnection(getUrl(), username, password));
+    Properties info = new Properties();
+    info.put(HIVE_AUTH_USER, username);
+    info.put(HIVE_AUTH_PASSWD, password);
+    Map<String, String> hiveVars = beeLine.getOpts().getHiveVariables();
+    for (Map.Entry<String, String> var : hiveVars.entrySet()) {
+      info.put(HIVE_VAR_PREFIX + var.getKey(), var.getValue());
+    }
+
+    Map<String, String> hiveConfVars = beeLine.getOpts().getHiveConfVariables();
+    for (Map.Entry<String, String> var : hiveConfVars.entrySet()) {
+      info.put(HIVE_CONF_PREFIX + var.getKey(), var.getValue());
+    }
+
+    setConnection(DriverManager.getConnection(getUrl(), info));
     setDatabaseMetaData(getConnection().getMetaData());
 
     try {

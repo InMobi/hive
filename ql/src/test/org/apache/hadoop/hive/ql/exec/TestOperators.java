@@ -29,6 +29,7 @@ import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.io.IOContext;
 import org.apache.hadoop.hive.ql.parse.TypeCheckProcFactory;
 import org.apache.hadoop.hive.ql.plan.CollectDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
@@ -116,7 +117,7 @@ public class TestOperators extends TestCase {
           new ObjectInspector[] {r[0].oi});
 
       for (InspectableObject oner : r) {
-        op.process(oner.o, 0);
+        op.processOp(oner.o, 0);
       }
 
       Map<Enum<?>, Long> results = op.getStats();
@@ -277,7 +278,7 @@ public class TestOperators extends TestCase {
 
       // evaluate on row
       for (int i = 0; i < 5; i++) {
-        op.process(r[i].o, 0);
+        op.processOp(r[i].o, 0);
       }
       op.close(false);
 
@@ -313,6 +314,7 @@ public class TestOperators extends TestCase {
       Configuration hconf = new JobConf(TestOperators.class);
       HiveConf.setVar(hconf, HiveConf.ConfVars.HADOOPMAPFILENAME,
           "hdfs:///testDir/testFile");
+      IOContext.get().setInputPath(new Path("hdfs:///testDir/testFile"));
 
       // initialize pathToAliases
       ArrayList<String> aliases = new ArrayList<String>();

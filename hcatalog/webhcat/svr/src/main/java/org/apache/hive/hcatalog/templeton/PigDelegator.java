@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.exec.ExecuteException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hive.hcatalog.templeton.tool.JobSubmissionConstants;
 import org.apache.hive.hcatalog.templeton.tool.TempletonControllerJob;
 import org.apache.hive.hcatalog.templeton.tool.TempletonUtils;
 
@@ -36,6 +39,7 @@ import org.apache.hive.hcatalog.templeton.tool.TempletonUtils;
  * This is the backend of the pig web service.
  */
 public class PigDelegator extends LauncherDelegator {
+  private static final Log LOG = LogFactory.getLog(PigDelegator.class);
   public PigDelegator(AppConfig appConf) {
     super(appConf);
   }
@@ -43,39 +47,79 @@ public class PigDelegator extends LauncherDelegator {
   public EnqueueBean run(String user, Map<String, Object> userArgs,
                String execute, String srcFile,
                List<String> pigArgs, String otherFiles,
-               String statusdir, String callback, String completedUrl, boolean enablelog)
+               String statusdir, String callback, 
+               boolean usesHcatalog, String completedUrl, boolean enablelog)
     throws NotAuthorizedException, BadParam, BusyException, QueueException,
     ExecuteException, IOException, InterruptedException {
     runAs = user;
     List<String> args = makeArgs(execute,
       srcFile, pigArgs,
-      otherFiles, statusdir, completedUrl, enablelog);
+      otherFiles, statusdir, usesHcatalog, completedUrl, enablelog);
 
     return enqueueController(user, userArgs, callback, args);
   }
 
+  /**
+   * @param execute pig query string to be executed
+   * @param srcFile pig query file to be executed
+   * @param pigArgs pig command line arguments
+   * @param otherFiles  files to be copied to the map reduce cluster
+   * @param statusdir status dir location
+   * @param usesHcatalog whether the command uses hcatalog/needs to connect
+   *         to hive metastore server
+   * @param completedUrl call back url
+   * @return list of arguments
+   * @throws BadParam
+   * @throws IOException
+   * @throws InterruptedException
+   */
   private List<String> makeArgs(String execute, String srcFile,
                   List<String> pigArgs, String otherFiles,
-                  String statusdir, String completedUrl, boolean enablelog)
+                  String statusdir, boolean usesHcatalog,
+                  String completedUrl, boolean enablelog)
     throws BadParam, IOException, InterruptedException {
     ArrayList<String> args = new ArrayList<String>();
+    //check if the REST command specified explicitly to use hcatalog
+    // or if it says that implicitly using the pig -useHCatalog arg
+    boolean needsMetastoreAccess = usesHcatalog || hasPigArgUseHcat(pigArgs);
+    
     try {
       ArrayList<String> allFiles = new ArrayList<String>();
-      if (TempletonUtils.isset(srcFile))
-        allFiles.add(TempletonUtils.hadoopFsFilename
-          (srcFile, appConf, runAs));
+      if (TempletonUtils.isset(srcFile)) {
+        allFiles.add(TempletonUtils.hadoopFsFilename(srcFile, appConf, runAs));
+      }
       if (TempletonUtils.isset(otherFiles)) {
         String[] ofs = TempletonUtils.hadoopFsListAsArray(otherFiles, appConf, runAs);
         allFiles.addAll(Arrays.asList(ofs));
       }
 
       args.addAll(makeLauncherArgs(appConf, statusdir, completedUrl, allFiles, enablelog, JobType.PIG));
-      if (appConf.pigArchive() != null && !appConf.pigArchive().equals(""))
-      {
-        args.add("-archives");
-        args.add(appConf.pigArchive());
+      boolean shipPigTar = appConf.pigArchive() != null && !appConf.pigArchive().equals("");
+      boolean shipHiveTar = needsMetastoreAccess && appConf.hiveArchive() != null 
+              && !appConf.hiveArchive().equals("");
+      if(shipPigTar || shipHiveTar) {
+        args.add(ARCHIVES);
+        StringBuilder archives = new StringBuilder();
+        if(shipPigTar) {
+          archives.append(appConf.pigArchive());
+        }
+        if(shipPigTar && shipHiveTar) {
+          archives.append(",");
+        }
+        if(shipHiveTar) {
+          archives.append(appConf.hiveArchive());
+        }
+        args.add(archives.toString());
       }
-
+      if(shipHiveTar) {
+        addDef(args, JobSubmissionConstants.PigConstants.HIVE_HOME,
+                appConf.get(AppConfig.HIVE_HOME_PATH));
+        addDef(args, JobSubmissionConstants.PigConstants.HCAT_HOME,  
+                appConf.get(AppConfig.HCAT_HOME_PATH));
+        //Pig which uses HCat will pass this to HCat so that it can find the metastore
+        addDef(args, JobSubmissionConstants.PigConstants.PIG_OPTS, 
+                appConf.get(AppConfig.HIVE_PROPS_NAME));
+      }
       args.add("--");
       TempletonUtils.addCmdForWindows(args);
       args.add(appConf.pigPath());
@@ -85,6 +129,10 @@ public class PigDelegator extends LauncherDelegator {
       for (String pigArg : pigArgs) {
         args.add(TempletonUtils.quoteForWindows(pigArg));
       }
+      if(needsMetastoreAccess) {
+        addHiveMetaStoreTokenArg();
+      }
+      
       if (TempletonUtils.isset(execute)) {
         args.add("-execute");
         args.add(TempletonUtils.quoteForWindows(execute));
@@ -100,5 +148,13 @@ public class PigDelegator extends LauncherDelegator {
     }
 
     return args;
+  }
+
+  /**
+   * Check if the pig arguments has -useHCatalog set
+   * see http://hive.apache.org/docs/hcat_r0.5.0/loadstore.pdf
+   */
+  private boolean hasPigArgUseHcat(List<String> pigArgs) {
+    return pigArgs.contains("-useHCatalog");
   }
 }

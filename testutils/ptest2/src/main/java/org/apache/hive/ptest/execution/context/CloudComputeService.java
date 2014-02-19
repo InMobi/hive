@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 
+import org.jclouds.Constants;
 import org.jclouds.ContextBuilder;
 import org.jclouds.aws.ec2.compute.AWSEC2TemplateOptions;
 import org.jclouds.compute.ComputeService;
@@ -35,6 +36,7 @@ import org.jclouds.compute.domain.Template;
 import org.jclouds.logging.log4j.config.Log4JLoggingModule;
 
 import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
@@ -58,11 +60,13 @@ public class CloudComputeService {
     mMaxBid = maxBid;
     mGroupTag = "group=" + mGroupName;
     Properties overrides = new Properties();
-    overrides.put(ComputeServiceProperties.POLL_INITIAL_PERIOD, String.valueOf(10L * 1000L));
-    overrides.put(ComputeServiceProperties.POLL_MAX_PERIOD, String.valueOf(30L * 1000L));
+    overrides.put(ComputeServiceProperties.POLL_INITIAL_PERIOD, String.valueOf(60L * 1000L));
+    overrides.put(ComputeServiceProperties.POLL_MAX_PERIOD, String.valueOf(600L * 1000L));
+    overrides.put(Constants.PROPERTY_MAX_RETRIES, String.valueOf(60));
     mComputeServiceContext = ContextBuilder.newBuilder("aws-ec2")
         .credentials(apiKey, accessKey)
         .modules(ImmutableSet.of(new Log4JLoggingModule()))
+        .overrides(overrides)
         .buildView(ComputeServiceContext.class);
     mComputeService = mComputeServiceContext.getComputeService();
   }
@@ -77,18 +81,32 @@ public class CloudComputeService {
     result.addAll(mComputeService.createNodesInGroup(mGroupName, count, template));
     return result;
   }
+  static Predicate<ComputeMetadata> createFilterPTestPredicate(final String groupName,
+      final String groupTag) {
+    return new Predicate<ComputeMetadata>() {
+      @Override
+      public boolean apply(ComputeMetadata computeMetadata) {
+        NodeMetadata nodeMetadata = (NodeMetadata) computeMetadata;
+        return nodeMetadata.getStatus() == Status.RUNNING && isPTestHost(nodeMetadata);
+      }
+      private boolean isPTestHost(NodeMetadata node) {
+        if(groupName.equalsIgnoreCase(node.getGroup())) {
+          return true;
+        }
+        if(Strings.nullToEmpty(node.getName()).startsWith(groupName)) {
+          return true;
+        }
+        if(node.getTags().contains(groupTag)) {
+          return true;
+        }
+        return false;
+      }
+    };
+  }
   public Set<NodeMetadata> listRunningNodes(){
     Set<NodeMetadata> result = Sets.newHashSet();
-    result.addAll(mComputeService
-        .listNodesDetailsMatching(new Predicate<ComputeMetadata>() {
-          @Override
-          public boolean apply(ComputeMetadata computeMetadata) {
-            NodeMetadata nodeMetadata = (NodeMetadata) computeMetadata;
-            return nodeMetadata.getStatus() == Status.RUNNING
-                && (mGroupName.equalsIgnoreCase(nodeMetadata.getGroup()) ||
-                    nodeMetadata.getTags().contains(mGroupTag));
-          }
-        }));
+    result.addAll(mComputeService.listNodesDetailsMatching(
+        createFilterPTestPredicate(mGroupName, mGroupTag)));
     return result;
   }
   public void destroyNode(String nodeId) {

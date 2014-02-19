@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.metastore;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import junit.framework.Assert;
 
@@ -27,6 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.Index;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
@@ -51,6 +53,7 @@ import org.apache.hadoop.hive.metastore.model.MPartitionPrivilege;
 import org.apache.hadoop.hive.metastore.model.MRoleMap;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
+import org.apache.thrift.TException;
 
 /**
  *
@@ -329,6 +332,12 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
+  public boolean getPartitionsByExpr(String dbName, String tblName, byte[] expr,
+      String defaultPartitionName, short maxParts, List<Partition> result) throws TException {
+    return false;
+  }
+
+  @Override
   public Table markPartitionForEvent(String dbName, String tblName, Map<String, String> partVals,
       PartitionEventType evtType) throws MetaException, UnknownTableException,
       InvalidPartitionException, UnknownPartitionException {
@@ -561,11 +570,70 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public ColumnStatistics getTableColumnStatistics(String dbName, String tableName, String colName)
-      throws MetaException, NoSuchObjectException {
+  public List<HiveObjectPrivilege> listPrincipalDBGrantsAll(
+      String principalName, PrincipalType principalType) {
     return null;
   }
 
+  @Override
+  public List<HiveObjectPrivilege> listPrincipalTableGrantsAll(
+      String principalName, PrincipalType principalType) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listPrincipalPartitionGrantsAll(
+      String principalName, PrincipalType principalType) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listPrincipalTableColumnGrantsAll(
+      String principalName, PrincipalType principalType) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listPrincipalPartitionColumnGrantsAll(
+      String principalName, PrincipalType principalType) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listGlobalGrantsAll() {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listDBGrantsAll(String dbName) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listPartitionColumnGrantsAll(String dbName, String tableName, String partitionName, String columnName) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listTableGrantsAll(String dbName, String tableName) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listPartitionGrantsAll(String dbName, String tableName, String partitionName) {
+    return null;
+  }
+
+  @Override
+  public List<HiveObjectPrivilege> listTableColumnGrantsAll(String dbName, String tableName, String columnName) {
+    return null;
+  }
+
+  @Override
+  public  ColumnStatistics getTableColumnStatistics(String dbName, String tableName,
+      List<String> colName) throws MetaException, NoSuchObjectException {
+    return null;
+  }
 
   @Override
   public boolean deleteTableColumnStatistics(String dbName, String tableName,
@@ -581,13 +649,6 @@ public class DummyRawStoreForJdoConnection implements RawStore {
     InvalidInputException {
     return false;
 
-  }
-
-  @Override
-  public ColumnStatistics getPartitionColumnStatistics(String dbName, String tableName,
-    String partName, List<String> partVal, String colName) throws MetaException,
-    NoSuchObjectException, InvalidInputException, InvalidObjectException  {
-    return null;
   }
 
   @Override
@@ -612,6 +673,29 @@ public class DummyRawStoreForJdoConnection implements RawStore {
 
   @Override
   public void setMetaStoreSchemaVersion(String version, String comment) throws MetaException {
+  }
+
+  @Override
+  public List<ColumnStatistics> getPartitionColumnStatistics(String dbName,
+      String tblName, List<String> colNames, List<String> partNames)
+      throws MetaException, NoSuchObjectException {
+    return null;
+  }
+
+  @Override
+  public boolean doesPartitionExist(String dbName, String tableName,
+      List<String> partVals) throws MetaException, NoSuchObjectException {
+    return false;
+  }
+
+  @Override
+  public boolean addPartitions(String dbName, String tblName, List<Partition> parts)
+      throws InvalidObjectException, MetaException {
+    return false;
+  }
+
+  @Override
+  public void dropPartitions(String dbName, String tblName, List<String> partNames) {
   }
 }
 

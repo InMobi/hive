@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hive.cli;
 
+import static org.apache.hadoop.util.StringUtils.stringifyException;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -25,6 +27,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -64,7 +67,6 @@ import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.service.HiveClient;
 import org.apache.hadoop.hive.service.HiveServerException;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.thrift.TException;
 
@@ -96,6 +98,7 @@ public class CliDriver {
 
   public int processCmd(String cmd) {
     CliSessionState ss = (CliSessionState) SessionState.get();
+    ss.setLastCommand(cmd);
     // Flush the print stream, so it doesn't include output from the last command
     ss.err.flush();
     String cmd_trimmed = cmd.trim();
@@ -122,7 +125,7 @@ public class CliDriver {
           this.processFile(cmd_1);
         } catch (IOException e) {
           console.printError("Failed processing file "+ cmd_1 +" "+ e.getLocalizedMessage(),
-            org.apache.hadoop.util.StringUtils.stringifyException(e));
+            stringifyException(e));
           ret = 1;
         }
       }
@@ -146,7 +149,7 @@ public class CliDriver {
         }
       } catch (Exception e) {
         console.printError("Exception raised from Shell command " + e.getLocalizedMessage(),
-            org.apache.hadoop.util.StringUtils.stringifyException(e));
+            stringifyException(e));
         ret = 1;
       }
 
@@ -212,8 +215,14 @@ public class CliDriver {
         }
       }
     } else { // local mode
-      CommandProcessor proc = CommandProcessorFactory.get(tokens[0], (HiveConf) conf);
-      ret = processLocalCmd(cmd, proc, ss);
+      try {
+        CommandProcessor proc = CommandProcessorFactory.get(tokens, (HiveConf) conf);
+        ret = processLocalCmd(cmd, proc, ss);
+      } catch (SQLException e) {
+        console.printError("Failed processing command " + tokens[0] + " " + e.getLocalizedMessage(),
+          org.apache.hadoop.util.StringUtils.stringifyException(e));
+        ret = 1;
+      }
     }
 
     return ret;
@@ -262,10 +271,15 @@ public class CliDriver {
               return ret;
             }
 
+            // query has run capture the time
+            long end = System.currentTimeMillis();
+            double timeTaken = (end - start) / 1000.0;
+
             ArrayList<String> res = new ArrayList<String>();
 
             printHeader(qp, out);
 
+            // print the results
             int counter = 0;
             try {
               while (qp.getResults(res)) {
@@ -290,11 +304,8 @@ public class CliDriver {
               ret = cret;
             }
 
-            long end = System.currentTimeMillis();
-            double timeTaken = (end - start) / 1000.0;
             console.printInfo("Time taken: " + timeTaken + " seconds" +
                 (counter == 0 ? "" : ", Fetched: " + counter + " row(s)"));
-
           } else {
             String firstToken = tokenizeCmd(cmd.trim())[0];
             String cmd_1 = getFirstCmd(cmd.trim(), firstToken.length());
@@ -570,8 +581,9 @@ public class CliDriver {
     // We stack a custom Completor on top of our ArgumentCompletor
     // to reverse this.
     Completor completor = new Completor () {
+      @Override
       public int complete (String buffer, int offset, List completions) {
-        List<String> comp = (List<String>) completions;
+        List<String> comp = completions;
         int ret = ac.complete(buffer, offset, completions);
         // ConsoleReader will do the substitution if and only if there
         // is exactly one valid completion, so we ignore other cases.
@@ -707,7 +719,7 @@ public class CliDriver {
     }
 
     // CLI remote mode is a thin client: only load auxJars in local mode
-    if (!ss.isRemoteMode() && !ShimLoader.getHadoopShims().usesJobShell()) {
+    if (!ss.isRemoteMode()) {
       // hadoop-20 and above - we need to augment classpath using hiveconf
       // components
       // see also: code in ExecDriver.java

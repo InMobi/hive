@@ -32,9 +32,15 @@ import org.apache.hcatalog.hbase.snapshot.transaction.thrift.StoreFamilyRevision
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TestRevisionManager extends SkeletonHBaseTest {
+
+  @BeforeClass
+  public static void setup() throws Throwable {
+    setupSkeletonHBaseTest();
+  }
 
   @Test
   public void testBasicZNodeCreation() throws IOException, KeeperException, InterruptedException {
@@ -204,7 +210,7 @@ public class TestRevisionManager extends SkeletonHBaseTest {
     String tableName = newTableName("testTable");
     List<String> columnFamilies = Arrays.asList("cf1", "cf2");
     Transaction txn = manager.beginWriteTransaction(tableName,
-      columnFamilies, 40);
+      columnFamilies, 40L);
     Thread.sleep(100);
     try {
       manager.commitWriteTransaction(txn);

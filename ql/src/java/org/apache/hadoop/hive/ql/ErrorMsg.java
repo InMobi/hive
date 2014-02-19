@@ -45,7 +45,7 @@ public enum ErrorMsg {
   // 30000 to 39999: Runtime errors which Hive thinks may be transient and retrying may succeed.
   // 40000 to 49999: Errors where Hive is unable to advise about retries.
   // In addition to the error code, ErrorMsg also has a SQLState field.
-  // SQLStates are taken from Section 12.5 of ISO-9075.
+  // SQLStates are taken from Section 22.1 of ISO-9075.
   // See http://www.contrib.andrew.cmu.edu/~shadow/sql/sql1992.txt
   // Most will just rollup to the generic syntax error state of 42000, but
   // specific errors can override the that state.
@@ -53,6 +53,7 @@ public enum ErrorMsg {
   // http://dev.mysql.com/doc/refman/5.0/en/connector-j-reference-error-sqlstates.html
   GENERIC_ERROR(40000, "Exception while processing"),
 
+  //========================== 10000 range starts here ========================//
   INVALID_TABLE(10001, "Table not found", "42S02"),
   INVALID_COLUMN(10002, "Invalid column reference"),
   INVALID_INDEX(10003, "Invalid index"),
@@ -363,7 +364,18 @@ public enum ErrorMsg {
   INVALID_BIGTABLE_MAPJOIN(10246, "{0} table chosen for streaming is not valid", true),
   MISSING_OVER_CLAUSE(10247, "Missing over clause for function : "),
   PARTITION_SPEC_TYPE_MISMATCH(10248, "Cannot add partition column {0} of type {1} as it cannot be converted to type {2}", true),
+  UNSUPPORTED_SUBQUERY_EXPRESSION(10249, "Unsupported SubQuery Expression"),
+  INVALID_SUBQUERY_EXPRESSION(10250, "Invalid SubQuery expression"),
 
+  INVALID_HDFS_URI(10251, "{0} is not a hdfs uri", true),
+  INVALID_DIR(10252, "{0} is not a directory", true),
+  NO_VALID_LOCATIONS(10253, "Could not find any valid location to place the jars. " +
+  "Please update hive.jar.directory or hive.user.install.directory with a valid location", false),
+  UNNSUPPORTED_AUTHORIZATION_PRINCIPAL_TYPE_GROUP(10254,
+      "Principal type GROUP is not supported in this authorization setting", "28000"),
+  INVALID_TABLE_NAME(10255, "Invalid table name {0}", true),
+
+  //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),
   SCRIPT_IO_ERROR(20001, "An error occurred while reading or writing to your custom script. "
       + "It may have crashed with an error."),
@@ -371,7 +383,11 @@ public enum ErrorMsg {
       + "running your custom script."),
   SCRIPT_CLOSING_ERROR(20003, "An error occurred when trying to close the Operator " +
       "running your custom script."),
+  DYNAMIC_PARTITIONS_TOO_MANY_PER_NODE_ERROR(20004, "Fatal error occurred when node " +
+      "tried to create too many dynamic partitions. The maximum number of dynamic partitions " +
+      "is controlled by hive.exec.max.dynamic.partitions and hive.exec.max.dynamic.partitions.pernode. "),
 
+  //========================== 30000 range starts here ========================//
   STATSPUBLISHER_NOT_OBTAINED(30000, "StatsPublisher cannot be obtained. " +
     "There was a error to retrieve the StatsPublisher, and retrying " +
     "might help. If you dont want the query to fail because accurate statistics " +
@@ -404,7 +420,19 @@ public enum ErrorMsg {
   COLUMNSTATSCOLLECTOR_PARSE_ERROR(30009, "Encountered parse error while parsing rewritten query"),
   COLUMNSTATSCOLLECTOR_IO_ERROR(30010, "Encountered I/O exception while parsing rewritten query"),
   DROP_COMMAND_NOT_ALLOWED_FOR_PARTITION(30011, "Partition protected from being dropped"),
-    ;
+  COLUMNSTATSCOLLECTOR_INVALID_COLUMN(30012, "Column statistics are not supported "
+      + "for partition columns"),
+
+  STATISTICS_CLONING_FAILED(30013, "Cloning of statistics failed"),
+
+  STATSAGGREGATOR_SOURCETASK_NULL(30014, "SourceTask of StatsTask should not be null"),
+  STATSAGGREGATOR_CONNECTION_ERROR(30015,
+      "Stats aggregator of type {0} cannot be connected to", true),
+  STATSAGGREGATOR_MISSED_SOMESTATS(30016,
+      "Stats type {0} is missing from stats aggregator. If you don't want the query " +
+      "to fail because of this, set hive.stats.atomic=false", true),
+  STATS_SKIPPING_BY_ERROR(30017, "Skipping stats aggregation by error {0}", true);
+  ;
 
   private int errorCode;
   private String mesg;
@@ -657,6 +685,10 @@ public enum ErrorMsg {
 
   public String getErrorCodedMsg() {
     return "[Error " + errorCode + "]: " + mesg;
+  }
+
+  public String getErrorCodedMsg(String... reasons) {
+    return "[Error " + errorCode + "]: " + format(reasons);
   }
 
   public static Pattern getErrorCodePattern() {

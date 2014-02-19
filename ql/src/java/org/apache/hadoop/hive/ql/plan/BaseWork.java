@@ -19,10 +19,13 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
 
+import org.apache.hadoop.hive.ql.exec.HashTableDummyOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 
 /**
@@ -32,7 +35,21 @@ import org.apache.hadoop.hive.ql.exec.Operator;
 @SuppressWarnings({"serial", "deprecation"})
 public abstract class BaseWork extends AbstractOperatorDesc {
 
+  // dummyOps is a reference to all the HashTableDummy operators in the
+  // plan. These have to be separately initialized when we setup a task.
+  // Their funtion is mainly as root ops to give the mapjoin the correct
+  // schema info.
+  List<HashTableDummyOperator> dummyOps;
+
+  public BaseWork() {}
+
+  public BaseWork(String name) {
+    setName(name);
+  }
+
   private boolean gatheringStats;
+
+  private String name;
 
   public void setGatheringStats(boolean gatherStats) {
     this.gatheringStats = gatherStats;
@@ -42,22 +59,48 @@ public abstract class BaseWork extends AbstractOperatorDesc {
     return this.gatheringStats;
   }
 
-  protected abstract List<Operator<?>> getAllRootOperators();
+  public String getName() {
+    return name;
+  }
 
-  public List<Operator<?>> getAllOperators() {
+  public void setName(String name) {
+    this.name = name;
+  }
 
-    List<Operator<?>> returnList = new ArrayList<Operator<?>>();
-    List<Operator<?>> opList = getAllRootOperators();
+  public List<HashTableDummyOperator> getDummyOps() {
+    return dummyOps;
+  }
 
-    //recursively add all children
-    while (!opList.isEmpty()) {
-      Operator<?> op = opList.remove(0);
+  public void setDummyOps(List<HashTableDummyOperator> dummyOps) {
+    this.dummyOps = dummyOps;
+  }
+
+  public void addDummyOp(HashTableDummyOperator dummyOp) {
+    if (dummyOps == null) {
+      dummyOps = new LinkedList<HashTableDummyOperator>();
+    }
+    dummyOps.add(dummyOp);
+  }
+
+  protected abstract Set<Operator<?>> getAllRootOperators();
+
+  public Set<Operator<?>> getAllOperators() {
+
+    Set<Operator<?>> returnSet = new LinkedHashSet<Operator<?>>();
+    Set<Operator<?>> opSet = getAllRootOperators();
+    Stack<Operator<?>> opStack = new Stack<Operator<?>>();
+
+    // add all children
+    opStack.addAll(opSet);
+    
+    while(!opStack.empty()) {
+      Operator<?> op = opStack.pop();
+      returnSet.add(op);
       if (op.getChildOperators() != null) {
-        opList.addAll(op.getChildOperators());
+        opStack.addAll(op.getChildOperators());
       }
-      returnList.add(op);
     }
 
-    return returnList;
+    return returnSet;
   }
 }

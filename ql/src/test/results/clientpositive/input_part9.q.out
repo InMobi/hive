@@ -5,7 +5,44 @@ POSTHOOK: query: EXPLAIN EXTENDED
 SELECT x.* FROM SRCPART x WHERE key IS NOT NULL AND ds = '2008-04-08' order by x.key, x.hr
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME SRCPART) x)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_ALLCOLREF (TOK_TABNAME x)))) (TOK_WHERE (AND (TOK_FUNCTION TOK_ISNOTNULL (TOK_TABLE_OR_COL key)) (= (TOK_TABLE_OR_COL ds) '2008-04-08'))) (TOK_ORDERBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL x) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL x) hr)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            SRCPART
+         x
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_ALLCOLREF
+               TOK_TABNAME
+                  x
+      TOK_WHERE
+         AND
+            TOK_FUNCTION
+               TOK_ISNOTNULL
+               TOK_TABLE_OR_COL
+                  key
+            =
+               TOK_TABLE_OR_COL
+                  ds
+               '2008-04-08'
+      TOK_ORDERBY
+         TOK_TABSORTCOLNAMEASC
+            .
+               TOK_TABLE_OR_COL
+                  x
+               key
+         TOK_TABSORTCOLNAMEASC
+            .
+               TOK_TABLE_OR_COL
+                  x
+               hr
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -14,44 +51,25 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        x 
+      Map Operator Tree:
           TableScan
             alias: x
+            Statistics: Num rows: 58 Data size: 11624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: key is not null
-                  type: boolean
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-                      expr: ds
-                      type: string
-                      expr: hr
-                      type: string
+                expressions: key (type: string), value (type: string), ds (type: string), hr (type: string)
                 outputColumnNames: _col0, _col1, _col2, _col3
+                Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: string
-                        expr: _col3
-                        type: string
+                  key expressions: _col0 (type: string), _col3 (type: string)
                   sort order: ++
+                  Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
                   tag: -1
-                  value expressions:
-                        expr: _col0
-                        type: string
-                        expr: _col1
-                        type: string
-                        expr: _col2
-                        type: string
-                        expr: _col3
-                        type: string
+                  value expressions: _col0 (type: string), _col1 (type: string), _col2 (type: string), _col3 (type: string)
       Path -> Alias:
 #### A masked pattern was here ####
       Path -> Partition:
@@ -64,6 +82,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -88,15 +107,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.srcpart
-                numFiles 4
-                numPartitions 4
-                numRows 0
                 partition_columns ds/hr
-                rawDataSize 0
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 23248
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.srcpart
@@ -110,6 +124,7 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
@@ -134,15 +149,10 @@ STAGE PLANS:
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.srcpart
-                numFiles 4
-                numPartitions 4
-                numRows 0
                 partition_columns ds/hr
-                rawDataSize 0
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                totalSize 23248
 #### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
               name: default.srcpart
@@ -153,11 +163,13 @@ STAGE PLANS:
       Needs Tagging: false
       Reduce Operator Tree:
         Extract
+          Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
             GlobalTableId: 0
 #### A masked pattern was here ####
             NumFilesPerFileSink: 1
+            Statistics: Num rows: 29 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
@@ -168,6 +180,8 @@ STAGE PLANS:
                   escape.delim \
                   hive.serialization.extend.nesting.levels true
                   serialization.format 1
+                  serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
             TotalFiles: 1
             GatherStats: false
             MultiFileSpray: false
@@ -175,7 +189,6 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
 
 PREHOOK: query: SELECT x.* FROM SRCPART x WHERE key IS NOT NULL AND ds = '2008-04-08' order by x.key, x.hr
 PREHOOK: type: QUERY

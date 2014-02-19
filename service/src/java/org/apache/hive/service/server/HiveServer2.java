@@ -36,8 +36,6 @@ import org.apache.hive.service.cli.thrift.ThriftHttpCLIService;
  */
 public class HiveServer2 extends CompositeService {
   private static final Log LOG = LogFactory.getLog(HiveServer2.class);
-  private static CompositeServiceShutdownHook serverShutdownHook;
-  public static final int SHUTDOWN_HOOK_PRIORITY = 100;
 
   private CLIService cliService;
   private ThriftCLIService thriftCLIService;
@@ -56,8 +54,7 @@ public class HiveServer2 extends CompositeService {
     if(transportMode == null) {
       transportMode = hiveConf.getVar(HiveConf.ConfVars.HIVE_SERVER2_TRANSPORT_MODE);
     }
-    if(transportMode != null && (transportMode.equalsIgnoreCase("http") ||
-        transportMode.equalsIgnoreCase("https"))) {
+    if(transportMode != null && (transportMode.equalsIgnoreCase("http"))) {
       thriftCLIService = new ThriftHttpCLIService(cliService);
     }
     else {
@@ -78,29 +75,62 @@ public class HiveServer2 extends CompositeService {
     super.stop();
   }
 
-  /**
-   * @param args
-   */
-  public static void main(String[] args) {
-    //NOTE: It is critical to do this here so that log4j is reinitialized
-    // before any of the other core hive classes are loaded
-    try {
-      LogUtils.initHiveLog4j();
-    } catch (LogInitializationException e) {
-      LOG.warn(e.getMessage());
+  private static void startHiveServer2() throws Throwable {
+    long attempts = 0, maxAttempts = 1;
+    while(true) {
+      HiveConf hiveConf = new HiveConf();
+      maxAttempts = hiveConf.getLongVar(HiveConf.ConfVars.HIVE_SERVER2_MAX_START_ATTEMPTS);
+      HiveServer2 server = null;
+      try {
+        server = new HiveServer2();
+        server.init(hiveConf);
+        server.start();
+        break;
+      } catch (Throwable throwable) {
+        if(++attempts >= maxAttempts) {
+          throw new Error("Max start attempts " + maxAttempts + " exhausted", throwable);
+        } else {
+          LOG.warn("Error starting HiveServer2 on attempt " + attempts +
+            ", will retry in 60 seconds", throwable);
+          try {
+            if (server != null) {
+              server.stop();
+              server = null;
+            }
+          } catch (Exception e) {
+            LOG.info("Exception caught when calling stop of HiveServer2 before" +
+              " retrying start", e);
+          }
+          try {
+            Thread.sleep(60L * 1000L);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+      }
     }
+  }
 
-    HiveStringUtils.startupShutdownMessage(HiveServer2.class, args, LOG);
+  public static void main(String[] args) {
     try {
       ServerOptionsProcessor oproc = new ServerOptionsProcessor("hiveserver2");
       if (!oproc.process(args)) {
-        LOG.fatal("Error starting HiveServer2 with given arguments");
+        System.err.println("Error starting HiveServer2 with given arguments");
         System.exit(-1);
       }
-      HiveConf hiveConf = new HiveConf();
-      HiveServer2 server = new HiveServer2();
-      server.init(hiveConf);
-      server.start();
+
+      //NOTE: It is critical to do this here so that log4j is reinitialized
+      // before any of the other core hive classes are loaded
+      String initLog4jMessage = LogUtils.initHiveLog4j();
+      LOG.debug(initLog4jMessage);
+      
+      HiveStringUtils.startupShutdownMessage(HiveServer2.class, args, LOG);
+      //log debug message from "oproc" after log4j initialize properly
+      LOG.debug(oproc.getDebugMessage().toString());
+      startHiveServer2();
+    } catch (LogInitializationException e) {
+      LOG.error("Error initializing log: " + e.getMessage(), e);
+      System.exit(-1);
     } catch (Throwable t) {
       LOG.fatal("Error starting HiveServer2", t);
       System.exit(-1);

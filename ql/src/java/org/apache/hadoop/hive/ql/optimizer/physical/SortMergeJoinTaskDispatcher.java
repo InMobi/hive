@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hive.ql.optimizer.physical;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -28,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
@@ -120,10 +119,10 @@ public class SortMergeJoinTaskDispatcher extends AbstractJoinTaskDispatcher impl
 
       PartitionDesc partitionInfo = currWork.getAliasToPartnInfo().get(alias);
       if (fetchWork.getTblDir() != null) {
-        currWork.mergeAliasedInput(alias, fetchWork.getTblDir(), partitionInfo);
+        currWork.mergeAliasedInput(alias, fetchWork.getTblDir().toUri().toString(), partitionInfo);
       } else {
-        for (String pathDir : fetchWork.getPartDir()) {
-          currWork.mergeAliasedInput(alias, pathDir, partitionInfo);
+        for (Path pathDir : fetchWork.getPartDir()) {
+          currWork.mergeAliasedInput(alias, pathDir.toUri().toString(), partitionInfo);
         }
       }
     }
@@ -206,7 +205,7 @@ public class SortMergeJoinTaskDispatcher extends AbstractJoinTaskDispatcher impl
 
     Operator<? extends OperatorDesc> currOp = originalSMBJoinOp;
     while (true) {
-      if (currOp.getChildOperators() == null) {
+      if ((currOp.getChildOperators() == null) || (currOp.getChildOperators().isEmpty())) {
         if (currOp instanceof FileSinkOperator) {
           FileSinkOperator fsOp = (FileSinkOperator)currOp;
           // The query has enforced that a sort-merge join should be performed.
@@ -236,7 +235,6 @@ public class SortMergeJoinTaskDispatcher extends AbstractJoinTaskDispatcher impl
   public Task<? extends Serializable> processCurrentTask(MapRedTask currTask,
       ConditionalTask conditionalTask, Context context)
       throws SemanticException {
-
     // whether it contains a sort merge join operator
     MapredWork currWork = currTask.getWork();
     SMBMapJoinOperator originalSMBJoinOp = getSMBMapJoinOp(currWork);
@@ -435,7 +433,8 @@ public class SortMergeJoinTaskDispatcher extends AbstractJoinTaskDispatcher impl
     opParseContextMap.put(newSMBJoinOp, opParseContextMap.get(oldSMBJoinOp));
 
     // generate the map join operator
-    return MapJoinProcessor.convertSMBJoinToMapJoin(opParseContextMap, newSMBJoinOp,
+    return MapJoinProcessor.convertSMBJoinToMapJoin(physicalContext.getConf(),
+        opParseContextMap, newSMBJoinOp,
         joinTree, mapJoinPos, true);
   }
 }

@@ -21,15 +21,15 @@ package org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive;
 import org.apache.hadoop.hive.serde2.lazy.LazyBinary;
 import org.apache.hadoop.hive.serde2.lazy.LazyUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.BytesWritable;
 
 public class LazyBinaryObjectInspector extends
   AbstractPrimitiveLazyObjectInspector<BytesWritable> implements
     BinaryObjectInspector {
 
-  protected LazyBinaryObjectInspector() {
-    super(PrimitiveObjectInspectorUtils.binaryTypeEntry);
+  public LazyBinaryObjectInspector() {
+    super(TypeInfoFactory.binaryTypeInfo);
   }
 
   @Override

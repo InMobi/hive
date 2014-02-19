@@ -3,10 +3,10 @@ PREHOOK: type: CREATETABLE
 POSTHOOK: query: create table exim_department ( dep_id int) stored as textfile
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: default@exim_department
-PREHOOK: query: load data local inpath "../data/files/test.dat" into table exim_department
+PREHOOK: query: load data local inpath "../../data/files/test.dat" into table exim_department
 PREHOOK: type: LOAD
 PREHOOK: Output: default@exim_department
-POSTHOOK: query: load data local inpath "../data/files/test.dat" into table exim_department
+POSTHOOK: query: load data local inpath "../../data/files/test.dat" into table exim_department
 POSTHOOK: type: LOAD
 POSTHOOK: Output: default@exim_department
 #### A masked pattern was here ####
@@ -34,4 +34,4 @@ PREHOOK: query: use importer
 PREHOOK: type: SWITCHDATABASE
 POSTHOOK: query: use importer
 POSTHOOK: type: SWITCHDATABASE
-Authorization failed:No privilege 'Create' found for outputs { database:importer}. Use show grant to get more details.
+Authorization failed:No privilege 'Create' found for outputs { database:importer}. Use SHOW GRANT to get more details.

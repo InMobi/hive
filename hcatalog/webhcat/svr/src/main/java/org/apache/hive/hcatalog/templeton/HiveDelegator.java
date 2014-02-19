@@ -65,6 +65,8 @@ public class HiveDelegator extends LauncherDelegator {
       args.addAll(makeBasicArgs(execute, srcFile, otherFiles, statusdir, completedUrl, enablelog));
       args.add("--");
       TempletonUtils.addCmdForWindows(args);
+      addHiveMetaStoreTokenArg();
+      
       args.add(appConf.hivePath());
 
       args.add("--service");
@@ -111,9 +113,10 @@ public class HiveDelegator extends LauncherDelegator {
     ArrayList<String> args = new ArrayList<String>();
 
     ArrayList<String> allFiles = new ArrayList<String>();
-    if (TempletonUtils.isset(srcFile))
+    if (TempletonUtils.isset(srcFile)) {
       allFiles.add(TempletonUtils.hadoopFsFilename(srcFile, appConf,
           runAs));
+    }
 
     if (TempletonUtils.isset(otherFiles)) {
       String[] ofs = TempletonUtils.hadoopFsListAsArray(otherFiles, appConf, runAs);
@@ -125,7 +128,7 @@ public class HiveDelegator extends LauncherDelegator {
 
     if (appConf.hiveArchive() != null && !appConf.hiveArchive().equals(""))
     {
-      args.add("-archives");
+      args.add(ARCHIVES);
       args.add(appConf.hiveArchive());
     }
 

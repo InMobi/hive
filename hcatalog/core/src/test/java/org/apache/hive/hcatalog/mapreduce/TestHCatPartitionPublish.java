@@ -70,19 +70,23 @@ public class TestHCatPartitionPublish {
   private static FileSystem fs = null;
   private static MiniMRCluster mrCluster = null;
   private static boolean isServerRunning = false;
-  private static final int msPort = 20101;
+  private static int msPort;
   private static HiveConf hcatConf;
   private static HiveMetaStoreClient msc;
   private static SecurityManager securityManager;
+  private static Configuration conf = new Configuration(true);
 
-  @BeforeClass
-  public static void setup() throws Exception {
+  public static File handleWorkDir() throws IOException {
     String testDir = System.getProperty("test.data.dir", "./");
     testDir = testDir + "/test_hcat_partitionpublish_" + Math.abs(new Random().nextLong()) + "/";
     File workDir = new File(new File(testDir).getCanonicalPath());
     FileUtil.fullyDelete(workDir);
     workDir.mkdirs();
-    Configuration conf = new Configuration(true);
+    return workDir;
+  }
+  @BeforeClass
+  public static void setup() throws Exception {
+    File workDir = handleWorkDir();
     conf.set("yarn.scheduler.capacity.root.queues", "default");
     conf.set("yarn.scheduler.capacity.root.default.capacity", "100");
 
@@ -98,6 +102,8 @@ public class TestHCatPartitionPublish {
       return;
     }
 
+    msPort = MetaStoreUtils.findFreePort();
+
     MetaStoreUtils.startMetaStore(msPort, ShimLoader
         .getHadoopThriftAuthBridge());
     Thread.sleep(10000);
@@ -111,6 +117,7 @@ public class TestHCatPartitionPublish {
         + msPort);
     hcatConf.setIntVar(HiveConf.ConfVars.METASTORETHRIFTCONNECTIONRETRIES, 3);
     hcatConf.setIntVar(HiveConf.ConfVars.METASTORETHRIFTFAILURERETRIES, 3);
+    hcatConf.setIntVar(HiveConf.ConfVars.METASTORE_CLIENT_SOCKET_TIMEOUT, 120);
     hcatConf.set(HiveConf.ConfVars.SEMANTIC_ANALYZER_HOOK.varname,
         HCatSemanticAnalyzer.class.getName());
     hcatConf.set(HiveConf.ConfVars.PREEXECHOOKS.varname, "");
@@ -155,8 +162,9 @@ public class TestHCatPartitionPublish {
     // In Windows, we cannot remove the output directory when job fail. See
     // FileOutputCommitterContainer.abortJob
     if (!Shell.WINDOWS) {
-      Assert.assertFalse(fs.exists(new Path(table.getSd().getLocation()
-          + "/part1=p1value1/part0=p0value1")));
+      Path path = new Path(table.getSd().getLocation()
+          + "/part1=p1value1/part0=p0value1");
+      Assert.assertFalse(path.getFileSystem(conf).exists(path));
     }
   }
 

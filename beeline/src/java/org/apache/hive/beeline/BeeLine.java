@@ -95,8 +95,8 @@ import jline.SimpleCompletor;
  */
 public class BeeLine {
   private static final ResourceBundle resourceBundle =
-      ResourceBundle.getBundle(BeeLine.class.getName());
-  private BeeLineSignalHandler signalHandler = null;
+      ResourceBundle.getBundle(BeeLine.class.getSimpleName());
+  private final BeeLineSignalHandler signalHandler = null;
   private static final String separator = System.getProperty("line.separator");
   private boolean exit = false;
   private final DatabaseConnections connections = new DatabaseConnections();
@@ -124,6 +124,9 @@ public class BeeLine {
   private static final int ERRNO_OK = 0;
   private static final int ERRNO_ARGS = 1;
   private static final int ERRNO_OTHER = 2;
+
+  private static final String HIVE_VAR_PREFIX = "--hivevar";
+  private static final String HIVE_CONF_PREFIX = "--hiveconf";
 
   private final Map<Object, Object> formats = map(new Object[] {
       "vertical", new VerticalOutputFormat(this),
@@ -222,6 +225,8 @@ public class BeeLine {
           null),
       new ReflectiveCommandHandler(this, new String[] {"call"},
           null),
+      new ReflectiveCommandHandler(this, new String[] {"nullemptystring"},
+          new Completor[] {new BooleanCompletor()}),
   };
 
 
@@ -500,8 +505,28 @@ public class BeeLine {
 
     for (int i = 0; i < args.length; i++) {
       if (args[i].equals("--help") || args[i].equals("-h")) {
-        usage();
+        // Return false here, so usage will be printed.
         return false;
+      }
+
+      // Parse hive variables
+      if (args[i].equals(HIVE_VAR_PREFIX)) {
+        String[] parts = split(args[++i], "=");
+        if (parts.length != 2) {
+          return false;
+        }
+        getOpts().getHiveVariables().put(parts[0], parts[1]);
+        continue;
+      }
+
+      // Parse hive conf variables
+      if (args[i].equals(HIVE_CONF_PREFIX)) {
+        String[] parts = split(args[++i], "=");
+        if (parts.length != 2) {
+          return false;
+        }
+        getOpts().getHiveConfVariables().put(parts[0], parts[1]);
+        continue;
       }
 
       // -- arguments are treated as properties

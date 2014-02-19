@@ -23,10 +23,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -78,7 +76,7 @@ public class Context {
   private final String scratchDirPermission;
 
   // Keeps track of scratch directories created for different scheme/authority
-  private final Map<String, String> fsScratchDirs = new HashMap<String, String>();
+  private final Map<String, Path> fsScratchDirs = new HashMap<String, Path>();
 
   private final Configuration conf;
   protected int pathid = 10000;
@@ -189,11 +187,11 @@ public class Context {
    * @param mkdir create the directory if true
    * @param scratchDir path of tmp directory
    */
-  private String getScratchDir(String scheme, String authority,
+  private Path getScratchDir(String scheme, String authority,
                                boolean mkdir, String scratchDir) {
 
     String fileSystem =  scheme + ":" + authority;
-    String dir = fsScratchDirs.get(fileSystem + "-" + TaskRunner.getTaskRunnerID());
+    Path dir = fsScratchDirs.get(fileSystem + "-" + TaskRunner.getTaskRunnerID());
 
     if (dir == null) {
       Path dirPath = new Path(scheme, authority,
@@ -216,7 +214,7 @@ public class Context {
           throw new RuntimeException (e);
         }
       }
-      dir = dirPath.toString();
+      dir = dirPath;
       fsScratchDirs.put(fileSystem + "-" + TaskRunner.getTaskRunnerID(), dir);
 
     }
@@ -227,7 +225,7 @@ public class Context {
   /**
    * Create a local scratch directory on demand and return it.
    */
-  public String getLocalScratchDir(boolean mkdir) {
+  public Path getLocalScratchDir(boolean mkdir) {
     try {
       FileSystem fs = FileSystem.getLocal(conf);
       URI uri = fs.getUri();
@@ -243,7 +241,7 @@ public class Context {
    * Create a map-reduce scratch directory on demand and return it.
    *
    */
-  public String getMRScratchDir() {
+  public Path getMRScratchDir() {
 
     // if we are executing entirely on the client side - then
     // just (re)use the local scratch directory
@@ -254,7 +252,7 @@ public class Context {
     try {
       Path dir = FileUtils.makeQualified(nonLocalScratchPath, conf);
       URI uri = dir.toUri();
-      String newScratchDir = getScratchDir(uri.getScheme(), uri.getAuthority(),
+      Path newScratchDir = getScratchDir(uri.getScheme(), uri.getAuthority(),
                            !explain, uri.getPath());
       LOG.info("New scratch dir is " + newScratchDir);
       return newScratchDir;
@@ -266,7 +264,7 @@ public class Context {
     }
   }
 
-  private String getExternalScratchDir(URI extURI) {
+  private Path getExternalScratchDir(URI extURI) {
     return getScratchDir(extURI.getScheme(), extURI.getAuthority(),
                          !explain, nonLocalScratchPath.toUri().getPath());
   }
@@ -275,9 +273,9 @@ public class Context {
    * Remove any created scratch directories.
    */
   private void removeScratchDir() {
-    for (Map.Entry<String, String> entry : fsScratchDirs.entrySet()) {
+    for (Map.Entry<String, Path> entry : fsScratchDirs.entrySet()) {
       try {
-        Path p = new Path(entry.getValue());
+        Path p = entry.getValue();
         p.getFileSystem(conf).delete(p, true);
       } catch (Exception e) {
         LOG.warn("Error Removing Scratch: "
@@ -311,45 +309,18 @@ public class Context {
    *
    * @return next available path for map-red intermediate data
    */
-  public String getMRTmpFileURI() {
-    return getMRScratchDir() + Path.SEPARATOR + MR_PREFIX +
-      nextPathId();
+  public Path getMRTmpPath() {
+    return new Path(getMRScratchDir(), MR_PREFIX +
+      nextPathId());
   }
-
-
-  /**
-   * Given a URI for mapreduce intermediate output, swizzle the
-   * it to point to the local file system. This can be called in
-   * case the caller decides to run in local mode (in which case
-   * all intermediate data can be stored locally)
-   *
-   * @param originalURI uri to localize
-   * @return localized path for map-red intermediate data
-   */
-  public String localizeMRTmpFileURI(String originalURI) {
-    Path o = new Path(originalURI);
-    Path mrbase = new Path(getMRScratchDir());
-
-    URI relURI = mrbase.toUri().relativize(o.toUri());
-    if (relURI.equals(o.toUri())) {
-      throw new RuntimeException
-        ("Invalid URI: " + originalURI + ", cannot relativize against" +
-         mrbase.toString());
-    }
-
-    return getLocalScratchDir(!explain) + Path.SEPARATOR +
-      relURI.getPath();
-  }
-
 
   /**
    * Get a tmp path on local host to store intermediate data.
    *
    * @return next available tmp path on local fs
    */
-  public String getLocalTmpFileURI() {
-    return getLocalScratchDir(true) + Path.SEPARATOR + LOCAL_PREFIX +
-      nextPathId();
+  public Path getLocalTmpPath() {
+    return new Path(getLocalScratchDir(true), LOCAL_PREFIX + nextPathId());
   }
 
   /**
@@ -359,9 +330,19 @@ public class Context {
    *          external URI to which the tmp data has to be eventually moved
    * @return next available tmp path on the file system corresponding extURI
    */
-  public String getExternalTmpFileURI(URI extURI) {
-    return getExternalScratchDir(extURI) +  Path.SEPARATOR + EXT_PREFIX +
-      nextPathId();
+  public Path getExternalTmpPath(URI extURI) {
+    return new Path(getExternalScratchDir(extURI), EXT_PREFIX +
+      nextPathId());
+  }
+
+  /**
+   * This is similar to getExternalTmpPath() with difference being this method returns temp path
+   * within passed in uri, whereas getExternalTmpPath() ignores passed in path and returns temp
+   * path within /tmp
+   */
+  public Path getExtTmpPathRelTo(URI uri) {
+    return new Path (getScratchDir(uri.getScheme(), uri.getAuthority(), !explain, 
+    uri.getPath() + Path.SEPARATOR + "_" + this.executionId), EXT_PREFIX + nextPathId());
   }
 
   /**
@@ -481,6 +462,13 @@ public class Context {
     return null;
   }
 
+  public void resetStream() {
+    if (initialized) {
+      resDirFilesNum = 0;
+      initialized = false;
+    }
+  }
+
   /**
    * Little abbreviation for StringUtils.
    */
@@ -585,38 +573,6 @@ public class Context {
 
   public Configuration getConf() {
     return conf;
-  }
-
-  /**
-   * Given a mapping from paths to objects, localize any MR tmp paths
-   * @param map mapping from paths to objects
-   */
-  public void localizeKeys(Map<String, Object> map) {
-    for (Map.Entry<String, Object> entry: map.entrySet()) {
-      String path = entry.getKey();
-      if (isMRTmpFileURI(path)) {
-        Object val = entry.getValue();
-        map.remove(path);
-        map.put(localizeMRTmpFileURI(path), val);
-      }
-    }
-  }
-
-  /**
-   * Given a list of paths, localize any MR tmp paths contained therein
-   * @param paths list of paths to be localized
-   */
-  public void localizePaths(List<String> paths) {
-    Iterator<String> iter = paths.iterator();
-    List<String> toAdd = new ArrayList<String> ();
-    while(iter.hasNext()) {
-      String path = iter.next();
-      if (isMRTmpFileURI(path)) {
-        iter.remove();
-        toAdd.add(localizeMRTmpFileURI(path));
-      }
-    }
-    paths.addAll(toAdd);
   }
 
   /**

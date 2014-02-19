@@ -44,6 +44,10 @@ $GLOBALS['serde_CONSTANTS']['QUOTE_CHAR'] = "quote.delim";
 
 $GLOBALS['serde_CONSTANTS']['ESCAPE_CHAR'] = "escape.delim";
 
+$GLOBALS['serde_CONSTANTS']['HEADER_COUNT'] = "skip.header.line.count";
+
+$GLOBALS['serde_CONSTANTS']['FOOTER_COUNT'] = "skip.footer.line.count";
+
 $GLOBALS['serde_CONSTANTS']['VOID_TYPE_NAME'] = "void";
 
 $GLOBALS['serde_CONSTANTS']['BOOLEAN_TYPE_NAME'] = "boolean";
@@ -110,6 +114,13 @@ $GLOBALS['serde_CONSTANTS']['PrimitiveTypes'] = array(
 $GLOBALS['serde_CONSTANTS']['CollectionTypes'] = array(
   "array" => true,
   "map" => true,
+);
+
+$GLOBALS['serde_CONSTANTS']['IntegralTypes'] = array(
+  "tinyint" => true,
+  "smallint" => true,
+  "int" => true,
+  "bigint" => true,
 );
 
 

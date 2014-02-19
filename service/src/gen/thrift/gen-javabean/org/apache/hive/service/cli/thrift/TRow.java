@@ -350,6 +350,7 @@ public class TRow implements org.apache.thrift.TBase<TRow, TRow._Fields>, java.i
           case 1: // COL_VALS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
+<<<<<<< HEAD
                 org.apache.thrift.protocol.TList _list102 = iprot.readListBegin();
                 struct.colVals = new ArrayList<TColumnValue>(_list102.size);
                 for (int _i103 = 0; _i103 < _list102.size; ++_i103)
@@ -358,6 +359,16 @@ public class TRow implements org.apache.thrift.TBase<TRow, TRow._Fields>, java.i
                   _elem104 = new TColumnValue();
                   _elem104.read(iprot);
                   struct.colVals.add(_elem104);
+=======
+                org.apache.thrift.protocol.TList _list46 = iprot.readListBegin();
+                struct.colVals = new ArrayList<TColumnValue>(_list46.size);
+                for (int _i47 = 0; _i47 < _list46.size; ++_i47)
+                {
+                  TColumnValue _elem48; // required
+                  _elem48 = new TColumnValue();
+                  _elem48.read(iprot);
+                  struct.colVals.add(_elem48);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
                 }
                 iprot.readListEnd();
               }
@@ -383,9 +394,15 @@ public class TRow implements org.apache.thrift.TBase<TRow, TRow._Fields>, java.i
         oprot.writeFieldBegin(COL_VALS_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.colVals.size()));
+<<<<<<< HEAD
           for (TColumnValue _iter105 : struct.colVals)
           {
             _iter105.write(oprot);
+=======
+          for (TColumnValue _iter49 : struct.colVals)
+          {
+            _iter49.write(oprot);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           }
           oprot.writeListEnd();
         }
@@ -410,9 +427,15 @@ public class TRow implements org.apache.thrift.TBase<TRow, TRow._Fields>, java.i
       TTupleProtocol oprot = (TTupleProtocol) prot;
       {
         oprot.writeI32(struct.colVals.size());
+<<<<<<< HEAD
         for (TColumnValue _iter106 : struct.colVals)
         {
           _iter106.write(oprot);
+=======
+        for (TColumnValue _iter50 : struct.colVals)
+        {
+          _iter50.write(oprot);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
         }
       }
     }
@@ -421,6 +444,7 @@ public class TRow implements org.apache.thrift.TBase<TRow, TRow._Fields>, java.i
     public void read(org.apache.thrift.protocol.TProtocol prot, TRow struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       {
+<<<<<<< HEAD
         org.apache.thrift.protocol.TList _list107 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
         struct.colVals = new ArrayList<TColumnValue>(_list107.size);
         for (int _i108 = 0; _i108 < _list107.size; ++_i108)
@@ -429,6 +453,16 @@ public class TRow implements org.apache.thrift.TBase<TRow, TRow._Fields>, java.i
           _elem109 = new TColumnValue();
           _elem109.read(iprot);
           struct.colVals.add(_elem109);
+=======
+        org.apache.thrift.protocol.TList _list51 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+        struct.colVals = new ArrayList<TColumnValue>(_list51.size);
+        for (int _i52 = 0; _i52 < _list51.size; ++_i52)
+        {
+          TColumnValue _elem53; // required
+          _elem53 = new TColumnValue();
+          _elem53.read(iprot);
+          struct.colVals.add(_elem53);
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
         }
       }
       struct.setColValsIsSet(true);

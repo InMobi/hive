@@ -60,7 +60,7 @@ public class TableScanDesc extends AbstractOperatorDesc {
   private boolean statsReliable;
   private int maxStatsKeyPrefixLength = -1;
 
-  private ExprNodeDesc filterExpr;
+  private ExprNodeGenericFuncDesc filterExpr;
 
   public static final String FILTER_EXPR_CONF_STR =
     "hive.io.filter.expr.serialized";
@@ -96,11 +96,17 @@ public class TableScanDesc extends AbstractOperatorDesc {
   }
 
   @Explain(displayName = "filterExpr")
-  public ExprNodeDesc getFilterExpr() {
+  public String getFilterExprString() {
+    StringBuffer sb = new StringBuffer();
+    PlanUtils.addExprToStringBuffer(filterExpr, sb);
+    return sb.toString();
+  }
+
+  public ExprNodeGenericFuncDesc getFilterExpr() {
     return filterExpr;
   }
 
-  public void setFilterExpr(ExprNodeDesc filterExpr) {
+  public void setFilterExpr(ExprNodeGenericFuncDesc filterExpr) {
     this.filterExpr = filterExpr;
   }
 

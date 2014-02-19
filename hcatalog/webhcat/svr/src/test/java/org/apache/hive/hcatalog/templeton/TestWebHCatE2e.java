@@ -26,6 +26,7 @@ import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -43,7 +44,7 @@ import java.util.Map;
 /**
  * A set of tests exercising e2e WebHCat DDL APIs.  These tests are somewhat
  * between WebHCat e2e (hcatalog/src/tests/e2e/templeton) tests and simple58
- * 
+ *
  * unit tests.  This will start a WebHCat server and make REST calls to it.
  * It doesn't need Hadoop or (standalone) metastore to be running.
  * Running this is much simpler than e2e tests.
@@ -57,7 +58,7 @@ import java.util.Map;
 public class TestWebHCatE2e {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestWebHCatE2e.class);
-  private static final String templetonBaseUrl =
+  private static String templetonBaseUrl =
       "http://localhost:50111/templeton/v1";
   private static final String username= "johndoe";
   private static final String ERROR_CODE = "errorCode";
@@ -65,8 +66,18 @@ public class TestWebHCatE2e {
   private static final String charSet = "UTF-8";
   @BeforeClass
   public static void startHebHcatInMem() {
-    templetonServer = new Main(new String[] {"-D" + AppConfig.UNIT_TEST_MODE + "=true"});
-    LOG.info("Starting Main");
+    int webhcatPort = 50111;
+    try {
+      //in case concurrent tests are running on the same machine
+      webhcatPort = MetaStoreUtils.findFreePort();
+    }
+    catch (IOException ex) {
+      LOG.warn("Unable to find free port; using default: " + webhcatPort);
+    }
+    templetonBaseUrl = templetonBaseUrl.replace("50111", Integer.toString(webhcatPort));
+    templetonServer = new Main(new String[] {"-D" +
+            AppConfig.UNIT_TEST_MODE + "=true", "-D" + AppConfig.PORT + "=" + webhcatPort});
+    LOG.info("Starting Main; WebHCat using port: " + webhcatPort);
     templetonServer.run();
     LOG.info("Main started");
   }
@@ -145,7 +156,7 @@ public class TestWebHCatE2e {
   public void createDataBase() throws IOException {
     Map<String, Object> props = new HashMap<String, Object>();
     props.put("comment", "Hello, there");
-    props.put("location", "file://" + System.getProperty("hive.metastore.warehouse.dir"));
+    props.put("location", System.getProperty("test.warehouse.dir"));
     Map<String, String> props2 = new HashMap<String, String>();
     props2.put("prop", "val");
     props.put("properties", props2);
@@ -186,6 +197,39 @@ public class TestWebHCatE2e {
       ErrorMsg.INVALID_TABLE.getErrorCode(),
       getErrorCode(p.responseBody));
   }
+
+  @Test
+  public void getHadoopVersion() throws Exception {
+    MethodCallRetVal p = doHttpCall(templetonBaseUrl + "/version/hadoop",
+        HTTP_METHOD_TYPE.GET);
+    Assert.assertEquals(HttpStatus.OK_200, p.httpStatusCode);
+    Map<String, Object> props = JsonBuilder.jsonToMap(p.responseBody);
+    Assert.assertEquals("hadoop", props.get("module"));
+    Assert.assertTrue(p.getAssertMsg(),
+        ((String)props.get("version")).matches("[1-2].[0-9]+.[0-9]+.*"));
+  }
+
+  @Test
+  public void getHiveVersion() throws Exception {
+    MethodCallRetVal p = doHttpCall(templetonBaseUrl + "/version/hive",
+        HTTP_METHOD_TYPE.GET);
+    Assert.assertEquals(HttpStatus.OK_200, p.httpStatusCode);
+    Map<String, Object> props = JsonBuilder.jsonToMap(p.responseBody);
+    Assert.assertEquals("hive", props.get("module"));
+    Assert.assertTrue(p.getAssertMsg(),
+        ((String) props.get("version")).matches("0.[0-9]+.[0-9]+.*"));
+  }
+
+  @Test
+  public void getPigVersion() throws Exception {
+    MethodCallRetVal p = doHttpCall(templetonBaseUrl + "/version/pig",
+        HTTP_METHOD_TYPE.GET);
+    Assert.assertEquals(HttpStatus.NOT_IMPLEMENTED_501, p.httpStatusCode);
+    Map<String, Object> props = JsonBuilder.jsonToMap(p.responseBody);
+    Assert.assertEquals(p.getAssertMsg(), "Pig version request not yet " +
+        "implemented", (String)props.get("error"));
+  }
+
   /**
    * It's expected that Templeton returns a properly formatted JSON object when it
    * encounters an error.  It should have {@code ERROR_CODE} element in it which

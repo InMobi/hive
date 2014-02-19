@@ -17,8 +17,7 @@
  */
 package org.apache.hive.service.cli.operation;
 
-import java.io.*;
-import java.util.List;
+import java.util.EnumSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,7 +33,7 @@ import org.apache.hive.service.cli.OperationType;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.HiveSession;
-
+import org.apache.hive.service.cli.thrift.TProtocolVersion;
 
 
 public abstract class Operation {
@@ -52,10 +51,13 @@ public abstract class Operation {
   protected long operationStart;
   protected long operationComplete;
 
+  protected static final EnumSet<FetchOrientation> DEFAULT_FETCH_ORIENTATION_SET =
+      EnumSet.of(FetchOrientation.FETCH_NEXT,FetchOrientation.FETCH_FIRST);
+  
   protected Operation(HiveSession parentSession, OperationType opType) {
     super();
     this.parentSession = parentSession;
-    opHandle = new OperationHandle(opType);
+    this.opHandle = new OperationHandle(opType, parentSession.getProtocolVersion());
     console = new SessionState.LogHelper(LOG);
   }
 
@@ -73,6 +75,10 @@ public abstract class Operation {
 
   public OperationHandle getHandle() {
     return opHandle;
+  }
+
+  public TProtocolVersion getProtocolVersion() {
+    return opHandle.getProtocolVersion();
   }
 
   public OperationType getType() {
@@ -210,5 +216,29 @@ public abstract class Operation {
   }
   protected void markOperationCompletedTime() {
     operationComplete = System.currentTimeMillis();
+  }
+
+  /**
+   * Verify if the given fetch orientation is part of the default orientation types.
+   * @param orientation
+   * @throws HiveSQLException
+   */
+  protected void validateDefaultFetchOrientation(FetchOrientation orientation)
+      throws HiveSQLException {
+    validateFetchOrientation(orientation, DEFAULT_FETCH_ORIENTATION_SET);
+  }
+
+  /**
+   * Verify if the given fetch orientation is part of the supported orientation types.
+   * @param orientation
+   * @param supportedOrientations
+   * @throws HiveSQLException
+   */
+  protected void validateFetchOrientation(FetchOrientation orientation,
+      EnumSet<FetchOrientation> supportedOrientations) throws HiveSQLException {
+    if (!supportedOrientations.contains(orientation)) {
+      throw new HiveSQLException("The fetch type " + orientation.toString() +
+        " is not supported for this resultset", "HY106");
+    }
   }
 }

@@ -21,48 +21,6 @@ POSTHOOK: Input: default@anaylyze_external
 4
 5
 6
-PREHOOK: query: analyze table anaylyze_external compute statistics
-PREHOOK: type: QUERY
-PREHOOK: Input: default@anaylyze_external
-PREHOOK: Output: default@anaylyze_external
-POSTHOOK: query: analyze table anaylyze_external compute statistics
-POSTHOOK: type: QUERY
-POSTHOOK: Input: default@anaylyze_external
-POSTHOOK: Output: default@anaylyze_external
-PREHOOK: query: describe formatted anaylyze_external
-PREHOOK: type: DESCTABLE
-POSTHOOK: query: describe formatted anaylyze_external
-POSTHOOK: type: DESCTABLE
-# col_name            	data_type           	comment             
-	 	 
-a                   	int                 	None                
-	 	 
-# Detailed Table Information	 	 
-Database:           	default             	 
-#### A masked pattern was here ####
-Protect Mode:       	None                	 
-Retention:          	0                   	 
-#### A masked pattern was here ####
-Table Type:         	EXTERNAL_TABLE      	 
-Table Parameters:	 	 
-	EXTERNAL            	TRUE                
-	numFiles            	1                   
-	numPartitions       	0                   
-	numRows             	6                   
-	rawDataSize         	6                   
-	totalSize           	11                  
-#### A masked pattern was here ####
-	 	 
-# Storage Information	 	 
-SerDe Library:      	org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe	 
-InputFormat:        	org.apache.hadoop.mapred.TextInputFormat	 
-OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat	 
-Compressed:         	No                  	 
-Num Buckets:        	-1                  	 
-Bucket Columns:     	[]                  	 
-Sort Columns:       	[]                  	 
-Storage Desc Params:	 	 
-	serialization.format	1                   
 PREHOOK: query: analyze table anaylyze_external compute statistics noscan
 PREHOOK: type: QUERY
 PREHOOK: Input: default@anaylyze_external
@@ -87,12 +45,54 @@ Retention:          	0
 #### A masked pattern was here ####
 Table Type:         	EXTERNAL_TABLE      	 
 Table Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
 	EXTERNAL            	TRUE                
-	numFiles            	1                   
-	numPartitions       	0                   
-	numRows             	0                   
-	rawDataSize         	0                   
-	totalSize           	11                  
+	numFiles            	0                   
+	numRows             	-1                  
+	rawDataSize         	-1                  
+	totalSize           	0                   
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe	 
+InputFormat:        	org.apache.hadoop.mapred.TextInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: analyze table anaylyze_external compute statistics
+PREHOOK: type: QUERY
+PREHOOK: Input: default@anaylyze_external
+PREHOOK: Output: default@anaylyze_external
+POSTHOOK: query: analyze table anaylyze_external compute statistics
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@anaylyze_external
+POSTHOOK: Output: default@anaylyze_external
+PREHOOK: query: describe formatted anaylyze_external
+PREHOOK: type: DESCTABLE
+POSTHOOK: query: describe formatted anaylyze_external
+POSTHOOK: type: DESCTABLE
+# col_name            	data_type           	comment             
+	 	 
+a                   	int                 	None                
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	EXTERNAL_TABLE      	 
+Table Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
+	EXTERNAL            	TRUE                
+	numFiles            	0                   
+	numRows             	6                   
+	rawDataSize         	6                   
+	totalSize           	0                   
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -184,14 +184,14 @@ POSTHOOK: Lineage: texternal PARTITION(insertdate=2008-01-01).key SIMPLE [(src)s
 POSTHOOK: Lineage: texternal PARTITION(insertdate=2008-01-01).val SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 500
 PREHOOK: query: -- analyze
-analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics
+analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics noscan
 PREHOOK: type: QUERY
 PREHOOK: Input: default@anaylyze_external
 PREHOOK: Input: default@anaylyze_external@insertdate=2008-01-01
 PREHOOK: Output: default@anaylyze_external
 PREHOOK: Output: default@anaylyze_external@insertdate=2008-01-01
 POSTHOOK: query: -- analyze
-analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics
+analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics noscan
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@anaylyze_external
 POSTHOOK: Input: default@anaylyze_external@insertdate=2008-01-01
@@ -223,9 +223,10 @@ Table:              	anaylyze_external
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
 	numFiles            	1                   
-	numRows             	500                 
-	rawDataSize         	5312                
+	numRows             	-1                  
+	rawDataSize         	-1                  
 	totalSize           	5812                
 #### A masked pattern was here ####
 	 	 
@@ -239,13 +240,13 @@ Bucket Columns:     	[]
 Sort Columns:       	[]                  	 
 Storage Desc Params:	 	 
 	serialization.format	1                   
-PREHOOK: query: analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics noscan
+PREHOOK: query: analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics
 PREHOOK: type: QUERY
 PREHOOK: Input: default@anaylyze_external
 PREHOOK: Input: default@anaylyze_external@insertdate=2008-01-01
 PREHOOK: Output: default@anaylyze_external
 PREHOOK: Output: default@anaylyze_external@insertdate=2008-01-01
-POSTHOOK: query: analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics noscan
+POSTHOOK: query: analyze table anaylyze_external PARTITION (insertdate='2008-01-01') compute statistics
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@anaylyze_external
 POSTHOOK: Input: default@anaylyze_external@insertdate=2008-01-01
@@ -277,9 +278,10 @@ Table:              	anaylyze_external
 Protect Mode:       	None                	 
 #### A masked pattern was here ####
 Partition Parameters:	 	 
+	COLUMN_STATS_ACCURATE	true                
 	numFiles            	1                   
-	numRows             	0                   
-	rawDataSize         	0                   
+	numRows             	500                 
+	rawDataSize         	5312                
 	totalSize           	5812                
 #### A masked pattern was here ####
 	 	 

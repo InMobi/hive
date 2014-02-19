@@ -30,6 +30,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
@@ -52,11 +53,13 @@ public class JoinUtil {
       ObjectInspector[] inputObjInspector,
       int posBigTableAlias, int tagLen) throws HiveException {
     List<ObjectInspector>[] result = new List[tagLen];
-    for (byte alias = 0; alias < exprEntries.length; alias++) {
-      //get big table
-      if (alias == (byte) posBigTableAlias){
-        //skip the big tables
-          continue;
+
+    int iterate = Math.min(exprEntries.length, inputObjInspector.length);
+    for (byte alias = 0; alias < iterate; alias++) {
+      if (alias == (byte) posBigTableAlias ||
+          exprEntries[alias] == null || inputObjInspector[alias] == null) {
+        // skip the driver and directly loadable tables
+        continue;
       }
 
       List<ExprNodeEvaluator> exprList = exprEntries[alias];
@@ -76,7 +79,7 @@ public class JoinUtil {
     List<ObjectInspector>[] result = new List[tagLen];
     for (byte alias = 0; alias < aliasToObjectInspectors.length; alias++) {
       //get big table
-      if(alias == (byte) posBigTableAlias ){
+      if(alias == (byte) posBigTableAlias || aliasToObjectInspectors[alias] == null){
         //skip the big tables
           continue;
       }
@@ -105,6 +108,9 @@ public class JoinUtil {
       int posBigTableAlias) throws HiveException {
     int total = 0;
     for (Entry<Byte, List<ExprNodeDesc>> e : inputMap.entrySet()) {
+      if (e.getValue() == null) {
+        continue;
+      }
       Byte key = order == null ? e.getKey() : order[e.getKey()];
       List<ExprNodeEvaluator> valueFields = new ArrayList<ExprNodeEvaluator>();
       for (ExprNodeDesc expr : e.getValue()) {
@@ -198,14 +204,15 @@ public class JoinUtil {
    * Return the value as a standard object. StandardObject can be inspected by a
    * standard ObjectInspector.
    * If it would be tagged by filter, reserve one more slot for that.
+   * outValues can be passed in to avoid allocation
    */
-  public static ArrayList<Object> computeValues(Object row,
+  public static List<Object> computeValues(Object row,
       List<ExprNodeEvaluator> valueFields, List<ObjectInspector> valueFieldsOI, boolean hasFilter)
       throws HiveException {
 
     // Compute the values
     int reserve = hasFilter ? valueFields.size() + 1 : valueFields.size();
-    ArrayList<Object> nr = new ArrayList<Object>(reserve);
+    List<Object> nr = new ArrayList<Object>(reserve);   
     for (int i = 0; i < valueFields.size(); i++) {
       nr.add(ObjectInspectorUtils.copyToStandardObject(valueFields.get(i)
           .evaluate(row), valueFieldsOI.get(i),
@@ -316,7 +323,7 @@ public class JoinUtil {
       // remove the last ','
       colNames.setLength(colNames.length() - 1);
       colTypes.setLength(colTypes.length() - 1);
-      TableDesc tblDesc = new TableDesc(LazyBinarySerDe.class,
+      TableDesc tblDesc = new TableDesc(
           SequenceFileInputFormat.class, HiveSequenceFileOutputFormat.class,
           Utilities.makeProperties(
           org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_FORMAT, ""
@@ -324,7 +331,8 @@ public class JoinUtil {
           org.apache.hadoop.hive.serde.serdeConstants.LIST_COLUMNS, colNames
           .toString(),
           org.apache.hadoop.hive.serde.serdeConstants.LIST_COLUMN_TYPES,
-          colTypes.toString()));
+          colTypes.toString(),
+          serdeConstants.SERIALIZATION_LIB,LazyBinarySerDe.class.getName()));
       spillTableDesc[tag] = tblDesc;
     }
     return spillTableDesc;

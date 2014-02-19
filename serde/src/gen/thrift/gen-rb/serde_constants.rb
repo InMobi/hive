@@ -35,6 +35,10 @@ QUOTE_CHAR = %q"quote.delim"
 
 ESCAPE_CHAR = %q"escape.delim"
 
+HEADER_COUNT = %q"skip.header.line.count"
+
+FOOTER_COUNT = %q"skip.footer.line.count"
+
 VOID_TYPE_NAME = %q"void"
 
 BOOLEAN_TYPE_NAME = %q"boolean"
@@ -101,5 +105,12 @@ PrimitiveTypes = Set.new([
 CollectionTypes = Set.new([
   %q"array",
   %q"map",
+])
+
+IntegralTypes = Set.new([
+  %q"tinyint",
+  %q"smallint",
+  %q"int",
+  %q"bigint",
 ])
 

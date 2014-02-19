@@ -140,8 +140,8 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
       throw new RuntimeException(e.getMessage());
     }
 
-    String outputPath = this.work.getOutputDir();
-    Path tempOutPath = Utilities.toTempPath(new Path(outputPath));
+    Path outputPath = this.work.getOutputDir();
+    Path tempOutPath = Utilities.toTempPath(outputPath);
     try {
       FileSystem fs = tempOutPath.getFileSystem(job);
       if (!fs.exists(tempOutPath)) {
@@ -152,7 +152,7 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
       return 6;
     }
 
-    RCFileBlockMergeOutputFormat.setMergeOutputPath(job, new Path(outputPath));
+    RCFileBlockMergeOutputFormat.setMergeOutputPath(job, outputPath);
 
     job.setOutputKeyClass(NullWritable.class);
     job.setOutputValueClass(NullWritable.class);
@@ -192,7 +192,7 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
     try {
       addInputPaths(job, work);
 
-      Utilities.setMapWork(job, work, ctx.getMRTmpFileURI(), true);
+      Utilities.setMapWork(job, work, ctx.getMRTmpPath(), true);
 
       // remove the pwd from conf file so that job tracker doesn't show this
       // logs
@@ -254,8 +254,8 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
   }
 
   private void addInputPaths(JobConf job, MergeWork work) {
-    for (String path : work.getInputPaths()) {
-      FileInputFormat.addInputPath(job, new Path(path));
+    for (Path path : work.getInputPaths()) {
+      FileInputFormat.addInputPath(job, path);
     }
   }
 
@@ -291,7 +291,7 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
       printUsage();
     }
 
-    List<String> inputPaths = new ArrayList<String>();
+    List<Path> inputPaths = new ArrayList<Path>();
     String[] paths = inputPathStr.split(INPUT_SEPERATOR);
     if (paths == null || paths.length == 0) {
       printUsage();
@@ -309,10 +309,10 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
         if (fstatus.isDir()) {
           FileStatus[] fileStatus = fs.listStatus(pathObj);
           for (FileStatus st : fileStatus) {
-            inputPaths.add(st.getPath().toString());
+            inputPaths.add(st.getPath());
           }
         } else {
-          inputPaths.add(fstatus.getPath().toString());
+          inputPaths.add(fstatus.getPath());
         }
       } catch (IOException e) {
         e.printStackTrace(System.err);
@@ -340,7 +340,7 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
       }
     }
 
-    MergeWork mergeWork = new MergeWork(inputPaths, outputDir);
+    MergeWork mergeWork = new MergeWork(inputPaths, new Path(outputDir));
     DriverContext driverCxt = new DriverContext();
     BlockMergeTask taskExec = new BlockMergeTask();
     taskExec.initialize(hiveConf, null, driverCxt);
@@ -372,10 +372,5 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
   @Override
   public void logPlanProgress(SessionState ss) throws IOException {
     // no op
-  }
-
-  @Override
-  public void updateCounters(Counters ctrs, RunningJob rj) throws IOException {
-    // no op
-  }
+  }  
 }

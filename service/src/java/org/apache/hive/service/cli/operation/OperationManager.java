@@ -18,13 +18,10 @@
 
 package org.apache.hive.service.cli.operation;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hive.service.AbstractService;
 import org.apache.hive.service.cli.FetchOrientation;
@@ -52,6 +49,7 @@ public class OperationManager extends AbstractService {
   @Override
   public synchronized void init(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
+
     super.init(hiveConf);
   }
 
@@ -172,5 +170,4 @@ public class OperationManager extends AbstractService {
           throws HiveSQLException {
     return getOperation(opHandle).getNextRowSet(orientation, maxRows);
   }
-
 }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,8 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
@@ -37,7 +40,11 @@ import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
+import org.apache.hadoop.hive.ql.io.ContentSummaryInputFormat;
+import org.apache.hadoop.hive.ql.io.HiveInputFormat;
+import org.apache.hadoop.hive.ql.metadata.InputEstimator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
@@ -53,6 +60,8 @@ import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
+import org.apache.hadoop.mapred.InputFormat;
+import org.apache.hadoop.mapred.JobConf;
 
 /**
  * Tries to convert simple fetch query to single fetch task, which fetches rows directly
@@ -75,7 +84,7 @@ public class SimpleFetchOptimizer implements Transform {
           if (fetchTask != null) {
             pctx.setFetchTask(fetchTask);
           }
-        } catch (HiveException e) {
+        } catch (Exception e) {
           // Has to use full name to make sure it does not conflict with
           // org.apache.commons.lang.StringUtils
           LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
@@ -92,13 +101,13 @@ public class SimpleFetchOptimizer implements Transform {
   // returns non-null FetchTask instance when succeeded
   @SuppressWarnings("unchecked")
   private FetchTask optimize(ParseContext pctx, String alias, TableScanOperator source)
-      throws HiveException {
+      throws Exception {
     String mode = HiveConf.getVar(
         pctx.getConf(), HiveConf.ConfVars.HIVEFETCHTASKCONVERSION);
 
     boolean aggressive = "more".equals(mode);
     FetchData fetch = checkTree(aggressive, pctx, alias, source);
-    if (fetch != null) {
+    if (fetch != null && checkThreshold(fetch, pctx)) {
       int limit = pctx.getQB().getParseInfo().getOuterQueryLimit();
       FetchWork fetchWork = fetch.convertToWork();
       FetchTask fetchTask = (FetchTask) TaskFactory.get(fetchWork, pctx.getConf());
@@ -108,6 +117,21 @@ public class SimpleFetchOptimizer implements Transform {
       return fetchTask;
     }
     return null;
+  }
+
+  private boolean checkThreshold(FetchData data, ParseContext pctx) throws Exception {
+    long threshold = HiveConf.getLongVar(pctx.getConf(),
+        HiveConf.ConfVars.HIVEFETCHTASKCONVERSIONTHRESHOLD);
+    if (threshold < 0) {
+      return true;
+    }
+    long remaining = threshold;
+    remaining -= data.getInputLength(pctx, remaining);
+    if (remaining < 0) {
+      LOG.info("Threshold " + remaining + " exceeded for pseudoMR mode");
+      return false;
+    }
+    return true;
   }
 
   // all we can handle is LimitOperator, FilterOperator SelectOperator and final FS
@@ -134,8 +158,9 @@ public class SimpleFetchOptimizer implements Transform {
     if (table == null) {
       return null;
     }
+    ReadEntity parent = PlanUtils.getParentViewInfo(alias, pctx.getViewAliasToInput());
     if (!table.isPartitioned()) {
-      return checkOperators(new FetchData(table, splitSample), ts, aggressive, false);
+      return checkOperators(new FetchData(parent, table, splitSample), ts, aggressive, false);
     }
 
     boolean bypassFilter = false;
@@ -147,7 +172,8 @@ public class SimpleFetchOptimizer implements Transform {
       PrunedPartitionList pruned = pctx.getPrunedPartitions(alias, ts).get(0);
       if (aggressive || !pruned.hasUnknownPartitions()) {
         bypassFilter &= !pruned.hasUnknownPartitions();
-        return checkOperators(new FetchData(pruned, splitSample), ts, aggressive, bypassFilter);
+        return checkOperators(new FetchData(parent, table, pruned, splitSample), ts,
+            aggressive, bypassFilter);
       }
     }
     return null;
@@ -174,6 +200,7 @@ public class SimpleFetchOptimizer implements Transform {
       }
     }
     if (op instanceof FileSinkOperator) {
+      fetch.scanOp = ts;
       fetch.fileSink = op;
       return fetch;
     }
@@ -182,46 +209,52 @@ public class SimpleFetchOptimizer implements Transform {
 
   private class FetchData {
 
+    private final ReadEntity parent;
     private final Table table;
     private final SplitSample splitSample;
     private final PrunedPartitionList partsList;
     private final HashSet<ReadEntity> inputs = new HashSet<ReadEntity>();
 
+    // source table scan
+    private TableScanOperator scanOp;
+
     // this is always non-null when conversion is completed
     private Operator<?> fileSink;
 
-    private FetchData(Table table, SplitSample splitSample) {
+    private FetchData(ReadEntity parent, Table table, SplitSample splitSample) {
+      this.parent = parent;
       this.table = table;
       this.partsList = null;
       this.splitSample = splitSample;
     }
 
-    private FetchData(PrunedPartitionList partsList, SplitSample splitSample) {
-      this.table = null;
+    private FetchData(ReadEntity parent, Table table, PrunedPartitionList partsList,
+        SplitSample splitSample) {
+      this.parent = parent;
+      this.table = table;
       this.partsList = partsList;
       this.splitSample = splitSample;
     }
 
     private FetchWork convertToWork() throws HiveException {
       inputs.clear();
-      if (table != null) {
-        inputs.add(new ReadEntity(table));
-        String path = table.getPath().toString();
-        FetchWork work = new FetchWork(path, Utilities.getTableDesc(table));
+      if (!table.isPartitioned()) {
+        inputs.add(new ReadEntity(table, parent));
+        FetchWork work = new FetchWork(table.getPath(), Utilities.getTableDesc(table));
         PlanUtils.configureInputJobPropertiesForStorageHandler(work.getTblDesc());
         work.setSplitSample(splitSample);
         return work;
       }
-      List<String> listP = new ArrayList<String>();
+      List<Path> listP = new ArrayList<Path>();
       List<PartitionDesc> partP = new ArrayList<PartitionDesc>();
 
       for (Partition partition : partsList.getNotDeniedPartns()) {
-        inputs.add(new ReadEntity(partition));
-        listP.add(partition.getPartitionPath().toString());
+        inputs.add(new ReadEntity(partition, parent));
+        listP.add(partition.getDataLocation());
         partP.add(Utilities.getPartitionDesc(partition));
       }
       Table sourceTable = partsList.getSourceTable();
-      inputs.add(new ReadEntity(sourceTable));
+      inputs.add(new ReadEntity(sourceTable, parent));
       TableDesc table = Utilities.getTableDesc(sourceTable);
       FetchWork work = new FetchWork(listP, partP, table);
       if (!work.getPartDesc().isEmpty()) {
@@ -236,8 +269,60 @@ public class SimpleFetchOptimizer implements Transform {
     // single direct fetching, which means FS is not needed any more when conversion completed.
     // rows forwarded will be received by ListSinkOperator, which is replacing FS
     private ListSinkOperator completed(ParseContext pctx, FetchWork work) {
-      pctx.getSemanticInputs().addAll(inputs);
+      for (ReadEntity input : inputs) {
+        PlanUtils.addInput(pctx.getSemanticInputs(), input);
+      }
       return replaceFSwithLS(fileSink, work.getSerializationNullFormat());
+    }
+
+    private long getInputLength(ParseContext pctx, long remaining) throws Exception {
+      if (splitSample != null && splitSample.getTotalLength() != null) {
+        return splitSample.getTotalLength();
+      }
+      long length = calculateLength(pctx, remaining);
+      if (splitSample != null) {
+        return splitSample.getTargetSize(length);
+      }
+      return length;
+    }
+
+    private long calculateLength(ParseContext pctx, long remaining) throws Exception {
+      JobConf jobConf = new JobConf(pctx.getConf());
+      Utilities.setColumnNameList(jobConf, scanOp, true);
+      Utilities.setColumnTypeList(jobConf, scanOp, true);
+      HiveStorageHandler handler = table.getStorageHandler();
+      if (handler instanceof InputEstimator) {
+        InputEstimator estimator = (InputEstimator) handler;
+        TableDesc tableDesc = Utilities.getTableDesc(table);
+        PlanUtils.configureInputJobPropertiesForStorageHandler(tableDesc);
+        Utilities.copyTableJobPropertiesToConf(tableDesc, jobConf);
+        return estimator.estimate(jobConf, scanOp, remaining).getTotalLength();
+      }
+      if (table.isNonNative()) {
+        return 0; // nothing can be done
+      }
+      if (!table.isPartitioned()) {
+        return getFileLength(jobConf, table.getPath(), table.getInputFormatClass());
+      }
+      long total = 0;
+      for (Partition partition : partsList.getNotDeniedPartns()) {
+        Path path = partition.getDataLocation();
+        total += getFileLength(jobConf, path, partition.getInputFormatClass());
+      }
+      return total;
+    }
+
+    // from Utilities.getInputSummary()
+    private long getFileLength(JobConf conf, Path path, Class<? extends InputFormat> clazz)
+        throws IOException {
+      ContentSummary summary;
+      if (ContentSummaryInputFormat.class.isAssignableFrom(clazz)) {
+        InputFormat input = HiveInputFormat.getInputFormatFromCache(clazz, conf);
+        summary = ((ContentSummaryInputFormat)input).getContentSummary(path, conf);
+      } else {
+        summary = path.getFileSystem(conf).getContentSummary(path);
+      }
+      return summary.getLength();
     }
   }
 

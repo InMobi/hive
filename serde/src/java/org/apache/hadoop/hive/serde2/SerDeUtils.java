@@ -21,30 +21,30 @@ package org.apache.hadoop.hive.serde2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
@@ -66,36 +66,9 @@ public final class SerDeUtils {
   // lower case null is used within json objects
   private static final String JSON_NULL = "null";
 
-  private static ConcurrentHashMap<String, Class<?>> serdes =
-    new ConcurrentHashMap<String, Class<?>>();
-
   public static final Log LOG = LogFactory.getLog(SerDeUtils.class.getName());
 
-  public static void registerSerDe(String name, Class<?> serde) {
-    if (serdes.containsKey(name)) {
-      LOG.warn("double registering serde " + name);
-      return;
-    }
-    serdes.put(name, serde);
-  }
-
-  public static Deserializer lookupDeserializer(String name) throws SerDeException {
-    Class<?> c;
-    if (serdes.containsKey(name)) {
-      c = serdes.get(name);
-    } else {
-      try {
-        c = Class.forName(name, true, JavaUtils.getClassLoader());
-      } catch (ClassNotFoundException e) {
-        throw new SerDeException("SerDe " + name + " does not exist");
-      }
-    }
-    try {
-      return (Deserializer) c.newInstance();
-    } catch (Exception e) {
-      throw new SerDeException(e);
-    }
-  }
+  public static void registerSerDe(String name, Class<?> serde) {}
 
   private static List<String> nativeSerDeNames = new ArrayList<String>();
   static {
@@ -219,6 +192,32 @@ public final class SerDeUtils {
     return (escape.toString());
   }
 
+  /**
+   * Convert a Object to a standard Java object in compliance with JDBC 3.0 (see JDBC 3.0
+   * Specification, Table B-3: Mapping from JDBC Types to Java Object Types).
+   *
+   * This method is kept consistent with {@link HiveResultSetMetaData#hiveTypeToSqlType}.
+   */
+  public static Object toThriftPayload(Object val, ObjectInspector valOI, int version) {
+    if (valOI.getCategory() == ObjectInspector.Category.PRIMITIVE) {
+      if (val == null) {
+        return null;
+      }
+      Object obj = ObjectInspectorUtils.copyToStandardObject(val, valOI,
+          ObjectInspectorUtils.ObjectInspectorCopyOption.JAVA);
+      // uses string type for binary before HIVE_CLI_SERVICE_PROTOCOL_V6
+      if (version < 5 && ((PrimitiveObjectInspector)valOI).getPrimitiveCategory() ==
+          PrimitiveObjectInspector.PrimitiveCategory.BINARY) {
+        // todo HIVE-5269
+        return new String((byte[])obj);
+      }
+      return obj;
+    }
+    // for now, expose non-primitive as a string
+    // TODO: expose non-primitive as a structured object while maintaining JDBC compliance
+    return SerDeUtils.getJSONString(val, valOI);
+  }
+
   public static String getJSONString(Object o, ObjectInspector oi) {
     return getJSONString(o, oi, JSON_NULL);
   }
@@ -281,6 +280,13 @@ public final class SerDeUtils {
           sb.append('"');
           sb.append(escapeString(((StringObjectInspector) poi)
               .getPrimitiveJavaObject(o)));
+          sb.append('"');
+          break;
+        }
+        case CHAR: {
+          sb.append('"');
+          sb.append(escapeString(((HiveCharObjectInspector) poi)
+              .getPrimitiveJavaObject(o).toString()));
           sb.append('"');
           break;
         }

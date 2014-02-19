@@ -13,7 +13,15 @@ common/src/gen
 *.iml
 *.ipr
 *.iws
-ql/derby.log
 derby.log
+datanucleus.log
 .arc
+TempStatsStore/
+target/
 ql/TempStatsStore
+hcatalog/hcatalog-pig-adapter/target
+hcatalog/server-extensions/target
+hcatalog/core/target
+hcatalog/webhcat/java-client/target
+hcatalog/storage-handlers/hbase/target
+hcatalog/webhcat/svr/target

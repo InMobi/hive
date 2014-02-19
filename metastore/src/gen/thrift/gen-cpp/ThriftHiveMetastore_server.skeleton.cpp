@@ -157,6 +157,11 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("append_partition\n");
   }
 
+  void add_partitions_req(AddPartitionsResult& _return, const AddPartitionsRequest& request) {
+    // Your implementation goes here
+    printf("add_partitions_req\n");
+  }
+
   void append_partition_with_environment_context(Partition& _return, const std::string& db_name, const std::string& tbl_name, const std::vector<std::string> & part_vals, const EnvironmentContext& environment_context) {
     // Your implementation goes here
     printf("append_partition_with_environment_context\n");
@@ -190,6 +195,11 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   bool drop_partition_by_name_with_environment_context(const std::string& db_name, const std::string& tbl_name, const std::string& part_name, const bool deleteData, const EnvironmentContext& environment_context) {
     // Your implementation goes here
     printf("drop_partition_by_name_with_environment_context\n");
+  }
+
+  void drop_partitions_req(DropPartitionsResult& _return, const DropPartitionsRequest& req) {
+    // Your implementation goes here
+    printf("drop_partitions_req\n");
   }
 
   void get_partition(Partition& _return, const std::string& db_name, const std::string& tbl_name, const std::vector<std::string> & part_vals) {
@@ -247,9 +257,9 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("get_partitions_by_filter\n");
   }
 
-  int32_t get_num_partitions_by_filter(const std::string& db_name, const std::string& tbl_name, const std::string& filter, const int16_t max_parts) {
+  void get_partitions_by_expr(PartitionsByExprResult& _return, const PartitionsByExprRequest& req) {
     // Your implementation goes here
-    printf("get_num_partitions_by_filter\n");
+    printf("get_partitions_by_expr\n");
   }
 
   void get_partitions_by_names(std::vector<Partition> & _return, const std::string& db_name, const std::string& tbl_name, const std::vector<std::string> & names) {
@@ -355,6 +365,16 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   void get_partition_column_statistics(ColumnStatistics& _return, const std::string& db_name, const std::string& tbl_name, const std::string& part_name, const std::string& col_name) {
     // Your implementation goes here
     printf("get_partition_column_statistics\n");
+  }
+
+  void get_table_statistics_req(TableStatsResult& _return, const TableStatsRequest& request) {
+    // Your implementation goes here
+    printf("get_table_statistics_req\n");
+  }
+
+  void get_partitions_statistics_req(PartitionsStatsResult& _return, const PartitionsStatsRequest& request) {
+    // Your implementation goes here
+    printf("get_partitions_statistics_req\n");
   }
 
   bool delete_partition_column_statistics(const std::string& db_name, const std::string& tbl_name, const std::string& part_name, const std::string& col_name) {

@@ -215,7 +215,7 @@ public class MuxOperator extends Operator<MuxDesc> implements Serializable{
   protected void initializeChildren(Configuration hconf) throws HiveException {
     state = State.INIT;
     LOG.info("Operator " + id + " " + getName() + " initialized");
-    if (childOperators == null) {
+    if (childOperators == null || childOperators.isEmpty()) {
       return;
     }
     LOG.info("Initializing children of " + id + " " + getName());
@@ -243,11 +243,11 @@ public class MuxOperator extends Operator<MuxDesc> implements Serializable{
       } else {
         if (forward[tag]) {
           // No need to evaluate, just forward it.
-          child.process(row, tag);
+          child.processOp(row, tag);
         } else {
           // Call the corresponding handler to evaluate this row and
           // forward the result
-          child.process(handlers[tag].process(row), handlers[tag].getTag());
+          child.processOp(handlers[tag].process(row), handlers[tag].getTag());
         }
       }
     }

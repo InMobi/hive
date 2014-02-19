@@ -31,15 +31,43 @@ import org.apache.hadoop.hive.metastore.parser.ExpressionTree.LeafNode;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.Operator;
 import org.apache.hadoop.hive.metastore.parser.ExpressionTree.LogicalOperator;
 }
-@lexer::header {package org.apache.hadoop.hive.metastore.parser;}
+
+@lexer::header {
+package org.apache.hadoop.hive.metastore.parser;
+
+import java.sql.Date;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+}
 
 @lexer::members {
   public String errorMsg;
 
+  private static final Pattern datePattern = Pattern.compile(".*(\\d\\d\\d\\d-\\d\\d-\\d\\d).*");
+  private static final SimpleDateFormat dateFormat;
+  static { 
+    dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+    dateFormat.setLenient(false);
+  }
+
+  public static java.sql.Date ExtractDate (String input) {
+    Matcher m = datePattern.matcher(input);
+    if (!m.matches()) {
+      return null;
+    }
+    try {
+      return new java.sql.Date(dateFormat.parse(m.group(1)).getTime());
+    } catch (ParseException pe) {
+      return null;
+    }
+  }
+
   @Override
   public void emitErrorMessage(String msg) {
     // save for caller to detect invalid filter
-	errorMsg = msg;
+    errorMsg = msg;
   }
 }
 
@@ -86,23 +114,36 @@ expression
     operatorExpression
     ;
 
-operatorExpression 
-@init { 
+operatorExpression
+    :
+    betweenExpression
+    |
+    binOpExpression
+    ;
+
+binOpExpression
+@init {
     boolean isReverseOrder = false;
     Object val = null;
 }
     :
     (
        (
-	       (key = Identifier op = operator  value = StringLiteral)
-	       |
-	       (value = StringLiteral  op = operator key = Identifier) { isReverseOrder = true; }
+         (key = Identifier op = operator  value = DateLiteral)
+         |
+         (value = DateLiteral  op = operator key = Identifier) { isReverseOrder = true; }
+       ) { val = FilterLexer.ExtractDate(value.getText()); }
+       |
+       (
+         (key = Identifier op = operator  value = StringLiteral)
+         |
+         (value = StringLiteral  op = operator key = Identifier) { isReverseOrder = true; }
        ) { val = TrimQuotes(value.getText()); }
        |
        (
-	       (key = Identifier op = operator value = IntegralLiteral)
-	       |
-	       (value = IntegralLiteral op = operator key = Identifier) { isReverseOrder = true; }
+         (key = Identifier op = operator value = IntegralLiteral)
+         |
+         (value = IntegralLiteral op = operator key = Identifier) { isReverseOrder = true; }
        ) { val = Long.parseLong(value.getText()); }
     )
     {
@@ -122,10 +163,48 @@ operator returns [Operator op]
       $op = Operator.fromString(t.getText().toUpperCase());
    };
 
+betweenExpression
+@init {
+    Object leftV = null;
+    Object rightV = null;
+    boolean isPositive = true;
+}
+    :
+    (
+       key = Identifier (KW_NOT { isPositive = false; } )? BETWEEN
+       (
+         (left = DateLiteral KW_AND right = DateLiteral) {
+            leftV = FilterLexer.ExtractDate(left.getText());
+            rightV = FilterLexer.ExtractDate(right.getText());
+         }
+         |
+         (left = StringLiteral KW_AND right = StringLiteral) { leftV = TrimQuotes(left.getText());
+            rightV = TrimQuotes(right.getText());
+         }
+         |
+         (left = IntegralLiteral KW_AND right = IntegralLiteral) { leftV = Long.parseLong(left.getText());
+            rightV = Long.parseLong(right.getText());
+         }
+       )
+    )
+    {
+        LeafNode leftNode = new LeafNode(), rightNode = new LeafNode();
+        leftNode.keyName = rightNode.keyName = key.getText();
+        leftNode.value = leftV;
+        rightNode.value = rightV;
+        leftNode.operator = isPositive ? Operator.GREATERTHANOREQUALTO : Operator.LESSTHAN;
+        rightNode.operator = isPositive ? Operator.LESSTHANOREQUALTO : Operator.GREATERTHAN;
+        tree.addLeafNode(leftNode);
+        tree.addLeafNode(rightNode);
+        tree.addIntermediateNode(isPositive ? LogicalOperator.AND : LogicalOperator.OR);
+    };
+
 // Keywords
+KW_NOT : 'NOT';
 KW_AND : 'AND';
 KW_OR : 'OR';
 KW_LIKE : 'LIKE';
+KW_DATE : 'date';
 
 // Operators
 LPAREN : '(' ;
@@ -136,6 +215,7 @@ LESSTHANOREQUALTO : '<=';
 LESSTHAN : '<';
 GREATERTHANOREQUALTO : '>=';
 GREATERTHAN : '>';
+BETWEEN : 'BETWEEN';
 
 // LITERALS
 fragment
@@ -149,13 +229,25 @@ Digit
     '0'..'9'
     ;
 
+fragment DateString
+    :
+    (Digit)(Digit)(Digit)(Digit) '-' (Digit)(Digit) '-' (Digit)(Digit)
+    ;
+
+/* When I figure out how to make lexer backtrack after validating predicate, dates would be able 
+to support single quotes [( '\'' DateString '\'' ) |]. For now, what we do instead is have a hack
+to parse the string in metastore code from StringLiteral. */
+DateLiteral
+    :
+    KW_DATE? DateString { ExtractDate(getText()) != null }?
+    ;
+
 StringLiteral
     :
     ( '\'' ( ~('\''|'\\') | ('\\' .) )* '\''
     | '\"' ( ~('\"'|'\\') | ('\\' .) )* '\"'
     )
     ;
-
 
 IntegralLiteral
     :

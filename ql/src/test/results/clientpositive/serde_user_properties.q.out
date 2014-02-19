@@ -7,7 +7,21 @@ POSTHOOK: query: -- HIVE-2906 Table properties in SQL
 explain extended select key from src
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -16,21 +30,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -41,6 +55,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -53,13 +69,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -72,13 +88,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}
@@ -96,13 +112,29 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
 PREHOOK: query: explain extended select a.key from src a
 PREHOOK: type: QUERY
 POSTHOOK: query: explain extended select a.key from src a
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src) a)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+         a
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -111,21 +143,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -136,6 +168,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -148,13 +182,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -167,13 +201,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}
@@ -191,13 +225,32 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
 PREHOOK: query: explain extended select a.key from src tablesample(1 percent) a
 PREHOOK: type: QUERY
 POSTHOOK: query: explain extended select a.key from src tablesample(1 percent) a
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src) (TOK_TABLESPLITSAMPLE TOK_PERCENT 1) a)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+         TOK_TABLESPLITSAMPLE
+            TOK_PERCENT
+            1
+         a
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -206,21 +259,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -231,6 +284,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -247,13 +302,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -266,13 +321,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}
@@ -290,13 +345,31 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
 PREHOOK: query: explain extended select key from src ('user.defined.key'='some.value')
 PREHOOK: type: QUERY
 POSTHOOK: query: explain extended select key from src ('user.defined.key'='some.value')
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src) (TOK_TABLEPROPERTIES (TOK_TABLEPROPLIST (TOK_TABLEPROPERTY 'user.defined.key' 'some.value'))))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+         TOK_TABLEPROPERTIES
+            TOK_TABLEPROPLIST
+               TOK_TABLEPROPERTY
+                  'user.defined.key'
+                  'some.value'
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -305,21 +378,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -330,6 +403,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -342,13 +417,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -362,13 +437,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}
@@ -387,13 +462,34 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
 PREHOOK: query: explain extended select key from src ('user.defined.key'='some.value') tablesample(1 percent)
 PREHOOK: type: QUERY
 POSTHOOK: query: explain extended select key from src ('user.defined.key'='some.value') tablesample(1 percent)
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src) (TOK_TABLEPROPERTIES (TOK_TABLEPROPLIST (TOK_TABLEPROPERTY 'user.defined.key' 'some.value'))) (TOK_TABLESPLITSAMPLE TOK_PERCENT 1))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+         TOK_TABLEPROPERTIES
+            TOK_TABLEPROPLIST
+               TOK_TABLEPROPERTY
+                  'user.defined.key'
+                  'some.value'
+         TOK_TABLESPLITSAMPLE
+            TOK_PERCENT
+            1
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_TABLE_OR_COL
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -402,21 +498,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -427,6 +523,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -443,13 +541,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -463,13 +561,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}
@@ -493,7 +591,29 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain extended select a.key from src ('user.defined.key'='some.value') a
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src) (TOK_TABLEPROPERTIES (TOK_TABLEPROPLIST (TOK_TABLEPROPERTY 'user.defined.key' 'some.value'))) a)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+         TOK_TABLEPROPERTIES
+            TOK_TABLEPROPLIST
+               TOK_TABLEPROPERTY
+                  'user.defined.key'
+                  'some.value'
+         a
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -502,21 +622,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -527,6 +647,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -539,13 +661,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -559,13 +681,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}
@@ -584,13 +706,37 @@ STAGE PLANS:
     Fetch Operator
       limit: -1
 
-
 PREHOOK: query: explain extended select a.key from src ('user.defined.key'='some.value') tablesample(1 percent) a
 PREHOOK: type: QUERY
 POSTHOOK: query: explain extended select a.key from src ('user.defined.key'='some.value') tablesample(1 percent) a
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF (TOK_TABNAME src) (TOK_TABLEPROPERTIES (TOK_TABLEPROPLIST (TOK_TABLEPROPERTY 'user.defined.key' 'some.value'))) (TOK_TABLESPLITSAMPLE TOK_PERCENT 1) a)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_TABREF
+         TOK_TABNAME
+            src
+         TOK_TABLEPROPERTIES
+            TOK_TABLEPROPLIST
+               TOK_TABLEPROPERTY
+                  'user.defined.key'
+                  'some.value'
+         TOK_TABLESPLITSAMPLE
+            TOK_PERCENT
+            1
+         a
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
@@ -599,21 +745,21 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
+              expressions: key (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
 #### A masked pattern was here ####
                 NumFilesPerFileSink: 1
+                Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
 #### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
@@ -624,6 +770,8 @@ STAGE PLANS:
                       escape.delim \
                       hive.serialization.extend.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -640,13 +788,13 @@ STAGE PLANS:
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
               columns.types string:string
 #### A masked pattern was here ####
               name default.src
               numFiles 1
-              numPartitions 0
               numRows 0
               rawDataSize 0
               serialization.ddl struct src { string key, string value}
@@ -660,13 +808,13 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
                 columns.types string:string
 #### A masked pattern was here ####
                 name default.src
                 numFiles 1
-                numPartitions 0
                 numRows 0
                 rawDataSize 0
                 serialization.ddl struct src { string key, string value}

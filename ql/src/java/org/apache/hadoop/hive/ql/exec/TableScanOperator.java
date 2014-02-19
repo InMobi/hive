@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,14 +27,16 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
+import org.apache.hadoop.hive.ql.stats.CounterStatsPublisher;
 import org.apache.hadoop.hive.ql.stats.StatsPublisher;
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils.ObjectInspectorCopyOption;
@@ -105,9 +106,9 @@ public class TableScanOperator extends Operator<TableScanDesc> implements
     Map<String, Integer> bucketNameMapping =
         (conf != null) ? conf.getBucketFileNameMapping() : null;
     if ((bucketNameMapping != null) && (!bucketNameMapping.isEmpty())) {
-      String currentInputFile = getExecContext().getCurrentInputFile();
+      Path currentInputPath = getExecContext().getCurrentInputPath();
       getExecContext().setFileId(Integer.toString(bucketNameMapping.get(
-          Utilities.getFileNameFromDirName(currentInputFile))));
+          currentInputPath.getName())));
     }
   }
 
@@ -237,18 +238,22 @@ public class TableScanOperator extends Operator<TableScanDesc> implements
     return "TS";
   }
 
-  // this 'neededColumnIDs' field is included in this operator class instead of
+  // This 'neededColumnIDs' field is included in this operator class instead of
   // its desc class.The reason is that 1)tableScanDesc can not be instantiated,
   // and 2) it will fail some join and union queries if this is added forcibly
-  // into tableScanDesc
-  java.util.ArrayList<Integer> neededColumnIDs;
+  // into tableScanDesc.
+  // Both neededColumnIDs and neededColumns should never be null.
+  // When neededColumnIDs is an empty list,
+  // it means no needed column (e.g. we do not need any column to evaluate
+  // SELECT count(*) FROM t).
+  List<Integer> neededColumnIDs;
   List<String> neededColumns;
 
-  public void setNeededColumnIDs(java.util.ArrayList<Integer> orign_columns) {
+  public void setNeededColumnIDs(List<Integer> orign_columns) {
     neededColumnIDs = orign_columns;
   }
 
-  public java.util.ArrayList<Integer> getNeededColumnIDs() {
+  public List<Integer> getNeededColumnIDs() {
     return neededColumnIDs;
   }
 
@@ -279,24 +284,18 @@ public class TableScanOperator extends Operator<TableScanDesc> implements
       return;
     }
 
-    String key;
     String taskID = Utilities.getTaskIdFromFilename(Utilities.getTaskId(hconf));
     Map<String, String> statsToPublish = new HashMap<String, String>();
 
     for (String pspecs : stats.keySet()) {
       statsToPublish.clear();
-      if (pspecs.isEmpty()) {
-        // In case of a non-partitioned table, the key for temp storage is just
-        // "tableName + taskID"
-        String keyPrefix = Utilities.getHashedStatsPrefix(
-            conf.getStatsAggPrefix(), conf.getMaxStatsKeyPrefixLength());
-        key = keyPrefix + taskID;
-      } else {
-        // In case of a partition, the key for temp storage is
-        // "tableName + partitionSpecs + taskID"
-        String keyPrefix = Utilities.getHashedStatsPrefix(
-            conf.getStatsAggPrefix() + pspecs + Path.SEPARATOR, conf.getMaxStatsKeyPrefixLength());
-        key = keyPrefix + taskID;
+      String prefix = Utilities.join(conf.getStatsAggPrefix(), pspecs);
+
+      int maxKeyLength = conf.getMaxStatsKeyPrefixLength();
+      String key = Utilities.getHashedStatsPrefix(prefix, maxKeyLength);
+      if (!(statsPublisher instanceof CounterStatsPublisher)) {
+        // stats publisher except counter type needs postfix 'taskID'
+        key = Utilities.join(prefix, taskID);
       }
       for(String statType : stats.get(pspecs).getStoredStats()) {
         statsToPublish.put(statType, Long.toString(stats.get(pspecs).getStat(statType)));
@@ -324,4 +323,14 @@ public class TableScanOperator extends Operator<TableScanDesc> implements
   public boolean supportAutomaticSortMergeJoin() {
     return true;
   }
+
+  @Override
+  public Operator<? extends OperatorDesc> clone()
+    throws CloneNotSupportedException {
+    TableScanOperator ts = (TableScanOperator) super.clone();
+    ts.setNeededColumnIDs(new ArrayList<Integer>(getNeededColumnIDs()));
+    ts.setNeededColumns(new ArrayList<String>(getNeededColumns()));
+    return ts;
+  }
+
 }

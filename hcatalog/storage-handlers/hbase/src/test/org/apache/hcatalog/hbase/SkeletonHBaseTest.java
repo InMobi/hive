@@ -36,14 +36,13 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 
 /**
  * Base class for HBase Tests which need a mini cluster instance
  */
 public abstract class SkeletonHBaseTest {
 
-  protected static String TEST_DIR = "/tmp/build/test/data/";
+  protected static String TEST_DIR = System.getProperty("test.tmp.dir", "target/tmp/");
 
   protected final static String DEFAULT_CONTEXT_HANDLE = "default";
 
@@ -56,20 +55,15 @@ public abstract class SkeletonHBaseTest {
    */
   protected static Configuration testConf = null;
 
-  protected void createTable(String tableName, String[] families) {
-    try {
-      HBaseAdmin admin = new HBaseAdmin(getHbaseConf());
-      HTableDescriptor tableDesc = new HTableDescriptor(tableName);
-      for (String family : families) {
-        HColumnDescriptor columnDescriptor = new HColumnDescriptor(family);
-        tableDesc.addFamily(columnDescriptor);
-      }
-      admin.createTable(tableDesc);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw new IllegalStateException(e);
+  protected void createTable(String tableName, String[] families) throws IOException {
+    HBaseAdmin admin = new HBaseAdmin(getHbaseConf());
+    HTableDescriptor tableDesc = new HTableDescriptor(tableName);
+    for (String family : families) {
+      HColumnDescriptor columnDescriptor = new HColumnDescriptor(family);
+      tableDesc.addFamily(columnDescriptor);
     }
-
+    admin.createTable(tableDesc);
+    admin.close();
   }
 
   protected String newTableName(String prefix) {
@@ -78,21 +72,20 @@ public abstract class SkeletonHBaseTest {
     do {
       name = prefix + "_" + Math.abs(new Random().nextLong());
     } while (tableNames.contains(name) && --tries > 0);
-    if (tableNames.contains(name))
+    if (tableNames.contains(name)) {
       throw new IllegalStateException("Couldn't find a unique table name, tableNames size: " + tableNames.size());
+    }
     tableNames.add(name);
     return name;
   }
 
-
   /**
    * startup an hbase cluster instance before a test suite runs
    */
-  @BeforeClass
-  public static void setup() {
-    if (!contextMap.containsKey(getContextHandle()))
+  public static void setupSkeletonHBaseTest() {
+    if (!contextMap.containsKey(getContextHandle())) {
       contextMap.put(getContextHandle(), new Context(getContextHandle()));
-
+    }
     contextMap.get(getContextHandle()).start();
   }
 
@@ -172,12 +165,8 @@ public abstract class SkeletonHBaseTest {
     protected int usageCount = 0;
 
     public Context(String handle) {
-      try {
-        testDir = new File(TEST_DIR + "/test_" + handle + "_" + Math.abs(new Random().nextLong()) + "/").getCanonicalPath();
-        System.out.println("Cluster work directory: " + testDir);
-      } catch (IOException e) {
-        throw new IllegalStateException("Failed to generate testDir", e);
-      }
+      testDir = new File(TEST_DIR + "/test_" + handle + "_" + Math.abs(new Random().nextLong()) + "/").getPath();
+      System.out.println("Cluster work directory: " + testDir);
     }
 
     public void start() {

@@ -31,6 +31,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
@@ -520,6 +521,8 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
       originalTree = tree;
       boolean isPartitionStats = isPartitionLevelStats(tree);
       PartitionList partList = null;
+      checkForPartitionColumns(colNames, getPartitionKeys(tableName));
+      validateSpecifiedColumnNames(tableName, colNames);
 
       if (isPartitionStats) {
         isTableLevel = false;
@@ -540,6 +543,49 @@ public class ColumnStatsSemanticAnalyzer extends SemanticAnalyzer {
       originalTree = rewrittenTree = tree;
       rewrittenQuery = null;
       isRewritten = false;
+    }
+  }
+
+  // fail early if the columns specified for column statistics are not valid
+  private void validateSpecifiedColumnNames(String tableName, List<String> specifiedCols)
+      throws SemanticException {
+    List<FieldSchema> fields = null;
+    try {
+      fields = db.getTable(tableName).getAllCols();
+    } catch (HiveException e) {
+      throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tableName));
+    }
+    List<String> tableCols = Utilities.getColumnNamesFromFieldSchema(fields);
+
+    for(String sc : specifiedCols) {
+      if (!tableCols.contains(sc.toLowerCase())) {
+        String msg = "'" + sc + "' (possible columns are " + tableCols.toString() + ")";
+        throw new SemanticException(ErrorMsg.INVALID_COLUMN.getMsg(msg));
+      }
+    }
+  }
+
+  private List<String> getPartitionKeys(String tableName) throws SemanticException {
+    List<FieldSchema> fields;
+    try {
+      fields = db.getTable(tableName).getPartitionKeys();
+    } catch (HiveException e) {
+      throw new SemanticException(ErrorMsg.INVALID_TABLE.getMsg(tableName));
+    }
+
+    return Utilities.getColumnNamesFromFieldSchema(fields);
+  }
+
+  private void checkForPartitionColumns(List<String> specifiedCols, List<String> partCols)
+      throws SemanticException {
+    // Raise error if user has specified partition column for stats
+    for (String pc : partCols) {
+      for (String sc : specifiedCols) {
+        if (pc.equalsIgnoreCase(sc)) {
+          throw new SemanticException(ErrorMsg.COLUMNSTATSCOLLECTOR_INVALID_COLUMN.getMsg()
+              + " [Try removing column '" + sc + "' from column list]");
+        }
+      }
     }
   }
 

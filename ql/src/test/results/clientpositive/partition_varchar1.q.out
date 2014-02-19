@@ -8,24 +8,40 @@ POSTHOOK: query: create table partition_varchar_1 (key string, value varchar(20)
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: default@partition_varchar_1
 PREHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2000-01-01', region=1)
+<<<<<<< HEAD
   select * from src limit 10
+=======
+  select * from src tablesample (10 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
 PREHOOK: Output: default@partition_varchar_1@dt=2000-01-01/region=1
 POSTHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2000-01-01', region=1)
+<<<<<<< HEAD
   select * from src limit 10
+=======
+  select * from src tablesample (10 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@partition_varchar_1@dt=2000-01-01/region=1
 POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2000-01-01,region=1).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2000-01-01,region=1).value EXPRESSION [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2000-01-01', region=2)
+<<<<<<< HEAD
   select * from src limit 5
+=======
+  select * from src tablesample (5 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
 PREHOOK: Output: default@partition_varchar_1@dt=2000-01-01/region=2
 POSTHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2000-01-01', region=2)
+<<<<<<< HEAD
   select * from src limit 5
+=======
+  select * from src tablesample (5 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@partition_varchar_1@dt=2000-01-01/region=2
@@ -34,12 +50,20 @@ POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2000-01-01,region=1).value E
 POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2000-01-01,region=2).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2000-01-01,region=2).value EXPRESSION [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2013-08-08', region=1)
+<<<<<<< HEAD
   select * from src limit 20
+=======
+  select * from src tablesample (20 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
 PREHOOK: Output: default@partition_varchar_1@dt=2013-08-08/region=1
 POSTHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2013-08-08', region=1)
+<<<<<<< HEAD
   select * from src limit 20
+=======
+  select * from src tablesample (20 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@partition_varchar_1@dt=2013-08-08/region=1
@@ -50,12 +74,20 @@ POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2000-01-01,region=2).value E
 POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2013-08-08,region=1).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: partition_varchar_1 PARTITION(dt=2013-08-08,region=1).value EXPRESSION [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2013-08-08', region=10)
+<<<<<<< HEAD
   select * from src limit 11
+=======
+  select * from src tablesample (11 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
 PREHOOK: Output: default@partition_varchar_1@dt=2013-08-08/region=10
 POSTHOOK: query: insert overwrite table partition_varchar_1 partition(dt='2013-08-08', region=10)
+<<<<<<< HEAD
   select * from src limit 11
+=======
+  select * from src tablesample (11 rows)
+>>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@partition_varchar_1@dt=2013-08-08/region=10

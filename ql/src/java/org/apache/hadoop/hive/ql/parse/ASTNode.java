@@ -32,7 +32,7 @@ import org.apache.hadoop.hive.ql.lib.Node;
 public class ASTNode extends CommonTree implements Node,Serializable {
   private static final long serialVersionUID = 1L;
 
-  private ASTNodeOrigin origin;
+  private transient ASTNodeOrigin origin;
 
   public ASTNode() {
   }
@@ -102,22 +102,28 @@ public class ASTNode extends CommonTree implements Node,Serializable {
   }
 
   public String dump() {
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder("\n");
+    dump(sb, "");
+    return sb.toString();
+  }
 
-    sb.append('(');
+  private StringBuilder dump(StringBuilder sb, String ws) {
+    sb.append(ws);
     sb.append(toString());
+    sb.append("\n");
+
     ArrayList<Node> children = getChildren();
     if (children != null) {
       for (Node node : getChildren()) {
         if (node instanceof ASTNode) {
-          sb.append(((ASTNode) node).dump());
+          ((ASTNode) node).dump(sb, ws + "   ");
         } else {
-          sb.append("NON-ASTNODE!!");
+          sb.append(ws);
+          sb.append("   NON-ASTNODE!!");
+          sb.append("\n");
         }
       }
     }
-    sb.append(')');
-    return sb.toString();
+    return sb;
   }
-
 }

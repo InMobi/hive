@@ -33,10 +33,10 @@ import org.apache.hadoop.hive.metastore.api.PartitionEventType;
 import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hive.hcatalog.cli.SemanticAnalysis.HCatSemanticAnalyzer;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hive.hcatalog.common.HCatConstants;
 import org.apache.hive.hcatalog.common.HCatException;
 import org.apache.hive.hcatalog.data.schema.HCatFieldSchema;
@@ -48,10 +48,13 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.junit.Assert.fail;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertArrayEquals;
+
+import org.apache.hadoop.util.Shell;
 
 public class TestHCatClient {
   private static final Logger LOG = LoggerFactory.getLogger(TestHCatClient.class);
@@ -100,7 +103,16 @@ public class TestHCatClient {
     System.setProperty(HiveConf.ConfVars.PREEXECHOOKS.varname, " ");
     System.setProperty(HiveConf.ConfVars.POSTEXECHOOKS.varname, " ");
   }
-
+  public static String fixPath(String path) {
+    if(!Shell.WINDOWS) {
+      return path;
+    }
+    String expectedDir = path.replaceAll("\\\\", "/");
+    if (!expectedDir.startsWith("/")) {
+      expectedDir = "/" + expectedDir;
+    }
+    return expectedDir;
+  }
   @Test
   public void testBasicDDLCommands() throws Exception {
     String db = "testdb";
@@ -120,13 +132,9 @@ public class TestHCatClient {
     assertTrue(testDb.getComment() == null);
     assertTrue(testDb.getProperties().size() == 0);
     String warehouseDir = System
-      .getProperty(ConfVars.METASTOREWAREHOUSE.varname, "/user/hive/warehouse");
-    String expectedDir = warehouseDir.replaceAll("\\\\", "/");
-    if (!expectedDir.startsWith("/")) {
-      expectedDir = "/" + expectedDir;
-    }
-    assertTrue(testDb.getLocation().equals(
-      "file:" + expectedDir + "/" + db + ".db"));
+      .getProperty("test.warehouse.dir", "/user/hive/warehouse");
+    String expectedDir = fixPath(warehouseDir).replaceFirst("pfile:///", "pfile:/");
+    assertEquals(expectedDir + "/" + db + ".db", testDb.getLocation());
     ArrayList<HCatFieldSchema> cols = new ArrayList<HCatFieldSchema>();
     cols.add(new HCatFieldSchema("id", Type.INT, "id comment"));
     cols.add(new HCatFieldSchema("value", Type.STRING, "value comment"));
@@ -146,6 +154,7 @@ public class TestHCatClient {
     // will result in an exception.
     try {
       client.createTable(tableDesc);
+      fail("Expected exception");
     } catch (HCatException e) {
       assertTrue(e.getMessage().contains(
         "AlreadyExistsException while creating table."));
@@ -153,15 +162,29 @@ public class TestHCatClient {
 
     client.dropTable(db, tableOne, true);
     HCatCreateTableDesc tableDesc2 = HCatCreateTableDesc.create(db,
-      tableTwo, cols).build();
+      tableTwo, cols).fieldsTerminatedBy('\001').escapeChar('\002').linesTerminatedBy('\003').
+      mapKeysTerminatedBy('\004').collectionItemsTerminatedBy('\005').nullDefinedAs('\006').build();
     client.createTable(tableDesc2);
     HCatTable table2 = client.getTable(db, tableTwo);
     assertTrue(table2.getInputFileFormat().equalsIgnoreCase(
       TextInputFormat.class.getName()));
     assertTrue(table2.getOutputFileFormat().equalsIgnoreCase(
       IgnoreKeyTextOutputFormat.class.getName()));
-    assertTrue(table2.getLocation().equalsIgnoreCase(
-      "file:" + expectedDir + "/" + db + ".db/" + tableTwo));
+    assertTrue("SerdeParams not found", table2.getSerdeParams() != null);
+    assertEquals("checking " + serdeConstants.FIELD_DELIM, Character.toString('\001'),
+      table2.getSerdeParams().get(serdeConstants.FIELD_DELIM));
+    assertEquals("checking " + serdeConstants.ESCAPE_CHAR, Character.toString('\002'),
+      table2.getSerdeParams().get(serdeConstants.ESCAPE_CHAR));
+    assertEquals("checking " + serdeConstants.LINE_DELIM, Character.toString('\003'),
+      table2.getSerdeParams().get(serdeConstants.LINE_DELIM));
+    assertEquals("checking " + serdeConstants.MAPKEY_DELIM, Character.toString('\004'),
+      table2.getSerdeParams().get(serdeConstants.MAPKEY_DELIM));
+    assertEquals("checking " + serdeConstants.COLLECTION_DELIM, Character.toString('\005'),
+      table2.getSerdeParams().get(serdeConstants.COLLECTION_DELIM));
+    assertEquals("checking " + serdeConstants.SERIALIZATION_NULL_FORMAT, Character.toString('\006'),
+      table2.getSerdeParams().get(serdeConstants.SERIALIZATION_NULL_FORMAT));
+    
+    assertEquals((expectedDir + "/" + db + ".db/" + tableTwo).toLowerCase(), table2.getLocation().toLowerCase());
     client.close();
   }
 

@@ -28,6 +28,8 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hive.common.classification.InterfaceAudience;
+import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -52,6 +54,8 @@ import org.slf4j.LoggerFactory;
 
 /** The OutputFormat to use to write data to HCatalog. The key value is ignored and
  *  should be given as null. The value is the HCatRecord to write.*/
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class HCatOutputFormat extends HCatBaseOutputFormat {
 
   static final private Logger LOG = LoggerFactory.getLogger(HCatOutputFormat.class);
@@ -155,6 +159,11 @@ public class HCatOutputFormat extends HCatBaseOutputFormat {
           }
           conf.set(HCatConstants.HCAT_DYNAMIC_PTN_JOBID, dynHash);
 
+          // if custom pattern is set in case of dynamic partitioning, configure custom path
+          String customPattern = conf.get(HCatConstants.HCAT_DYNAMIC_CUSTOM_PATTERN);
+          if (customPattern != null) {
+            HCatFileUtil.setCustomPath(customPattern, outputJobInfo);
+          }
         }
 
         outputJobInfo.setPartitionValues(valueMap);

@@ -19,10 +19,16 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 
 /**
@@ -37,10 +43,13 @@ public class MapredLocalWork implements Serializable {
   private LinkedHashMap<String, FetchWork> aliasToFetchWork;
   private boolean inputFileChangeSensitive;
   private BucketMapJoinContext bucketMapjoinContext;
-  private String tmpFileURI;
+  private Path tmpPath;
   private String stageID;
 
-  private List<Operator<? extends OperatorDesc>> dummyParentOp ;
+  private List<Operator<? extends OperatorDesc>> dummyParentOp;
+  private Map<MapJoinOperator, List<Operator<? extends OperatorDesc>>> directFetchOp;
+
+  private boolean hasStagedAlias;
 
   public MapredLocalWork() {
 
@@ -55,7 +64,7 @@ public class MapredLocalWork implements Serializable {
   }
 
   public MapredLocalWork(MapredLocalWork clone){
-    this.tmpFileURI = clone.tmpFileURI;
+    this.tmpPath = clone.tmpPath;
     this.inputFileChangeSensitive=clone.inputFileChangeSensitive;
 
   }
@@ -151,12 +160,12 @@ public class MapredLocalWork implements Serializable {
     return null;
   }
 
-  public void setTmpFileURI(String tmpFileURI) {
-    this.tmpFileURI = tmpFileURI;
+  public void setTmpPath(Path tmpPath) {
+    this.tmpPath = tmpPath;
   }
 
-  public String getTmpFileURI() {
-    return tmpFileURI;
+  public Path getTmpPath() {
+    return tmpPath;
   }
 
   public String getBucketFileName(String bigFileName) {
@@ -176,5 +185,62 @@ public class MapredLocalWork implements Serializable {
       return path;
     }
     return path.substring(last_separator + 1);
+  }
+
+  public MapredLocalWork extractDirectWorks(
+      Map<MapJoinOperator, List<Operator<? extends OperatorDesc>>> directWorks) {
+    MapredLocalWork newLocalWork = new MapredLocalWork();
+    newLocalWork.setTmpPath(tmpPath);
+    newLocalWork.setInputFileChangeSensitive(inputFileChangeSensitive);
+
+    Set<Operator<?>> validWorks = getDirectWorks(directWorks.values());
+    if (validWorks.isEmpty()) {
+      // all small aliases are staged.. no need full bucket context
+      newLocalWork.setBucketMapjoinContext(copyPartSpecMappingOnly());
+      return newLocalWork;
+    }
+    newLocalWork.directFetchOp =
+        new HashMap<MapJoinOperator, List<Operator<? extends OperatorDesc>>>(directWorks);
+    newLocalWork.aliasToWork = new LinkedHashMap<String, Operator<? extends OperatorDesc>>();
+    newLocalWork.aliasToFetchWork = new LinkedHashMap<String, FetchWork>();
+
+    Map<String, Operator<?>> works = new HashMap<String, Operator<?>>(aliasToWork);
+    for (Map.Entry<String, Operator<?>> entry : works.entrySet()) {
+      String alias = entry.getKey();
+      boolean notStaged = validWorks.contains(entry.getValue());
+      newLocalWork.aliasToWork.put(alias, notStaged ? aliasToWork.remove(alias) : null);
+      newLocalWork.aliasToFetchWork.put(alias, notStaged ? aliasToFetchWork.remove(alias) : null);
+    }
+    // copy full bucket context
+    newLocalWork.setBucketMapjoinContext(getBucketMapjoinContext());
+    return newLocalWork;
+  }
+
+  private Set<Operator<?>> getDirectWorks(Collection<List<Operator<?>>> values) {
+    Set<Operator<?>> operators = new HashSet<Operator<?>>();
+    for (List<Operator<?>> works : values) {
+      for (Operator<?> work : works) {
+        if (work != null) {
+          operators.add(work);
+        }
+      }
+    }
+    return operators;
+  }
+
+  public void setDirectFetchOp(Map<MapJoinOperator, List<Operator<? extends OperatorDesc>>> op){
+    this.directFetchOp = op;
+  }
+
+  public Map<MapJoinOperator, List<Operator<? extends OperatorDesc>>> getDirectFetchOp() {
+    return directFetchOp;
+  }
+
+  public boolean hasStagedAlias() {
+    return hasStagedAlias;
+  }
+
+  public void setHasStagedAlias(boolean hasStagedAlias) {
+    this.hasStagedAlias = hasStagedAlias;
   }
 }

@@ -34,8 +34,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
+import org.apache.hadoop.hive.ql.exec.FooterBuffer;
 import org.apache.hadoop.hive.ql.io.HiveContextAwareRecordReader;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveRecordReader;
@@ -46,6 +48,7 @@ import org.apache.hadoop.hive.ql.plan.FetchWork;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.objectinspector.DelegatedObjectInspectorFactory;
@@ -80,6 +83,9 @@ public class FetchOperator implements Serializable {
   private PartitionDesc currPart;
   private TableDesc currTbl;
   private boolean tblDataDone;
+  private FooterBuffer footerBuffer = null;
+  private int headerCount = 0;
+  private int footerCount = 0;
 
   private boolean hasVC;
   private boolean isPartitioned;
@@ -299,7 +305,7 @@ public class FetchOperator implements Serializable {
     if (iterPath == null) {
       if (work.isNotPartitioned()) {
         if (!tblDataDone) {
-          currPath = work.getTblDirPath();
+          currPath = work.getTblDir();
           currTbl = work.getTblDesc();
           if (isNativeTable) {
             FileSystem fs = currPath.getFileSystem(job);
@@ -326,7 +332,7 @@ public class FetchOperator implements Serializable {
         }
         return;
       } else {
-        iterPath = FetchWork.convertStringToPathArray(work.getPartDir()).iterator();
+        iterPath = work.getPartDir().iterator();
         iterPartDesc = work.getPartDesc().iterator();
       }
     }
@@ -353,6 +359,11 @@ public class FetchOperator implements Serializable {
     }
   }
 
+  /**
+   * A cache of Object Inspector Settable Properties.
+   */
+  private static Map<ObjectInspector, Boolean> oiSettableProperties = new HashMap<ObjectInspector, Boolean>();
+
   private RecordReader<WritableComparable, Writable> getRecordReader() throws Exception {
     if (currPath == null) {
       getNextPath();
@@ -367,6 +378,12 @@ public class FetchOperator implements Serializable {
       // operations
       job.set("mapred.input.dir", org.apache.hadoop.util.StringUtils.escapeString(currPath
           .toString()));
+
+      // Fetch operator is not vectorized and as such turn vectorization flag off so that
+      // non-vectorized record reader is created below.
+      if (HiveConf.getBoolVar(job, HiveConf.ConfVars.HIVE_VECTORIZATION_ENABLED)) {
+        HiveConf.setBoolVar(job, HiveConf.ConfVars.HIVE_VECTORIZATION_ENABLED, false);
+      }
 
       PartitionDesc partDesc;
       if (currTbl == null) {
@@ -389,7 +406,7 @@ public class FetchOperator implements Serializable {
       this.inputSplits = inputSplits;
 
       splitNum = 0;
-      serde = partDesc.getDeserializerClass().newInstance();
+      serde = partDesc.getDeserializer(job);
       serde.initialize(job, partDesc.getOverlayedProperties());
 
       if (currTbl != null) {
@@ -402,7 +419,8 @@ public class FetchOperator implements Serializable {
 
       ObjectInspector outputOI = ObjectInspectorConverters.getConvertedOI(
           serde.getObjectInspector(),
-          partitionedTableOI == null ? tblSerde.getObjectInspector() : partitionedTableOI, true);
+          partitionedTableOI == null ? tblSerde.getObjectInspector() : partitionedTableOI,
+          oiSettableProperties);
 
       partTblObjectInspectorConverter = ObjectInspectorConverters.getConverter(
           serde.getObjectInspector(), outputOI);
@@ -486,6 +504,13 @@ public class FetchOperator implements Serializable {
    * Currently only used by FetchTask.
    **/
   public boolean pushRow() throws IOException, HiveException {
+    if(work.getRowsComputedUsingStats() != null) {
+      for (List<Object> row : work.getRowsComputedUsingStats()) {
+        operator.processOp(row, 0);
+      }
+      operator.flush();
+      return true;
+    }
     InspectableObject row = getNextRow();
     if (row != null) {
       pushRow(row);
@@ -496,7 +521,7 @@ public class FetchOperator implements Serializable {
   }
 
   protected void pushRow(InspectableObject row) throws HiveException {
-    operator.process(row.o, 0);
+    operator.processOp(row.o, 0);
   }
 
   private transient final InspectableObject inspectable = new InspectableObject();
@@ -508,6 +533,7 @@ public class FetchOperator implements Serializable {
   public InspectableObject getNextRow() throws IOException {
     try {
       while (true) {
+        boolean opNotEOF = true;
         if (context != null) {
           context.resetRow();
         }
@@ -516,10 +542,49 @@ public class FetchOperator implements Serializable {
           if (currRecReader == null) {
             return null;
           }
+
+          /**
+           * Start reading a new file.
+           * If file contains header, skip header lines before reading the records.
+           * If file contains footer, used FooterBuffer to cache and remove footer
+           * records at the end of the file.
+           */
+          headerCount = 0;
+          footerCount = 0;
+          TableDesc table = null;
+          if (currTbl != null) {
+            table = currTbl;
+          } else if (currPart != null) {
+            table = currPart.getTableDesc();
+          }
+          if (table != null) {
+            headerCount = Utilities.getHeaderCount(table);
+            footerCount = Utilities.getFooterCount(table, job);
+          }
+
+          // Skip header lines.
+          opNotEOF = Utilities.skipHeader(currRecReader, headerCount, key, value);
+
+          // Initialize footer buffer.
+          if (opNotEOF) {
+            if (footerCount > 0) {
+              footerBuffer = new FooterBuffer();
+              opNotEOF = footerBuffer.initializeBuffer(job, currRecReader, footerCount, key, value);
+            }
+          }
         }
 
-        boolean ret = currRecReader.next(key, value);
-        if (ret) {
+        if (opNotEOF && footerBuffer == null) {
+          /**
+           * When file doesn't end after skipping header line
+           * and there is no footer lines, read normally.
+           */
+          opNotEOF = currRecReader.next(key, value);
+        }
+        if (opNotEOF && footerBuffer != null) {
+          opNotEOF = footerBuffer.updateBuffer(job, currRecReader, key, value);
+        }
+        if (opNotEOF) {
           if (operator != null && context != null && context.inputFileChanged()) {
             // The child operators cleanup if input file has changed
             try {
@@ -597,6 +662,9 @@ public class FetchOperator implements Serializable {
    * returns output ObjectInspector, never null
    */
   public ObjectInspector getOutputObjectInspector() throws HiveException {
+    if(null != work.getStatRowOI()) {
+      return work.getStatRowOI();
+    }
     try {
       if (work.isNotPartitioned()) {
         return getRowInspectorFromTable(work.getTblDesc());
@@ -624,11 +692,11 @@ public class FetchOperator implements Serializable {
       // Get the OI corresponding to all the partitions
       for (PartitionDesc listPart : listParts) {
         partition = listPart;
-        Deserializer partSerde = listPart.getDeserializerClass().newInstance();
+        Deserializer partSerde = listPart.getDeserializer(job);
         partSerde.initialize(job, listPart.getOverlayedProperties());
 
         partitionedTableOI = ObjectInspectorConverters.getConvertedOI(
-            partSerde.getObjectInspector(), tableOI, true);
+            partSerde.getObjectInspector(), tableOI, oiSettableProperties);
         if (!partitionedTableOI.equals(tableOI)) {
           break;
         }
