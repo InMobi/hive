@@ -24,10 +24,7 @@ PRIMITIVE_TYPES = set([
     16,
     17,
     18,
-<<<<<<< HEAD
-=======
     19,
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 ])
 COMPLEX_TYPES = set([
     10,
@@ -59,13 +56,8 @@ TYPE_NAMES = {
     16 : "NULL",
     17 : "DATE",
     18 : "VARCHAR",
-<<<<<<< HEAD
-}
-CHARACTER_MAXIMUM_LENGTH = "characterMaximumLength"
-=======
     19 : "CHAR",
 }
 CHARACTER_MAXIMUM_LENGTH = "characterMaximumLength"
 PRECISION = "precision"
 SCALE = "scale"
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb

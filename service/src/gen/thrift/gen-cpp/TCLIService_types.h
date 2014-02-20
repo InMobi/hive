@@ -22,12 +22,8 @@ struct TProtocolVersion {
     HIVE_CLI_SERVICE_PROTOCOL_V2 = 1,
     HIVE_CLI_SERVICE_PROTOCOL_V3 = 2,
     HIVE_CLI_SERVICE_PROTOCOL_V4 = 3,
-<<<<<<< HEAD
-    HIVE_CLI_SERVICE_PROTOCOL_V5 = 4
-=======
     HIVE_CLI_SERVICE_PROTOCOL_V5 = 4,
     HIVE_CLI_SERVICE_PROTOCOL_V6 = 5
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   };
 };
 
@@ -53,12 +49,8 @@ struct TTypeId {
     DECIMAL_TYPE = 15,
     NULL_TYPE = 16,
     DATE_TYPE = 17,
-<<<<<<< HEAD
-    VARCHAR_TYPE = 18
-=======
     VARCHAR_TYPE = 18,
     CHAR_TYPE = 19
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   };
 };
 
@@ -1953,13 +1945,8 @@ class TOpenSessionReq {
   static const char* ascii_fingerprint; // = "C8FD0F306A16C16BDA7B57F58BFAE5B2";
   static const uint8_t binary_fingerprint[16]; // = {0xC8,0xFD,0x0F,0x30,0x6A,0x16,0xC1,0x6B,0xDA,0x7B,0x57,0xF5,0x8B,0xFA,0xE5,0xB2};
 
-<<<<<<< HEAD
-  TOpenSessionReq() : client_protocol((TProtocolVersion::type)4), username(), password() {
-    client_protocol = (TProtocolVersion::type)4;
-=======
   TOpenSessionReq() : client_protocol((TProtocolVersion::type)5), username(), password() {
     client_protocol = (TProtocolVersion::type)5;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
   }
 
@@ -2034,13 +2021,8 @@ class TOpenSessionResp {
   static const char* ascii_fingerprint; // = "CFE7D7F4E9EC671F2518ED74FEE9F163";
   static const uint8_t binary_fingerprint[16]; // = {0xCF,0xE7,0xD7,0xF4,0xE9,0xEC,0x67,0x1F,0x25,0x18,0xED,0x74,0xFE,0xE9,0xF1,0x63};
 
-<<<<<<< HEAD
-  TOpenSessionResp() : serverProtocolVersion((TProtocolVersion::type)4) {
-    serverProtocolVersion = (TProtocolVersion::type)4;
-=======
   TOpenSessionResp() : serverProtocolVersion((TProtocolVersion::type)5) {
     serverProtocolVersion = (TProtocolVersion::type)5;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
   }
 
@@ -3296,7 +3278,6 @@ class TGetOperationStatusReq {
 void swap(TGetOperationStatusReq &a, TGetOperationStatusReq &b);
 
 typedef struct _TGetOperationStatusResp__isset {
-<<<<<<< HEAD
   _TGetOperationStatusResp__isset() : operationState(false), taskStatus(false), sqlState(false), errorCode(false), errorMessage(false), operationStarted(false), operationCompleted(false) {}
   bool operationState;
   bool taskStatus;
@@ -3305,47 +3286,27 @@ typedef struct _TGetOperationStatusResp__isset {
   bool errorMessage;
   bool operationStarted;
   bool operationCompleted;
-=======
-  _TGetOperationStatusResp__isset() : operationState(false), sqlState(false), errorCode(false), errorMessage(false) {}
-  bool operationState;
-  bool sqlState;
-  bool errorCode;
-  bool errorMessage;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 } _TGetOperationStatusResp__isset;
 
 class TGetOperationStatusResp {
  public:
 
-<<<<<<< HEAD
   static const char* ascii_fingerprint; // = "C872A36F57CCE24A7598048E62EB7DC4";
   static const uint8_t binary_fingerprint[16]; // = {0xC8,0x72,0xA3,0x6F,0x57,0xCC,0xE2,0x4A,0x75,0x98,0x04,0x8E,0x62,0xEB,0x7D,0xC4};
 
   TGetOperationStatusResp() : operationState((TOperationState::type)0), taskStatus(), sqlState(), errorCode(0), errorMessage(), operationStarted(0), operationCompleted(0) {
-=======
-  static const char* ascii_fingerprint; // = "BD124DB87A5A2E7D11945BD1B17F013D";
-  static const uint8_t binary_fingerprint[16]; // = {0xBD,0x12,0x4D,0xB8,0x7A,0x5A,0x2E,0x7D,0x11,0x94,0x5B,0xD1,0xB1,0x7F,0x01,0x3D};
-
-  TGetOperationStatusResp() : operationState((TOperationState::type)0), sqlState(), errorCode(0), errorMessage() {
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   }
 
   virtual ~TGetOperationStatusResp() throw() {}
 
   TStatus status;
   TOperationState::type operationState;
-<<<<<<< HEAD
   std::string taskStatus;
   std::string sqlState;
   int32_t errorCode;
   std::string errorMessage;
   int64_t operationStarted;
   int64_t operationCompleted;
-=======
-  std::string sqlState;
-  int32_t errorCode;
-  std::string errorMessage;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
   _TGetOperationStatusResp__isset __isset;
 
@@ -3358,14 +3319,11 @@ class TGetOperationStatusResp {
     __isset.operationState = true;
   }
 
-<<<<<<< HEAD
   void __set_taskStatus(const std::string& val) {
     taskStatus = val;
     __isset.taskStatus = true;
   }
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   void __set_sqlState(const std::string& val) {
     sqlState = val;
     __isset.sqlState = true;
@@ -3381,7 +3339,6 @@ class TGetOperationStatusResp {
     __isset.errorMessage = true;
   }
 
-<<<<<<< HEAD
   void __set_operationStarted(const int64_t val) {
     operationStarted = val;
     __isset.operationStarted = true;
@@ -3392,8 +3349,6 @@ class TGetOperationStatusResp {
     __isset.operationCompleted = true;
   }
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   bool operator == (const TGetOperationStatusResp & rhs) const
   {
     if (!(status == rhs.status))
@@ -3402,13 +3357,10 @@ class TGetOperationStatusResp {
       return false;
     else if (__isset.operationState && !(operationState == rhs.operationState))
       return false;
-<<<<<<< HEAD
     if (__isset.taskStatus != rhs.__isset.taskStatus)
       return false;
     else if (__isset.taskStatus && !(taskStatus == rhs.taskStatus))
       return false;
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     if (__isset.sqlState != rhs.__isset.sqlState)
       return false;
     else if (__isset.sqlState && !(sqlState == rhs.sqlState))
@@ -3421,7 +3373,6 @@ class TGetOperationStatusResp {
       return false;
     else if (__isset.errorMessage && !(errorMessage == rhs.errorMessage))
       return false;
-<<<<<<< HEAD
     if (__isset.operationStarted != rhs.__isset.operationStarted)
       return false;
     else if (__isset.operationStarted && !(operationStarted == rhs.operationStarted))
@@ -3430,8 +3381,6 @@ class TGetOperationStatusResp {
       return false;
     else if (__isset.operationCompleted && !(operationCompleted == rhs.operationCompleted))
       return false;
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     return true;
   }
   bool operator != (const TGetOperationStatusResp &rhs) const {

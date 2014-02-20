@@ -22,10 +22,7 @@ PRIMITIVE_TYPES = Set.new([
     16,
     17,
     18,
-<<<<<<< HEAD
-=======
     19,
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 ])
 
 COMPLEX_TYPES = Set.new([
@@ -60,18 +57,12 @@ TYPE_NAMES = {
     16 => %q"NULL",
     17 => %q"DATE",
     18 => %q"VARCHAR",
-<<<<<<< HEAD
-=======
     19 => %q"CHAR",
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 }
 
 CHARACTER_MAXIMUM_LENGTH = %q"characterMaximumLength"
 
-<<<<<<< HEAD
-=======
 PRECISION = %q"precision"
 
 SCALE = %q"scale"
 
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb

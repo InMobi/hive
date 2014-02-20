@@ -542,15 +542,15 @@ public class TGetQueryPlanReq implements org.apache.thrift.TBase<TGetQueryPlanRe
           case 3: // CONF_OVERLAY
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
-                org.apache.thrift.protocol.TMap _map172 = iprot.readMapBegin();
-                struct.confOverlay = new HashMap<String,String>(2*_map172.size);
-                for (int _i173 = 0; _i173 < _map172.size; ++_i173)
+                org.apache.thrift.protocol.TMap _map180 = iprot.readMapBegin();
+                struct.confOverlay = new HashMap<String,String>(2*_map180.size);
+                for (int _i181 = 0; _i181 < _map180.size; ++_i181)
                 {
-                  String _key174; // required
-                  String _val175; // optional
-                  _key174 = iprot.readString();
-                  _val175 = iprot.readString();
-                  struct.confOverlay.put(_key174, _val175);
+                  String _key182; // required
+                  String _val183; // required
+                  _key182 = iprot.readString();
+                  _val183 = iprot.readString();
+                  struct.confOverlay.put(_key182, _val183);
                 }
                 iprot.readMapEnd();
               }
@@ -587,10 +587,10 @@ public class TGetQueryPlanReq implements org.apache.thrift.TBase<TGetQueryPlanRe
           oprot.writeFieldBegin(CONF_OVERLAY_FIELD_DESC);
           {
             oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.confOverlay.size()));
-            for (Map.Entry<String, String> _iter176 : struct.confOverlay.entrySet())
+            for (Map.Entry<String, String> _iter184 : struct.confOverlay.entrySet())
             {
-              oprot.writeString(_iter176.getKey());
-              oprot.writeString(_iter176.getValue());
+              oprot.writeString(_iter184.getKey());
+              oprot.writeString(_iter184.getValue());
             }
             oprot.writeMapEnd();
           }
@@ -624,10 +624,10 @@ public class TGetQueryPlanReq implements org.apache.thrift.TBase<TGetQueryPlanRe
       if (struct.isSetConfOverlay()) {
         {
           oprot.writeI32(struct.confOverlay.size());
-          for (Map.Entry<String, String> _iter177 : struct.confOverlay.entrySet())
+          for (Map.Entry<String, String> _iter185 : struct.confOverlay.entrySet())
           {
-            oprot.writeString(_iter177.getKey());
-            oprot.writeString(_iter177.getValue());
+            oprot.writeString(_iter185.getKey());
+            oprot.writeString(_iter185.getValue());
           }
         }
       }
@@ -644,15 +644,15 @@ public class TGetQueryPlanReq implements org.apache.thrift.TBase<TGetQueryPlanRe
       BitSet incoming = iprot.readBitSet(1);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TMap _map178 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.confOverlay = new HashMap<String,String>(2*_map178.size);
-          for (int _i179 = 0; _i179 < _map178.size; ++_i179)
+          org.apache.thrift.protocol.TMap _map186 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.confOverlay = new HashMap<String,String>(2*_map186.size);
+          for (int _i187 = 0; _i187 < _map186.size; ++_i187)
           {
-            String _key180; // required
-            String _val181; // optional
-            _key180 = iprot.readString();
-            _val181 = iprot.readString();
-            struct.confOverlay.put(_key180, _val181);
+            String _key188; // required
+            String _val189; // required
+            _key188 = iprot.readString();
+            _val189 = iprot.readString();
+            struct.confOverlay.put(_key188, _val189);
           }
         }
         struct.setConfOverlayIsSet(true);

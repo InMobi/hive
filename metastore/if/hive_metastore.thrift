@@ -584,7 +584,8 @@ service ThriftHiveMetastore extends fb303.FacebookService
 
   // get the partitions matching the given partition filter
   i32 get_num_partitions_by_filter(1:string db_name 2:string tbl_name
-    3:string filter, 4:i16 max_parts=-1)
+    3:string filter)
+
   // unlike get_partitions_by_filter, takes serialized hive expression, and with that can work
   // with any filter (get_partitions_by_filter only works if the filter can be pushed down to JDOQL.
   PartitionsByExprResult get_partitions_by_expr(1:PartitionsByExprRequest req)
