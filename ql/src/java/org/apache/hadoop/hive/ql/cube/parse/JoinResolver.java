@@ -47,16 +47,13 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
-  public static final String DISABLE_AUTO_JOINS = "hive.cube.disable.auto.join";
-  public static final String JOIN_TYPE_KEY = "hive.cube.join.type";
-
   public static class AutoJoinContext {
     private final Map<CubeDimensionTable, List<TableRelationship>> joinChain;
     private final Map<AbstractCubeTable, String> partialJoinConditions;
     private final Set<String> whereClauseAddedTables;
 
     public AutoJoinContext(Map<CubeDimensionTable, List<TableRelationship>> joinChain,
-                            Map<AbstractCubeTable, String> partialJoinConditions) {
+        Map<AbstractCubeTable, String> partialJoinConditions) {
       this.joinChain = joinChain;
       this.partialJoinConditions = partialJoinConditions;
       whereClauseAddedTables = new HashSet<String>();
@@ -71,9 +68,9 @@ public class JoinResolver implements ContextRewriter {
     }
 
     public String getMergedJoinClause(Configuration conf,
-                                      Map<String, String> dimStorageTableToWhereClause,
-                                      Map<AbstractCubeTable, Set<String>> storageTableToQuery,
-                                      CubeQueryContext cubeql) {
+        Map<String, String> dimStorageTableToWhereClause,
+        Map<AbstractCubeTable, Set<String>> storageTableToQuery,
+        CubeQueryContext cubeql) {
       for (List<TableRelationship> chain : joinChain.values()) {
         // Need to reverse the chain so that left most table in join comes first
         Collections.reverse(chain);
@@ -81,37 +78,37 @@ public class JoinResolver implements ContextRewriter {
 
       Set<String> clauses = new LinkedHashSet<String>();
 
-      String joinTypeCfg = conf.get(JOIN_TYPE_KEY);
+      String joinTypeCfg = conf.get(CubeQueryConfUtil.JOIN_TYPE_KEY);
       String joinType = "";
 
       if (StringUtils.isNotBlank(joinTypeCfg)) {
         JoinType type = JoinType.valueOf(joinTypeCfg.toUpperCase());
         switch (type) {
-          case FULLOUTER:
-            joinType = "full outer";
-            break;
-          case INNER:
-            joinType = "inner";
-            break;
-          case LEFTOUTER:
-            joinType = "left outer";
-            break;
-          case LEFTSEMI:
-            joinType = "left semi";
-            break;
-          case UNIQUE:
-            joinType = "unique";
-            break;
-          case RIGHTOUTER:
-            joinType = "right outer";
-            break;
+        case FULLOUTER:
+          joinType = "full outer";
+          break;
+        case INNER:
+          joinType = "inner";
+          break;
+        case LEFTOUTER:
+          joinType = "left outer";
+          break;
+        case LEFTSEMI:
+          joinType = "left semi";
+          break;
+        case UNIQUE:
+          joinType = "unique";
+          break;
+        case RIGHTOUTER:
+          joinType = "right outer";
+          break;
         }
       }
 
       for (List<TableRelationship> chain : joinChain.values()) {
         for (TableRelationship rel : chain) {
           StringBuilder clause = new StringBuilder(joinType)
-            .append(" join ");
+          .append(" join ");
           String alias = cubeql.getAliasForTabName(rel.getToTable().getName());
 
           if (!alias.equalsIgnoreCase(rel.getToTable().getName())) {
@@ -121,9 +118,9 @@ public class JoinResolver implements ContextRewriter {
           }
 
           clause.append(" on ")
-            .append(cubeql.getAliasForTabName(rel.getFromTable().getName())).append(".").append(rel.getFromColumn())
-            .append(" = ")
-            .append(cubeql.getAliasForTabName(rel.getToTable().getName())).append(".").append(rel.getToColumn());
+          .append(cubeql.getAliasForTabName(rel.getFromTable().getName())).append(".").append(rel.getFromColumn())
+          .append(" = ")
+          .append(cubeql.getAliasForTabName(rel.getToTable().getName())).append(".").append(rel.getToColumn());
           // Check if user specified a join clause, if yes, add it
           String filter = partialJoinConditions.get(rel.getToTable());
 
@@ -188,7 +185,8 @@ public class JoinResolver implements ContextRewriter {
 
   public void resolveJoins(CubeQueryContext cubeql) throws HiveException {
     QB cubeQB = cubeql.getQB();
-    boolean joinResolverDisabled = conf.getBoolean(DISABLE_AUTO_JOINS, false);
+    boolean joinResolverDisabled = conf.getBoolean(
+        CubeQueryConfUtil.DISABLE_AUTO_JOINS, CubeQueryConfUtil.DEFAULT_DISABLE_AUTO_JOINS);
     if (joinResolverDisabled) {
       if (cubeql.getJoinTree() != null) {
         cubeQB.setQbJoinTree(genJoinTree(cubeQB, cubeql.getJoinTree(), cubeql));
@@ -299,7 +297,7 @@ public class JoinResolver implements ContextRewriter {
 
   private void setTarget(ASTNode node) throws HiveException {
     String targetTableName =
-      HQLParser.getString(HQLParser.findNodeByPath(node, TOK_TABNAME, Identifier));
+        HQLParser.getString(HQLParser.findNodeByPath(node, TOK_TABNAME, Identifier));
     if (getMetastoreClient().isDimensionTable(targetTableName)) {
       target = getMetastoreClient().getDimensionTable(targetTableName);
     } else if (getMetastoreClient().isCube(targetTableName)) {
@@ -320,7 +318,7 @@ public class JoinResolver implements ContextRewriter {
       // Get table name and
 
       String tableName = HQLParser.getString(HQLParser.findNodeByPath(right,
-        TOK_TABNAME, Identifier));
+          TOK_TABNAME, Identifier));
 
       CubeDimensionTable dimensionTable = getMetastoreClient().getDimensionTable(tableName);
       String joinCond = "";
@@ -338,7 +336,7 @@ public class JoinResolver implements ContextRewriter {
         }
       }
     } else if (node.getToken().getType() == TOK_TABREF) {
-       setTarget(node);
+      setTarget(node);
     }
 
   }
@@ -346,7 +344,7 @@ public class JoinResolver implements ContextRewriter {
   // Recursively find out join conditions
   private QBJoinTree genJoinTree(QB qb, ASTNode joinParseTree,
       CubeQueryContext cubeql)
-      throws SemanticException {
+          throws SemanticException {
     QBJoinTree joinTree = new QBJoinTree();
     JoinCond[] condn = new JoinCond[1];
 
@@ -386,7 +384,7 @@ public class JoinResolver implements ContextRewriter {
           (ASTNode) left.getChild(0)).toLowerCase();
       String alias = left.getChildCount() == 1 ? tableName
           : SemanticAnalyzer.unescapeIdentifier(left.getChild(left.getChildCount() - 1)
-                  .getText().toLowerCase());
+              .getText().toLowerCase());
 
       joinTree.setLeftAlias(alias);
 

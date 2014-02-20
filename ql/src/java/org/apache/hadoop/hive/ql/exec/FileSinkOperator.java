@@ -38,8 +38,8 @@ import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveKey;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.ql.io.HivePassThroughOutputFormat;
 import org.apache.hadoop.hive.ql.io.HivePartitioner;
+import org.apache.hadoop.hive.ql.io.HivePassThroughOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -575,7 +575,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
 
     // Since File Sink is a terminal operator, forward is not called - so,
     // maintain the number of output rows explicitly
-    if (counterNameToEnum != null) {
+    if (recordCounters) {
       ++outputRows;
       if (outputRows % 1000 == 0) {
         incrCounter(numOutputRowsCntr, outputRows);
@@ -755,7 +755,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
         // check # of dp
         if (valToPaths.size() > maxPartitions) {
           // throw fatal error
-          if (counterNameToEnum != null) {
+          if (recordCounters) {
             incrCounter(fatalErrorCntr, 1);
           }
           fatalError = true;
@@ -934,7 +934,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
                  hiveOutputFormat = ReflectionUtils.newInstance(conf.getTableInfo().getOutputFileFormatClass(),job);
            }
           else {
-                 hiveOutputFormat = conf.getTableInfo().getOutputFileFormatClass().newInstance(); 
+                 hiveOutputFormat = conf.getTableInfo().getOutputFileFormatClass().newInstance();
           }
         }
         else {

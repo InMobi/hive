@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
@@ -140,6 +140,11 @@ public final class PlanUtils {
       }
       if (localDirectoryDesc.getOutputFormat() != null){
           tableDesc.setOutputFileFormatClass(Class.forName(localDirectoryDesc.getOutputFormat()));
+      }
+      if (localDirectoryDesc.getSerdeProps() != null) {
+        for ( Entry<String, String> entry : localDirectoryDesc.getSerdeProps().entrySet()) {
+          tableDesc.getProperties().setProperty(entry.getKey(), entry.getValue());
+        }
       }
     } catch (ClassNotFoundException e) {
       // mimicking behaviour in CreateTableDesc tableDesc creation
@@ -274,7 +279,7 @@ public final class PlanUtils {
     tblDesc.getProperties().setProperty(serdeConstants.ESCAPE_CHAR, "\\");
     //enable extended nesting levels
     tblDesc.getProperties().setProperty(
-        LazySimpleSerDe.SERIALIZATION_EXTEND_NESTING_LEVELS, "true");    
+        LazySimpleSerDe.SERIALIZATION_EXTEND_NESTING_LEVELS, "true");
     return tblDesc;
   }
 
