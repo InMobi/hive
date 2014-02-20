@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
-import java.lang.StringBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.Stack;
@@ -28,7 +28,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.DriverContext;
-import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
@@ -39,15 +38,9 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.optimizer.GenMapRedUtils;
-import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer.tableSpec;
-import org.apache.hadoop.hive.ql.parse.GenTezWork;
-import org.apache.hadoop.hive.ql.parse.ParseContext;
-import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
-import org.apache.hadoop.hive.ql.parse.QBParseInfo;
-import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.MapWork;
-import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.StatsWork;
+import org.apache.hadoop.hive.ql.plan.TezWork;
 
 /**
  * ProcessAnalyzeTable sets up work for the several variants of analyze table
@@ -75,13 +68,13 @@ public class ProcessAnalyzeTable implements NodeProcessor {
       throws SemanticException {
 
     GenTezProcContext context = (GenTezProcContext) procContext;
-    
+
     TableScanOperator tableScan = (TableScanOperator) nd;
 
     ParseContext parseContext = context.parseContext;
     QB queryBlock = parseContext.getQB();
     QBParseInfo parseInfo = parseContext.getQB().getParseInfo();
-    
+
     if (parseInfo.isAnalyzeCommand()) {
 
       assert tableScan.getChildOperators() == null
@@ -101,7 +94,7 @@ public class ProcessAnalyzeTable implements NodeProcessor {
       // ANALYZE TABLE T [PARTITION (...)] COMPUTE STATISTICS;
       // The plan consists of a simple TezTask followed by a StatsTask.
       // The Tez task is just a simple TableScanOperator
-      
+
       StatsWork statsWork = new StatsWork(parseInfo.getTableSpec());
       statsWork.setAggKey(tableScan.getConf().getStatsAggPrefix());
       statsWork.setSourceTask(context.currentTask);
@@ -126,10 +119,10 @@ public class ProcessAnalyzeTable implements NodeProcessor {
       // NOTE: here we should use the new partition predicate pushdown API to get a list of pruned list,
       // and pass it to setTaskPlan as the last parameter
       Set<Partition> confirmedPartns = GenMapRedUtils.getConfirmedPartitionsForScan(parseInfo);
-      PrunedPartitionList partitions = null;
+      List<PrunedPartitionList> partitions = new ArrayList<PrunedPartitionList>();
       if (confirmedPartns.size() > 0) {
-        Table source = queryBlock.getMetaData().getTableForAlias(alias);
-        partitions = new PrunedPartitionList(source, confirmedPartns, false);
+        List<Table> source = queryBlock.getMetaData().getTablesForAlias(alias);
+        partitions.add(new PrunedPartitionList(source.get(0), confirmedPartns, false));
       }
 
       MapWork w = utils.createMapWork(context, tableScan, tezWork, partitions);
@@ -146,7 +139,7 @@ public class ProcessAnalyzeTable implements NodeProcessor {
    *
    * It is composed of PartialScanTask followed by StatsTask.
    */
-  private void handlePartialScanCommand(TableScanOperator tableScan, ParseContext parseContext, 
+  private void handlePartialScanCommand(TableScanOperator tableScan, ParseContext parseContext,
       QBParseInfo parseInfo, StatsWork statsWork, GenTezProcContext context,
       Task<StatsWork> statsTask) throws SemanticException {
 
@@ -154,7 +147,7 @@ public class ProcessAnalyzeTable implements NodeProcessor {
     StringBuffer aggregationKeyBuffer = new StringBuffer(aggregationKey);
     List<Path> inputPaths = GenMapRedUtils.getInputPathsForPartialScan(parseInfo, aggregationKeyBuffer);
     aggregationKey = aggregationKeyBuffer.toString();
-    
+
     // scan work
     PartialScanWork scanWork = new PartialScanWork(inputPaths);
     scanWork.setMapperCannotSpanPartns(true);

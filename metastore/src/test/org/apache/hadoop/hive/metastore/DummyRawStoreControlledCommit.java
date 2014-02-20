@@ -301,8 +301,8 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
 
   @Override
   public int getNumPartitionsByFilter(String dbName, String tblName,
-      String filter, short maxParts) throws MetaException, NoSuchObjectException {
-    return objectStore.getNumPartitionsByFilter(dbName, tblName, filter, maxParts);
+      String filter) throws MetaException, NoSuchObjectException {
+    return objectStore.getNumPartitionsByFilter(dbName, tblName, filter);
   }
 
   @Override

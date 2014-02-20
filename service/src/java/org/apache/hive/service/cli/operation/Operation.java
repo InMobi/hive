@@ -17,6 +17,8 @@
  */
 package org.apache.hive.service.cli.operation;
 
+import java.io.*;
+import java.util.List;
 import java.util.EnumSet;
 
 import org.apache.commons.logging.Log;
@@ -34,6 +36,7 @@ import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.TableSchema;
 import org.apache.hive.service.cli.session.HiveSession;
 import org.apache.hive.service.cli.thrift.TProtocolVersion;
+
 
 
 public abstract class Operation {

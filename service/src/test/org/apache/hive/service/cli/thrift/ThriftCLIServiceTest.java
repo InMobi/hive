@@ -357,14 +357,9 @@ public abstract class ThriftCLIServiceTest {
     cliService.init(hconf);
     ThriftCLIService tcliService = new ThriftBinaryCLIService(cliService);
     TOpenSessionReq req = new TOpenSessionReq();
-<<<<<<< HEAD
-    req.setUsername("testuser1");
-    SessionHandle sHandle = tcliService.getSessionHandle(req );
-=======
     TOpenSessionResp res = new TOpenSessionResp();
     req.setUsername("testuser1");
     SessionHandle sHandle = tcliService.getSessionHandle(req, res);
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     SessionManager sManager = getSessionManager(cliService.getServices());
     HiveSession session = sManager.getSession(sHandle);
 

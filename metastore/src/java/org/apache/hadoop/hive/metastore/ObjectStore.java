@@ -2045,6 +2045,36 @@ public class ObjectStore implements RawStore, Configurable {
     return results;
   }
 
+  /**
+   * Gets partition names from the table via ORM (JDOQL) filter pushdown.
+   * @param table The table.
+   * @param tree The expression tree from which JDOQL filter will be made.
+   * @param maxParts Maximum number of partitions to return.
+   * @param isValidatedFilter Whether the filter was pre-validated for JDOQL pushdown by a client
+   *   (old hive client or non-hive one); if it was and we fail to create a filter, we will throw.
+   * @return Resulting partitions. Can be null if isValidatedFilter is false, and
+   *         there was error deriving the JDO filter.
+   */
+  private int getNumPartitionsViaOrmFilter(Table table, ExpressionTree tree,
+      boolean isValidatedFilter) throws MetaException {
+    Map<String, Object> params = new HashMap<String, Object>();
+    String jdoFilter = makeQueryFilterString(
+        table.getDbName(), table, tree, params, isValidatedFilter);
+    if (jdoFilter == null) {
+      assert !isValidatedFilter;
+      return -1;
+    }
+    Query query = pm.newQuery(MPartition.class, jdoFilter);
+
+    @SuppressWarnings("unchecked")
+    List<MPartition> mparts = (List<MPartition>) query.executeWithMap(params);
+
+    LOG.debug("Done executing query for getNumPartitionsViaOrmFilter");
+    int ret = mparts.size();
+    query.closeAll();
+    return ret;
+  }
+
   private static class Out<T> {
     public T val;
   }
@@ -2159,56 +2189,36 @@ public class ObjectStore implements RawStore, Configurable {
 
   @Override
   public int getNumPartitionsByFilter(String dbName, String tblName,
-      String filter, short maxParts) throws MetaException, NoSuchObjectException {
-    return getNumPartitionsByFilterInternal(dbName, tblName, filter, maxParts,
+      String filter) throws MetaException, NoSuchObjectException {
+    return getNumPartitionsByFilterInternal(dbName, tblName, filter,
         true, true);
   }
 
   protected int getNumPartitionsByFilterInternal(String dbName, String tblName,
-      String filter, short maxParts, boolean allowSql, boolean allowJdo)
+      String filter, boolean allowSql, boolean allowJdo)
       throws MetaException, NoSuchObjectException {
-    assert allowSql || allowJdo;
-    boolean doTrace = LOG.isDebugEnabled();
-    boolean doUseDirectSql = canUseDirectSql(allowSql);
-    dbName = dbName.toLowerCase();
-    tblName = tblName.toLowerCase();
-    FilterParser parser = null;
-    if (filter != null && filter.length() != 0) {
-      LOG.debug("Filter specified is " + filter);
-      parser = getFilterParser(filter);
-    }
+    final ExpressionTree tree = (filter != null && !filter.isEmpty())
+        ? getFilterParser(filter).tree : ExpressionTree.EMPTY_TREE;
 
-    int count = -1;
-    boolean success = false;
-    try {
-      long start = doTrace ? System.nanoTime() : 0;
-      openTransaction();
-      MTable mtable = ensureGetMTable(dbName, tblName);
-      if (doUseDirectSql) {
-        try {
-          Table table = convertToTable(mtable);
-          Integer max = (maxParts < 0) ? null : (int)maxParts;
-          count = directSql.getNumPartitionsViaSqlFilter(table, parser, max);
-        } catch (Exception ex) {
-          handleDirectSqlError(allowJdo, ex);
-          doUseDirectSql = false;
-          start = doTrace ? System.nanoTime() : 0;
-          mtable = ensureGetMTable(dbName, tblName); // detached on rollback, get again
-        }
+    return new GetHelper<Integer>(dbName, tblName, allowSql, allowJdo) {
+      @Override
+      protected Integer getSqlResult(GetHelper<Integer> ctx) throws MetaException {
+        int numParts = directSql.getNumPartitionsViaSqlFilter(
+            ctx.getTable(), tree);
+        return numParts;
       }
-      if (!doUseDirectSql) {
-        count = listMPartitionsByFilterNoTxn(
-            mtable, dbName, tblName, parser, maxParts).size();
+      @Override
+      protected Integer getJdoResult(
+          GetHelper<Integer> ctx) throws MetaException, NoSuchObjectException {
+        return getNumPartitionsViaOrmFilter(ctx.getTable(), tree, true);
       }
-      success = commitTransaction();
-      LOG.info(count + " num partitions retrieved using " + (doUseDirectSql ? "SQL" : "ORM")
-          + (doTrace ? (" in " + ((System.nanoTime() - start) / 1000000.0) + "ms") : ""));
-      return count;
-    } finally {
-      if (!success) {
-        rollbackTransaction();
+
+      @Override
+      protected String describeResult() {
+        return "num parts";
       }
-    }
+
+    }.run(true);
   }
 
   /** Helper class for getting stuff w/transaction, direct SQL, perf logging, etc. */

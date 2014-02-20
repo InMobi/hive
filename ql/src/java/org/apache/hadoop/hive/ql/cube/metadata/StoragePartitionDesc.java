@@ -2,12 +2,11 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.hadoop.hive.ql.plan.AddPartitionDesc;
 
-public class StoragePartitionDesc extends AddPartitionDesc {
+public class StoragePartitionDesc extends AddPartitionDesc.OnePartitionDesc {
 
   private static final long serialVersionUID = 1L;
 
@@ -30,27 +29,6 @@ public class StoragePartitionDesc extends AddPartitionDesc {
   }
 
   /**
-   * @return the table we're going to add the partitions to.
-   * @deprecated
-   */
-  @Override
-  @Deprecated
-  public String getTableName() {
-    return super.getTableName();
-  }
-
-  /**
-   * @param tableName
-   *          the table we're going to add the partitions to.
-   * @deprecated
-   */
-  @Override
-  @Deprecated
-  public void setTableName(String tableName) {
-    super.setTableName(tableName);
-  }
-
-  /**
    * @return the cubeTableName
    */
   public String getCubeTableName() {
@@ -65,21 +43,11 @@ public class StoragePartitionDesc extends AddPartitionDesc {
   }
 
   /**
-   * @param partSpec
-   *          partition specification
-   * @deprecated Use setTimePartSpec and setNonTimePartSpec
-   */
-  @Override
-  @Deprecated
-  public void setPartSpec(LinkedHashMap<String, String> partSpec) {
-  }
-
-  /**
   * @deprecated Use getStoragePartSpec
   */
   @Override
   @Deprecated
-  public LinkedHashMap<String, String> getPartSpec() {
+  public Map<String, String> getPartSpec() {
     return super.getPartSpec();
   }
 

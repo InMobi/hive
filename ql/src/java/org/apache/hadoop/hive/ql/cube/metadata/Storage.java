@@ -20,6 +20,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.plan.AddPartitionDesc;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.TextInputFormat;
@@ -189,7 +190,7 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
       tbl.setProperty("comment", crtTbl.getComment());
     }
     if (crtTbl.getLocation() != null) {
-      tbl.setDataLocation(new Path(crtTbl.getLocation()).toUri());
+      tbl.setDataLocation(new Path(crtTbl.getLocation()));
     }
 
     if (crtTbl.getSkewedColNames() != null) {
@@ -244,12 +245,8 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
     try {
       String tableName = MetastoreUtil.getStorageTableName(
           addPartitionDesc.getCubeTableName(), this.getPrefix());
-      String dbName = addPartitionDesc.getDbName();
-      if (dbName == null) {
-        dbName = SessionState.get().getCurrentDatabase();
-      }
-      Table storageTbl = client.getTable(dbName,
-          tableName);
+      String dbName = SessionState.get().getCurrentDatabase();
+      Table storageTbl = client.getTable(dbName, tableName);
       Path location = null;
       if (addPartitionDesc.getLocation() != null) {
         Path partLocation = new Path(addPartitionDesc.getLocation());
@@ -265,14 +262,18 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
       }
       partParams.put(MetastoreConstants.PARTITION_UPDATE_PERIOD,
           addPartitionDesc.getUpdatePeriod().name());
-      client.createPartition(storageTbl, addPartitionDesc.getStoragePartSpec(),
-          location, partParams,
-          addPartitionDesc.getInputFormat(), addPartitionDesc.getOutputFormat(),
-          addPartitionDesc.getNumBuckets(), addPartitionDesc.getCols(),
-          addPartitionDesc.getSerializationLib(),
-          addPartitionDesc.getSerdeParams(),
-          addPartitionDesc.getBucketCols(),
-          addPartitionDesc.getSortCols());
+      AddPartitionDesc addParts = new AddPartitionDesc(dbName, tableName, true);
+      addParts.addPartition(addPartitionDesc.getStoragePartSpec(), location.toString());
+      addParts.getPartition(0).setPartParams(partParams);
+      addParts.getPartition(0).setInputFormat(addPartitionDesc.getInputFormat());
+      addParts.getPartition(0).setOutputFormat(addPartitionDesc.getOutputFormat());
+      addParts.getPartition(0).setNumBuckets(addPartitionDesc.getNumBuckets());
+      addParts.getPartition(0).setCols(addPartitionDesc.getCols());
+      addParts.getPartition(0).setSerializationLib(addPartitionDesc.getSerializationLib());
+      addParts.getPartition(0).setSerdeParams(addPartitionDesc.getSerdeParams());
+      addParts.getPartition(0).setBucketCols(addPartitionDesc.getBucketCols());
+      addParts.getPartition(0).setSortCols(addPartitionDesc.getSortCols());
+      client.createPartitions(addParts);
 
       if (latestInfo != null) {
         for (Map.Entry<String, LatestPartColumnInfo> entry :
@@ -290,17 +291,20 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
             client.dropPartition(storageTbl.getTableName(),
                 latest.get(0).getValues(), false);
           }
-          client.createPartition(storageTbl, StorageConstants.getLatestPartSpec(
+          AddPartitionDesc latestPart = new AddPartitionDesc(dbName, tableName, true);
+          latestPart.addPartition(StorageConstants.getLatestPartSpec(
               addPartitionDesc.getStoragePartSpec(),
-              latestPartCol),
-              location, entry.getValue().getPartParams(partParams),
-              addPartitionDesc.getInputFormat(),
-              addPartitionDesc.getOutputFormat(),
-              addPartitionDesc.getNumBuckets(), addPartitionDesc.getCols(),
-              addPartitionDesc.getSerializationLib(),
-              addPartitionDesc.getSerdeParams(),
-              addPartitionDesc.getBucketCols(),
-              addPartitionDesc.getSortCols());
+              latestPartCol), location.toString());
+          latestPart.getPartition(0).setPartParams(entry.getValue().getPartParams(partParams));
+          latestPart.getPartition(0).setInputFormat(addPartitionDesc.getInputFormat());
+          latestPart.getPartition(0).setOutputFormat(addPartitionDesc.getOutputFormat());
+          latestPart.getPartition(0).setNumBuckets(addPartitionDesc.getNumBuckets());
+          latestPart.getPartition(0).setCols(addPartitionDesc.getCols());
+          latestPart.getPartition(0).setSerializationLib(addPartitionDesc.getSerializationLib());
+          latestPart.getPartition(0).setSerdeParams(addPartitionDesc.getSerdeParams());
+          latestPart.getPartition(0).setBucketCols(addPartitionDesc.getBucketCols());
+          latestPart.getPartition(0).setSortCols(addPartitionDesc.getSortCols());
+          client.createPartitions(latestPart);
         }
       }
       commitAddPartition(addPartitionDesc);
@@ -331,6 +335,7 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
     boolean success = false;
     try {
       client.dropPartition(storageTableName, partVals, false);
+      String dbName = SessionState.get().getCurrentDatabase();
       Table storageTbl = client.getTable(storageTableName);
       // update latest info
       for (Map.Entry<String, LatestInfo> entry : updateLatestInfo.entrySet()) {
@@ -349,18 +354,19 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
         }
         LatestInfo latest = entry.getValue();
         if (latest != null && latest.part != null) {
-          client.createPartition(storageTbl, StorageConstants.getLatestPartSpec(
-              latest.part.getSpec(),
-              latestPartCol),
-              new Path(latest.part.getLocation()),
-              latest.latestParts.get(latestPartCol).getPartParams(latest.part.getParameters()),
-              latest.part.getInputFormatClass().getCanonicalName(),
-              latest.part.getOutputFormatClass().getCanonicalName(),
-              latest.part.getBucketCount(), latest.part.getCols(),
-              latest.part.getTPartition().getSd().getSerdeInfo().getSerializationLib(),
-              latest.part.getTPartition().getSd().getSerdeInfo().getParameters(),
-              latest.part.getBucketCols(),
-              latest.part.getSortCols());
+          AddPartitionDesc latestPart = new AddPartitionDesc(dbName, storageTableName, true);
+          latestPart.addPartition(StorageConstants.getLatestPartSpec(
+              latest.part.getSpec(), latestPartCol), latest.part.getLocation());
+          latestPart.getPartition(0).setPartParams(latest.latestParts.get(latestPartCol).getPartParams(latest.part.getParameters()));
+          latestPart.getPartition(0).setInputFormat(latest.part.getInputFormatClass().getCanonicalName());
+          latestPart.getPartition(0).setOutputFormat(latest.part.getOutputFormatClass().getCanonicalName());
+          latestPart.getPartition(0).setNumBuckets(latest.part.getBucketCount());
+          latestPart.getPartition(0).setCols(latest.part.getCols());
+          latestPart.getPartition(0).setSerializationLib(latest.part.getTPartition().getSd().getSerdeInfo().getSerializationLib());
+          latestPart.getPartition(0).setSerdeParams(latest.part.getTPartition().getSd().getSerdeInfo().getParameters());
+          latestPart.getPartition(0).setBucketCols(latest.part.getBucketCols());
+          latestPart.getPartition(0).setSortCols(latest.part.getSortCols());
+          client.createPartitions(latestPart);
         }
       }
       commitDropPartition(storageTableName, partVals);

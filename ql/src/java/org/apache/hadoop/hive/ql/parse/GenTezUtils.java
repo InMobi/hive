@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.optimizer.GenMapRedUtils;
-import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
@@ -103,7 +104,7 @@ public class GenTezUtils {
   }
 
   public MapWork createMapWork(GenTezProcContext context, Operator<?> root,
-      TezWork tezWork, PrunedPartitionList partitions) throws SemanticException {
+      TezWork tezWork, List<PrunedPartitionList> partitions) throws SemanticException {
     assert root.getParentOperators().isEmpty();
     MapWork mapWork = new MapWork("Map "+ (++sequenceNumber));
     LOG.debug("Adding map work (" + mapWork.getName() + ") for " + root);
@@ -121,8 +122,8 @@ public class GenTezUtils {
   }
 
   // this method's main use is to help unit testing this class
-  protected void setupMapWork(MapWork mapWork, GenTezProcContext context, 
-      PrunedPartitionList partitions, Operator<? extends OperatorDesc> root, 
+  protected void setupMapWork(MapWork mapWork, GenTezProcContext context,
+      List<PrunedPartitionList> partitions, Operator<? extends OperatorDesc> root,
       String alias) throws SemanticException {
     // All the setup is done in GenMapRedUtils
     GenMapRedUtils.setMapWork(mapWork, context.parseContext,

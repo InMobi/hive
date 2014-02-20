@@ -1985,7 +1985,7 @@ private void constructOneLBLocationMap(FileStatus fSta,
     }
 
     int numParts = getMSC().getNumPartitionsByFilter(
-        tbl.getDbName(), tbl.getTableName(), filter, (short)-1);
+        tbl.getDbName(), tbl.getTableName(), filter);
 
     return numParts;
   }

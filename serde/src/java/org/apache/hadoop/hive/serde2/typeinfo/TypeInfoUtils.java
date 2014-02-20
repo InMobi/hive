@@ -29,11 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-<<<<<<< HEAD
-import org.apache.commons.lang.StringUtils;
-=======
 import org.apache.hadoop.hive.common.type.HiveDecimal;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
@@ -396,17 +392,6 @@ public final class TypeInfoUtils {
       Token t = expect("type");
 
       // Is this a primitive type?
-<<<<<<< HEAD
-      PrimitiveTypeEntry primitiveType = PrimitiveObjectInspectorUtils
-          .getTypeEntryFromTypeName(t.text);
-      if (primitiveType != null
-          && !primitiveType.primitiveCategory.equals(PrimitiveCategory.UNKNOWN)) {
-        if (primitiveType.isParameterized()) {
-          primitiveType = primitiveType.addParameters(parseParams());
-        }
-        // If type has qualifiers, the TypeInfo needs them in its type string
-        return TypeInfoFactory.getPrimitiveTypeInfo(primitiveType.toString());
-=======
       PrimitiveTypeEntry typeEntry =
           PrimitiveObjectInspectorUtils.getTypeEntryFromTypeName(t.text);
       if (typeEntry != null && typeEntry.primitiveCategory != PrimitiveCategory.UNKNOWN ) {
@@ -454,7 +439,6 @@ public final class TypeInfoUtils {
         default:
           return TypeInfoFactory.getPrimitiveTypeInfo(typeEntry.typeName);
         }
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       }
 
       // Is this a list type?
@@ -802,19 +786,10 @@ public final class TypeInfoUtils {
     switch (typeInfo.getPrimitiveCategory()) {
       case STRING:
         return HiveVarchar.MAX_VARCHAR_LENGTH;
-<<<<<<< HEAD
-      case VARCHAR:
-        VarcharTypeParams varcharParams = (VarcharTypeParams) typeInfo.getTypeParams();
-        if (varcharParams == null) {
-          throw new RuntimeException("varchar type used without type params");
-        }
-        return varcharParams.getLength();
-=======
       case CHAR:
       case VARCHAR:
         BaseCharTypeInfo baseCharTypeInfo = (BaseCharTypeInfo) typeInfo;
         return baseCharTypeInfo.getLength();
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       default:
         return 0;
     }

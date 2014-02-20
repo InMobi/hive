@@ -78,10 +78,10 @@ public class TestGenTezWork {
 
     proc = new GenTezWork(new GenTezUtils() {
       @Override
-        protected void setupMapWork(MapWork mapWork, GenTezProcContext context, 
-          PrunedPartitionList partitions, Operator<? extends OperatorDesc> root, String alias) 
+        protected void setupMapWork(MapWork mapWork, GenTezProcContext context,
+          List<PrunedPartitionList> partitions, Operator<? extends OperatorDesc> root, String alias)
         throws SemanticException {
-        
+
         LinkedHashMap<String, Operator<? extends OperatorDesc>> map
           = new LinkedHashMap<String, Operator<? extends OperatorDesc>>();
         map.put("foo", root);

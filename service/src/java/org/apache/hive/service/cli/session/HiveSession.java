@@ -45,10 +45,6 @@ public interface HiveSession {
    * @param sessionManager
    */
   public void setSessionManager(SessionManager sessionManager);
-  /**
-   * Get the session manager for the session
-   */
-  public SessionManager getSessionManager();
 
   /**
    * Get the session manager for the session

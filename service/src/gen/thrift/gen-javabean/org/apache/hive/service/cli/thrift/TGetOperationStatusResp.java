@@ -36,18 +36,12 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
 
   private static final org.apache.thrift.protocol.TField STATUS_FIELD_DESC = new org.apache.thrift.protocol.TField("status", org.apache.thrift.protocol.TType.STRUCT, (short)1);
   private static final org.apache.thrift.protocol.TField OPERATION_STATE_FIELD_DESC = new org.apache.thrift.protocol.TField("operationState", org.apache.thrift.protocol.TType.I32, (short)2);
-<<<<<<< HEAD
   private static final org.apache.thrift.protocol.TField TASK_STATUS_FIELD_DESC = new org.apache.thrift.protocol.TField("taskStatus", org.apache.thrift.protocol.TType.STRING, (short)3);
   private static final org.apache.thrift.protocol.TField SQL_STATE_FIELD_DESC = new org.apache.thrift.protocol.TField("sqlState", org.apache.thrift.protocol.TType.STRING, (short)4);
   private static final org.apache.thrift.protocol.TField ERROR_CODE_FIELD_DESC = new org.apache.thrift.protocol.TField("errorCode", org.apache.thrift.protocol.TType.I32, (short)5);
   private static final org.apache.thrift.protocol.TField ERROR_MESSAGE_FIELD_DESC = new org.apache.thrift.protocol.TField("errorMessage", org.apache.thrift.protocol.TType.STRING, (short)6);
   private static final org.apache.thrift.protocol.TField OPERATION_STARTED_FIELD_DESC = new org.apache.thrift.protocol.TField("operationStarted", org.apache.thrift.protocol.TType.I64, (short)7);
   private static final org.apache.thrift.protocol.TField OPERATION_COMPLETED_FIELD_DESC = new org.apache.thrift.protocol.TField("operationCompleted", org.apache.thrift.protocol.TType.I64, (short)8);
-=======
-  private static final org.apache.thrift.protocol.TField SQL_STATE_FIELD_DESC = new org.apache.thrift.protocol.TField("sqlState", org.apache.thrift.protocol.TType.STRING, (short)3);
-  private static final org.apache.thrift.protocol.TField ERROR_CODE_FIELD_DESC = new org.apache.thrift.protocol.TField("errorCode", org.apache.thrift.protocol.TType.I32, (short)4);
-  private static final org.apache.thrift.protocol.TField ERROR_MESSAGE_FIELD_DESC = new org.apache.thrift.protocol.TField("errorMessage", org.apache.thrift.protocol.TType.STRING, (short)5);
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -57,18 +51,12 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
 
   private TStatus status; // required
   private TOperationState operationState; // optional
-<<<<<<< HEAD
   private String taskStatus; // optional
   private String sqlState; // optional
   private int errorCode; // optional
   private String errorMessage; // optional
   private long operationStarted; // optional
   private long operationCompleted; // optional
-=======
-  private String sqlState; // optional
-  private int errorCode; // optional
-  private String errorMessage; // optional
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -78,18 +66,12 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
      * @see TOperationState
      */
     OPERATION_STATE((short)2, "operationState"),
-<<<<<<< HEAD
     TASK_STATUS((short)3, "taskStatus"),
     SQL_STATE((short)4, "sqlState"),
     ERROR_CODE((short)5, "errorCode"),
     ERROR_MESSAGE((short)6, "errorMessage"),
     OPERATION_STARTED((short)7, "operationStarted"),
     OPERATION_COMPLETED((short)8, "operationCompleted");
-=======
-    SQL_STATE((short)3, "sqlState"),
-    ERROR_CODE((short)4, "errorCode"),
-    ERROR_MESSAGE((short)5, "errorMessage");
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -108,7 +90,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
           return STATUS;
         case 2: // OPERATION_STATE
           return OPERATION_STATE;
-<<<<<<< HEAD
         case 3: // TASK_STATUS
           return TASK_STATUS;
         case 4: // SQL_STATE
@@ -121,14 +102,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
           return OPERATION_STARTED;
         case 8: // OPERATION_COMPLETED
           return OPERATION_COMPLETED;
-=======
-        case 3: // SQL_STATE
-          return SQL_STATE;
-        case 4: // ERROR_CODE
-          return ERROR_CODE;
-        case 5: // ERROR_MESSAGE
-          return ERROR_MESSAGE;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
         default:
           return null;
       }
@@ -170,15 +143,10 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
 
   // isset id assignments
   private static final int __ERRORCODE_ISSET_ID = 0;
-<<<<<<< HEAD
   private static final int __OPERATIONSTARTED_ISSET_ID = 1;
   private static final int __OPERATIONCOMPLETED_ISSET_ID = 2;
   private byte __isset_bitfield = 0;
   private _Fields optionals[] = {_Fields.OPERATION_STATE,_Fields.TASK_STATUS,_Fields.SQL_STATE,_Fields.ERROR_CODE,_Fields.ERROR_MESSAGE,_Fields.OPERATION_STARTED,_Fields.OPERATION_COMPLETED};
-=======
-  private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.OPERATION_STATE,_Fields.SQL_STATE,_Fields.ERROR_CODE,_Fields.ERROR_MESSAGE};
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -186,24 +154,18 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TStatus.class)));
     tmpMap.put(_Fields.OPERATION_STATE, new org.apache.thrift.meta_data.FieldMetaData("operationState", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.EnumMetaData(org.apache.thrift.protocol.TType.ENUM, TOperationState.class)));
-<<<<<<< HEAD
     tmpMap.put(_Fields.TASK_STATUS, new org.apache.thrift.meta_data.FieldMetaData("taskStatus", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     tmpMap.put(_Fields.SQL_STATE, new org.apache.thrift.meta_data.FieldMetaData("sqlState", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.ERROR_CODE, new org.apache.thrift.meta_data.FieldMetaData("errorCode", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
     tmpMap.put(_Fields.ERROR_MESSAGE, new org.apache.thrift.meta_data.FieldMetaData("errorMessage", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-<<<<<<< HEAD
     tmpMap.put(_Fields.OPERATION_STARTED, new org.apache.thrift.meta_data.FieldMetaData("operationStarted", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     tmpMap.put(_Fields.OPERATION_COMPLETED, new org.apache.thrift.meta_data.FieldMetaData("operationCompleted", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TGetOperationStatusResp.class, metaDataMap);
   }
@@ -229,12 +191,9 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     if (other.isSetOperationState()) {
       this.operationState = other.operationState;
     }
-<<<<<<< HEAD
     if (other.isSetTaskStatus()) {
       this.taskStatus = other.taskStatus;
     }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     if (other.isSetSqlState()) {
       this.sqlState = other.sqlState;
     }
@@ -242,11 +201,8 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     if (other.isSetErrorMessage()) {
       this.errorMessage = other.errorMessage;
     }
-<<<<<<< HEAD
     this.operationStarted = other.operationStarted;
     this.operationCompleted = other.operationCompleted;
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   }
 
   public TGetOperationStatusResp deepCopy() {
@@ -257,21 +213,15 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
   public void clear() {
     this.status = null;
     this.operationState = null;
-<<<<<<< HEAD
     this.taskStatus = null;
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     this.sqlState = null;
     setErrorCodeIsSet(false);
     this.errorCode = 0;
     this.errorMessage = null;
-<<<<<<< HEAD
     setOperationStartedIsSet(false);
     this.operationStarted = 0;
     setOperationCompletedIsSet(false);
     this.operationCompleted = 0;
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   }
 
   public TStatus getStatus() {
@@ -328,7 +278,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     }
   }
 
-<<<<<<< HEAD
   public String getTaskStatus() {
     return this.taskStatus;
   }
@@ -352,8 +301,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     }
   }
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   public String getSqlState() {
     return this.sqlState;
   }
@@ -422,7 +369,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     }
   }
 
-<<<<<<< HEAD
   public long getOperationStarted() {
     return this.operationStarted;
   }
@@ -467,8 +413,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __OPERATIONCOMPLETED_ISSET_ID, value);
   }
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case STATUS:
@@ -487,7 +431,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       break;
 
-<<<<<<< HEAD
     case TASK_STATUS:
       if (value == null) {
         unsetTaskStatus();
@@ -496,8 +439,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       break;
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     case SQL_STATE:
       if (value == null) {
         unsetSqlState();
@@ -522,7 +463,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       break;
 
-<<<<<<< HEAD
     case OPERATION_STARTED:
       if (value == null) {
         unsetOperationStarted();
@@ -539,8 +479,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       break;
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     }
   }
 
@@ -552,12 +490,9 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     case OPERATION_STATE:
       return getOperationState();
 
-<<<<<<< HEAD
     case TASK_STATUS:
       return getTaskStatus();
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     case SQL_STATE:
       return getSqlState();
 
@@ -567,15 +502,12 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     case ERROR_MESSAGE:
       return getErrorMessage();
 
-<<<<<<< HEAD
     case OPERATION_STARTED:
       return Long.valueOf(getOperationStarted());
 
     case OPERATION_COMPLETED:
       return Long.valueOf(getOperationCompleted());
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     }
     throw new IllegalStateException();
   }
@@ -591,24 +523,18 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       return isSetStatus();
     case OPERATION_STATE:
       return isSetOperationState();
-<<<<<<< HEAD
     case TASK_STATUS:
       return isSetTaskStatus();
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     case SQL_STATE:
       return isSetSqlState();
     case ERROR_CODE:
       return isSetErrorCode();
     case ERROR_MESSAGE:
       return isSetErrorMessage();
-<<<<<<< HEAD
     case OPERATION_STARTED:
       return isSetOperationStarted();
     case OPERATION_COMPLETED:
       return isSetOperationCompleted();
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     }
     throw new IllegalStateException();
   }
@@ -644,7 +570,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return false;
     }
 
-<<<<<<< HEAD
     boolean this_present_taskStatus = true && this.isSetTaskStatus();
     boolean that_present_taskStatus = true && that.isSetTaskStatus();
     if (this_present_taskStatus || that_present_taskStatus) {
@@ -654,8 +579,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return false;
     }
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     boolean this_present_sqlState = true && this.isSetSqlState();
     boolean that_present_sqlState = true && that.isSetSqlState();
     if (this_present_sqlState || that_present_sqlState) {
@@ -683,7 +606,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return false;
     }
 
-<<<<<<< HEAD
     boolean this_present_operationStarted = true && this.isSetOperationStarted();
     boolean that_present_operationStarted = true && that.isSetOperationStarted();
     if (this_present_operationStarted || that_present_operationStarted) {
@@ -702,8 +624,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return false;
     }
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     return true;
   }
 
@@ -721,14 +641,11 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     if (present_operationState)
       builder.append(operationState.getValue());
 
-<<<<<<< HEAD
     boolean present_taskStatus = true && (isSetTaskStatus());
     builder.append(present_taskStatus);
     if (present_taskStatus)
       builder.append(taskStatus);
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     boolean present_sqlState = true && (isSetSqlState());
     builder.append(present_sqlState);
     if (present_sqlState)
@@ -744,7 +661,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     if (present_errorMessage)
       builder.append(errorMessage);
 
-<<<<<<< HEAD
     boolean present_operationStarted = true && (isSetOperationStarted());
     builder.append(present_operationStarted);
     if (present_operationStarted)
@@ -755,8 +671,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
     if (present_operationCompleted)
       builder.append(operationCompleted);
 
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     return builder.toHashCode();
   }
 
@@ -788,7 +702,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return lastComparison;
       }
     }
-<<<<<<< HEAD
     lastComparison = Boolean.valueOf(isSetTaskStatus()).compareTo(typedOther.isSetTaskStatus());
     if (lastComparison != 0) {
       return lastComparison;
@@ -799,8 +712,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return lastComparison;
       }
     }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     lastComparison = Boolean.valueOf(isSetSqlState()).compareTo(typedOther.isSetSqlState());
     if (lastComparison != 0) {
       return lastComparison;
@@ -831,7 +742,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return lastComparison;
       }
     }
-<<<<<<< HEAD
     lastComparison = Boolean.valueOf(isSetOperationStarted()).compareTo(typedOther.isSetOperationStarted());
     if (lastComparison != 0) {
       return lastComparison;
@@ -852,8 +762,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         return lastComparison;
       }
     }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     return 0;
   }
 
@@ -891,7 +799,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       first = false;
     }
-<<<<<<< HEAD
     if (isSetTaskStatus()) {
       if (!first) sb.append(", ");
       sb.append("taskStatus:");
@@ -902,8 +809,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       first = false;
     }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     if (isSetSqlState()) {
       if (!first) sb.append(", ");
       sb.append("sqlState:");
@@ -930,7 +835,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       }
       first = false;
     }
-<<<<<<< HEAD
     if (isSetOperationStarted()) {
       if (!first) sb.append(", ");
       sb.append("operationStarted:");
@@ -943,8 +847,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       sb.append(this.operationCompleted);
       first = false;
     }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     sb.append(")");
     return sb.toString();
   }
@@ -1014,7 +916,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-<<<<<<< HEAD
           case 3: // TASK_STATUS
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.taskStatus = iprot.readString();
@@ -1024,9 +925,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
             }
             break;
           case 4: // SQL_STATE
-=======
-          case 3: // SQL_STATE
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.sqlState = iprot.readString();
               struct.setSqlStateIsSet(true);
@@ -1034,11 +932,7 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-<<<<<<< HEAD
           case 5: // ERROR_CODE
-=======
-          case 4: // ERROR_CODE
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.errorCode = iprot.readI32();
               struct.setErrorCodeIsSet(true);
@@ -1046,11 +940,7 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-<<<<<<< HEAD
           case 6: // ERROR_MESSAGE
-=======
-          case 5: // ERROR_MESSAGE
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.errorMessage = iprot.readString();
               struct.setErrorMessageIsSet(true);
@@ -1058,7 +948,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-<<<<<<< HEAD
           case 7: // OPERATION_STARTED
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.operationStarted = iprot.readI64();
@@ -1075,8 +964,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1102,7 +989,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
           oprot.writeFieldEnd();
         }
       }
-<<<<<<< HEAD
       if (struct.taskStatus != null) {
         if (struct.isSetTaskStatus()) {
           oprot.writeFieldBegin(TASK_STATUS_FIELD_DESC);
@@ -1110,8 +996,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
           oprot.writeFieldEnd();
         }
       }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       if (struct.sqlState != null) {
         if (struct.isSetSqlState()) {
           oprot.writeFieldBegin(SQL_STATE_FIELD_DESC);
@@ -1131,7 +1015,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
           oprot.writeFieldEnd();
         }
       }
-<<<<<<< HEAD
       if (struct.isSetOperationStarted()) {
         oprot.writeFieldBegin(OPERATION_STARTED_FIELD_DESC);
         oprot.writeI64(struct.operationStarted);
@@ -1142,8 +1025,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         oprot.writeI64(struct.operationCompleted);
         oprot.writeFieldEnd();
       }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1166,7 +1047,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       if (struct.isSetOperationState()) {
         optionals.set(0);
       }
-<<<<<<< HEAD
       if (struct.isSetTaskStatus()) {
         optionals.set(1);
       }
@@ -1192,21 +1072,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       if (struct.isSetTaskStatus()) {
         oprot.writeString(struct.taskStatus);
       }
-=======
-      if (struct.isSetSqlState()) {
-        optionals.set(1);
-      }
-      if (struct.isSetErrorCode()) {
-        optionals.set(2);
-      }
-      if (struct.isSetErrorMessage()) {
-        optionals.set(3);
-      }
-      oprot.writeBitSet(optionals, 4);
-      if (struct.isSetOperationState()) {
-        oprot.writeI32(struct.operationState.getValue());
-      }
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       if (struct.isSetSqlState()) {
         oprot.writeString(struct.sqlState);
       }
@@ -1216,15 +1081,12 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       if (struct.isSetErrorMessage()) {
         oprot.writeString(struct.errorMessage);
       }
-<<<<<<< HEAD
       if (struct.isSetOperationStarted()) {
         oprot.writeI64(struct.operationStarted);
       }
       if (struct.isSetOperationCompleted()) {
         oprot.writeI64(struct.operationCompleted);
       }
-=======
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     }
 
     @Override
@@ -1233,17 +1095,12 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
       struct.status = new TStatus();
       struct.status.read(iprot);
       struct.setStatusIsSet(true);
-<<<<<<< HEAD
       BitSet incoming = iprot.readBitSet(7);
-=======
-      BitSet incoming = iprot.readBitSet(4);
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       if (incoming.get(0)) {
         struct.operationState = TOperationState.findByValue(iprot.readI32());
         struct.setOperationStateIsSet(true);
       }
       if (incoming.get(1)) {
-<<<<<<< HEAD
         struct.taskStatus = iprot.readString();
         struct.setTaskStatusIsSet(true);
       }
@@ -1267,19 +1124,6 @@ public class TGetOperationStatusResp implements org.apache.thrift.TBase<TGetOper
         struct.operationCompleted = iprot.readI64();
         struct.setOperationCompletedIsSet(true);
       }
-=======
-        struct.sqlState = iprot.readString();
-        struct.setSqlStateIsSet(true);
-      }
-      if (incoming.get(2)) {
-        struct.errorCode = iprot.readI32();
-        struct.setErrorCodeIsSet(true);
-      }
-      if (incoming.get(3)) {
-        struct.errorMessage = iprot.readString();
-        struct.setErrorMessageIsSet(true);
-      }
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
     }
   }
 

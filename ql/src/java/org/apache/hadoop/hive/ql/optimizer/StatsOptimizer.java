@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.ql.optimizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,8 +32,6 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
@@ -56,6 +55,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
+import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
@@ -67,7 +67,6 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFMax;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFMin;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFSum;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
@@ -76,7 +75,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 import org.apache.thrift.TException;
 
 import com.google.common.collect.Lists;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 
 /** There is a set of queries which can be answered entirely from statistics stored in metastore.
@@ -273,8 +271,12 @@ public class StatsOptimizer implements Transform {
                   rowCnt -= nullCnt;
                 }
               } else {
-                Set<Partition> parts = pctx.getPrunedPartitions(
-                  tsOp.getConf().getAlias(), tsOp).getPartitions();
+                List<PrunedPartitionList> pList = pctx.getPrunedPartitions(
+                    tsOp.getConf().getAlias(), tsOp);
+                Set<Partition> parts = new LinkedHashSet<Partition>();
+                for (PrunedPartitionList p : pList) {
+                  parts.addAll(p.getPartitions());
+                }
                 for (Partition part : parts) {
                   if (!StatsSetupConst.areStatsUptoDate(part.getParameters())) {
                     Log.debug("Stats for part : " + part.getSpec() + " are not upto date.");
@@ -295,7 +297,9 @@ public class StatsOptimizer implements Transform {
                 }
                 for (List<ColumnStatisticsObj> statObj : result) {
                   ColumnStatisticsData statData = validateSingleColStat(statObj);
-                  if (statData == null) return null;
+                  if (statData == null) {
+                    return null;
+                  }
                   Long nullCnt = getNullcountFor(type, statData);
                   if (nullCnt == null) {
                     Log.debug("Unsupported type: " + desc.getTypeString() + " encountered in " +
@@ -345,8 +349,12 @@ public class StatsOptimizer implements Transform {
                 return null;
               }
             } else {
-              Set<Partition> parts = pctx.getPrunedPartitions(
-                tsOp.getConf().getAlias(), tsOp).getPartitions();
+              List<PrunedPartitionList> pList = pctx.getPrunedPartitions(
+                  tsOp.getConf().getAlias(), tsOp);
+              Set<Partition> parts = new LinkedHashSet<Partition>();
+              for (PrunedPartitionList p : pList) {
+                parts.addAll(p.getPartitions());
+              }
               switch (type) {
               case Integeral: {
                 long maxVal = Long.MIN_VALUE;
@@ -357,7 +365,9 @@ public class StatsOptimizer implements Transform {
                 }
                 for (List<ColumnStatisticsObj> statObj : result) {
                   ColumnStatisticsData statData = validateSingleColStat(statObj);
-                  if (statData == null) return null;
+                  if (statData == null) {
+                    return null;
+                  }
                   long curVal = statData.getLongStats().getHighValue();
                   maxVal = Math.max(maxVal, curVal);
                 }
@@ -375,7 +385,9 @@ public class StatsOptimizer implements Transform {
                 }
                 for (List<ColumnStatisticsObj> statObj : result) {
                   ColumnStatisticsData statData = validateSingleColStat(statObj);
-                  if (statData == null) return null;
+                  if (statData == null) {
+                    return null;
+                  }
                   double curVal = statData.getDoubleStats().getHighValue();
                   maxVal = Math.max(maxVal, curVal);
                 }
@@ -420,7 +432,12 @@ public class StatsOptimizer implements Transform {
                 return null;
               }
             } else {
-              Set<Partition> parts = pctx.getPrunedPartitions(tsOp.getConf().getAlias(), tsOp).getPartitions();
+              List<PrunedPartitionList> pList = pctx.getPrunedPartitions(
+                  tsOp.getConf().getAlias(), tsOp);
+              Set<Partition> parts = new LinkedHashSet<Partition>();
+              for (PrunedPartitionList p : pList) {
+                parts.addAll(p.getPartitions());
+              }
               switch(type) {
               case Integeral: {
                 long minVal = Long.MAX_VALUE;
@@ -431,7 +448,9 @@ public class StatsOptimizer implements Transform {
                 }
                 for (List<ColumnStatisticsObj> statObj : result) {
                   ColumnStatisticsData statData = validateSingleColStat(statObj);
-                  if (statData == null) return null;
+                  if (statData == null) {
+                    return null;
+                  }
                   long curVal = statData.getLongStats().getLowValue();
                   minVal = Math.min(minVal, curVal);
                 }
@@ -449,7 +468,9 @@ public class StatsOptimizer implements Transform {
                 }
                 for (List<ColumnStatisticsObj> statObj : result) {
                   ColumnStatisticsData statData = validateSingleColStat(statObj);
-                  if (statData == null) return null;
+                  if (statData == null) {
+                    return null;
+                  }
                   double curVal = statData.getDoubleStats().getLowValue();
                   minVal = Math.min(minVal, curVal);
                 }
@@ -529,8 +550,13 @@ public class StatsOptimizer implements Transform {
         ParseContext pCtx, TableScanOperator tsOp, Table tbl) throws HiveException {
       Long rowCnt = 0L;
       if (tbl.isPartitioned()) {
-        for (Partition part : pctx.getPrunedPartitions(
-            tsOp.getConf().getAlias(), tsOp).getPartitions()) {
+        List<PrunedPartitionList> pList = pctx.getPrunedPartitions(
+            tsOp.getConf().getAlias(), tsOp);
+        Set<Partition> parts = new LinkedHashSet<Partition>();
+        for (PrunedPartitionList p : pList) {
+          parts.addAll(p.getPartitions());
+        }
+        for (Partition part : parts) {
           long partRowCnt = Long.parseLong(part.getParameters().get(StatsSetupConst.ROW_COUNT));
           if (partRowCnt < 1) {
             Log.debug("Partition doesn't have upto date stats " + part.getSpec());

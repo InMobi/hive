@@ -318,8 +318,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
-  public int getNumPartitionsByFilter(String dbName, String tblName, String filter,
-      short maxParts) throws MetaException, NoSuchObjectException {
+  public int getNumPartitionsByFilter(String dbName, String tblName, String filter) throws MetaException, NoSuchObjectException {
 
     return -1;
   }

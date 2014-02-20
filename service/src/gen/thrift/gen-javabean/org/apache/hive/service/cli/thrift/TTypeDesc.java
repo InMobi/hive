@@ -354,11 +354,7 @@ public class TTypeDesc implements org.apache.thrift.TBase<TTypeDesc, TTypeDesc._
                 struct.types = new ArrayList<TTypeEntry>(_list30.size);
                 for (int _i31 = 0; _i31 < _list30.size; ++_i31)
                 {
-<<<<<<< HEAD
-                  TTypeEntry _elem32; // optional
-=======
                   TTypeEntry _elem32; // required
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
                   _elem32 = new TTypeEntry();
                   _elem32.read(iprot);
                   struct.types.add(_elem32);
@@ -429,11 +425,7 @@ public class TTypeDesc implements org.apache.thrift.TBase<TTypeDesc, TTypeDesc._
         struct.types = new ArrayList<TTypeEntry>(_list35.size);
         for (int _i36 = 0; _i36 < _list35.size; ++_i36)
         {
-<<<<<<< HEAD
-          TTypeEntry _elem37; // optional
-=======
           TTypeEntry _elem37; // required
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
           _elem37 = new TTypeEntry();
           _elem37.read(iprot);
           struct.types.add(_elem37);

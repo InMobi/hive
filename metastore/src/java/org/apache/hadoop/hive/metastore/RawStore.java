@@ -210,7 +210,7 @@ public interface RawStore extends Configurable {
       throws MetaException, NoSuchObjectException;
 
   public abstract int getNumPartitionsByFilter(String dbName, String tblName,
-      String filter, short maxParts)
+      String filter)
           throws MetaException, NoSuchObjectException;
 
   public abstract boolean getPartitionsByExpr(String dbName, String tblName,

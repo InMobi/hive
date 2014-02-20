@@ -92,7 +92,7 @@ public class StatsRulesProcFactory {
         Object... nodeOutputs) throws SemanticException {
       TableScanOperator tsop = (TableScanOperator) nd;
       AnnotateStatsProcCtx aspCtx = (AnnotateStatsProcCtx) procCtx;
-      PrunedPartitionList partList = null;
+      List<PrunedPartitionList> partList = null;
       try {
         partList = aspCtx.getParseContext().getPrunedPartitions(tsop.getName(), tsop);
       } catch (HiveException e1) {
@@ -101,7 +101,7 @@ public class StatsRulesProcFactory {
       Table table = aspCtx.getParseContext().getTopToTable().get(tsop);
 
       // gather statistics for the first time and the attach it to table scan operator
-      Statistics stats = StatsUtils.collectStatistics(aspCtx.getConf(), partList, table, tsop);
+      Statistics stats = StatsUtils.collectStatistics(aspCtx.getConf(), partList.get(0), table, tsop);
       try {
         tsop.setStatistics(stats.clone());
 

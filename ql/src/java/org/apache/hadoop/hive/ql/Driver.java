@@ -118,7 +118,7 @@ public class Driver implements CommandProcessor {
 
   static final private String CLASS_NAME = Driver.class.getName();
   static final private Log LOG = LogFactory.getLog(CLASS_NAME);
-  static final private LogHelper console = new LogHelper(LOG);
+  private LogHelper console = new LogHelper(LOG);
 
   private static final Object compileMonitor = new Object();
 

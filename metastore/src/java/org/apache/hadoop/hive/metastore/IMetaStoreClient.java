@@ -464,15 +464,13 @@ public interface IMetaStoreClient {
    * @param filter the filter string,
    *    for example "part1 = \"p1_abc\" and part2 <= "\p2_test\"". Filtering can
    *    be done only on string partition keys.
-   * @param max_parts the maximum number of partitions to return,
-   *    all partitions are returned if -1 is passed
    * @return number of partitions
    * @throws MetaException
    * @throws NoSuchObjectException
    * @throws TException
    */
   public int getNumPartitionsByFilter(String dbName, String tableName,
-      String filter, short s) throws MetaException, NoSuchObjectException, TException;
+      String filter) throws MetaException, NoSuchObjectException, TException;
 
   /**
    * @param dbName
@@ -1021,13 +1019,10 @@ public interface IMetaStoreClient {
    */
   public void cancelDelegationToken(String tokenStrForm) throws MetaException, TException;
 
-<<<<<<< HEAD
-=======
 
   public class IncompatibleMetastoreException extends MetaException {
     public IncompatibleMetastoreException(String message) {
       super(message);
     }
   }
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 }

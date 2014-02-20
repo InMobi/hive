@@ -30,12 +30,8 @@ public enum TTypeId implements org.apache.thrift.TEnum {
   DECIMAL_TYPE(15),
   NULL_TYPE(16),
   DATE_TYPE(17),
-<<<<<<< HEAD
-  VARCHAR_TYPE(18);
-=======
   VARCHAR_TYPE(18),
   CHAR_TYPE(19);
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 
   private final int value;
 
@@ -94,11 +90,8 @@ public enum TTypeId implements org.apache.thrift.TEnum {
         return DATE_TYPE;
       case 18:
         return VARCHAR_TYPE;
-<<<<<<< HEAD
-=======
       case 19:
         return CHAR_TYPE;
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
       default:
         return null;
     }
