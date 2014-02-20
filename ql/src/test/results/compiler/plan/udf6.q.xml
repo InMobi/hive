@@ -296,6 +296,7 @@
                   </void> 
                  </object> 
                 </void> 
+                <void id="Boolean0" property="countersAvailable"/> 
                </object> 
               </void> 
              </object> 
@@ -317,7 +318,7 @@
                      </object> 
                     </void> 
                     <void property="value"> 
-                     <boolean>true</boolean> 
+                     <object idref="Boolean0"/> 
                     </void> 
                    </object> 
                   </void> 
