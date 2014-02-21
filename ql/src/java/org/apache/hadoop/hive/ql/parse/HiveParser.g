@@ -2100,7 +2100,7 @@ destination
 @after { popMsg(state); }
    :
      KW_LOCAL KW_DIRECTORY StringLiteral tableRowFormat? tableFileFormat? -> ^(TOK_LOCAL_DIR StringLiteral tableRowFormat? tableFileFormat?)
-   | KW_DIRECTORY StringLiteral -> ^(TOK_DIR StringLiteral)
+   | KW_DIRECTORY StringLiteral tableRowFormat? tableFileFormat? -> ^(TOK_DIR StringLiteral tableRowFormat? tableFileFormat?)
    | KW_TABLE tableOrPartition -> tableOrPartition
    ;
 

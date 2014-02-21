@@ -89,6 +89,11 @@ public class SessionState {
    */
   protected boolean isVerbose;
 
+  /**
+   * has a jar been added in this context?
+   */
+  private boolean addedJarOnce;
+
   /*
    * HiveHistory Object
    */
@@ -287,6 +292,7 @@ public class SessionState {
 
     setCurrentSessionState(startSs);
 
+    Thread.currentThread().setContextClassLoader(startSs.conf.getClassLoader());
     if(startSs.hiveHist == null){
       if (startSs.getConf().getBoolVar(HiveConf.ConfVars.HIVE_SESSION_HISTORY_ENABLED)) {
         startSs.hiveHist = new HiveHistoryImpl(startSs);
@@ -629,7 +635,15 @@ public class SessionState {
   public static boolean registerJar(String newJar) {
     LogHelper console = getConsole();
     try {
-      ClassLoader loader = Thread.currentThread().getContextClassLoader();
+      SessionState ss = SessionState.get();
+      ClassLoader loader;
+      if (!ss.addedJarOnce) {
+        loader = SessionState.class.getClassLoader();
+        ss.addedJarOnce = true;
+      } else {
+        loader = ss.conf.getClassLoader();
+      }
+
       ClassLoader newLoader = Utilities.addToClassPath(loader, StringUtils.split(newJar, ","));
       Thread.currentThread().setContextClassLoader(newLoader);
       SessionState.get().getConf().setClassLoader(newLoader);

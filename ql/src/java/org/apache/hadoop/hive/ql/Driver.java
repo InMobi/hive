@@ -1792,7 +1792,8 @@ public class Driver implements CommandProcessor {
 
     List<TaskStatus> statuses = new ArrayList<TaskStatus>(tasks.size());
     for (Task<?> tsk : tasks) {
-      statuses.add(new TaskStatus(tsk.getId(), tsk.getExternalHandle(), tsk.getTaskState()));
+      statuses.add(new TaskStatus(tsk.getId(), tsk.getExternalHandle(),
+          tsk.getTaskState(), tsk.getType()));
     }
     return statuses;
   }

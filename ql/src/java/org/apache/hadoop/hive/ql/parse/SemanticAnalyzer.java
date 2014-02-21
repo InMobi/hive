@@ -47,8 +47,10 @@ import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -80,8 +82,8 @@ import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.NullRowsInputFormat;
+import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
 import org.apache.hadoop.hive.ql.lib.GraphWalker;
@@ -535,7 +537,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // tablename props alias
     // tablename tablesample alias
     // tablename props tablesample alias
-    // tablename,tablename alias -> (TOK_TABREF (TOK_TABNAME t1) (TOK_TABNAME t2) t)) 
+    // tablename,tablename alias -> (TOK_TABREF (TOK_TABNAME t1) (TOK_TABNAME t2) t))
     // tablename,tablename tablesample alias
     // tablename,tablename,tablename alias
     // tablename,tablename,tablename tablesample alias
@@ -726,13 +728,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
    * The scoping rules we use are: to search for a CTE from the current QB outwards. In order to
    * disambiguate between CTES are different levels we qualify(prefix) them with the id of the QB
    * they appear in when adding them to the <code>aliasToCTEs</code> map.
-   * 
+   *
    */
   private ASTNode findCTEFromName(QB qb, String cteName) {
 
     /*
      * When saving a view definition all table references in the AST are qualified; including CTE references.
-     * Where as CTE definitions have no DB qualifier; so we strip out the DB qualifier before searching in 
+     * Where as CTE definitions have no DB qualifier; so we strip out the DB qualifier before searching in
      * <code>aliasToCTEs</code> map.
      */
     String currDB = SessionState.get().getCurrentDatabase();
@@ -758,17 +760,17 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
     return aliasToCTEs.get(cteName);
   }
-  
+
   /*
    * If a CTE is referenced in a QueryBlock:
    * - add it as a SubQuery for now.
-   *   - SQ.alias is the alias used in QB. (if no alias is specified, 
+   *   - SQ.alias is the alias used in QB. (if no alias is specified,
    *     it used the CTE name. Works just like table references)
    *   - Adding SQ done by:
    *     - copying AST of CTE
    *     - setting ASTOrigin on cloned AST.
    *   - trigger phase 1 on new QBExpr.
-   *   - update QB data structs: remove this as a table reference, move it to a SQ invocation. 
+   *   - update QB data structs: remove this as a table reference, move it to a SQ invocation.
    */
   private void addCTEAsSubQuery(QB qb, String cteName, String cteAlias) throws SemanticException {
     cteAlias = cteAlias == null ? cteName : cteAlias;
@@ -828,7 +830,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         processPTF(qb, child);
         PTFInvocationSpec ptfInvocationSpec = qb.getPTFInvocationSpec(child);
         String inputAlias = ptfInvocationSpec == null ? null :
-          ((PartitionedTableFunctionSpec)ptfInvocationSpec.getFunction()).getAlias();;
+          ptfInvocationSpec.getFunction().getAlias();;
         if ( inputAlias == null ) {
           throw new SemanticException(generateErrorMessage(child,
               "PTF invocation in a Join must have an alias"));
@@ -1454,8 +1456,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           qb.getMetaData().setDestForAlias(name, fname,
               (ast.getToken().getType() == HiveParser.TOK_DIR));
 
-          CreateTableDesc localDirectoryDesc = new CreateTableDesc();
-          boolean localDirectoryDescIsSet = false;
+          CreateTableDesc directoryDesc = new CreateTableDesc();
+          boolean directoryDescIsSet = false;
           int numCh = ast.getChildCount();
           for (int num = 1; num < numCh ; num++){
             ASTNode child = (ASTNode) ast.getChild(num);
@@ -1463,19 +1465,24 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
               switch (child.getToken().getType()) {
                 case HiveParser.TOK_TABLEROWFORMAT:
                   rowFormatParams.analyzeRowFormat(shared, child);
-                  localDirectoryDesc.setFieldDelim(rowFormatParams.fieldDelim);
-                  localDirectoryDesc.setLineDelim(rowFormatParams.lineDelim);
-                  localDirectoryDesc.setCollItemDelim(rowFormatParams.collItemDelim);
-                  localDirectoryDesc.setMapKeyDelim(rowFormatParams.mapKeyDelim);
-                  localDirectoryDesc.setFieldEscape(rowFormatParams.fieldEscape);
-                  localDirectoryDesc.setNullFormat(rowFormatParams.nullFormat);
-                  localDirectoryDescIsSet=true;
+                  directoryDesc.setFieldDelim(rowFormatParams.fieldDelim);
+                  directoryDesc.setLineDelim(rowFormatParams.lineDelim);
+                  directoryDesc.setCollItemDelim(rowFormatParams.collItemDelim);
+                  directoryDesc.setMapKeyDelim(rowFormatParams.mapKeyDelim);
+                  directoryDesc.setFieldEscape(rowFormatParams.fieldEscape);
+                  directoryDesc.setNullFormat(rowFormatParams.nullFormat);
+                  directoryDescIsSet=true;
                   break;
                 case HiveParser.TOK_TABLESERIALIZER:
                   ASTNode serdeChild = (ASTNode) child.getChild(0);
                   shared.serde = unescapeSQLString(serdeChild.getChild(0).getText());
-                  localDirectoryDesc.setSerName(shared.serde);
-                  localDirectoryDescIsSet=true;
+                  directoryDesc.setSerName(shared.serde);
+                  if (serdeChild.getChildCount() >= 2) {
+                    readProps((ASTNode) (serdeChild.getChild(1).getChild(0)),
+                        shared.serdeProps);
+                    directoryDesc.setSerdeProps(shared.serdeProps);
+                  }
+                  directoryDescIsSet=true;
                   break;
                 case HiveParser.TOK_TBLSEQUENCEFILE:
                 case HiveParser.TOK_TBLTEXTFILE:
@@ -1483,15 +1490,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
                 case HiveParser.TOK_TBLORCFILE:
                 case HiveParser.TOK_TABLEFILEFORMAT:
                   storageFormat.fillStorageFormat(child, shared);
-                  localDirectoryDesc.setOutputFormat(storageFormat.outputFormat);
-                  localDirectoryDesc.setSerName(shared.serde);
-                  localDirectoryDescIsSet=true;
+                  directoryDesc.setOutputFormat(storageFormat.outputFormat);
+                  directoryDesc.setSerName(shared.serde);
+                  directoryDescIsSet=true;
                   break;
               }
             }
           }
-          if (localDirectoryDescIsSet){
-            qb.setLocalDirectoryDesc(localDirectoryDesc);
+          if (directoryDescIsSet){
+            qb.setDirectoryDesc(directoryDesc);
           }
           break;
         }
@@ -1524,6 +1531,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       tree = ParseUtils.findRootNonNullToken(tree);
       viewTree = tree;
       Dispatcher nodeOriginDispatcher = new Dispatcher() {
+        @Override
         public Object dispatch(Node nd, java.util.Stack<Node> stack,
             Object... nodeOutputs) {
           ((ASTNode) nd).setOrigin(viewOrigin);
@@ -2095,7 +2103,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     output = putOpInsertMap(output, inputRR);
     return output;
   }
-  
+
   private Operator genPlanForSubQueryPredicate(
       QB qbSQ,
       ISubQueryJoinInfo subQueryPredicate) throws SemanticException {
@@ -2137,15 +2145,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
      *     --> ===CONTINUE_FILTER_PROCESSING===
      *   endif
      * endif
-     * 
+     *
      * Support for Sub Queries in Having Clause:
      * - By and large this works the same way as SubQueries in the Where Clause.
      * - The one addum is the handling of aggregation expressions from the Outer Query
-     *   appearing in correlation clauses. 
+     *   appearing in correlation clauses.
      *   - So such correlating predicates are allowed:
      *        min(OuterQuert.x) = SubQuery.y
      *   - this requires special handling when converting to joins. See QBSubQuery.rewrite
-     *     method method for detailed comments. 
+     *     method method for detailed comments.
      */
     List<ASTNode> subQueriesInOriginalTree = SubQueryUtils.findSubQueries(searchCond);
 
@@ -2183,9 +2191,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
         QBSubQuery subQuery = SubQueryUtils.buildSubQuery(qb.getId(),
             sqIdx, subQueryAST, originalSubQueryAST, ctx);
-        
+
         String havingInputAlias = null;
-        
+
         if ( forHavingClause ) {
         	havingInputAlias = "gby_sq" + sqIdx;
         	aliasToOpInfo.put(havingInputAlias, input);
@@ -2209,7 +2217,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           throw new SemanticException(ErrorMsg.INVALID_SUBQUERY_EXPRESSION.getMsg(
               subQueryAST, "SubQuery can contain only 1 item in Select List."));
         }
-        
+
         /*
          * If this is a Not In SubQuery Predicate then Join in the Null Check SubQuery.
          * See QBSubQuery.NotInCheck for details on why and how this is constructed.
@@ -2309,7 +2317,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
      * if a columnInfo has multiple mappings; then add the column only once,
      * but carry the mappings forward.
      */
-    Map<ColumnInfo, ColumnInfo> inputColsProcessed = new HashMap<ColumnInfo, ColumnInfo>(); 
+    Map<ColumnInfo, ColumnInfo> inputColsProcessed = new HashMap<ColumnInfo, ColumnInfo>();
     // For expr "*", aliases should be iterated in the order they are specified
     // in the query.
     for (String alias : aliases) {
@@ -2922,7 +2930,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     String qIdSupport = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_QUOTEDID_SUPPORT);
     if ( "column".equals(qIdSupport)) {
       return false;
-    }    
+    }
     for (int i = 0; i < pattern.length(); i++) {
       if (!Character.isLetterOrDigit(pattern.charAt(i))
           && pattern.charAt(i) != '_') {
@@ -3155,7 +3163,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         colInfo.setSkewedCol((exp instanceof ExprNodeColumnDesc) ? ((ExprNodeColumnDesc) exp)
             .isSkewedCol() : false);
         out_rwsch.put(tabAlias, colAlias, colInfo);
-        
+
         if ( exp instanceof ExprNodeColumnDesc ) {
           ExprNodeColumnDesc colExp = (ExprNodeColumnDesc) exp;
           String[] altMapping = inputRR.getAlternateMappings(colExp.getColumn());
@@ -3437,11 +3445,11 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // get the last colName for the reduce KEY
     // it represents the column name corresponding to distinct aggr, if any
     String lastKeyColName = null;
-    List<String> inputKeyCols = ((ReduceSinkDesc) rs.getConf()).getOutputKeyColumnNames();
+    List<String> inputKeyCols = rs.getConf().getOutputKeyColumnNames();
     if (inputKeyCols.size() > 0) {
       lastKeyColName = inputKeyCols.get(inputKeyCols.size() - 1);
     }
-    List<ExprNodeDesc> reduceValues = ((ReduceSinkDesc) rs.getConf()).getValueCols();
+    List<ExprNodeDesc> reduceValues = rs.getConf().getValueCols();
     int numDistinctUDFs = 0;
     for (Map.Entry<String, ASTNode> entry : aggregationTrees.entrySet()) {
       ASTNode value = entry.getValue();
@@ -4233,8 +4241,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
         // extract columns missing in current RS key/value
         for (Map.Entry<ASTNode, ExprNodeDesc> entry : nodeOutputs.entrySet()) {
-          ASTNode parameter = (ASTNode) entry.getKey();
-          ExprNodeDesc expression = (ExprNodeDesc) entry.getValue();
+          ASTNode parameter = entry.getKey();
+          ExprNodeDesc expression = entry.getValue();
           if (!(expression instanceof ExprNodeColumnDesc)) {
             continue;
           }
@@ -4268,7 +4276,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   // Remaining column expressions would be a candidate for an RS value
   private void removeMappingForKeys(ASTNode predicate, Map<ASTNode, ExprNodeDesc> mapping,
       List<ExprNodeDesc> keys) {
-    ExprNodeDesc expr = (ExprNodeDesc) mapping.get(predicate);
+    ExprNodeDesc expr = mapping.get(predicate);
     if (expr != null && ExprNodeDescUtils.indexOf(expr, keys) >= 0) {
       removeRecursively(predicate, mapping);
     } else {
@@ -5601,9 +5609,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
       // if we are on viewfs we don't want to use /tmp as tmp dir since rename from /tmp/..
       // to final /user/hive/warehouse/ will fail later, so instead pick tmp dir
-      // on same namespace as tbl dir. 
-      queryTmpdir = dest_path.toUri().getScheme().equals("viewfs") ? 
-        ctx.getExtTmpPathRelTo(dest_path.getParent().toUri()) : 
+      // on same namespace as tbl dir.
+      queryTmpdir = dest_path.toUri().getScheme().equals("viewfs") ?
+        ctx.getExtTmpPathRelTo(dest_path.getParent().toUri()) :
         ctx.getExternalTmpPath(dest_path.toUri());
       table_desc = Utilities.getTableDesc(dest_tab);
 
@@ -5745,7 +5753,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           String fileFormat = HiveConf.getVar(conf, HiveConf.ConfVars.HIVEQUERYRESULTFILEFORMAT);
           table_desc = PlanUtils.getDefaultQueryOutputTableDesc(cols, colTypes, fileFormat);
         } else {
-          table_desc = PlanUtils.getDefaultTableDesc(qb.getLLocalDirectoryDesc(), cols, colTypes);
+          table_desc = PlanUtils.getDefaultTableDesc(qb.getDirectoryDesc(), cols, colTypes);
         }
       } else {
         table_desc = PlanUtils.getTableDesc(tblDesc, cols, colTypes);

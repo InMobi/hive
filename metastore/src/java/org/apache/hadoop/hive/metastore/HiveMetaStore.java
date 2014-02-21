@@ -3705,7 +3705,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       return ret;
     }
 
-    //@Override
+    @Override
     public int get_num_partitions_by_filter(final String dbName,
         final String tblName, final String filter)
         throws MetaException, NoSuchObjectException, TException {

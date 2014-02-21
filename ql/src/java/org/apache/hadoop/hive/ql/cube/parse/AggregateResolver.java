@@ -3,6 +3,8 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
 
+import java.util.Iterator;
+
 import org.antlr.runtime.CommonToken;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -14,8 +16,6 @@ import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-
-import java.util.Iterator;
 
 /**
  * <p>
@@ -36,7 +36,6 @@ import java.util.Iterator;
 public class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
-  public static final String DISABLE_AGGREGATE_RESOLVER = "hive.cube.disable.aggregate.resolver";
   private final Configuration conf;
 
   public AggregateResolver(Configuration conf) {
@@ -49,7 +48,8 @@ public class AggregateResolver implements ContextRewriter {
       return;
     }
 
-    if (conf.getBoolean(DISABLE_AGGREGATE_RESOLVER, false)) {
+    if (conf.getBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER,
+        CubeQueryConfUtil.DEFAULT_DISABLE_AGGREGATE_RESOLVER)) {
       // Check if the query contains measures not inside default aggregate expressions
       // If yes, only the raw (non aggregated) fact can answer this query.
       // In that case remove aggregate facts from the candidate fact list

@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 
@@ -154,6 +155,11 @@ public final class PlanUtils {
         properties.putAll(localDirectoryDesc.getTblProps());
       }
 
+      if (localDirectoryDesc.getSerdeProps() != null) {
+        for ( Entry<String, String> entry : localDirectoryDesc.getSerdeProps().entrySet()) {
+          properties.setProperty(entry.getKey(), entry.getValue());
+        }
+      }
     } catch (ClassNotFoundException e) {
       // mimicking behaviour in CreateTableDesc tableDesc creation
       // returning null table description for output.

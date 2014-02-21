@@ -64,7 +64,11 @@ public class TaskRunner extends Thread {
     try {
       exitVal = tsk.executeTask();
     } catch (Throwable t) {
-      t.printStackTrace();
+      if (tsk.isLogRedirectionEnabled()) {
+        t.printStackTrace(tsk.getConsole().getErrStream());
+      } else {
+        t.printStackTrace();
+      }
     }
     result.setExitVal(exitVal, tsk.getException());
   }

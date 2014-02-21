@@ -19,6 +19,12 @@ package org.apache.hadoop.hive.ql.session;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
+
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
@@ -64,5 +70,75 @@ public class TestSessionState {
     assertNull(ss.getTezSession());
     ss.close();
     assertNull(ss.getTezSession());
+  }
+
+  class RegisterJarRunnable implements Runnable{
+    String jar;
+    ClassLoader loader;
+    SessionState ss;
+    public RegisterJarRunnable(String jar, SessionState ss) {
+      this.jar = jar;
+      this.ss = ss;
+      System.out.println("Starting jar");
+    }
+
+    public void run() {
+      SessionState.start(ss);
+      SessionState.registerJar(jar);
+      loader = Thread.currentThread().getContextClassLoader();
+      System.out.println("Test added jar:" + jar);
+    }
+  }
+
+  @Test
+  public void testClassLoaderEquality() throws Exception {
+    HiveConf conf = new HiveConf();
+    final SessionState ss1 = new SessionState(conf);
+    RegisterJarRunnable otherThread = new RegisterJarRunnable("./build/contrib/test/test-udfs.jar", ss1);
+    Thread th1 = new Thread(otherThread);
+    th1.start();
+    th1.join();
+
+    // set state in current thread
+    SessionState.start(ss1);
+    SessionState ss2 = SessionState.get();
+    ClassLoader loader2 = ss2.conf.getClassLoader();
+
+    System.out.println("Loader1:(Set in other thread) " + otherThread.loader);
+    System.out.println("Loader2:(Set in SessionState.conf) " + loader2);
+    System.out.println("Loader3:(CurrentThread.getContextClassLoader()) " + Thread.currentThread().getContextClassLoader());
+    assertEquals("Other thread loader and session state loader", otherThread.loader, loader2);
+    assertEquals("Other thread loader and current thread loader", otherThread.loader, Thread.currentThread().getContextClassLoader());
+  }
+
+  @Test
+  public void testRegisterJarForDifferentThreads() {
+    // Create a session state
+    SessionState ss1 = new SessionState(new HiveConf());
+    // Set the session state in current thread
+    SessionState.start(ss1);
+    // Add jar
+    SessionState.registerJar("test__1__.jar");
+
+    // Create another session state
+    SessionState ss2 = new SessionState(new HiveConf());
+    // Now set this one in the current thread
+    SessionState.start(ss2);
+    // Add another jar
+    SessionState.registerJar("test__2__.jar");
+
+    // Check if test1.jar is still present in the new session state
+    ClassLoader ss2Loader = ss2.conf.getClassLoader();
+    if (ss2Loader instanceof URLClassLoader) {
+      URLClassLoader classLoader = (URLClassLoader) ss2Loader;
+      List<URL> ss2Paths = new ArrayList<URL>();
+      for (URL path : classLoader.getURLs()) {
+        ss2Paths.add(path);
+        if (path.toString().contains("test__1__.jar")) {
+          System.out.println("SS2 CP URL: " + path);
+          fail("Jar from old session should not be present here!");
+        }
+      }
+    }
   }
 }

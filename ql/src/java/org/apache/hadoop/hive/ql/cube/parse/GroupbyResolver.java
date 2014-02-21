@@ -8,44 +8,43 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class GroupbyResolver implements ContextRewriter {
+  private static Log LOG = LogFactory.getLog(
+      GroupbyResolver.class.getName());
 
-  private final boolean enabled;
+  private final boolean selectPromotionEnabled;
+  private final boolean groupbyPromotionEnabled;
   public GroupbyResolver(Configuration conf) {
-    enabled = conf.getBoolean(CubeQueryConfUtil.ENABLE_AUTOMATIC_GROUP_BY_RESOLVER,
-        CubeQueryConfUtil.DEFAULT_ENABLE_AUTOMATIC_GROUP_BY_RESOLVER);
+    selectPromotionEnabled = conf.getBoolean(CubeQueryConfUtil.ENABLE_SELECT_TO_GROUPBY,
+        CubeQueryConfUtil.DEFAULT_ENABLE_SELECT_TO_GROUPBY);
+    groupbyPromotionEnabled = conf.getBoolean(CubeQueryConfUtil.ENABLE_GROUP_BY_TO_SELECT,
+        CubeQueryConfUtil.DEFAULT_ENABLE_GROUP_BY_TO_SELECT);
   }
 
-  @Override
-  public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
-    if (!enabled) {
+  private void promoteSelect(CubeQueryContext cubeql, List<String> selectExprs,
+      List<String> groupByExprs) {
+    if (!selectPromotionEnabled) {
       return;
     }
-    // Process Aggregations by making sure that all group by keys are projected;
-    // and all projection fields are added to group by keylist;
+
+    if (!groupByExprs.isEmpty()) {
+      LOG.info("Not promoting select expression to groupby," +
+      		" since there are already group by expressions");
+      return;
+    }
+
     String groupByTree = cubeql.getGroupByTree();
-    String selectTree = cubeql.getSelectTree();
-    List<String> selectExprs = new ArrayList<String>();
-    String[] sel = getExpressions(cubeql.getSelectAST(), cubeql).toArray(new String[]{});
-    for (String s : sel) {
-      selectExprs.add(s.trim());
-    }
-    List<String> groupByExprs = new ArrayList<String>();
-    if (groupByTree != null) {
-      String[] gby = getExpressions(cubeql.getGroupByAST(), cubeql).toArray(new String[]{});
-      for (String g : gby) {
-        groupByExprs.add(g.trim());
-      }
-    }
     // each selected column, if it is not a cube measure, and does not have
     // aggregation on the column, then it is added to group by columns.
-    for (String expr : selectExprs) {
-      if (cubeql.hasAggregates()) {
+    if (cubeql.hasAggregates()) {
+      for (String expr : selectExprs) {
         expr = getExpressionWithoutAlias(cubeql, expr);
         if (!groupByExprs.contains(expr)) {
           if (!cubeql.isAggregateExpr(expr)) {
@@ -64,6 +63,23 @@ public class GroupbyResolver implements ContextRewriter {
     if (groupByTree != null) {
       cubeql.setGroupByTree(groupByTree);
     }
+  }
+
+  private void promoteGroupby(CubeQueryContext cubeql, List<String> selectExprs,
+      List<String> groupByExprs) {
+    if (!groupbyPromotionEnabled) {
+      return;
+    }
+
+    for (String expr : selectExprs) {
+      expr = getExpressionWithoutAlias(cubeql, expr);
+      if (!cubeql.isAggregateExpr(expr)) {
+        LOG.info("Not promoting groupby expression to select, since there are expression projected");
+        return;
+      }
+    }
+
+    String selectTree = cubeql.getSelectTree();
 
     for (String expr : groupByExprs) {
       if (!contains(cubeql, selectExprs, expr)) {
@@ -71,6 +87,26 @@ public class GroupbyResolver implements ContextRewriter {
       }
     }
     cubeql.setSelectTree(selectTree);
+  }
+
+  @Override
+  public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
+    // Process Aggregations by making sure that all group by keys are projected;
+    // and all projection fields are added to group by keylist;
+    List<String> selectExprs = new ArrayList<String>();
+    String[] sel = getExpressions(cubeql.getSelectAST(), cubeql).toArray(new String[]{});
+    for (String s : sel) {
+      selectExprs.add(s.trim());
+    }
+    List<String> groupByExprs = new ArrayList<String>();
+    if (cubeql.getGroupByTree() != null) {
+      String[] gby = getExpressions(cubeql.getGroupByAST(), cubeql).toArray(new String[]{});
+      for (String g : gby) {
+        groupByExprs.add(g.trim());
+      }
+    }
+    promoteSelect(cubeql, selectExprs, groupByExprs);
+    promoteGroupby(cubeql, selectExprs, groupByExprs);
   }
 
   private String getExpressionWithoutAlias(CubeQueryContext cubeql,

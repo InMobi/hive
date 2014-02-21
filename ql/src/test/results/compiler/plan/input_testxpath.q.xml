@@ -220,9 +220,13 @@
                   </void> 
                  </object> 
                 </void> 
+<<<<<<< HEAD
                 <void property="totalFiles"> 
                  <int>1</int> 
                 </void> 
+=======
+                <void id="Boolean0" property="recordCounters"/> 
+>>>>>>> 3675747f27186dabba58d176936fa92e8133ed13
                </object> 
               </void> 
               <void property="operatorId"> 
@@ -277,6 +281,33 @@
                     </void> 
                    </object> 
                   </void> 
+<<<<<<< HEAD
+=======
+                  <void property="genericUDF"> 
+                   <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFIndex"/> 
+                  </void> 
+                  <void property="typeInfo"> 
+                   <object idref="StructTypeInfo0"/> 
+                  </void> 
+                 </object> 
+                </void> 
+                <void property="fieldName"> 
+                 <string>mystring</string> 
+                </void> 
+                <void property="isList"> 
+                 <object idref="Boolean0"/> 
+                </void> 
+                <void property="typeInfo"> 
+                 <object idref="PrimitiveTypeInfo1"/> 
+                </void> 
+               </object> 
+              </void> 
+              <void method="put"> 
+               <string>_col0</string> 
+               <object id="ExprNodeGenericFuncDesc1" class="org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc"> 
+                <void property="childExprs"> 
+                 <object class="java.util.ArrayList"> 
+>>>>>>> 3675747f27186dabba58d176936fa92e8133ed13
                   <void method="add"> 
                    <object class="org.apache.hadoop.hive.ql.exec.ColumnInfo"> 
                     <void property="internalName"> 

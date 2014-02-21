@@ -54,6 +54,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   protected transient boolean started;
   protected transient boolean initialized;
   protected transient boolean isdone;
+  protected transient boolean isfailed;
   protected transient boolean queued;
   protected transient HiveConf conf;
   protected transient Hive db;
@@ -102,6 +103,8 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     RUNNING_STATE,
     // Task has completed
     FINISHED_STATE,
+    // Task has completed
+    FAILED_STATE,
     // Task state is unkown
     UNKNOWN_STATE
   }
@@ -121,6 +124,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public Task() {
     isdone = false;
+    isfailed = false;
     started = false;
     initialized = false;
     queued = false;
@@ -135,6 +139,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   public void initialize(HiveConf conf, QueryPlan queryPlan, DriverContext driverContext) {
     this.queryPlan = queryPlan;
     isdone = false;
+    isfailed = false;
     started = false;
     setInitialized();
     this.conf = conf;
@@ -166,7 +171,11 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
         ss.getHiveHistory().logPlanProgress(queryPlan);
       }
       int retval = execute(driverContext);
-      this.setDone();
+      if (retval != 0) {
+        this.setFailed();
+      } else {
+        this.setDone();
+      }
       if (ss != null) {
         ss.getHiveHistory().logPlanProgress(queryPlan);
       }
@@ -324,6 +333,14 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return isdone;
   }
 
+  public boolean failed() {
+    return isfailed;
+  }
+
+  public void setFailed() {
+    isfailed = true;
+  }
+
   public void setDone() {
     isdone = true;
   }
@@ -383,7 +400,9 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     if (done())  {
       return TaskState.FINISHED_STATE;
     }
-
+    if (failed()) {
+      return TaskState.FAILED_STATE;
+    }
     if (started()) {
       return TaskState.RUNNING_STATE;
     }
@@ -395,7 +414,6 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     if (getQueued()) {
       return TaskState.QUEUED_STATE;
     }
-
     return TaskState.UNKNOWN_STATE;
   }
 

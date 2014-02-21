@@ -898,9 +898,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   public int getNumPartitionsByFilter(String db_name, String tbl_name,
       String filter) throws MetaException,
          NoSuchObjectException, TException {
-    //return
-    //  client.get_num_partitions_by_filter(db_name, tbl_name, filter);
-    return -1;
+    return
+      client.get_num_partitions_by_filter(db_name, tbl_name, filter);
   }
 
   /**
