@@ -247,13 +247,13 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
           addPartitionDesc.getCubeTableName(), this.getPrefix());
       String dbName = SessionState.get().getCurrentDatabase();
       Table storageTbl = client.getTable(dbName, tableName);
-      Path location = null;
+      String location = null;
       if (addPartitionDesc.getLocation() != null) {
         Path partLocation = new Path(addPartitionDesc.getLocation());
         if (partLocation.isAbsolute()) {
-          location = partLocation;
+          location = addPartitionDesc.getLocation();
         } else {
-          location = new Path(storageTbl.getPath(), partLocation);
+          location = new Path(storageTbl.getPath(), partLocation).toString();
         }
       }
       Map<String, String> partParams = addPartitionDesc.getPartParams();
@@ -263,7 +263,7 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
       partParams.put(MetastoreConstants.PARTITION_UPDATE_PERIOD,
           addPartitionDesc.getUpdatePeriod().name());
       AddPartitionDesc addParts = new AddPartitionDesc(dbName, tableName, true);
-      addParts.addPartition(addPartitionDesc.getStoragePartSpec(), location.toString());
+      addParts.addPartition(addPartitionDesc.getStoragePartSpec(), location);
       addParts.getPartition(0).setPartParams(partParams);
       addParts.getPartition(0).setInputFormat(addPartitionDesc.getInputFormat());
       addParts.getPartition(0).setOutputFormat(addPartitionDesc.getOutputFormat());
@@ -294,7 +294,7 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
           AddPartitionDesc latestPart = new AddPartitionDesc(dbName, tableName, true);
           latestPart.addPartition(StorageConstants.getLatestPartSpec(
               addPartitionDesc.getStoragePartSpec(),
-              latestPartCol), location.toString());
+              latestPartCol), location);
           latestPart.getPartition(0).setPartParams(entry.getValue().getPartParams(partParams));
           latestPart.getPartition(0).setInputFormat(addPartitionDesc.getInputFormat());
           latestPart.getPartition(0).setOutputFormat(addPartitionDesc.getOutputFormat());

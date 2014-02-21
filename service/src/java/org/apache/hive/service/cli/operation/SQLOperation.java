@@ -46,12 +46,15 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils.ObjectInspectorCopyOption;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationState;
+import org.apache.hive.service.cli.OperationStatus;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.cli.TableSchema;
@@ -218,7 +221,6 @@ public class SQLOperation extends ExecuteStatementOperation {
     }
 
     closeLogStreams();
-    setState(state);
   }
 
   @Override
@@ -427,7 +429,8 @@ public class SQLOperation extends ExecuteStatementOperation {
         try {
           sqlOperationConf.verifyAndSet(confEntry.getKey(), confEntry.getValue());
         } catch (IllegalArgumentException e) {
-          throw new HiveSQLException("Error applying statement specific settings", e);
+          // Ignore the conf setting if failed to set
+          LOG.info("Ignoring the conf setting:" + confEntry);
         }
       }
     }
