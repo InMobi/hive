@@ -565,15 +565,15 @@ public final class GenMapRedUtils {
 
     // The table should also be considered a part of inputs, even if the table is a
     // partitioned table and whether any partition is selected or not
-    for (Table tbl : parseCtx.getTopToTables().get(topOp)) {
-      PlanUtils.addInput(inputs, new ReadEntity(tbl, parentViewInfo));
-    }
 
     //This read entity is a direct read entity and not an indirect read (that is when
     // this is being read because it is a dependency of a view).
     boolean isDirectRead = (parentViewInfo == null);
     PlanUtils.addInput(inputs,
         new ReadEntity(parseCtx.getTopToTable().get(topOp), parentViewInfo, isDirectRead));
+    for (Table tbl : parseCtx.getTopToTables().get(topOp)) {
+      PlanUtils.addInput(inputs, new ReadEntity(tbl, parentViewInfo, isDirectRead));
+    }
 
     for (Partition part : parts) {
       if (part.getTable().isPartitioned()) {
