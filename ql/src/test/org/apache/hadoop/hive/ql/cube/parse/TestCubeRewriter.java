@@ -54,7 +54,10 @@ public class TestCubeRewriter {
   public void setupDriver() throws Exception {
     conf = new Configuration();
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1,C2");
-    conf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, true);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
+    conf.setBoolean(CubeQueryConfUtil.ENABLE_SELECT_TO_GROUPBY, true);
+    conf.setBoolean(CubeQueryConfUtil.ENABLE_GROUP_BY_TO_SELECT, true);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, false);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
   }
 
@@ -503,36 +506,176 @@ public class TestCubeRewriter {
 
     hqlQuery = rewrite(driver, "select round(cityid), SUM(msr2) from" +
       " testCube where " + twoDaysRange + " group by zipcode");
-    expected = getExpectedQuery(cubeName, "select testcube.zipcode," +
+    expected = getExpectedQuery(cubeName, "select " +
       " round(testcube.cityid), sum(testcube.msr2) FROM ", null,
-      " group by testcube.zipcode, round(testcube.cityid)",
+      " group by testcube.zipcode",
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select round(cityid), SUM(msr2) from" +
+        " testCube where " + twoDaysRange);
+      expected = getExpectedQuery(cubeName, "select " +
+        " round(testcube.cityid), sum(testcube.msr2) FROM ", null,
+        " group by round(testcube.cityid)",
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+      compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select cityid, SUM(msr2) from testCube"
       + " where " + twoDaysRange + " group by round(zipcode)");
-    expected = getExpectedQuery(cubeName, "select round(testcube.zipcode)," +
+    expected = getExpectedQuery(cubeName, "select " +
       " testcube.cityid, sum(testcube.msr2) FROM ", null,
-      " group by round(testcube.zipcode), testcube.cityid",
+      " group by round(testcube.zipcode)",
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube"
+        + " where " + twoDaysRange + " group by round(zipcode)");
+      expected = getExpectedQuery(cubeName, "select round(testcube.zipcode)," +
+        " sum(testcube.msr2) FROM ", null,
+        " group by round(testcube.zipcode)",
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+      compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select cityid, msr2 from testCube"
       + " where " + twoDaysRange + " group by round(zipcode)");
-    expected = getExpectedQuery(cubeName, "select round(testcube.zipcode)," +
+    expected = getExpectedQuery(cubeName, "select " +
       " testcube.cityid, sum(testcube.msr2) FROM ", null,
-      " group by round(testcube.zipcode), testcube.cityid",
+      " group by round(testcube.zipcode)",
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
 
-    hqlQuery = rewrite(driver, "select round(zipcode) rzc, cityid," +
-      " msr2 from testCube where " + twoDaysRange + " group by round(zipcode)" +
+    hqlQuery = rewrite(driver, "select round(zipcode) rzc," +
+      " msr2 from testCube where " + twoDaysRange + " group by zipcode" +
       " order by rzc");
     expected = getExpectedQuery(cubeName, "select round(testcube.zipcode) rzc,"
-      + " testcube.cityid, sum(testcube.msr2) FROM ", null,
-      " group by round(testcube.zipcode), testcube.cityid order by rzc",
+      + " sum(testcube.msr2) FROM ", null,
+      " group by testcube.zipcode  order by rzc",
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
+
+    // rewrite with expressions
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "SELECT citytable.name AS g1,"
+       + " CASE  WHEN citytable.name=='NULL'  THEN 'NULL' "
+       + " WHEN citytable.name=='X'  THEN 'X-NAME' "
+       + " WHEN citytable.name=='Y'  THEN 'Y-NAME' "
+       + " ELSE 'DEFAULT'   END  AS g2, "
+       + " statetable.name AS g3,"
+       + " statetable.id AS g4, "
+       + " ziptable.code!=1  AND "
+       + " ((ziptable.f1==\"xyz\"  AND  (ziptable.f2 >= \"3\"  AND "
+       + "  ziptable.f2 !=\"NULL\"  AND  ziptable.f2 != \"uk\")) "
+       + "  OR (ziptable.f2==\"adc\"  AND  ziptable.f1==\"js\" "
+       + "  AND  ( citytable.name == \"X\"  OR  citytable.name == \"Y\" )) "
+       + " OR ((ziptable.f1==\"api\"  OR  ziptable.f1==\"uk\"  OR  (ziptable.f1==\"adc\"  AND  ziptable.f1!=\"js\"))"
+       + "  AND  citytable.id==12) ) AS g5,"
+       + " ziptable.code==1  AND "
+       + " ((ziptable.f1==\"xyz\"  AND  (ziptable.f2 >= \"3\"  AND "
+       + "  ziptable.f2 !=\"NULL\"  AND  ziptable.f2 != \"uk\")) "
+       + " OR (ziptable.f2==\"adc\"  AND  ziptable.f1==\"js\" "
+       + " AND  ( citytable.name == \"X\"  OR  citytable.name == \"Y\" )) "
+       + "  OR ((ziptable.f1==\"api\"  OR  ziptable.f1==\"uk\"  OR  (ziptable.f1==\"adc\"  AND  ziptable.f1!=\"js\"))"
+       + "    AND  citytable.id==12) ) AS g6, "
+       + "  ziptable.f1 AS g7, "
+       + "  format_number(SUM(msr1),\"##################.###\") AS a1,"
+       + "  format_number(SUM(msr2),\"##################.###\") AS a2, "
+       + "  format_number(SUM(msr3),\"##################.###\") AS a3, "
+       + " format_number(SUM(msr1)+SUM(msr2), \"##################.###\") AS a4,"
+       + "  format_number(SUM(msr1)+SUM(msr3),\"##################.###\") AS a5,"
+       + " format_number(SUM(msr1)-(SUM(msr2)+SUM(msr3)),\"##################.###\") AS a6"
+       + "  FROM testCube where " + twoDaysRange + " HAVING (SUM(msr1) >=1000)  AND (SUM(msr2)>=0.01)");
+    joinWhereConds = new ArrayList<String>();
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+      "citytable", StorageConstants.getPartitionsForLatest()));
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+        "stattetable", StorageConstants.getPartitionsForLatest()));
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+        "ziptable", StorageConstants.getPartitionsForLatest()));
+    String joinExpr = " INNER JOIN c1_citytable citytable ON" +
+        " testcube.cityid = citytable.id INNER JOIN c1_statetable statetable"
+        + " ON statetable.id = citytable.stateid " +
+        "INNER JOIN c1_ziptable" +
+        " ziptable ON citytable.zipcode = ziptable.code";
+    String actualExpr = "join statetable on testcube.stateid = statetable.id" +
+    		"  join ziptable on testcube.zipcode = ziptable.zipcode" +
+    		"  join citytable on testcube.cityid = citytable.id ";
+    expected = getExpectedQuery(cubeName, "SELECT ( citytable  .  name ) g1 ," +
+    		"  case  when (( citytable  .  name ) ==  'NULL' ) then  'NULL'  when (( citytable  .  name ) ==  'X' )" +
+    		" then  'X-NAME'  when (( citytable  .  name ) ==  'Y' ) then  'Y-NAME'" +
+    		"  else  'DEFAULT'  end  g2 , ( statetable  .  name ) g3 , ( statetable  .  id ) g4 ," +
+    		" ((( ziptable  .  code ) !=  1 ) and ((((( ziptable  .  f1 ) ==  \"xyz\" )" +
+    		" and (((( ziptable  .  f2 ) >=  \"3\" ) and (( ziptable  .  f2 ) !=  \"NULL\" ))" +
+    		" and (( ziptable  .  f2 ) !=  \"uk\" ))) or (((( ziptable  .  f2 ) ==  \"adc\" ) and (( ziptable  .  f1 ) ==  \"js\" ))" +
+    		" and ((( citytable  .  name ) ==  \"X\" ) or (( citytable  .  name ) ==  \"Y\" )))) or ((((( ziptable  .  f1 ) ==  \"api\" )" +
+    		" or (( ziptable  .  f1 ) ==  \"uk\" )) or ((( ziptable  .  f1 ) ==  \"adc\" ) and (( ziptable  .  f1 ) !=  \"js\" )))" +
+    		" and (( citytable  .  id ) ==  12 )))) g5 , ((( ziptable  .  code ) ==  1 )" +
+    		" and ((((( ziptable  .  f1 ) ==  \"xyz\" ) and (((( ziptable  .  f2 ) >=  \"3\" ) and (( ziptable  .  f2 ) !=  \"NULL\" ))" +
+    		" and (( ziptable  .  f2 ) !=  \"uk\" ))) or (((( ziptable  .  f2 ) ==  \"adc\" ) and (( ziptable  .  f1 ) ==  \"js\" ))" +
+    		" and ((( citytable  .  name ) ==  \"X\" ) or (( citytable  .  name ) ==  \"Y\" )))) or ((((( ziptable  .  f1 ) ==  \"api\" )" +
+    		" or (( ziptable  .  f1 ) ==  \"uk\" )) or ((( ziptable  .  f1 ) ==  \"adc\" ) and (( ziptable  .  f1 ) !=  \"js\" )))" +
+    		" and (( citytable  .  id ) ==  12 )))) g6 , ( ziptable  .  f1 ) g7 , format_number(sum(( testcube  .  msr1 )),  \"##################.###\" ) a1 ," +
+    		" format_number(sum(( testcube  .  msr2 )),  \"##################.###\" ) a2 , format_number(sum(( testcube  .  msr3 )),  \"##################.###\" ) a3, " +
+    		" format_number((sum(( testcube  .  msr1 )) + sum(( testcube  .  msr2 ))),  \"##################.###\" ) a4 ," +
+    		" format_number((sum(( testcube  .  msr1 )) + sum(( testcube  .  msr3 ))),  \"##################.###\" ) a5 ," +
+    		" format_number((sum(( testcube  .  msr1 )) - (sum(( testcube  .  msr2 )) + sum(( testcube  .  msr3 )))),  \"##################.###\" ) a6" +
+    		"  FROM ",  actualExpr, null,
+    	  " GROUP BY ( citytable  .  name ), case  when (( citytable  .  name ) ==  'NULL' ) " +
+    	  "then  'NULL'  when (( citytable  .  name ) ==  'X' ) then  'X-NAME'  when (( citytable  .  name ) ==  'Y' )" +
+    	  " then  'Y-NAME'  else  'DEFAULT'  end, ( statetable  .  name ), ( statetable  .  id )," +
+    	  " ((( ziptable  .  code ) !=  1 ) and ((((( ziptable  .  f1 ) ==  \"xyz\" ) and (((( ziptable  .  f2 ) >=  \"3\" )" +
+    	  " and (( ziptable  .  f2 ) !=  \"NULL\" )) and (( ziptable  .  f2 ) !=  \"uk\" ))) or (((( ziptable  .  f2 ) ==  \"adc\" )" +
+    	  " and (( ziptable  .  f1 ) ==  \"js\" )) and ((( citytable  .  name ) ==  \"X\" ) or (( citytable  .  name ) ==  \"Y\" ))))" +
+    	  " or ((((( ziptable  .  f1 ) ==  \"api\" ) or (( ziptable  .  f1 ) ==  \"uk\" )) or ((( ziptable  .  f1 ) ==  \"adc\" )" +
+    	  " and (( ziptable  .  f1 ) !=  \"js\" ))) and (( citytable  .  id ) ==  12 )))), ((( ziptable  .  code ) ==  1 ) and" +
+    	  " ((((( ziptable  .  f1 ) ==  \"xyz\" ) and (((( ziptable  .  f2 ) >=  \"3\" ) and (( ziptable  .  f2 ) !=  \"NULL\" ))" +
+    	  " and (( ziptable  .  f2 ) !=  \"uk\" ))) or (((( ziptable  .  f2 ) ==  \"adc\" ) and (( ziptable  .  f1 ) ==  \"js\" ))" +
+    	  " and ((( citytable  .  name ) ==  \"X\" ) or (( citytable  .  name ) ==  \"Y\" )))) or ((((( ziptable  .  f1 ) ==  \"api\" )" +
+    	  " or (( ziptable  .  f1 ) ==  \"uk\" )) or ((( ziptable  .  f1 ) ==  \"adc\" ) and (( ziptable  .  f1 ) !=  \"js\" )))" +
+    	  " and (( citytable  .  id ) ==  12 )))), ( ziptable  .  f1 ) HAVING ((sum(( testcube  .  msr1 )) >=  1000 ) and (sum(( testcube  .  msr2 )) >=  0.01 ))",
+    	  null, getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+      compareQueries(expected, hqlQuery);
+
+      hqlQuery = rewrite(driver, "SELECT citytable.name AS g1,"
+          + " CASE  WHEN citytable.name=='NULL'  THEN 'NULL' "
+          + " WHEN citytable.name=='X'  THEN 'X-NAME' "
+          + " WHEN citytable.name=='Y'  THEN 'Y-NAME' "
+          + " ELSE 'DEFAULT'   END  AS g2, "
+          + " statetable.name AS g3,"
+          + " statetable.id AS g4, "
+          + " ziptable.code!=1  AND "
+          + " ((ziptable.f1==\"xyz\"  AND  (ziptable.f2 >= \"3\"  AND "
+          + "  ziptable.f2 !=\"NULL\"  AND  ziptable.f2 != \"uk\")) "
+          + "  OR (ziptable.f2==\"adc\"  AND  ziptable.f1==\"js\" "
+          + "  AND  ( citytable.name == \"X\"  OR  citytable.name == \"Y\" )) "
+          + " OR ((ziptable.f1==\"api\"  OR  ziptable.f1==\"uk\"  OR  (ziptable.f1==\"adc\"  AND  ziptable.f1!=\"js\"))"
+          + "  AND  citytable.id==12) ) AS g5,"
+          + " ziptable.code==1  AND "
+          + " ((ziptable.f1==\"xyz\"  AND  (ziptable.f2 >= \"3\"  AND "
+          + "  ziptable.f2 !=\"NULL\"  AND  ziptable.f2 != \"uk\")) "
+          + " OR (ziptable.f2==\"adc\"  AND  ziptable.f1==\"js\" "
+          + " AND  ( citytable.name == \"X\"  OR  citytable.name == \"Y\" )) "
+          + "  OR ((ziptable.f1==\"api\"  OR  ziptable.f1==\"uk\"  OR  (ziptable.f1==\"adc\"  AND  ziptable.f1!=\"js\"))"
+          + "    AND  citytable.id==12) ) AS g6, "
+          + "  ziptable.f1 AS g7, "
+          + "  format_number(SUM(msr1),\"##################.###\") AS a1,"
+          + "  format_number(SUM(msr2),\"##################.###\") AS a2, "
+          + "  format_number(SUM(msr3),\"##################.###\") AS a3, "
+          + " format_number(SUM(msr1)+SUM(msr2), \"##################.###\") AS a4,"
+          + "  format_number(SUM(msr1)+SUM(msr3),\"##################.###\") AS a5,"
+          + " format_number(SUM(msr1)-(SUM(msr2)+SUM(msr3)),\"##################.###\") AS a6"
+          + "  FROM testCube where " + twoDaysRange
+          + " group by citytable.name, CASE WHEN citytable.name=='NULL' THEN 'NULL'"
+          + " WHEN citytable.name=='X' THEN 'X-NAME' WHEN citytable.name=='Y' THEN 'Y-NAME'"
+          + " ELSE 'DEFAULT'   END, statetable.name, statetable.id,  ziptable.code!=1  AND"
+          + "  ((ziptable.f1==\"xyz\"  AND  (ziptable.f2 >= \"3\"  AND ziptable.f2 !=\"NULL\"  AND  ziptable.f2 != \"uk\"))"
+          + "   OR (ziptable.f2==\"adc\"  AND  ziptable.f1==\"js\" AND ( citytable.name == \"X\"  OR  citytable.name == \"Y\" ))"
+          + "  OR ((ziptable.f1==\"api\"  OR  ziptable.f1==\"uk\"  OR  (ziptable.f1==\"adc\"  AND  ziptable.f1!=\"js\"))  AND  citytable.id==12) ),"
+          + " ziptable.code==1  AND  ((ziptable.f1==\"xyz\" AND ( ziptable.f2 >= \"3\"  AND ziptable.f2 !=\"NULL\"  AND  ziptable.f2 != \"uk\"))"
+          + "  OR (ziptable.f2==\"adc\"  AND  ziptable.f1==\"js\"  AND  ( citytable.name == \"X\"  OR  citytable.name == \"Y\" ))"
+          + "   OR ((ziptable.f1=\"api\"  OR  ziptable.f1==\"uk\" OR (ziptable.f1==\"adc\"  AND  ziptable.f1!=\"js\")) AND  citytable.id==12)),"
+          + " ziptable.f1 " + "HAVING (SUM(msr1) >=1000)  AND (SUM(msr2)>=0.01)");
+      compareQueries(expected, hqlQuery);
   }
 
   @Test
@@ -801,12 +944,12 @@ public class TestCubeRewriter {
       compareQueries(expectedHqlWithFunction, hql);
 
     } finally {
-      conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
+      conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, true);
     }
 
     // Test if raw fact is selected for query with no aggregate function on a measure, with aggregate resolver disabled
     String query = "SELECT cityid, testCube.msr2 FROM testCube WHERE " + twoDaysRange;
-    conf.setBoolean(AggregateResolver.DISABLE_AGGREGATE_RESOLVER, true);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, true);
     CubeQueryRewriter driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     CubeQueryContext cubeql = driver.rewrite(query);
     Assert.assertEquals(1, cubeql.getCandidateFactTables().size());

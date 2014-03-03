@@ -43,7 +43,7 @@ public class TestJoinResolver {
     dateTwoDaysBack = getDateUptoHours(twodaysBack);
     dateNow = getDateUptoHours(now);
     this.metastore = CubeMetastoreClient.getInstance(hconf);
-    hconf.setBoolean(JoinResolver.DISABLE_AUTO_JOINS, false);
+    hconf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
   }
 
   @After
@@ -232,8 +232,8 @@ public class TestJoinResolver {
 
   @Test
   public void testJoinTypeConf() throws Exception {
-    hconf.set(JoinResolver.JOIN_TYPE_KEY, "LEFTOUTER");
-    System.out.println("@@Set join type to " + hconf.get(JoinResolver.JOIN_TYPE_KEY));
+    hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "LEFTOUTER");
+    System.out.println("@@Set join type to " + hconf.get(CubeQueryConfUtil.JOIN_TYPE_KEY));
     driver = new CubeQueryRewriter(hconf);
     String query = "select citytable.name, msr2 FROM testCube WHERE " + twoDaysRange;
     CubeQueryContext ctx = driver.rewrite(query);
@@ -242,8 +242,8 @@ public class TestJoinResolver {
     assertEquals("left outer join citytable on testcube.cityid = citytable.id",
       ctx.getAutoResolvedJoinChain().trim());
 
-    hconf.set(JoinResolver.JOIN_TYPE_KEY, "FULLOUTER");
-    System.out.println("@@Set join type to " + hconf.get(JoinResolver.JOIN_TYPE_KEY));
+    hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "FULLOUTER");
+    System.out.println("@@Set join type to " + hconf.get(CubeQueryConfUtil.JOIN_TYPE_KEY));
     driver = new CubeQueryRewriter(hconf);
     ctx = driver.rewrite(query);
     System.out.println("@@Resolved join clause - "+ ctx.getAutoResolvedJoinChain());
@@ -253,7 +253,7 @@ public class TestJoinResolver {
 
   @Test
   public void testPreserveTableAlias() throws Exception {
-    hconf.set(JoinResolver.JOIN_TYPE_KEY, "LEFTOUTER");
+    hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "LEFTOUTER");
     String query = "select c.name, t.msr2 FROM testCube t join citytable c WHERE " + twoDaysRange;
     CubeQueryRewriter driver = new CubeQueryRewriter(hconf);
     CubeQueryContext ctx = driver.rewrite(query);

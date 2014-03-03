@@ -31,12 +31,15 @@ public class CubeQueryConfUtil {
       ".partition.column";
   public static final String LOOK_AHEAD_PT_PARTS_PFX =
       "cube.query.lookahead.ptparts.forinterval.";
-  public static final String ENABLE_AUTOMATIC_GROUP_BY_RESOLVER =
-      "cube.query.enable.automatic.groupby.resolver";
+  public static final String ENABLE_GROUP_BY_TO_SELECT =
+      "cube.query.promote.groupby.toselect";
+  public static final String ENABLE_SELECT_TO_GROUPBY =
+      "cube.query.promote.select.togroupby";
 
   public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
   public static final int DEFAULT_LOOK_AHEAD_PT_PARTS = 1;
-  public static final boolean DEFAULT_ENABLE_AUTOMATIC_GROUP_BY_RESOLVER = true;
+  public static final boolean DEFAULT_ENABLE_GROUP_BY_TO_SELECT = false;
+  public static final boolean DEFAULT_ENABLE_SELECT_TO_GROUPBY = false;
 
   public static String getLookAheadPTPartsKey(UpdatePeriod interval) {
     return LOOK_AHEAD_PT_PARTS_PFX + interval.name().toLowerCase();
@@ -73,4 +76,10 @@ public class CubeQueryConfUtil {
       Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
     return list;
   }
+
+  public static final String DISABLE_AUTO_JOINS = "hive.cube.disable.auto.join";
+  public static final boolean DEFAULT_DISABLE_AUTO_JOINS = true;
+  public static final String JOIN_TYPE_KEY = "hive.cube.join.type";
+  public static final String DISABLE_AGGREGATE_RESOLVER = "hive.cube.disable.aggregate.resolver";
+  public static final boolean DEFAULT_DISABLE_AGGREGATE_RESOLVER = true;
 }

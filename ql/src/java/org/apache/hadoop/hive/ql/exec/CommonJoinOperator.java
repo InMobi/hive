@@ -132,7 +132,6 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.childOperators = clone.childOperators;
     this.parentOperators = clone.parentOperators;
     this.counterNames = clone.counterNames;
-    this.counterNameToEnum = clone.counterNameToEnum;
     this.done = clone.done;
     this.operatorId = clone.operatorId;
     this.storage = clone.storage;

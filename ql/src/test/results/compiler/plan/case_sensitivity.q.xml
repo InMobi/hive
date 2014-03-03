@@ -220,6 +220,7 @@
                               </void> 
                              </object> 
                             </void> 
+                            <void id="Boolean0" property="recordCounters"/> 
                            </object> 
                           </void> 
                          </object> 
@@ -847,7 +848,7 @@
                      <string>MYSTRING</string> 
                     </void> 
                     <void property="isList"> 
-                     <boolean>false</boolean> 
+                     <object idref="Boolean0"/> 
                     </void> 
                     <void property="typeInfo"> 
                      <object idref="PrimitiveTypeInfo0"/> 
