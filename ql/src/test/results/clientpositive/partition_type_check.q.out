@@ -7,18 +7,11 @@ CREATE TABLE tab1 (id1 int,id2 string) PARTITIONED BY(month string,day string) s
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@tab1
-<<<<<<< HEAD
-PREHOOK: query: LOAD DATA LOCAL INPATH '../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day=2)
-PREHOOK: type: LOAD
-PREHOOK: Output: default@tab1
-POSTHOOK: query: LOAD DATA LOCAL INPATH '../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day=2)
-=======
 PREHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day=2)
 PREHOOK: type: LOAD
 #### A masked pattern was here ####
 PREHOOK: Output: default@tab1
 POSTHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day=2)
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@tab1
@@ -56,18 +49,11 @@ CREATE TABLE tab1 (id1 int,id2 string) PARTITIONED BY(month string,day int) stor
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@tab1
-<<<<<<< HEAD
-PREHOOK: query: LOAD DATA LOCAL INPATH '../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2')
-PREHOOK: type: LOAD
-PREHOOK: Output: default@tab1
-POSTHOOK: query: LOAD DATA LOCAL INPATH '../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2')
-=======
 PREHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2')
 PREHOOK: type: LOAD
 #### A masked pattern was here ####
 PREHOOK: Output: default@tab1
 POSTHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2')
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@tab1
@@ -112,18 +98,11 @@ POSTHOOK: query: alter table tab1 add partition (month='June', day='2008-01-01')
 POSTHOOK: type: ALTERTABLE_ADDPARTS
 POSTHOOK: Output: default@tab1
 POSTHOOK: Output: default@tab1@month=June/day=2008-01-01
-<<<<<<< HEAD
-PREHOOK: query: LOAD DATA LOCAL INPATH '../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2008-01-01')
-PREHOOK: type: LOAD
-PREHOOK: Output: default@tab1@month=June/day=2008-01-01
-POSTHOOK: query: LOAD DATA LOCAL INPATH '../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2008-01-01')
-=======
 PREHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2008-01-01')
 PREHOOK: type: LOAD
 #### A masked pattern was here ####
 PREHOOK: Output: default@tab1@month=June/day=2008-01-01
 POSTHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/T1.txt' overwrite into table tab1 PARTITION(month='June', day='2008-01-01')
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@tab1@month=June/day=2008-01-01

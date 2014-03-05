@@ -67,8 +67,8 @@ PREHOOK: query: SHOW TBLPROPERTIES testTable
 PREHOOK: type: SHOW_TBLPROPERTIES
 POSTHOOK: query: SHOW TBLPROPERTIES testTable
 POSTHOOK: type: SHOW_TBLPROPERTIES
-d	4
 numFiles	0
+d	4
 #### A masked pattern was here ####
 c	3
 #### A masked pattern was here ####
@@ -134,8 +134,8 @@ PREHOOK: query: SHOW TBLPROPERTIES testTable
 PREHOOK: type: SHOW_TBLPROPERTIES
 POSTHOOK: query: SHOW TBLPROPERTIES testTable
 POSTHOOK: type: SHOW_TBLPROPERTIES
-d	4
 numFiles	0
+d	4
 #### A masked pattern was here ####
 b	2
 c	3

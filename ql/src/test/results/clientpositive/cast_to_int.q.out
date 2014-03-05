@@ -27,11 +27,7 @@ select
   cast('127' as tinyint),
   cast('1.0a' as int),
   cast('-1.-1' as int)
-<<<<<<< HEAD
-from src limit 1
-=======
 from src tablesample (1 rows)
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
 #### A masked pattern was here ####
@@ -64,11 +60,7 @@ select
   cast('127' as tinyint),
   cast('1.0a' as int),
   cast('-1.-1' as int)
-<<<<<<< HEAD
-from src limit 1
-=======
 from src tablesample (1 rows)
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 #### A masked pattern was here ####

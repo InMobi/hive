@@ -21,20 +21,12 @@ POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@varchar1_1
 PREHOOK: query: -- load from file
-<<<<<<< HEAD
-load data local inpath '../data/files/srcbucket0.txt' overwrite into table varchar1
-PREHOOK: type: LOAD
-PREHOOK: Output: default@varchar1
-POSTHOOK: query: -- load from file
-load data local inpath '../data/files/srcbucket0.txt' overwrite into table varchar1
-=======
 load data local inpath '../../data/files/srcbucket0.txt' overwrite into table varchar1
 PREHOOK: type: LOAD
 #### A masked pattern was here ####
 PREHOOK: Output: default@varchar1
 POSTHOOK: query: -- load from file
 load data local inpath '../../data/files/srcbucket0.txt' overwrite into table varchar1
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@varchar1

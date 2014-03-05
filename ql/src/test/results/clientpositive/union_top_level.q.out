@@ -187,15 +187,15 @@ select key, 2 as value from src where key % 3 == 2 limit 3
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 #### A masked pattern was here ####
+86	2
+311	2
+278	2
 238	1
 409	1
 484	1
 27	0
 165	0
 255	0
-86	2
-311	2
-278	2
 PREHOOK: query: explain
 select s1.key as k, s2.value as v from src s1 join src s2 on (s1.key = s2.key) limit 10
 union all
@@ -675,15 +675,15 @@ POSTHOOK: query: select * from union_top
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@union_top
 #### A masked pattern was here ####
+86	2
+311	2
+278	2
 238	1
 409	1
 484	1
 27	0
 165	0
 255	0
-86	2
-311	2
-278	2
 PREHOOK: query: truncate table union_top
 PREHOOK: type: TRUNCATETABLE
 PREHOOK: Output: default@union_top
@@ -952,15 +952,15 @@ POSTHOOK: Input: default@union_top
 #### A masked pattern was here ####
 POSTHOOK: Lineage: union_top.key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: union_top.value EXPRESSION []
+86	2
+311	2
+278	2
 238	1
 409	1
 484	1
 27	0
 165	0
 255	0
-86	2
-311	2
-278	2
 PREHOOK: query: explain
 insert overwrite table union_top
 select key, 0 as value from src where key % 3 == 0 limit 3
@@ -1227,15 +1227,15 @@ POSTHOOK: Lineage: union_top.key EXPRESSION [(src)src.FieldSchema(name:key, type
 POSTHOOK: Lineage: union_top.key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: union_top.value EXPRESSION []
 POSTHOOK: Lineage: union_top.value EXPRESSION []
+86	2
+311	2
+278	2
 238	1
 409	1
 484	1
 27	0
 165	0
 255	0
-86	2
-311	2
-278	2
 PREHOOK: query: -- create view
 explain
 create view union_top_view as
@@ -1314,15 +1314,15 @@ POSTHOOK: Lineage: union_top.key EXPRESSION [(src)src.FieldSchema(name:key, type
 POSTHOOK: Lineage: union_top.key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: union_top.value EXPRESSION []
 POSTHOOK: Lineage: union_top.value EXPRESSION []
+27	0
+165	0
+255	0
 238	1
 409	1
 484	1
 86	2
 311	2
 278	2
-27	0
-165	0
-255	0
 PREHOOK: query: drop table union_top
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@union_top

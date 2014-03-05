@@ -49,24 +49,6 @@ POSTHOOK: query: create table  varchar_union1_str (
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@varchar_union1_str
-<<<<<<< HEAD
-PREHOOK: query: load data local inpath '../data/files/vc1.txt' into table varchar_union1_vc1
-PREHOOK: type: LOAD
-PREHOOK: Output: default@varchar_union1_vc1
-POSTHOOK: query: load data local inpath '../data/files/vc1.txt' into table varchar_union1_vc1
-POSTHOOK: type: LOAD
-POSTHOOK: Output: default@varchar_union1_vc1
-PREHOOK: query: load data local inpath '../data/files/vc1.txt' into table varchar_union1_vc2
-PREHOOK: type: LOAD
-PREHOOK: Output: default@varchar_union1_vc2
-POSTHOOK: query: load data local inpath '../data/files/vc1.txt' into table varchar_union1_vc2
-POSTHOOK: type: LOAD
-POSTHOOK: Output: default@varchar_union1_vc2
-PREHOOK: query: load data local inpath '../data/files/vc1.txt' into table varchar_union1_str
-PREHOOK: type: LOAD
-PREHOOK: Output: default@varchar_union1_str
-POSTHOOK: query: load data local inpath '../data/files/vc1.txt' into table varchar_union1_str
-=======
 PREHOOK: query: load data local inpath '../../data/files/vc1.txt' into table varchar_union1_vc1
 PREHOOK: type: LOAD
 #### A masked pattern was here ####
@@ -88,7 +70,6 @@ PREHOOK: type: LOAD
 #### A masked pattern was here ####
 PREHOOK: Output: default@varchar_union1_str
 POSTHOOK: query: load data local inpath '../../data/files/vc1.txt' into table varchar_union1_str
->>>>>>> 5893677435f165bee81d1c5be4300321f9bf47fb
 POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@varchar_union1_str
