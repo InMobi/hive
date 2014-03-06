@@ -195,8 +195,9 @@ public class SetProcessor implements CommandProcessor {
         ss.out.println(SetProcessor.SYSTEM_PREFIX+propName + "=" + result);
         return createProcessorSuccessResponse();
       } else {
-        ss.out.println( propName + " is undefined as a system property");
-        return new CommandProcessorResponse(1);
+        String msg = propName + " is undefined as a system property";
+        ss.out.println(msg);
+        return new CommandProcessorResponse(1, msg, null);
       }
     } else if (varname.indexOf(SetProcessor.ENV_PREFIX)==0){
       String var = varname.substring(ENV_PREFIX.length());
@@ -204,8 +205,9 @@ public class SetProcessor implements CommandProcessor {
         ss.out.println(SetProcessor.ENV_PREFIX+var + "=" + System.getenv(var));
         return createProcessorSuccessResponse();
       } else {
-        ss.out.println(varname + " is undefined as an environmental variable");
-        return new CommandProcessorResponse(1);
+        String msg = varname + " is undefined as an environmental variable";
+        ss.out.println(msg);
+        return new CommandProcessorResponse(1, msg, null);
       }
     } else if (varname.indexOf(SetProcessor.HIVECONF_PREFIX)==0) {
       String var = varname.substring(SetProcessor.HIVECONF_PREFIX.length());
@@ -213,8 +215,9 @@ public class SetProcessor implements CommandProcessor {
         ss.out.println(SetProcessor.HIVECONF_PREFIX+var + "=" + ss.getConf().get(var));
         return createProcessorSuccessResponse();
       } else {
-        ss.out.println(varname + " is undefined as a hive configuration variable");
-        return new CommandProcessorResponse(1);
+        String msg = varname + " is undefined as a hive configuration variable";
+        ss.out.println(msg);
+        return new CommandProcessorResponse(1, msg, null);
       }
     } else if (varname.indexOf(SetProcessor.HIVEVAR_PREFIX)==0) {
       String var = varname.substring(SetProcessor.HIVEVAR_PREFIX.length());
@@ -222,8 +225,9 @@ public class SetProcessor implements CommandProcessor {
         ss.out.println(SetProcessor.HIVEVAR_PREFIX+var + "=" + ss.getHiveVariables().get(var));
         return createProcessorSuccessResponse();
       } else {
-        ss.out.println(varname + " is undefined as a hive variable");
-        return new CommandProcessorResponse(1);
+        String msg = varname + " is undefined as a hive variable";
+        ss.out.println(msg);
+        return new CommandProcessorResponse(1, msg, null);
       }
     } else {
       dumpOption(varname);
