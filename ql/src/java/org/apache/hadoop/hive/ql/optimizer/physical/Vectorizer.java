@@ -730,7 +730,7 @@ public class Vectorizer implements PhysicalPlanResolver {
         cmap.put(c.getInternalName(), columnCount++);
       }
     }
-    PrunedPartitionList partList = pctx.getParseContext().getOpToPartList().get(op);
+    PrunedPartitionList partList = pctx.getParseContext().getOpToPartList().get(op).get(0);
     if (partList != null) {
       Table tab = partList.getSourceTable();
       if (tab.getPartitionKeys() != null) {

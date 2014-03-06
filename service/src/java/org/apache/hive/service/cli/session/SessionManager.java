@@ -150,7 +150,6 @@ public class SessionManager extends CompositeService {
     }
     HiveSession session;
     if (withImpersonation) {
-<<<<<<< HEAD
       HiveSessionImplwithUGI hiveSessionUgi;
       if (sessionImplWithUGIclassName == null) {
         hiveSessionUgi = new HiveSessionImplwithUGI(protocol, username, password,
@@ -158,7 +157,8 @@ public class SessionManager extends CompositeService {
       } else {
         try {
           Class<?> clazz = Class.forName(sessionImplWithUGIclassName);
-          Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class, String.class, String.class, Map.class, String.class);
+          Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class,
+              String.class, String.class, HiveConf.class, Map.class, String.class);
           hiveSessionUgi = (HiveSessionImplwithUGI) constructor.newInstance(new Object[]
               {protocol, username, password, hiveConf, sessionConf, delegationToken});
         } catch (Exception e) {
@@ -173,7 +173,8 @@ public class SessionManager extends CompositeService {
       } else {
         try {
           Class<?> clazz = Class.forName(sessionImplclassName);
-          Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class, String.class, String.class, Map.class);
+          Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class,
+              String.class, String.class, HiveConf.class, Map.class);
           session = (HiveSession) constructor.newInstance(new Object[]
               {protocol, username, password, hiveConf, sessionConf});
         } catch (Exception e) {

@@ -369,11 +369,6 @@ public class SQLOperation extends ExecuteStatementOperation {
     }
   }
 
-
-  private boolean shouldRunAsync() {
-    return runAsync;
-  }
-
   @Override
   public String getTaskStatus() throws HiveSQLException {
     if (driver != null) {
