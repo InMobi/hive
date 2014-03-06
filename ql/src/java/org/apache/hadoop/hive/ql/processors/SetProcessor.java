@@ -87,7 +87,7 @@ public class SetProcessor implements CommandProcessor {
 
   }
 
-  private void dumpOption(String s) {
+  private boolean dumpOption(String s) {
     SessionState ss = SessionState.get();
 
     if (ss.getConf().get(s) != null) {
@@ -96,7 +96,9 @@ public class SetProcessor implements CommandProcessor {
       ss.out.println(s + "=" + ss.getHiveVariables().get(s));
     } else {
       ss.out.println(s + " is undefined");
+      return false;
     }
+    return true;
   }
 
   @Override
@@ -230,8 +232,12 @@ public class SetProcessor implements CommandProcessor {
         return new CommandProcessorResponse(1, msg, null);
       }
     } else {
-      dumpOption(varname);
-      return createProcessorSuccessResponse();
+      boolean ret = dumpOption(varname);
+      if (ret) {
+        return createProcessorSuccessResponse();
+      } else {
+        return new CommandProcessorResponse(1, varname + " is undefined", null);
+      }
     }
   }
 
