@@ -80,7 +80,9 @@ CREATE TABLE "DBS" (
     "DB_ID" bigint NOT NULL,
     "DESC" character varying(4000) DEFAULT NULL::character varying,
     "DB_LOCATION_URI" character varying(4000) NOT NULL,
-    "NAME" character varying(128) DEFAULT NULL::character varying
+    "NAME" character varying(128) DEFAULT NULL::character varying,
+    "OWNER_NAME" character varying(128) DEFAULT NULL::character varying,
+    "OWNER_TYPE" character varying(10) DEFAULT NULL::character varying
 );
 
 
@@ -549,6 +551,32 @@ CREATE TABLE "PART_COL_STATS" (
  "NUM_TRUES" bigint,
  "NUM_FALSES" bigint,
  "LAST_ANALYZED" bigint NOT NULL
+);
+
+--
+-- Table structure for FUNCS
+--
+CREATE TABLE "FUNCS" (
+  "FUNC_ID" BIGINT NOT NULL,
+  "CLASS_NAME" VARCHAR(4000),
+  "CREATE_TIME" INTEGER NOT NULL,
+  "DB_ID" BIGINT,
+  "FUNC_NAME" VARCHAR(128),
+  "FUNC_TYPE" INTEGER NOT NULL,
+  "OWNER_NAME" VARCHAR(128),
+  "OWNER_TYPE" VARCHAR(10),
+  PRIMARY KEY ("FUNC_ID")
+);
+
+--
+-- Table structure for FUNC_RU
+--
+CREATE TABLE "FUNC_RU" (
+  "FUNC_ID" BIGINT NOT NULL,
+  "RESOURCE_TYPE" INTEGER NOT NULL,
+  "RESOURCE_URI" VARCHAR(4000),
+  "INTEGER_IDX" INTEGER NOT NULL,
+  PRIMARY KEY ("FUNC_ID", "INTEGER_IDX")
 );
 
 --
@@ -1132,6 +1160,24 @@ CREATE INDEX "TAB_COL_STATS_N49" ON "TAB_COL_STATS" USING btree ("TBL_ID");
 
 CREATE INDEX "PART_COL_STATS_N49" ON "PART_COL_STATS" USING btree ("PART_ID");
 
+--
+-- Name: UNIQUEFUNCTION; Type: INDEX; Schema: public; Owner: hiveuser; Tablespace:
+--
+
+CREATE UNIQUE INDEX "UNIQUEFUNCTION" ON "FUNCS" ("FUNC_NAME", "DB_ID");
+
+--
+-- Name: FUNCS_N49; Type: INDEX; Schema: public; Owner: hiveuser; Tablespace:
+--
+
+CREATE INDEX "FUNCS_N49" ON "FUNCS" ("DB_ID");
+
+--
+-- Name: FUNC_RU_N49; Type: INDEX; Schema: public; Owner: hiveuser; Tablespace:
+--
+
+CREATE INDEX "FUNC_RU_N49" ON "FUNC_RU" ("FUNC_ID");
+
 
 ALTER TABLE ONLY "SKEWED_STRING_LIST_VALUES"
     ADD CONSTRAINT "SKEWED_STRING_LIST_VALUES_fkey" FOREIGN KEY ("STRING_LIST_ID") REFERENCES "SKEWED_STRING_LIST"("STRING_LIST_ID") DEFERRABLE;
@@ -1391,6 +1437,14 @@ ALTER TABLE ONLY "PART_COL_STATS" ADD CONSTRAINT "PART_COL_STATS_fkey" FOREIGN K
 
 ALTER TABLE ONLY "VERSION" ADD CONSTRAINT "VERSION_pkey" PRIMARY KEY ("VER_ID");
 
+-- Name: FUNCS_FK1; Type: FK CONSTRAINT; Schema: public; Owner: hiveuser
+ALTER TABLE ONLY "FUNCS"
+    ADD CONSTRAINT "FUNCS_FK1" FOREIGN KEY ("DB_ID") REFERENCES "DBS" ("DB_ID") DEFERRABLE;
+
+-- Name: FUNC_RU_FK1; Type: FK CONSTRAINT; Schema: public; Owner: hiveuser
+ALTER TABLE ONLY "FUNC_RU"
+    ADD CONSTRAINT "FUNC_RU_FK1" FOREIGN KEY ("FUNC_ID") REFERENCES "FUNCS" ("FUNC_ID") DEFERRABLE;
+
 --
 -- Name: public; Type: ACL; Schema: -; Owner: hiveuser
 --
@@ -1404,3 +1458,7 @@ INSERT INTO "VERSION" ("VER_ID", "SCHEMA_VERSION", "VERSION_COMMENT") VALUES (1,
 -- PostgreSQL database dump complete
 --
 
+------------------------------
+-- Transaction and lock tables
+------------------------------
+\i hive-txn-schema-0.13.0.postgres.sql;

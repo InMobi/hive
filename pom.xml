@@ -17,7 +17,7 @@
 
   <groupId>org.apache.hive</groupId>
   <artifactId>hive</artifactId>
-  <version>0.13.0-SNAPSHOT</version>
+  <version>0.13.0</version>
   <packaging>pom</packaging>
 
   <name>Hive</name>
@@ -60,7 +60,7 @@
   </modules>
 
   <properties>
-    <hive.version.shortname>0.13.0</hive.version.shortname>
+    <hive.version.shortname>0.14.0</hive.version.shortname>
 
     <!-- Build Properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -111,7 +111,7 @@
     <groovy.version>2.1.6</groovy.version>
     <hadoop-20.version>0.20.2</hadoop-20.version>
     <hadoop-20S.version>1.2.1</hadoop-20S.version>
-    <hadoop-23.version>2.2.0</hadoop-23.version>
+    <hadoop-23.version>2.3.0</hadoop-23.version>
     <hbase.hadoop1.version>0.96.0-hadoop1</hbase.hadoop1.version>
     <hbase.hadoop2.version>0.96.0-hadoop2</hbase.hadoop2.version>
     <!-- httpcomponents are not always in version sync -->
@@ -147,13 +147,14 @@
     <stax.version>1.0.1</stax.version>
     <slf4j.version>1.7.5</slf4j.version>
     <ST4.version>4.0.4</ST4.version>
-    <tez.version>0.2.0</tez.version>
+    <tez.version>0.3.0-incubating</tez.version>
     <tempus-fugit.version>1.1</tempus-fugit.version>
     <snappy.version>0.2</snappy.version>
     <wadl-resourcedoc-doclet.version>1.4</wadl-resourcedoc-doclet.version>
     <velocity.version>1.5</velocity.version>
     <xerces.version>2.9.1</xerces.version>
     <zookeeper.version>3.4.5</zookeeper.version>
+    <jpam.version>1.1</jpam.version>
   </properties>
 
   <repositories>
@@ -739,6 +740,18 @@
 	    <exclude>**/*.q</exclude>
 	    <exclude>**/*.q.out</exclude>
 	    <exclude>**/*.xml</exclude>
+	    <exclude>**/gen/**</exclude>
+	    <exclude>**/scripts/**</exclude>
+	    <exclude>**/resources/**</exclude>
+	    <exclude>**/*.rc</exclude>
+	    <exclude>**/*.rcfile</exclude>
+	    <exclude>**/*.qv</exclude>
+	    <exclude>**/*.out</exclude>
+	    <exclude>**/RecordTestObj.java</exclude>
+	    <exclude>**/*.m</exclude>
+	    <exclude>**/gen-java/**</exclude>
+	    <exclude>**/testdata/**</exclude>
+	    <exclude>**/ptest2/*.md</exclude>
 	  </excludes>
 	</configuration>
       </plugin>

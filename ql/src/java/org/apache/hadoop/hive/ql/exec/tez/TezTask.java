@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.TezWork;
+import org.apache.hadoop.hive.ql.plan.UnionWork;
 import org.apache.hadoop.hive.ql.plan.TezWork.EdgeType;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -54,9 +56,11 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.DAG;
 import org.apache.tez.dag.api.Edge;
+import org.apache.tez.dag.api.GroupInputEdge;
 import org.apache.tez.dag.api.SessionNotRunning;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.dag.api.VertexGroup;
 import org.apache.tez.dag.api.client.DAGClient;
 import org.apache.tez.dag.api.client.StatusGetOpts;
 
@@ -97,9 +101,6 @@ public class TezTask extends Task<TezWork> {
     DAGClient client = null;
     TezSessionState session = null;
 
-    // Tez requires us to use RPC for the query plan
-    HiveConf.setBoolVar(conf, ConfVars.HIVE_RPC_QUERY_PLAN, true);
-
     try {
       // Get or create Context object. If we create it we have to clean
       // it later as well.
@@ -113,19 +114,15 @@ public class TezTask extends Task<TezWork> {
       // get a session.
       SessionState ss = SessionState.get();
       session = ss.getTezSession();
-
-      // if we don't have one yet create it.
-      if (session == null) {
-        session = new TezSessionState();
-        ss.setTezSession(session);
-      }
+      session = TezSessionPoolManager.getInstance().getSession(session, conf);
+      ss.setTezSession(session);
 
       // if it's not running start it.
       if (!session.isOpen()) {
         // can happen if the user sets the tez flag after the session was
         // established
         LOG.info("Tez session hasn't been created yet. Opening session");
-        session.open(ss.getSessionId(), conf);
+        session.open(session.getSessionId(), conf);
       }
 
       // we will localize all the files (jars, plans, hashtables) to the
@@ -155,6 +152,7 @@ public class TezTask extends Task<TezWork> {
       // fetch the counters
       Set<StatusGetOpts> statusGetOpts = EnumSet.of(StatusGetOpts.GET_COUNTERS);
       counters = client.getDAGStatus(statusGetOpts).getDAGCounters();
+      TezSessionPoolManager.getInstance().returnSession(session);
 
       if (LOG.isInfoEnabled()) {
         for (CounterGroup group: counters) {
@@ -206,9 +204,7 @@ public class TezTask extends Task<TezWork> {
     FileSystem fs = tezDir.getFileSystem(conf);
 
     // the name of the dag is what is displayed in the AM/Job UI
-    DAG dag = new DAG(
-        Utilities.abbreviate(HiveConf.getVar(conf, HiveConf.ConfVars.HIVEQUERYSTRING),
-        HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVEJOBNAMELENGTH)));
+    DAG dag = new DAG(work.getName());
 
     for (BaseWork w: ws) {
 
@@ -216,23 +212,68 @@ public class TezTask extends Task<TezWork> {
 
       // translate work to vertex
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_CREATE_VERTEX + w.getName());
-      JobConf wxConf = utils.initializeVertexConf(conf, w);
-      Vertex wx = utils.createVertex(wxConf, w, tezDir,
-         appJarLr, additionalLr, fs, ctx, !isFinal);
-      dag.addVertex(wx);
-      perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_CREATE_VERTEX + w.getName());
-      workToVertex.put(w, wx);
-      workToConf.put(w, wxConf);
 
-      // add all dependencies (i.e.: edges) to the graph
-      for (BaseWork v: work.getChildren(w)) {
-        assert workToVertex.containsKey(v);
-        Edge e = null;
+      if (w instanceof UnionWork) {
+        // Special case for unions. These items translate to VertexGroups
 
-        EdgeType edgeType = work.getEdgeProperty(w, v);
+        List<BaseWork> unionWorkItems = new LinkedList<BaseWork>();
+        List<BaseWork> children = new LinkedList<BaseWork>();
 
-        e = utils.createEdge(wxConf, wx, workToConf.get(v), workToVertex.get(v), edgeType);
-        dag.addEdge(e);
+        // split the children into vertices that make up the union and vertices that are
+        // proper children of the union
+        for (BaseWork v: work.getChildren(w)) {
+          EdgeType type = work.getEdgeProperty(w, v);
+          if (type == EdgeType.CONTAINS) {
+            unionWorkItems.add(v);
+          } else {
+            children.add(v);
+          }
+        }
+
+        // create VertexGroup
+        Vertex[] vertexArray = new Vertex[unionWorkItems.size()];
+
+        int i = 0;
+        for (BaseWork v: unionWorkItems) {
+          vertexArray[i++] = workToVertex.get(v);
+        }
+        VertexGroup group = dag.createVertexGroup(w.getName(), vertexArray);
+        
+        // now hook up the children
+        for (BaseWork v: children) {
+          // need to pairwise patch up the configuration of the vertices
+          for (BaseWork part: unionWorkItems) {
+            utils.updateConfigurationForEdge(workToConf.get(part), workToVertex.get(part), 
+                 workToConf.get(v), workToVertex.get(v));
+          }
+          
+          // finally we can create the grouped edge
+          GroupInputEdge e = utils.createEdge(group, workToConf.get(v),
+               workToVertex.get(v), work.getEdgeProperty(w, v));
+
+          dag.addEdge(e);
+        }
+      } else {
+        // Regular vertices
+        JobConf wxConf = utils.initializeVertexConf(conf, w);
+        Vertex wx = utils.createVertex(wxConf, w, tezDir, appJarLr, 
+          additionalLr, fs, ctx, !isFinal);
+        dag.addVertex(wx);
+        utils.addCredentials(w, dag);
+        perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_CREATE_VERTEX + w.getName());
+        workToVertex.put(w, wx);
+        workToConf.put(w, wxConf);
+        
+        // add all dependencies (i.e.: edges) to the graph
+        for (BaseWork v: work.getChildren(w)) {
+          assert workToVertex.containsKey(v);
+          Edge e = null;
+
+          EdgeType edgeType = work.getEdgeProperty(w, v);
+          
+          e = utils.createEdge(wxConf, wx, workToConf.get(v), workToVertex.get(v), edgeType);
+          dag.addEdge(e);
+        }
       }
     }
     perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_BUILD_DAG);

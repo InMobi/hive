@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import com.facebook.fb303.FacebookBase;
+import com.facebook.fb303.fb_status;
 import static org.apache.commons.lang.StringUtils.join;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_COMMENT;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_NAME;
@@ -60,12 +62,16 @@ import org.apache.hadoop.hive.common.cli.CommonCliOptions;
 import org.apache.hadoop.hive.common.metrics.Metrics;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
 import org.apache.hadoop.hive.metastore.api.AddPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.AddPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.CheckLockRequest;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.CommitTxnRequest;
+import org.apache.hadoop.hive.metastore.api.CompactionRequest;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsExpr;
@@ -74,6 +80,9 @@ import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Function;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
+import org.apache.hadoop.hive.metastore.api.HeartbeatRequest;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
 import org.apache.hadoop.hive.metastore.api.HiveObjectType;
@@ -83,8 +92,14 @@ import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
+import org.apache.hadoop.hive.metastore.api.LockRequest;
+import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
+import org.apache.hadoop.hive.metastore.api.OpenTxnRequest;
+import org.apache.hadoop.hive.metastore.api.OpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprRequest;
@@ -97,16 +112,24 @@ import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
 import org.apache.hadoop.hive.metastore.api.Role;
+import org.apache.hadoop.hive.metastore.api.ShowCompactRequest;
+import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.TableStatsResult;
-import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
+import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
+import org.apache.hadoop.hive.metastore.api.TxnOpenException;
 import org.apache.hadoop.hive.metastore.api.Type;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
+import org.apache.hadoop.hive.metastore.api.UnlockRequest;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.hadoop.hive.metastore.txn.TxnHandler;
+import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.events.AddPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.AlterPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.AlterTableEvent;
@@ -149,14 +172,8 @@ import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
-import org.apache.thrift.transport.TFramedTransport;
-import org.apache.thrift.transport.TServerSocket;
-import org.apache.thrift.transport.TServerTransport;
-import org.apache.thrift.transport.TTransport;
-import org.apache.thrift.transport.TTransportFactory;
+import org.apache.thrift.transport.*;
 
-import com.facebook.fb303.FacebookBase;
-import com.facebook.fb303.fb_status;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
@@ -217,6 +234,13 @@ public class HiveMetaStore extends ThriftHiveMetastore {
             return null;
           }
         };
+
+    private final ThreadLocal<TxnHandler> threadLocalTxn = new ThreadLocal<TxnHandler>() {
+      @Override
+      protected synchronized TxnHandler initialValue() {
+        return null;
+      }
+    };
 
     // Thread local configuration is needed as many threads could make changes
     // to the conf using the connection hook
@@ -441,6 +465,15 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         ms = threadLocalMS.get();
       }
       return ms;
+    }
+
+    private TxnHandler getTxnHandler() {
+      TxnHandler txn = threadLocalTxn.get();
+      if (txn == null) {
+        txn = new TxnHandler(hiveConf);
+        threadLocalTxn.set(txn);
+      }
+      return txn;
     }
 
     private RawStore newRawStore() throws MetaException {
@@ -1634,9 +1667,6 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         part.setTableName(tableName);
         part.setValues(part_vals);
 
-        PreAddPartitionEvent event = new PreAddPartitionEvent(part, this);
-        firePreEvent(event);
-
         MetaStoreUtils.validatePartitionNameCharacters(part_vals, partitionValidationPattern);
 
         tbl = ms.getTable(part.getDbName(), part.getTableName());
@@ -1648,6 +1678,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
           throw new MetaException(
               "Cannot append a partition to a view");
         }
+
+        firePreEvent(new PreAddPartitionEvent(tbl, part, this));
 
         part.setSd(tbl.getSd());
         partLocation = new Path(tbl.getSd().getLocation(), Warehouse
@@ -1793,13 +1825,19 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       Map<PartValEqWrapper, Boolean> addedPartitions = new HashMap<PartValEqWrapper, Boolean>();
       List<Partition> result = new ArrayList<Partition>();
       List<Partition> existingParts = null;
+      Table tbl = null;
       try {
         ms.openTransaction();
-        Table tbl = ms.getTable(dbName, tblName);
+        tbl = ms.getTable(dbName, tblName);
         if (tbl == null) {
           throw new InvalidObjectException("Unable to add partitions because "
               + "database or table " + dbName + "." + tblName + " does not exist");
         }
+
+        if (!parts.isEmpty()) {
+          firePreEvent(new PreAddPartitionEvent(tbl, parts, this));
+        }
+
         for (Partition part : parts) {
           if (!part.getTableName().equals(tblName) || !part.getDbName().equals(dbName)) {
             throw new MetaException("Partition does not belong to target table "
@@ -1839,18 +1877,12 @@ public class HiveMetaStore extends ThriftHiveMetastore {
               // we just created this directory - it's not a case of pre-creation, so we nuke
             }
           }
-          for (Partition part : parts) {
-            fireMetaStoreAddPartitionEvent(ms, part, null, success);
-          }
+          fireMetaStoreAddPartitionEvent(tbl, parts, null, false);
         } else {
-          for (Partition part : result) {
-            fireMetaStoreAddPartitionEvent(ms, part, null, success);
-          }
+          fireMetaStoreAddPartitionEvent(tbl, result, null, true);
           if (existingParts != null) {
             // The request has succeeded but we failed to add these partitions.
-            for (Partition part : existingParts) {
-              fireMetaStoreAddPartitionEvent(ms, part, null, false);
-            }
+            fireMetaStoreAddPartitionEvent(tbl, existingParts, null, false);
           }
         }
       }
@@ -1913,7 +1945,6 @@ public class HiveMetaStore extends ThriftHiveMetastore {
 
     private boolean startAddPartition(
         RawStore ms, Partition part, boolean ifNotExists) throws MetaException, TException {
-      firePreEvent(new PreAddPartitionEvent(part, this));
       MetaStoreUtils.validatePartitionNameCharacters(part.getValues(),
           partitionValidationPattern);
       boolean doesExist = ms.doesPartitionExist(
@@ -2007,16 +2038,19 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         final Partition part, final EnvironmentContext envContext)
         throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
       boolean success = false;
-      Partition retPtn = null;
+      Table tbl = null;
       try {
         ms.openTransaction();
-        Table tbl = ms.getTable(part.getDbName(), part.getTableName());
+        tbl = ms.getTable(part.getDbName(), part.getTableName());
         if (tbl == null) {
           throw new InvalidObjectException(
               "Unable to add partition because table or database do not exist");
         }
+
+        firePreEvent(new PreAddPartitionEvent(tbl, part, this));
+
         boolean shouldAdd = startAddPartition(ms, part, false);
-        assert shouldAdd; // start would thrrow if it already existed here
+        assert shouldAdd; // start would throw if it already existed here
         boolean madeDir = createLocationForAddedPartition(tbl, part);
         try {
           initializeAddedPartition(tbl, part, madeDir);
@@ -2033,20 +2067,22 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         if (!success) {
           ms.rollbackTransaction();
         }
-        fireMetaStoreAddPartitionEvent(ms, part, envContext, success);
+        fireMetaStoreAddPartitionEvent(tbl, Arrays.asList(part), envContext, success);
       }
       return part;
     }
 
-    private void fireMetaStoreAddPartitionEvent(final RawStore ms,
-        final Partition part, final EnvironmentContext envContext, boolean success)
+    private void fireMetaStoreAddPartitionEvent(final Table tbl,
+        final List<Partition> parts, final EnvironmentContext envContext, boolean success)
           throws MetaException {
-      final Table tbl = ms.getTable(part.getDbName(), part.getTableName());
-      for (MetaStoreEventListener listener : listeners) {
+      if (tbl != null && parts != null && !parts.isEmpty()) {
         AddPartitionEvent addPartitionEvent =
-            new AddPartitionEvent(tbl, part, success, this);
+            new AddPartitionEvent(tbl, parts, success, this);
         addPartitionEvent.setEnvironmentContext(envContext);
-        listener.onAddPartition(addPartitionEvent);
+
+        for (MetaStoreEventListener listener : listeners) {
+          listener.onAddPartition(addPartitionEvent);
+        }
       }
     }
 
@@ -4601,19 +4637,6 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       if (className == null) {
         throw new InvalidObjectException("Function class name cannot be null");
       }
-
-      // Not sure if we can verify that the class is actually a UDF,
-      // since from metastore we do not have access to ql where UDF classes live.
-      // We can at least verify that the class name is a valid class.
-      try {
-        Class<?> functionClass = Class.forName(className, true, JavaUtils.getClassLoader());
-        if (functionClass == null) {
-          throw new ClassNotFoundException(className + " was null");
-        }
-      } catch (ClassNotFoundException e) {
-        throw new MetaException("Cannot load class " + className + " for function "
-            + func.getDbName() + "." + func.getFunctionName() + ": " + e);
-      }
     }
 
     @Override
@@ -4734,6 +4757,121 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       }
 
       return func;
+    }
+
+    // Transaction and locking methods
+    @Override
+    public GetOpenTxnsResponse get_open_txns() throws TException {
+      try {
+        return getTxnHandler().getOpenTxns();
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    // Transaction and locking methods
+    @Override
+    public GetOpenTxnsInfoResponse get_open_txns_info() throws TException {
+      try {
+        return getTxnHandler().getOpenTxnsInfo();
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public OpenTxnsResponse open_txns(OpenTxnRequest rqst) throws TException {
+      try {
+        return getTxnHandler().openTxns(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public void abort_txn(AbortTxnRequest rqst) throws NoSuchTxnException, TException {
+      try {
+        getTxnHandler().abortTxn(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public void commit_txn(CommitTxnRequest rqst)
+        throws NoSuchTxnException, TxnAbortedException, TException {
+      try {
+        getTxnHandler().commitTxn(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public LockResponse lock(LockRequest rqst)
+        throws NoSuchTxnException, TxnAbortedException, TException {
+      try {
+        return getTxnHandler().lock(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public LockResponse check_lock(CheckLockRequest rqst)
+        throws NoSuchTxnException, TxnAbortedException, NoSuchLockException, TException {
+      try {
+        return getTxnHandler().checkLock(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public void unlock(UnlockRequest rqst)
+        throws NoSuchLockException, TxnOpenException, TException {
+      try {
+        getTxnHandler().unlock(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public ShowLocksResponse show_locks(ShowLocksRequest rqst) throws TException {
+      try {
+        return getTxnHandler().showLocks(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override 
+    public void heartbeat(HeartbeatRequest ids)
+        throws NoSuchLockException, NoSuchTxnException, TxnAbortedException, TException {
+      try {
+        getTxnHandler().heartbeat(ids);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public void compact(CompactionRequest rqst) throws TException {
+      try {
+        getTxnHandler().compact(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
+    public ShowCompactResponse show_compact(ShowCompactRequest rqst) throws TException {
+      try {
+        return getTxnHandler().showCompact(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
     }
   }
 

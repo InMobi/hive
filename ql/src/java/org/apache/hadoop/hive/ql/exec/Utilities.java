@@ -777,6 +777,14 @@ public final class Utilities {
     }
   }
 
+  public static Set<Operator<?>> cloneOperatorTree(Configuration conf, Set<Operator<?>> roots) {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream(4096);
+    serializePlan(roots, baos, conf, true);
+    Set<Operator<?>> result = deserializePlan(new ByteArrayInputStream(baos.toByteArray()),
+        roots.getClass(), conf, true);
+    return result;
+  }
+
   private static void serializePlan(Object plan, OutputStream out, Configuration conf, boolean cloningPlan) {
     PerfLogger perfLogger = PerfLogger.getPerfLogger();
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.SERIALIZE_PLAN);
@@ -857,6 +865,7 @@ public final class Utilities {
   private static void serializeObjectByJavaXML(Object plan, OutputStream out) {
     XMLEncoder e = new XMLEncoder(out);
     e.setExceptionListener(new ExceptionListener() {
+      @Override
       public void exceptionThrown(Exception e) {
         LOG.warn(org.apache.hadoop.util.StringUtils.stringifyException(e));
         throw new RuntimeException("Cannot serialize object", e);
@@ -913,7 +922,7 @@ public final class Utilities {
 
   // Kryo is not thread-safe,
   // Also new Kryo() is expensive, so we want to do it just once.
-  private static ThreadLocal<Kryo> runtimeSerializationKryo = new ThreadLocal<Kryo>() {
+  public static ThreadLocal<Kryo> runtimeSerializationKryo = new ThreadLocal<Kryo>() {
     @Override
     protected synchronized Kryo initialValue() {
       Kryo kryo = new Kryo();
@@ -1250,7 +1259,7 @@ public final class Utilities {
     if (isCompressed) {
       Class<? extends CompressionCodec> codecClass = FileOutputFormat.getOutputCompressorClass(jc,
           DefaultCodec.class);
-      CompressionCodec codec = (CompressionCodec) ReflectionUtils.newInstance(codecClass, jc);
+      CompressionCodec codec = ReflectionUtils.newInstance(codecClass, jc);
       return codec.createOutputStream(out);
     } else {
       return (out);
@@ -1299,7 +1308,7 @@ public final class Utilities {
     if ((hiveOutputFormat instanceof HiveIgnoreKeyTextOutputFormat) && isCompressed) {
       Class<? extends CompressionCodec> codecClass = FileOutputFormat.getOutputCompressorClass(jc,
           DefaultCodec.class);
-      CompressionCodec codec = (CompressionCodec) ReflectionUtils.newInstance(codecClass, jc);
+      CompressionCodec codec = ReflectionUtils.newInstance(codecClass, jc);
       return codec.getDefaultExtension();
     }
     return "";
@@ -2090,6 +2099,9 @@ public final class Utilities {
     for (Map.Entry<String, String> entry : jobProperties.entrySet()) {
       job.set(entry.getKey(), entry.getValue());
     }
+    // copy the bucket count
+    job.set(hive_metastoreConstants.BUCKET_COUNT,
+        tbl.getProperties().getProperty(hive_metastoreConstants.BUCKET_COUNT));
   }
 
   private static final Object INPUT_SUMMARY_LOCK = new Object();
@@ -2180,6 +2192,7 @@ public final class Utilities {
           final PartitionDesc partDesc = work.getPathToPartitionInfo().get(
               p.toString());
           Runnable r = new Runnable() {
+            @Override
             public void run() {
               try {
                 Class<? extends InputFormat> inputFormatCls = partDesc
@@ -2324,7 +2337,7 @@ public final class Utilities {
 
   private static void getTezTasks(List<Task<? extends Serializable>> tasks, List<TezTask> tezTasks) {
     for (Task<? extends Serializable> task : tasks) {
-      if (task instanceof TezTask && !tezTasks.contains((TezTask) task)) {
+      if (task instanceof TezTask && !tezTasks.contains(task)) {
         tezTasks.add((TezTask) task);
       }
 
@@ -2344,7 +2357,7 @@ public final class Utilities {
 
   private static void getMRTasks(List<Task<? extends Serializable>> tasks, List<ExecDriver> mrTasks) {
     for (Task<? extends Serializable> task : tasks) {
-      if (task instanceof ExecDriver && !mrTasks.contains((ExecDriver) task)) {
+      if (task instanceof ExecDriver && !mrTasks.contains(task)) {
         mrTasks.add((ExecDriver) task);
       }
 
@@ -2969,7 +2982,7 @@ public final class Utilities {
           pathsProcessed.add(path);
 
           LOG.info("Adding input file " + path);
-          if (!HiveConf.getVar(job, ConfVars.HIVE_EXECUTION_ENGINE).equals("tez") 
+          if (!HiveConf.getVar(job, ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")
               && isEmptyPath(job, path, ctx)) {
             path = createDummyFileForEmptyPartition(path, job, work,
                  hiveScratchDir, alias, sequenceNumber++);
@@ -2987,7 +3000,7 @@ public final class Utilities {
       // T2) x;
       // If T is empty and T2 contains 100 rows, the user expects: 0, 100 (2
       // rows)
-      if (path == null 
+      if (path == null
           && !HiveConf.getVar(job, ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) {
         path = createDummyFileForEmptyTable(job, work, hiveScratchDir,
             alias, sequenceNumber++);
@@ -3136,8 +3149,10 @@ public final class Utilities {
    * Set hive input format, and input format file if necessary.
    */
   public static void setInputAttributes(Configuration conf, MapWork mWork) {
+    HiveConf.ConfVars var = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez") ?
+      HiveConf.ConfVars.HIVETEZINPUTFORMAT : HiveConf.ConfVars.HIVEINPUTFORMAT;
     if (mWork.getInputformat() != null) {
-      HiveConf.setVar(conf, HiveConf.ConfVars.HIVEINPUTFORMAT, mWork.getInputformat());
+      HiveConf.setVar(conf, var, mWork.getInputformat());
     }
     if (mWork.getIndexIntermediateFile() != null) {
       conf.set("hive.index.compact.file", mWork.getIndexIntermediateFile());
@@ -3218,7 +3233,7 @@ public final class Utilities {
   /**
    * Returns true if a plan is both configured for vectorized execution
    * and vectorization is allowed. The plan may be configured for vectorization
-   * but vectorization dissalowed eg. for FetchOperator execution. 
+   * but vectorization dissalowed eg. for FetchOperator execution.
    */
   public static boolean isVectorMode(Configuration conf) {
     if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_VECTORIZATION_ENABLED) &&
@@ -3228,11 +3243,11 @@ public final class Utilities {
     }
     return false;
   }
-  
+
     public static void clearWorkMap() {
     gWorkMap.clear();
   }
-  
+
   /**
    * Create a temp dir in specified baseDir
    * This can go away once hive moves to support only JDK 7

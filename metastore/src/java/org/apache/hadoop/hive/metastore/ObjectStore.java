@@ -39,7 +39,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import javax.jdo.JDODataStoreException;
-import javax.jdo.JDOEnhanceException;
 import javax.jdo.JDOHelper;
 import javax.jdo.JDOObjectNotFoundException;
 import javax.jdo.PersistenceManager;
@@ -49,7 +48,6 @@ import javax.jdo.Transaction;
 import javax.jdo.datastore.DataStoreCache;
 import javax.jdo.identity.IntIdentity;
 
-import org.antlr.runtime.CharStream;
 import org.antlr.runtime.CommonTokenStream;
 import org.antlr.runtime.RecognitionException;
 import org.apache.commons.logging.Log;
@@ -62,14 +60,10 @@ import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
-import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.FunctionType;
@@ -80,7 +74,6 @@ import org.apache.hadoop.hive.metastore.api.Index;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
-import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -90,11 +83,12 @@ import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
+import org.apache.hadoop.hive.metastore.api.ResourceType;
+import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.Type;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
@@ -115,6 +109,7 @@ import org.apache.hadoop.hive.metastore.model.MPartitionColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MPartitionColumnStatistics;
 import org.apache.hadoop.hive.metastore.model.MPartitionEvent;
 import org.apache.hadoop.hive.metastore.model.MPartitionPrivilege;
+import org.apache.hadoop.hive.metastore.model.MResourceUri;
 import org.apache.hadoop.hive.metastore.model.MRole;
 import org.apache.hadoop.hive.metastore.model.MRoleMap;
 import org.apache.hadoop.hive.metastore.model.MSerDeInfo;
@@ -136,8 +131,6 @@ import org.apache.hadoop.hive.metastore.parser.FilterParser;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.thrift.TException;
 import org.datanucleus.store.rdbms.exceptions.MissingTableException;
-
-import org.antlr.runtime.Token;
 
 import com.google.common.collect.Lists;
 
@@ -521,7 +514,7 @@ public class ObjectStore implements RawStore, Configurable {
 
   /**
    * Alter the database object in metastore. Currently only the parameters
-   * of the database can be changed.
+   * of the database or the owner can be changed.
    * @param dbName the database name
    * @param db the Hive Database object
    * @throws MetaException
@@ -535,8 +528,11 @@ public class ObjectStore implements RawStore, Configurable {
     boolean committed = false;
     try {
       mdb = getMDatabase(dbName);
-      // currently only allow changing database parameters
       mdb.setParameters(db.getParameters());
+      mdb.setOwnerName(db.getOwnerName());
+      if (db.getOwnerType() != null) {
+        mdb.setOwnerType(db.getOwnerType().name());
+      }
       openTransaction();
       pm.makePersistent(mdb);
       committed = commitTransaction();
@@ -3225,7 +3221,13 @@ public class ObjectStore implements RawStore, Configurable {
     return success;
   }
 
-  private List<MRoleMap> listRoles(String userName,
+  /**
+   * Get all the roles in the role hierarchy that this user and groupNames belongs to
+   * @param userName
+   * @param groupNames
+   * @return
+   */
+  private Set<String> listAllRolesInHierarchy(String userName,
       List<String> groupNames) {
     List<MRoleMap> ret = new ArrayList<MRoleMap>();
     if(userName != null) {
@@ -3236,7 +3238,29 @@ public class ObjectStore implements RawStore, Configurable {
         ret.addAll(listRoles(groupName, PrincipalType.GROUP));
       }
     }
-    return ret;
+    // get names of these roles and its ancestors
+    Set<String> roleNames = new HashSet<String>();
+    getAllRoleAncestors(roleNames, ret);
+    return roleNames;
+  }
+
+  /**
+   * Add role names of parentRoles and its parents to processedRoles
+   *
+   * @param processedRoleNames
+   * @param parentRoles
+   */
+  private void getAllRoleAncestors(Set<String> processedRoleNames, List<MRoleMap> parentRoles) {
+    for (MRoleMap parentRole : parentRoles) {
+      String parentRoleName = parentRole.getRole().getRoleName();
+      if (!processedRoleNames.contains(parentRoleName)) {
+        // unprocessed role: get its parents, add it to processed, and call this
+        // function recursively
+        List<MRoleMap> nextParentRoles = listRoles(parentRoleName, PrincipalType.ROLE);
+        processedRoleNames.add(parentRoleName);
+        getAllRoleAncestors(processedRoleNames, nextParentRoles);
+      }
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -3444,13 +3468,12 @@ public class ObjectStore implements RawStore, Configurable {
         }
         ret.setGroupPrivileges(dbGroupPriv);
       }
-      List<MRoleMap> roles = listRoles(userName, groupNames);
-      if (roles != null && roles.size() > 0) {
+      Set<String> roleNames = listAllRolesInHierarchy(userName, groupNames);
+      if (roleNames != null && roleNames.size() > 0) {
         Map<String, List<PrivilegeGrantInfo>> dbRolePriv = new HashMap<String, List<PrivilegeGrantInfo>>();
-        for (MRoleMap role : roles) {
-          String name = role.getRole().getRoleName();
+        for (String roleName : roleNames) {
           dbRolePriv
-              .put(name, getDBPrivilege(dbName, name, PrincipalType.ROLE));
+              .put(roleName, getDBPrivilege(dbName, roleName, PrincipalType.ROLE));
         }
         ret.setRolePrivileges(dbRolePriv);
       }
@@ -3488,11 +3511,10 @@ public class ObjectStore implements RawStore, Configurable {
         }
         ret.setGroupPrivileges(partGroupPriv);
       }
-      List<MRoleMap> roles = listRoles(userName, groupNames);
-      if (roles != null && roles.size() > 0) {
+      Set<String> roleNames = listAllRolesInHierarchy(userName, groupNames);
+      if (roleNames != null && roleNames.size() > 0) {
         Map<String, List<PrivilegeGrantInfo>> partRolePriv = new HashMap<String, List<PrivilegeGrantInfo>>();
-        for (MRoleMap role : roles) {
-          String roleName = role.getRole().getRoleName();
+        for (String roleName : roleNames) {
           partRolePriv.put(roleName, getPartitionPrivilege(dbName, tableName,
               partition, roleName, PrincipalType.ROLE));
         }
@@ -3532,11 +3554,10 @@ public class ObjectStore implements RawStore, Configurable {
         }
         ret.setGroupPrivileges(tableGroupPriv);
       }
-      List<MRoleMap> roles = listRoles(userName, groupNames);
-      if (roles != null && roles.size() > 0) {
+      Set<String> roleNames = listAllRolesInHierarchy(userName, groupNames);
+      if (roleNames != null && roleNames.size() > 0) {
         Map<String, List<PrivilegeGrantInfo>> tableRolePriv = new HashMap<String, List<PrivilegeGrantInfo>>();
-        for (MRoleMap role : roles) {
-          String roleName = role.getRole().getRoleName();
+        for (String roleName : roleNames) {
           tableRolePriv.put(roleName, getTablePrivilege(dbName, tableName,
               roleName, PrincipalType.ROLE));
         }
@@ -3578,11 +3599,10 @@ public class ObjectStore implements RawStore, Configurable {
         }
         ret.setGroupPrivileges(columnGroupPriv);
       }
-      List<MRoleMap> roles = listRoles(userName, groupNames);
-      if (roles != null && roles.size() > 0) {
+      Set<String> roleNames = listAllRolesInHierarchy(userName, groupNames);
+      if (roleNames != null && roleNames.size() > 0) {
         Map<String, List<PrivilegeGrantInfo>> columnRolePriv = new HashMap<String, List<PrivilegeGrantInfo>>();
-        for (MRoleMap role : roles) {
-          String roleName = role.getRole().getRoleName();
+        for (String roleName : roleNames) {
           columnRolePriv.put(roleName, getColumnPrivilege(dbName, tableName,
               columnName, partitionName, roleName, PrincipalType.ROLE));
         }
@@ -6453,7 +6473,8 @@ public class ObjectStore implements RawStore, Configurable {
         mfunc.getOwnerName(),
         PrincipalType.valueOf(mfunc.getOwnerType()),
         mfunc.getCreateTime(),
-        FunctionType.findByValue(mfunc.getFunctionType()));
+        FunctionType.findByValue(mfunc.getFunctionType()),
+        convertToResourceUriList(mfunc.getResourceUris()));
     return func;
   }
 
@@ -6476,10 +6497,35 @@ public class ObjectStore implements RawStore, Configurable {
         func.getOwnerName(),
         func.getOwnerType().name(),
         func.getCreateTime(),
-        func.getFunctionType().getValue());
+        func.getFunctionType().getValue(),
+        convertToMResourceUriList(func.getResourceUris()));
     return mfunc;
   }
 
+  private List<ResourceUri> convertToResourceUriList(List<MResourceUri> mresourceUriList) {
+    List<ResourceUri> resourceUriList = null;
+    if (mresourceUriList != null) {
+      resourceUriList = new ArrayList<ResourceUri>(mresourceUriList.size());
+      for (MResourceUri mres : mresourceUriList) {
+        resourceUriList.add(
+            new ResourceUri(ResourceType.findByValue(mres.getResourceType()), mres.getUri()));
+      }
+    }
+    return resourceUriList;
+  }
+
+  private List<MResourceUri> convertToMResourceUriList(List<ResourceUri> resourceUriList) {
+    List<MResourceUri> mresourceUriList = null;
+    if (resourceUriList != null) {
+      mresourceUriList = new ArrayList<MResourceUri>(resourceUriList.size());
+      for (ResourceUri res : resourceUriList) {
+        mresourceUriList.add(new MResourceUri(res.getResourceType().getValue(), res.getUri()));
+      }
+    }
+    return mresourceUriList;
+  }
+
+  @Override
   public void createFunction(Function func) throws InvalidObjectException, MetaException {
     boolean committed = false;
     try {
@@ -6494,6 +6540,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
   }
 
+  @Override
   public void alterFunction(String dbName, String funcName, Function newFunction)
       throws InvalidObjectException, MetaException {
     boolean success = false;
@@ -6528,6 +6575,7 @@ public class ObjectStore implements RawStore, Configurable {
     }
   }
 
+  @Override
   public void dropFunction(String dbName, String funcName) throws MetaException,
   NoSuchObjectException, InvalidObjectException, InvalidInputException {
     boolean success = false;
@@ -6568,6 +6616,7 @@ public class ObjectStore implements RawStore, Configurable {
     return mfunc;
   }
 
+  @Override
   public Function getFunction(String dbName, String funcName) throws MetaException {
     boolean commited = false;
     Function func = null;
@@ -6583,6 +6632,7 @@ public class ObjectStore implements RawStore, Configurable {
     return func;
   }
 
+  @Override
   public List<String> getFunctions(String dbName, String pattern)
       throws MetaException {
     boolean commited = false;

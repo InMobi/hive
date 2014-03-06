@@ -18,26 +18,6 @@
 
 package org.apache.hadoop.hive.conf;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.security.auth.login.LoginException;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -47,6 +27,14 @@ import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
+
+import javax.security.auth.login.LoginException;
+import java.io.*;
+import java.net.URL;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Hive Configuration.
@@ -135,7 +123,12 @@ public class HiveConf extends Configuration {
       HiveConf.ConfVars.METASTORE_PARTITION_NAME_WHITELIST_PATTERN,
       HiveConf.ConfVars.METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES,
       HiveConf.ConfVars.USERS_IN_ADMIN_ROLE,
-      HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER
+      HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER,
+      HiveConf.ConfVars.HIVE_TXN_MANAGER,
+      HiveConf.ConfVars.HIVE_TXN_JDBC_DRIVER,
+      HiveConf.ConfVars.HIVE_TXN_JDBC_CONNECT_STRING,
+      HiveConf.ConfVars.HIVE_TXN_TIMEOUT,
+      HiveConf.ConfVars.HIVE_TXN_MAX_OPEN_BATCH,
       };
 
   /**
@@ -432,6 +425,8 @@ public class HiveConf extends Configuration {
     // hive.mapjoin.bucket.cache.size has been replaced by hive.smbjoin.cache.row,
     // need to remove by hive .13. Also, do not change default (see SMB operator)
     HIVEMAPJOINBUCKETCACHESIZE("hive.mapjoin.bucket.cache.size", 100),
+    HIVEMAPJOINUSEOPTIMIZEDKEYS("hive.mapjoin.optimized.keys", true),
+    HIVEMAPJOINLAZYHASHTABLE("hive.mapjoin.lazy.hashtable", true),
 
     HIVESMBJOINCACHEROWS("hive.smbjoin.cache.rows", 10000),
     HIVEGROUPBYMAPINTERVAL("hive.groupby.mapaggr.checkinterval", 100000),
@@ -444,6 +439,7 @@ public class HiveConf extends Configuration {
     HIVE_MAP_GROUPBY_SORT_TESTMODE("hive.map.groupby.sorted.testmode", false),
     HIVE_GROUPBY_ORDERBY_POSITION_ALIAS("hive.groupby.orderby.position.alias", false),
     HIVE_NEW_JOB_GROUPING_SET_CARDINALITY("hive.new.job.grouping.set.cardinality", 30),
+
 
     // for hive udtf operator
     HIVEUDTFAUTOPROGRESS("hive.udtf.auto.progress", false),
@@ -500,6 +496,7 @@ public class HiveConf extends Configuration {
 
     HIVEMERGEMAPFILES("hive.merge.mapfiles", true),
     HIVEMERGEMAPREDFILES("hive.merge.mapredfiles", false),
+    HIVEMERGETEZFILES("hive.merge.tezfiles", false),
     HIVEMERGEMAPFILESSIZE("hive.merge.size.per.task", (long) (256 * 1000 * 1000)),
     HIVEMERGEMAPFILESAVGSIZE("hive.merge.smallfiles.avgsize", (long) (16 * 1000 * 1000)),
     HIVEMERGERCFILEBLOCKLEVEL("hive.merge.rcfile.block.level", true),
@@ -536,6 +533,8 @@ public class HiveConf extends Configuration {
     HIVE_ORC_COMPUTE_SPLITS_NUM_THREADS("hive.orc.compute.splits.num.threads", 10),
     HIVE_ORC_SKIP_CORRUPT_DATA("hive.exec.orc.skip.corrupt.data", false),
 
+    HIVE_ORC_ZEROCOPY("hive.exec.orc.zerocopy", false),
+
     HIVESKEWJOIN("hive.optimize.skewjoin", false),
     HIVECONVERTJOIN("hive.auto.convert.join", true),
     HIVECONVERTJOINNOCONDITIONALTASK("hive.auto.convert.join.noconditionaltask", true),
@@ -562,6 +561,10 @@ public class HiveConf extends Configuration {
     HIVEDEBUGLOCALTASK("hive.debug.localtask",false),
 
     HIVEINPUTFORMAT("hive.input.format", "org.apache.hadoop.hive.ql.io.CombineHiveInputFormat"),
+    HIVETEZINPUTFORMAT("hive.tez.input.format", "org.apache.hadoop.hive.ql.io.HiveInputFormat"),
+
+    HIVETEZCONTAINERSIZE("hive.tez.container.size", -1),
+    HIVETEZJAVAOPTS("hive.tez.java.opts", null),
 
     HIVEENFORCEBUCKETING("hive.enforce.bucketing", false),
     HIVEENFORCESORTING("hive.enforce.sorting", false),
@@ -624,8 +627,8 @@ public class HiveConf extends Configuration {
 
     // Statistics
     HIVESTATSAUTOGATHER("hive.stats.autogather", true),
-    HIVESTATSDBCLASS("hive.stats.dbclass", "counter",
-        new PatternValidator("jdbc(:.*)", "hbase", "counter", "custom")), // StatsSetupConst.StatDB
+    HIVESTATSDBCLASS("hive.stats.dbclass", "fs",
+        new PatternValidator("jdbc(:.*)", "hbase", "counter", "custom", "fs")), // StatsSetupConst.StatDB
     HIVESTATSJDBCDRIVER("hive.stats.jdbcdriver",
         "org.apache.derby.jdbc.EmbeddedDriver"), // JDBC driver specific to the dbclass
     HIVESTATSDBCONNECTIONSTRING("hive.stats.dbconnectionstring",
@@ -693,6 +696,48 @@ public class HiveConf extends Configuration {
     HIVE_ZOOKEEPER_SESSION_TIMEOUT("hive.zookeeper.session.timeout", 600*1000),
     HIVE_ZOOKEEPER_NAMESPACE("hive.zookeeper.namespace", "hive_zookeeper_namespace"),
     HIVE_ZOOKEEPER_CLEAN_EXTRA_NODES("hive.zookeeper.clean.extra.nodes", false),
+
+    // Transactions
+    HIVE_TXN_MANAGER("hive.txn.manager",
+        "org.apache.hadoop.hive.ql.lockmgr.DummyTxnManager"),
+    HIVE_TXN_JDBC_DRIVER("hive.txn.driver", ""),
+    HIVE_TXN_JDBC_CONNECT_STRING("hive.txn.connection.string", ""),
+    // time after which transactions are declared aborted if the client has
+    // not sent a heartbeat, in seconds.
+    HIVE_TXN_TIMEOUT("hive.txn.timeout", 300),
+
+    // Maximum number of transactions that can be fetched in one call to
+    // open_txns().
+    // Increasing this will decrease the number of delta files created when
+    // streaming data into Hive.  But it will also increase the number of
+    // open transactions at any given time, possibly impacting read
+    // performance.
+    HIVE_TXN_MAX_OPEN_BATCH("hive.txn.max.open.batch", 1000),
+
+    // Whether to run the compactor's initiator thread in this metastore instance or not.
+    HIVE_COMPACTOR_INITIATOR_ON("hive.compactor.initiator.on", false),
+
+    // Number of compactor worker threads to run on this metastore instance.
+    HIVE_COMPACTOR_WORKER_THREADS("hive.compactor.worker.threads", 0),
+
+    // Time, in seconds, before a given compaction in working state is declared a failure and
+    // returned to the initiated state.
+    HIVE_COMPACTOR_WORKER_TIMEOUT("hive.compactor.worker.timeout", 86400L),
+
+    // Time in seconds between checks to see if any partitions need compacted.  This should be
+    // kept high because each check for compaction requires many calls against the NameNode.
+    HIVE_COMPACTOR_CHECK_INTERVAL("hive.compactor.check.interval", 300L),
+
+    // Number of delta files that must exist in a directory before the compactor will attempt a
+    // minor compaction.
+    HIVE_COMPACTOR_DELTA_NUM_THRESHOLD("hive.compactor.delta.num.threshold", 10),
+
+    // Percentage (by size) of base that deltas can be before major compaction is initiated.
+    HIVE_COMPACTOR_DELTA_PCT_THRESHOLD("hive.compactor.delta.pct.threshold", 0.1f),
+
+    // Number of aborted transactions involving a particular table or partition before major
+    // compaction is initiated.
+    HIVE_COMPACTOR_ABORTEDTXN_THRESHOLD("hive.compactor.abortedtxn.threshold", 1000),
 
     // For HBase storage handler
     HIVE_HBASE_WAL_ENABLED("hive.hbase.wal.enabled", true),
@@ -821,19 +866,25 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_LOG_DIRECTORY("hive.server2.query.log.dir", "query_logs"),
     // By default, logs will be purged after a week
     HIVE_SERVER2_LOG_PURGE_DELAY("hive.server2.log.purge.delay", 7 * 1440 * 60 * 1000L),
+    // Time in milliseconds that HiveServer2 will wait,
+    // before responding to asynchronous calls that use long polling
+    HIVE_SERVER2_LONG_POLLING_TIMEOUT("hive.server2.long.polling.timeout", 5000L),
 
     // Hive session impl classes
     HIVE_SESSION_IMPL_CLASSNAME("hive.session.impl.classname", null),
     HIVE_SESSION_IMPL_WITH_UGI_CLASSNAME("hive.session.impl.withugi.classname", null),
     // HiveServer2 auth configuration
     HIVE_SERVER2_AUTHENTICATION("hive.server2.authentication", "NONE",
-        new StringsValidator("NOSASL", "NONE", "LDAP", "KERBEROS", "CUSTOM")),
+        new StringsValidator("NOSASL", "NONE", "LDAP", "KERBEROS", "PAM", "CUSTOM")),
     HIVE_SERVER2_KERBEROS_KEYTAB("hive.server2.authentication.kerberos.keytab", ""),
     HIVE_SERVER2_KERBEROS_PRINCIPAL("hive.server2.authentication.kerberos.principal", ""),
     HIVE_SERVER2_PLAIN_LDAP_URL("hive.server2.authentication.ldap.url", null),
     HIVE_SERVER2_PLAIN_LDAP_BASEDN("hive.server2.authentication.ldap.baseDN", null),
     HIVE_SERVER2_PLAIN_LDAP_DOMAIN("hive.server2.authentication.ldap.Domain", null),
     HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS("hive.server2.custom.authentication.class", null),
+    // List of the underlying pam services that should be used when auth type is PAM
+    // A file with the same name must exist in /etc/pam.d
+    HIVE_SERVER2_PAM_SERVICES("hive.server2.authentication.pam.services", null),
     HIVE_SERVER2_ENABLE_DOAS("hive.server2.enable.doAs", true),
     HIVE_SERVER2_TABLE_TYPE_MAPPING("hive.server2.table.type.mapping", "CLASSIC",
         new StringsValidator("CLASSIC", "HIVE")),
@@ -909,11 +960,19 @@ public class HiveConf extends Configuration {
     // Whether to generate the splits locally or in the AM (tez only)
     HIVE_AM_SPLIT_GENERATION("hive.compute.splits.in.am", true),
 
+    HIVE_PREWARM_ENABLED("hive.prewarm.enabled", false),
+    HIVE_PREWARM_NUM_CONTAINERS("hive.prewarm.numcontainers", 10),
+
     // none, idonly, traverse, execution
     HIVESTAGEIDREARRANGE("hive.stageid.rearrange", "none"),
     HIVEEXPLAINDEPENDENCYAPPENDTASKTYPES("hive.explain.dependency.append.tasktype", false),
 
     HIVECOUNTERGROUP("hive.counters.group.name", "HIVE"),
+
+    HIVE_SERVER2_TEZ_DEFAULT_QUEUES("hive.server2.tez.default.queues", ""),
+    HIVE_SERVER2_TEZ_SESSIONS_PER_DEFAULT_QUEUE("hive.server2.tez.sessions.per.default.queue", 1),
+    HIVE_SERVER2_TEZ_INITIALIZE_DEFAULT_SESSIONS("hive.server2.tez.initialize.default.sessions",
+        false),
 
     // none, column
     // none is the default(past) behavior. Implies only alphaNumeric and underscore are valid characters in identifiers.

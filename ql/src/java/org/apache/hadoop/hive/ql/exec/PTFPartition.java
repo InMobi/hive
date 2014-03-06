@@ -60,7 +60,7 @@ public class PTFPartition {
   }
 
   public void reset() throws HiveException {
-    elems.clear();
+    elems.clearRows();
   }
 
   public SerDe getSerDe() {
@@ -82,7 +82,7 @@ public class PTFPartition {
 
   public void append(Object o) throws HiveException {
 
-    if ( elems.size() == Integer.MAX_VALUE ) {
+    if ( elems.rowCount() == Integer.MAX_VALUE ) {
       throw new HiveException(String.format("Cannot add more than %d elements to a PTFPartition",
           Integer.MAX_VALUE));
     }
@@ -90,11 +90,11 @@ public class PTFPartition {
     @SuppressWarnings("unchecked")
     List<Object> l = (List<Object>)
         ObjectInspectorUtils.copyToStandardObject(o, inputOI, ObjectInspectorCopyOption.WRITABLE);
-    elems.add(l);
+    elems.addRow(l);
   }
 
   public int size() {
-    return (int) elems.size();
+    return elems.rowCount();
   }
 
   public PTFPartitionIterator<Object> iterator() throws HiveException {

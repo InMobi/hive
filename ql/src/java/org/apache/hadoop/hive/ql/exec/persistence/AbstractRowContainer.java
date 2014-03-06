@@ -20,29 +20,29 @@ package org.apache.hadoop.hive.ql.exec.persistence;
 
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 
-public abstract class AbstractRowContainer<ROW> {
+public interface AbstractRowContainer<ROW> {
 
-  public AbstractRowContainer() {
-
+  public interface RowIterator<ROW> {
+    public ROW first() throws HiveException;
+    public ROW next() throws HiveException;
   }
 
-  public abstract void add(ROW t) throws HiveException;
-
-  public abstract ROW first() throws HiveException;
-
-  public abstract ROW next() throws HiveException;
+  public RowIterator<ROW> rowIter() throws HiveException;
 
   /**
-   * Get the number of elements in the RowContainer.
+   * add a row into the RowContainer
    *
+   * @param t row
+   */
+  public void addRow(ROW t) throws HiveException;
+
+  /**
    * @return number of elements in the RowContainer
    */
-
-  public abstract long size();
+  public int rowCount() throws HiveException;
 
   /**
    * Remove all elements in the RowContainer.
    */
-
-  public abstract void clear() throws HiveException;
+  public void clearRows() throws HiveException;
 }

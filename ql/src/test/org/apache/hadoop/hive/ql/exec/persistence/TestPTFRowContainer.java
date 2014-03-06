@@ -81,11 +81,11 @@ public class TestPTFRowContainer {
       row.add(new DoubleWritable(i));
       row.add(new IntWritable(i));
       row.add(new Text("def " + i));
-      rc.add(row);
+      rc.addRow(row);
     }
 
     // test forward scan
-    assert(rc.size() == sz);
+    assert(rc.rowCount() == sz);
     i = 0;
     row = new ArrayList<Object>();
     row = rc.first();

@@ -67,8 +67,7 @@ public class HiveSessionImpl implements HiveSession {
 
   private String username;
   private final String password;
-  private final Map<String, String> sessionConf = new HashMap<String, String>();
-  private final HiveConf hiveConf = new HiveConf();
+  private final HiveConf hiveConf;
   private final SessionState sessionState;
 
   private static final String FETCH_WORK_SERDE_CLASS =
@@ -87,13 +86,15 @@ public class HiveSessionImpl implements HiveSession {
   private File sessionLogDir;
 
   public HiveSessionImpl(TProtocolVersion protocol, String username, String password,
-      Map<String, String> sessionConf) {
+      HiveConf serverhiveConf, Map<String, String> sessionConfMap) {
     this.username = username;
     this.password = password;
     this.sessionHandle = new SessionHandle(protocol);
+    this.hiveConf = new HiveConf(serverhiveConf);
 
-    if (sessionConf != null) {
-      for (Map.Entry<String, String> entry : sessionConf.entrySet()) {
+    //set conf properties specified by user from client side
+    if (sessionConfMap != null) {
+      for (Map.Entry<String, String> entry : sessionConfMap.entrySet()) {
         hiveConf.set(entry.getKey(), entry.getValue());
       }
     }
@@ -104,10 +105,12 @@ public class HiveSessionImpl implements HiveSession {
     hiveConf.set(ListSinkOperator.OUTPUT_FORMATTER,
         FetchFormatter.ThriftFormatter.class.getName());
     hiveConf.setInt(ListSinkOperator.OUTPUT_PROTOCOL, protocol.getValue());
-    sessionState = new SessionState(hiveConf);
+    sessionState = new SessionState(hiveConf, username);
+    sessionState.setIsHiveServerQuery(true);
     SessionState.start(sessionState);
   }
 
+  @Override
   public TProtocolVersion getProtocolVersion() {
     return sessionHandle.getProtocolVersion();
   }
@@ -164,10 +167,12 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public SessionManager getSessionManager() {
     return sessionManager;
   }
 
+  @Override
   public void setSessionManager(SessionManager sessionManager) {
     this.sessionManager = sessionManager;
   }
@@ -176,6 +181,7 @@ public class HiveSessionImpl implements HiveSession {
     return operationManager;
   }
 
+  @Override
   public void setOperationManager(OperationManager operationManager) {
     this.operationManager = operationManager;
   }
@@ -191,23 +197,28 @@ public class HiveSessionImpl implements HiveSession {
     // no need to release sessionState...
   }
 
+  @Override
   public SessionHandle getSessionHandle() {
     return sessionHandle;
   }
 
+  @Override
   public String getUsername() {
     return username;
   }
 
+  @Override
   public String getPassword() {
     return password;
   }
 
+  @Override
   public HiveConf getHiveConf() {
     hiveConf.setVar(HiveConf.ConfVars.HIVEFETCHOUTPUTSERDE, FETCH_WORK_SERDE_CLASS);
     return hiveConf;
   }
 
+  @Override
   public IMetaStoreClient getMetaStoreClient() throws HiveSQLException {
     if (metastoreClient == null) {
       try {
@@ -219,6 +230,7 @@ public class HiveSessionImpl implements HiveSession {
     return metastoreClient;
   }
 
+  @Override
   public GetInfoValue getInfo(GetInfoType getInfoType)
       throws HiveSQLException {
     acquire();
@@ -245,11 +257,13 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle executeStatement(String statement, Map<String, String> confOverlay)
       throws HiveSQLException {
     return executeStatementInternal(statement, confOverlay, false);
   }
 
+  @Override
   public OperationHandle executeStatementAsync(String statement, Map<String, String> confOverlay)
       throws HiveSQLException {
     return executeStatementInternal(statement, confOverlay, true);
@@ -257,12 +271,12 @@ public class HiveSessionImpl implements HiveSession {
 
   private OperationHandle executeStatementInternal(String statement, Map<String, String> confOverlay,
       boolean runAsync)
-      throws HiveSQLException {
+          throws HiveSQLException {
     acquire();
 
     OperationManager operationManager = getOperationManager();
     ExecuteStatementOperation operation = operationManager
-          .newExecuteStatementOperation(getSession(), statement, confOverlay, runAsync);
+        .newExecuteStatementOperation(getSession(), statement, confOverlay, runAsync);
     OperationHandle opHandle = operation.getHandle();
     try {
       operation.run();
@@ -280,6 +294,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getTypeInfo()
       throws HiveSQLException {
     acquire();
@@ -299,6 +314,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getCatalogs()
       throws HiveSQLException {
     acquire();
@@ -318,6 +334,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getSchemas(String catalogName, String schemaName)
       throws HiveSQLException {
     acquire();
@@ -338,9 +355,10 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getTables(String catalogName, String schemaName, String tableName,
       List<String> tableTypes)
-      throws HiveSQLException {
+          throws HiveSQLException {
     acquire();
 
     OperationManager operationManager = getOperationManager();
@@ -359,6 +377,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getTableTypes()
       throws HiveSQLException {
     acquire();
@@ -378,6 +397,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getColumns(String catalogName, String schemaName,
       String tableName, String columnName)  throws HiveSQLException {
     acquire();
@@ -387,9 +407,9 @@ public class HiveSessionImpl implements HiveSession {
         catalogName, schemaName, tableName, columnName);
     OperationHandle opHandle = operation.getHandle();
     try {
-    operation.run();
-    opHandleSet.add(opHandle);
-    return opHandle;
+      operation.run();
+      opHandleSet.add(opHandle);
+      return opHandle;
     } catch (HiveSQLException e) {
       operationManager.closeOperation(opHandle);
       throw e;
@@ -398,6 +418,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public OperationHandle getFunctions(String catalogName, String schemaName, String functionName)
       throws HiveSQLException {
     acquire();
@@ -418,6 +439,7 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public void close() throws HiveSQLException {
     try {
       acquire();
@@ -447,13 +469,16 @@ public class HiveSessionImpl implements HiveSession {
     }
   }
 
+  @Override
   public SessionState getSessionState() {
     return sessionState;
   }
 
+  @Override
   public String getUserName() {
     return username;
   }
+  @Override
   public void setUserName(String userName) {
     this.username = userName;
   }

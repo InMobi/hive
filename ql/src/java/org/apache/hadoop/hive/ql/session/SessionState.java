@@ -44,6 +44,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.MapRedStats;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.tez.TezSessionPoolManager;
 import org.apache.hadoop.hive.ql.exec.tez.TezSessionState;
 import org.apache.hadoop.hive.ql.history.HiveHistory;
 import org.apache.hadoop.hive.ql.history.HiveHistoryImpl;
@@ -54,7 +55,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
-import org.apache.hadoop.hive.ql.security.SessionStateUserAuthenticator;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.DisallowTransformHook;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizer;
@@ -93,6 +93,10 @@ public class SessionState {
    * has a jar been added in this context?
    */
   private boolean addedJarOnce;
+  /**
+   * Is the query served from HiveServer2
+   */
+  private boolean isHiveServerQuery = false;
 
   /*
    * HiveHistory Object
@@ -199,6 +203,10 @@ public class SessionState {
     }
   }
 
+  public boolean isHiveServerQuery() {
+    return this.isHiveServerQuery;
+  }
+
   public void setIsSilent(boolean isSilent) {
     if(conf != null) {
       conf.setBoolVar(HiveConf.ConfVars.HIVESESSIONSILENT, isSilent);
@@ -212,6 +220,10 @@ public class SessionState {
 
   public void setIsVerbose(boolean isVerbose) {
     this.isVerbose = isVerbose;
+  }
+
+  public void setIsHiveServerQuery(boolean isHiveServerQuery) {
+    this.isHiveServerQuery = isHiveServerQuery;
   }
 
   public SessionState(HiveConf conf) {
@@ -327,7 +339,7 @@ public class SessionState {
     }
 
     if (HiveConf.getVar(startSs.getConf(), HiveConf.ConfVars.HIVE_EXECUTION_ENGINE)
-        .equals("tez")) {
+        .equals("tez") && (startSs.isHiveServerQuery == false)) {
       try {
         if (startSs.tezSessionState == null) {
           startSs.tezSessionState = new TezSessionState();
@@ -337,7 +349,7 @@ public class SessionState {
         throw new RuntimeException(e);
       }
     } else {
-       LOG.info("No Tez session required at this point. hive.execution.engine=mr.");
+      LOG.info("No Tez session required at this point. hive.execution.engine=mr.");
     }
     return startSs;
   }
@@ -356,12 +368,6 @@ public class SessionState {
     try {
       authenticator = HiveUtils.getAuthenticator(getConf(),
           HiveConf.ConfVars.HIVE_AUTHENTICATOR_MANAGER);
-
-      if (userName != null) {
-        // if username is set through the session, use an authenticator that
-        // just returns the sessionstate user
-        authenticator = new SessionStateUserAuthenticator(this);
-      }
       authenticator.setSessionState(this);
 
       authorizer = HiveUtils.getAuthorizeProviderManager(getConf(),
@@ -396,7 +402,7 @@ public class SessionState {
     if(LOG.isDebugEnabled()){
       Object authorizationClass = getAuthorizationMode() == AuthorizationMode.V1 ?
           getAuthorizer() : getAuthorizerV2();
-      LOG.debug("Session is using authorization class " + authorizationClass.getClass());
+          LOG.debug("Session is using authorization class " + authorizationClass.getClass());
     }
     return;
   }
@@ -996,7 +1002,7 @@ public class SessionState {
 
     try {
       if (tezSessionState != null) {
-        tezSessionState.close(false);
+        TezSessionPoolManager.getInstance().close(tezSessionState);
       }
     } catch (Exception e) {
       LOG.info("Error closing tez session", e);

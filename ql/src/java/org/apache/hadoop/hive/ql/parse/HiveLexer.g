@@ -177,6 +177,8 @@ KW_REGEXP: 'REGEXP';
 KW_TEMPORARY: 'TEMPORARY';
 KW_FUNCTION: 'FUNCTION';
 KW_MACRO: 'MACRO';
+KW_FILE: 'FILE';
+KW_JAR: 'JAR';
 KW_EXPLAIN: 'EXPLAIN';
 KW_EXTENDED: 'EXTENDED';
 KW_FORMATTED: 'FORMATTED';
@@ -285,6 +287,7 @@ KW_ROLES: 'ROLES';
 KW_INNER: 'INNER';
 KW_EXCHANGE: 'EXCHANGE';
 KW_ADMIN: 'ADMIN';
+KW_OWNER: 'OWNER';
 
 // Operators
 // NOTE: if you add a new function/operator, add it to sysFuncNames so that describe function _FUNC_ will work.

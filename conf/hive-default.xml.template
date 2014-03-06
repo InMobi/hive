@@ -794,6 +794,12 @@
 </property>
 
 <property>
+  <name>hive.merge.tezfiles</name>
+  <value>false</value>
+  <description>Merge small files at the end of a Tez DAG</description>
+</property>
+
+<property>
   <name>hive.heartbeat.interval</name>
   <value>1000</value>
   <description>Send a heartbeat after this interval - used by mapjoin and filter operators</description>
@@ -957,6 +963,12 @@
   <name>hive.input.format</name>
   <value>org.apache.hadoop.hive.ql.io.CombineHiveInputFormat</value>
   <description>The default input format. Set this to HiveInputFormat if you encounter problems with CombineHiveInputFormat.</description>
+</property>
+
+<property>
+  <name>hive.tez.input.format</name>
+  <value>org.apache.hadoop.hive.ql.io.HiveInputFormat</value>
+  <description>The default input format for tez. Tez groups splits in the AM.</description>
 </property>
 
 <property>
@@ -2119,6 +2131,12 @@
 </property>
 
 <property>
+  <name>hive.server2.long.polling.timeout</name>
+  <value>5000L</value>
+  <description>Time in milliseconds that HiveServer2 will wait, before responding to asynchronous calls that use long polling</description>
+</property>
+
+<property>
   <name>hive.server2.async.exec.wait.queue.size</name>
   <value>100</value>
   <description>Size of the wait queue for async thread pool in HiveServer2.
@@ -2212,6 +2230,22 @@
   <value>mr</value>
   <description>
     Chooses execution engine. Options are: mr (Map reduce, default) or tez (hadoop 2 only)
+  </description>
+</property>
+
+<property>
+  <name>hive.prewarm.enabled</name>
+  <value>false</value>
+  <description>
+    Enables container prewarm for tez (hadoop 2 only)
+  </description>
+</property>
+
+<property>
+  <name>hive.prewarm.numcontainers</name>
+  <value>10</value>
+  <description>
+    Controls the number of containers to prewarm for tez (hadoop 2 only)
   </description>
 </property>
 
@@ -2334,6 +2368,14 @@
 </property>
 
 <property>
+  <name>hive.exec.orc.zerocopy</name>.
+  <value>false</value>
+  <description>
+    Use zerocopy reads with ORC.
+  </description>
+</property>
+
+<property>
   <name>hive.jar.directory</name>
   <value>hdfs:///user/hive/</value>
   <description>
@@ -2349,6 +2391,48 @@
     If hive (in tez mode only) cannot find a usable hive jar in "hive.jar.directory", 
     it will upload the hive jar to &lthive.user.install.directory&gt/&ltuser name&gt 
     and use it to run queries.
+  </description>
+</property>
+
+<property>
+  <name>hive.tez.container.size</name>
+  <value>-1</value>
+  <description>By default tez will spawn containers of the size of a mapper. This can be used to overwrite.</description>
+</property>
+
+<property>
+  <name>hive.tez.java.opts</name>
+  <value></value>
+  <description>By default tez will use the java opts from map tasks. This can be used to overwrite.</description>
+</property>
+
+<property>
+  <name>hive.server2.tez.default.queues</name>
+  <value></value>
+  <description>
+    A list of comma separated values corresponding to yarn queues of the same name.
+    When hive server 2 is launched in tez mode, this configuration needs to be set
+    for multiple tez sessions to run in parallel on the cluster.
+  </description>
+</property>
+
+<property>
+  <name>hive.server2.tez.sessions.per.default.queue</name>
+  <value>1</value>
+  <description>
+    A positive integer that determines the number of tez sessions that should be
+    launched on each of the queues specified by "hive.server2.tez.default.queues".
+    Determines the parallelism on each queue.
+  </description>
+</property>
+
+<property>
+  <name>hive.server2.tez.initialize.default.sessions</name>
+  <value>false</value>
+  <description>
+    This flag is used in hive server 2 to enable a user to use hive server 2 without
+    turning on tez for hive server 2. The user could potentially want to run queries
+    over tez without the pool of sessions.
   </description>
 </property>
 

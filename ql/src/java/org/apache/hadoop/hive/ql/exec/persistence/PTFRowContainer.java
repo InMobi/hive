@@ -91,7 +91,7 @@ public class PTFRowContainer<Row extends List<Object>> extends RowContainer<Row>
   }
 
   @Override
-  public void add(Row t) throws HiveException {
+  public void addRow(Row t) throws HiveException {
     if ( willSpill() ) {
       setupWriter();
       PTFRecordWriter rw = (PTFRecordWriter) getRecordWriter();
@@ -100,12 +100,12 @@ public class PTFRowContainer<Row extends List<Object>> extends RowContainer<Row>
         blkInfo.startOffset = rw.outStream.getLength();
         blockInfos.add(blkInfo);
       } catch(IOException e) {
-        clear();
+        clearRows();
         LOG.error(e.toString(), e);
         throw new HiveException(e);
       }
     }
-    super.add(t);
+    super.addRow(t);
   }
 
   @Override
@@ -149,8 +149,8 @@ public class PTFRowContainer<Row extends List<Object>> extends RowContainer<Row>
   }
 
   @Override
-  public void clear() throws HiveException {
-    super.clear();
+  public void clearRows() throws HiveException {
+    super.clearRows();
     resetReadBlocks();
     blockInfos = new ArrayList<PTFRowContainer.BlockInfo>();
   }
@@ -207,7 +207,7 @@ public class PTFRowContainer<Row extends List<Object>> extends RowContainer<Row>
       }
 
     } catch(Exception e) {
-      clear();
+      clearRows();
       LOG.error(e.toString(), e);
       if ( e instanceof HiveException ) {
         throw (HiveException) e;

@@ -21,6 +21,10 @@ package org.apache.hive.service.cli;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.security.auth.login.LoginException;
 
@@ -39,6 +43,7 @@ import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.session.HiveSession;
+import org.apache.hive.service.cli.operation.Operation;
 import org.apache.hive.service.cli.session.SessionManager;
 import org.apache.hive.service.cli.thrift.TProtocolVersion;
 
@@ -128,7 +133,7 @@ public class CLIService extends CompositeService implements ICLIService {
 
   public SessionHandle openSessionWithImpersonation(TProtocolVersion protocol, String username,
       String password, Map<String, String> configuration, String delegationToken)
-      throws HiveSQLException {
+          throws HiveSQLException {
     SessionHandle sessionHandle = sessionManager.openSession(protocol, username, password, configuration,
         true, delegationToken);
     LOG.debug(sessionHandle + ": openSession()");
@@ -151,9 +156,9 @@ public class CLIService extends CompositeService implements ICLIService {
    */
   @Override
   public SessionHandle openSessionWithImpersonation(String username, String password, Map<String, String> configuration,
-       String delegationToken) throws HiveSQLException {
+      String delegationToken) throws HiveSQLException {
     SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, configuration,
-          true, delegationToken);
+        true, delegationToken);
     LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
   }
@@ -302,8 +307,33 @@ public class CLIService extends CompositeService implements ICLIService {
   @Override
   public OperationStatus getOperationStatus(OperationHandle opHandle)
       throws HiveSQLException {
-    OperationStatus opStatus = sessionManager.getOperationManager()
-        .getOperationStatus(opHandle);
+    Operation operation = sessionManager.getOperationManager().getOperation(opHandle);
+    /**
+     * If this is a background operation run asynchronously,
+     * we block for a configured duration, before we return
+     * (duration: HIVE_SERVER2_LONG_POLLING_TIMEOUT).
+     * However, if the background operation is complete, we return immediately.
+     */
+    if (operation.shouldRunAsync()) {
+      long timeout = operation.getParentSession().getHiveConf().getLongVar(
+          HiveConf.ConfVars.HIVE_SERVER2_LONG_POLLING_TIMEOUT);
+      try {
+        operation.getBackgroundHandle().get(timeout, TimeUnit.MILLISECONDS);
+      } catch (TimeoutException e) {
+        // No Op, return to the caller since long polling timeout has expired
+        LOG.trace(opHandle + ": Long polling timed out");
+      } catch (CancellationException e) {
+        // The background operation thread was cancelled
+        LOG.trace(opHandle + ": The background operation was cancelled", e);
+      } catch (ExecutionException e) {
+        // The background operation thread was aborted
+        LOG.trace(opHandle + ": The background operation was aborted", e);
+      } catch (InterruptedException e) {
+        // No op, this thread was interrupted
+        // In this case, the call might return sooner than long polling timeout
+      }
+    }
+    OperationStatus opStatus = operation.getStatus();
     LOG.debug(opHandle + ": getOperationStatus()");
     return opStatus;
   }
@@ -315,7 +345,7 @@ public class CLIService extends CompositeService implements ICLIService {
   public void cancelOperation(OperationHandle opHandle)
       throws HiveSQLException {
     sessionManager.getOperationManager().getOperation(opHandle)
-        .getParentSession().cancelOperation(opHandle);
+    .getParentSession().cancelOperation(opHandle);
     LOG.debug(opHandle + ": cancelOperation()");
   }
 
@@ -326,7 +356,7 @@ public class CLIService extends CompositeService implements ICLIService {
   public void closeOperation(OperationHandle opHandle)
       throws HiveSQLException {
     sessionManager.getOperationManager().getOperation(opHandle)
-        .getParentSession().closeOperation(opHandle);
+    .getParentSession().closeOperation(opHandle);
     LOG.debug(opHandle + ": closeOperation");
   }
 

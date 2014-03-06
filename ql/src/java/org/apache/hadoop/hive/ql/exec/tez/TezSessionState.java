@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.security.auth.login.LoginException;
 
@@ -35,6 +36,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.tez.client.AMConfiguration;
@@ -43,7 +45,7 @@ import org.apache.tez.client.TezSessionConfiguration;
 import org.apache.tez.dag.api.SessionNotRunning;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezException;
-import org.apache.tez.mapreduce.hadoop.MRHelpers;
+import org.apache.tez.client.PreWarmContext;
 
 /**
  * Holds session state related to Tez
@@ -59,6 +61,8 @@ public class TezSessionState {
   private TezSession session;
   private String sessionId;
   private DagUtils utils;
+  private String queueName;
+  private boolean defaultQueue = false;
 
   private static List<TezSessionState> openSessions
     = Collections.synchronizedList(new LinkedList<TezSessionState>());
@@ -94,6 +98,10 @@ public class TezSessionState {
     return openSessions;
   }
 
+  public static String makeSessionId() {
+    return UUID.randomUUID().toString();
+  }
+
   /**
    * Creates a tez session. A session is tied to either a cli/hs2 session. You can
    * submit multiple DAGs against a session (as long as they are executed serially).
@@ -103,7 +111,7 @@ public class TezSessionState {
    * @throws TezException
    */
   public void open(String sessionId, HiveConf conf)
-      throws IOException, LoginException, URISyntaxException, TezException {
+    throws IOException, LoginException, URISyntaxException, TezException {
 
     this.sessionId = sessionId;
     this.conf = conf;
@@ -125,7 +133,7 @@ public class TezSessionState {
     commonLocalResources.put(utils.getBaseName(appJarLr), appJarLr);
 
     AMConfiguration amConfig = new AMConfiguration(null, commonLocalResources,
-         tezConfig, null);
+        tezConfig, null);
 
     // configuration for the session
     TezSessionConfiguration sessionConfig = new TezSessionConfiguration(amConfig, tezConfig);
@@ -134,7 +142,23 @@ public class TezSessionState {
     session = new TezSession("HIVE-"+sessionId, sessionConfig);
 
     LOG.info("Opening new Tez Session (id: "+sessionId+", scratch dir: "+tezScratchDir+")");
+
     session.start();
+
+    if (HiveConf.getBoolVar(conf, ConfVars.HIVE_PREWARM_ENABLED)) {
+      int n = HiveConf.getIntVar(conf, ConfVars.HIVE_PREWARM_NUM_CONTAINERS);
+      LOG.info("Prewarming " + n + " containers  (id: " + sessionId
+          + ", scratch dir: " + tezScratchDir + ")");
+      PreWarmContext context = utils.createPreWarmContext(sessionConfig, n,
+          commonLocalResources);
+      try {
+        session.preWarm(context);
+      } catch (InterruptedException ie) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Hive Prewarm threw an exception ", ie);
+        }
+      }
+    }
 
     // In case we need to run some MR jobs, we'll run them under tez MR emulation. The session
     // id is used for tez to reuse the current session rather than start a new one.
@@ -195,7 +219,7 @@ public class TezSessionState {
    * be used with Tez. Assumes scratchDir exists.
    */
   private Path createTezDir(String sessionId)
-      throws IOException {
+    throws IOException {
 
     // tez needs its own scratch dir (per session)
     Path tezDir = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.SCRATCHDIR),
@@ -219,7 +243,7 @@ public class TezSessionState {
    * @throws URISyntaxException when current jar location cannot be determined.
    */
   private LocalResource createHiveExecLocalResource()
-      throws IOException, LoginException, URISyntaxException {
+    throws IOException, LoginException, URISyntaxException {
     String hiveJarDir = conf.getVar(HiveConf.ConfVars.HIVE_JAR_DIRECTORY);
     String currentVersionPathStr = utils.getExecJarPathLocal();
     String currentJarName = utils.getResourceBaseName(currentVersionPathStr);
@@ -228,6 +252,7 @@ public class TezSessionState {
     FileStatus dirStatus = null;
 
     if (hiveJarDir != null) {
+      LOG.info("Hive jar directory is " + hiveJarDir);
       // check if it is a valid directory in HDFS
       Path hiveJarDirPath = new Path(hiveJarDir);
       fs = hiveJarDirPath.getFileSystem(conf);
@@ -269,6 +294,7 @@ public class TezSessionState {
     if ((hiveJarDir == null) || (dirStatus == null) ||
         ((dirStatus != null) && (!dirStatus.isDir()))) {
       Path dest = utils.getDefaultDestDir(conf);
+      LOG.info("Jar dir is null/directory doesn't exist. Choosing HIVE_INSTALL_DIR - " + dest);
       String destPathStr = dest.toString();
       String jarPathStr = destPathStr + "/" + currentJarName;
       dirStatus = fs.getFileStatus(dest);
@@ -277,9 +303,29 @@ public class TezSessionState {
       } else {
         throw new IOException(ErrorMsg.INVALID_DIR.format(dest.toString()));
       }
-    }
+        }
 
     // we couldn't find any valid locations. Throw exception
     throw new IOException(ErrorMsg.NO_VALID_LOCATIONS.getMsg());
+  }
+
+  public void setQueueName(String queueName) {
+    this.queueName = queueName;
+  }
+
+  public String getQueueName() {
+    return queueName;
+  }
+
+  public void setDefault() {
+    defaultQueue  = true;
+  }
+
+  public boolean isDefault() {
+    return defaultQueue;
+  }
+
+  public HiveConf getConf() {
+    return conf;
   }
 }
