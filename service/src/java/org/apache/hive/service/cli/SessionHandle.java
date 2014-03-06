@@ -46,6 +46,11 @@ public class SessionHandle extends Handle {
     this.protocol = protocol;
   }
 
+  public SessionHandle(HandleIdentifier handleId, TProtocolVersion protocol) {
+    super(handleId);
+    this.protocol = protocol;
+  }
+
   public UUID getSessionId() {
     return getHandleIdentifier().getPublicId();
   }
