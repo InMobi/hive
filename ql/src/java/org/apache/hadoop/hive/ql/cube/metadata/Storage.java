@@ -142,7 +142,7 @@ public abstract class Storage extends AbstractCubeTable implements PartitionMeta
     HiveStorageHandler storageHandler = tbl.getStorageHandler();
 
     if (crtTbl.getSerName() == null) {
-      if (storageHandler == null) {
+      if (storageHandler == null || storageHandler.getSerDeClass() == null) {
         tbl.setSerializationLib(org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
       } else {
         String serDeClassName = storageHandler.getSerDeClass().getName();
