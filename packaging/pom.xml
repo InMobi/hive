@@ -58,6 +58,33 @@
               </execution>
             </executions>
           </plugin>
+          <plugin>
+            <artifactId>jdeb</artifactId>
+            <groupId>org.vafer</groupId>
+            <version>0.9</version>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>jdeb</goal>
+                </goals>
+                <configuration>
+                  <installDir>/usr/local/inmobi-hive</installDir>
+                  <deb>${project.build.directory}/inmobi-hive_${version}.deb</deb>
+                  <dataSet>
+                    <data>
+                      <src>target/apache-hive-${project.version}-bin/apache-hive-${project.version}-bin</src>
+                      <type>directory</type>
+                      <mapper>
+                        <type>perm</type>
+                        <prefix>/usr/local/inmobi-hive</prefix>
+                      </mapper>
+                    </data>
+                  </dataSet>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>          
         </plugins>
       </build>
     </profile>
