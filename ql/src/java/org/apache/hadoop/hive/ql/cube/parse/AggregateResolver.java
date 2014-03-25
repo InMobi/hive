@@ -54,7 +54,10 @@ public class AggregateResolver implements ContextRewriter {
       // If yes, only the raw (non aggregated) fact can answer this query.
       // In that case remove aggregate facts from the candidate fact list
       if (hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null)
-        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null)) {
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getWhereAST(), null)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getGroupByAST(), null)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getOrderByAST(), null) ) {
         Iterator<CubeQueryContext.CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
         while (factItr.hasNext()) {
           CubeQueryContext.CandidateFact candidate = factItr.next();

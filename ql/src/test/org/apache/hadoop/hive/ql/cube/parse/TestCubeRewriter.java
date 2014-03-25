@@ -958,8 +958,26 @@ public class TestCubeRewriter {
 
     // Check a query with non default aggregate function
     String nonDefaultAggrQuery = "SELECT cityid, avg(testCube.msr2) FROM testCube WHERE " + twoDaysRange;
-    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     cubeql = driver.rewrite(nonDefaultAggrQuery);
+    Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
+    candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
+
+    // query with measure in a where clause
+    query = "SELECT cityid, sum(testCube.msr2) FROM testCube WHERE testCube.msr1 < 100 and " + twoDaysRange;
+    cubeql = driver.rewrite(query);
+    Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
+    candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
+
+    query = "SELECT cityid, sum(testCube.msr2) FROM testCube WHERE " + twoDaysRange + " group by testCube.msr1";
+    cubeql = driver.rewrite(query);
+    Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
+    candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
+
+    query = "SELECT cityid, sum(testCube.msr2) FROM testCube WHERE " + twoDaysRange + " order by testCube.msr1";
+    cubeql = driver.rewrite(query);
     Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
     candidateFact = cubeql.getCandidateFactTables().iterator().next();
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
