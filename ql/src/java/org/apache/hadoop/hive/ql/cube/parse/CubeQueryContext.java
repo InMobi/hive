@@ -363,7 +363,8 @@ public class CubeQueryContext {
             table = qb.getTabNameForAlias(table);
           }
           if (client.isDimensionTable(table)) {
-            autoJoinDims.add(client.getDimensionTable(table));
+            CubeDimensionTable dimTable = client.getDimensionTable(table);
+            autoJoinDims.add(dimTable);
           }
         }
       } catch (HiveException e) {
@@ -843,7 +844,7 @@ public class CubeQueryContext {
     return qstrs.toArray(new String[0]);
   }
 
-  private String getStorageString(AbstractCubeTable tbl) {
+  public String getStorageString(AbstractCubeTable tbl) {
     return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
         getAliasForTabName(tbl.getName());
   }
@@ -1042,7 +1043,9 @@ public class CubeQueryContext {
   }
 
   private void findDimStorageTables() {
-    Iterator<CubeDimensionTable> it = dimensions.iterator();
+    Set<CubeDimensionTable> dimTables = new HashSet<CubeDimensionTable>(dimensions);
+    dimTables.addAll(autoJoinDims);
+    Iterator<CubeDimensionTable> it = dimTables.iterator();
     while (it.hasNext()) {
       CubeDimensionTable dim = it.next();
       String storageTable = dimStorageMap.get(dim).get(0);
