@@ -503,6 +503,14 @@
 </property>
 
 <property>
+  <name>hive.optimize.sort.dynamic.partition</name>
+  <value>true</value>
+  <description>When enabled dynamic partitioning column will be globally sorted.
+  This way we can keep only one record writer open for each partition value
+  in the reducer thereby reducing the memory pressure on reducers.</description>
+</property>
+
+<property>
   <name>hive.optimize.skewjoin.compiletime</name>
   <value>false</value>
   <description>Whether to create a separate plan for skewed keys for the tables in the join.
@@ -1876,6 +1884,17 @@
 </property>
 
 <property>
+  <name>hive.display.partition.cols.separately</name>
+  <value>true</value>
+  <description>
+    In older Hive version (0.10 and earlier) no distinction was made between
+    partition columns or non-partition columns while displaying columns in describe
+    table. From 0.12 onwards, they are displayed separately. This flag will let you
+    get old behavior, if desired. See, test-case in patch for HIVE-6689.
+  </description>
+</property>
+
+<property>
   <name>hive.transform.escape.input</name>
   <value>false</value>
   <description>
@@ -2368,6 +2387,15 @@
 </property>
 
 <property>
+  <name>hive.stats.gather.num.threads</name>
+  <value>10</value>
+  <description>
+    Number of threads used by partialscan/noscan analyze command for partitioned tables.
+    This is applicable only for file formats that implement StatsProvidingRecordReader (like ORC).
+  </description>
+</property>
+
+<property>
   <name>hive.exec.orc.zerocopy</name>.
   <value>false</value>
   <description>
@@ -2377,10 +2405,11 @@
 
 <property>
   <name>hive.jar.directory</name>
-  <value>hdfs:///user/hive/</value>
+  <value></value>
   <description>
     This is the location hive in tez mode will look for to find a site wide 
-    installed hive instance.
+    installed hive instance. If not set, the directory under hive.user.install.directory 
+    corresponding to current user name will be used.
   </description>
 </property>
 
@@ -2433,6 +2462,32 @@
     This flag is used in hive server 2 to enable a user to use hive server 2 without
     turning on tez for hive server 2. The user could potentially want to run queries
     over tez without the pool of sessions.
+  </description>
+</property>
+
+<property>
+  <name>hive.server2.allow.user.substitution</name>
+  <value>true</value>
+  <description>
+    Allow alternate user to be specified as part of HiveServer2 open connection request
+  </description>
+</property>
+
+<property>
+  <name>hive.resultset.use.unique.column.names</name>
+  <value>true</value>
+  <description>
+    Make column names unique in the result set by qualifying column names with table alias if needed.
+    Table alias will be added to column names for queries of type "select *" or
+    if query explicitly uses table alias "select r1.x..".
+  </description>
+</property>
+
+<property>
+  <name>hive.compat</name>
+  <value>0.12</value>
+  <description>
+    Enable (configurable) deprecated behaviors by setting desired level of backward compatbility
   </description>
 </property>
 

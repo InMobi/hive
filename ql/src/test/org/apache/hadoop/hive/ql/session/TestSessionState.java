@@ -95,21 +95,20 @@ public class TestSessionState {
     assertNull(ss.getTezSession());
   }
 
-  class RegisterJarRunnable implements Runnable{
+  class RegisterJarRunnable implements Runnable {
     String jar;
     ClassLoader loader;
     SessionState ss;
+
     public RegisterJarRunnable(String jar, SessionState ss) {
       this.jar = jar;
       this.ss = ss;
-      System.out.println("Starting jar");
     }
 
     public void run() {
       SessionState.start(ss);
       SessionState.registerJar(jar);
       loader = Thread.currentThread().getContextClassLoader();
-      System.out.println("Test added jar:" + jar);
     }
   }
 
@@ -163,5 +162,11 @@ public class TestSessionState {
         }
       }
     }
+    System.out.println("Loader3:(CurrentThread.getContextClassLoader()) " +
+        Thread.currentThread().getContextClassLoader());
+    assertEquals("Other thread loader and session state loader",
+        otherThread.loader, loader2);
+    assertEquals("Other thread loader and current thread loader",
+        otherThread.loader, Thread.currentThread().getContextClassLoader());
   }
 }

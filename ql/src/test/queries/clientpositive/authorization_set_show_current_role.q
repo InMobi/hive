@@ -13,7 +13,7 @@ show current roles;
 set role PUBLIC;
 show current roles;
 
-set role NONE;
+set role ALL;
 show current roles;
 
 set role ADMIN;

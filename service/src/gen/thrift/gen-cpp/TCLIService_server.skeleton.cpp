@@ -102,9 +102,25 @@ class TCLIServiceHandler : virtual public TCLIServiceIf {
     printf("FetchResults\n");
   }
 
+<<<<<<< HEAD
   void GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req) {
     // Your implementation goes here
     printf("GetQueryPlan\n");
+=======
+  void GetDelegationToken(TGetDelegationTokenResp& _return, const TGetDelegationTokenReq& req) {
+    // Your implementation goes here
+    printf("GetDelegationToken\n");
+  }
+
+  void CancelDelegationToken(TCancelDelegationTokenResp& _return, const TCancelDelegationTokenReq& req) {
+    // Your implementation goes here
+    printf("CancelDelegationToken\n");
+  }
+
+  void RenewDelegationToken(TRenewDelegationTokenResp& _return, const TRenewDelegationTokenReq& req) {
+    // Your implementation goes here
+    printf("RenewDelegationToken\n");
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
 };

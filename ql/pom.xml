@@ -354,6 +354,7 @@
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-hdfs</artifactId>
           <version>${hadoop-23.version}</version>
+          <optional>true</optional>
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
@@ -372,6 +373,14 @@
          <artifactId>hadoop-yarn-client</artifactId>
          <version>${hadoop-23.version}</version>
          <optional>true</optional>
+       </dependency>
+       <!-- Test dependencies -->
+       <dependency>
+         <groupId>org.apache.hadoop</groupId>
+         <artifactId>hadoop-mapreduce-client-common</artifactId>
+         <version>${hadoop-23.version}</version>
+         <optional>true</optional>
+         <scope>test</scope>
        </dependency>
       </dependencies>
     </profile>
@@ -486,7 +495,7 @@
                   <include>org.apache.hive:hive-exec</include>
                   <include>org.apache.hive:hive-serde</include>
                   <include>com.esotericsoftware.kryo:kryo</include>
-                  <include>com.twiter:parquet-hadoop-bundle</include>
+                  <include>com.twitter:parquet-hadoop-bundle</include>
                   <include>org.apache.thrift:libthrift</include>
                   <include>commons-lang:commons-lang</include>
                   <include>org.json:json</include>

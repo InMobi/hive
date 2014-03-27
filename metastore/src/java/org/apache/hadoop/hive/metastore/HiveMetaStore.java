@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hive.metastore;
 
-import com.facebook.fb303.FacebookBase;
-import com.facebook.fb303.fb_status;
 import static org.apache.commons.lang.StringUtils.join;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_COMMENT;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_NAME;
@@ -44,7 +42,6 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Timer;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import org.apache.commons.cli.OptionBuilder;
@@ -53,7 +50,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
-import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.LogUtils;
 import org.apache.hadoop.hive.common.LogUtils.LogInitializationException;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
@@ -82,6 +78,8 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
+import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleRequest;
+import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleResponse;
 import org.apache.hadoop.hive.metastore.api.HeartbeatRequest;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
@@ -112,6 +110,7 @@ import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
 import org.apache.hadoop.hive.metastore.api.Role;
+import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.ShowCompactRequest;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
@@ -120,6 +119,7 @@ import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.TableStatsResult;
+import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.api.TxnOpenException;
 import org.apache.hadoop.hive.metastore.api.Type;
@@ -128,8 +128,6 @@ import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.metastore.api.UnlockRequest;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.hadoop.hive.metastore.txn.TxnHandler;
-import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.events.AddPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.AlterPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.AlterTableEvent;
@@ -158,9 +156,9 @@ import org.apache.hadoop.hive.metastore.model.MRole;
 import org.apache.hadoop.hive.metastore.model.MRoleMap;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
+import org.apache.hadoop.hive.metastore.txn.TxnHandler;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
 import org.apache.hadoop.hive.thrift.TUGIContainingTransport;
@@ -172,8 +170,14 @@ import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
-import org.apache.thrift.transport.*;
+import org.apache.thrift.transport.TFramedTransport;
+import org.apache.thrift.transport.TServerSocket;
+import org.apache.thrift.transport.TServerTransport;
+import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.transport.TTransportFactory;
 
+import com.facebook.fb303.FacebookBase;
+import com.facebook.fb303.fb_status;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
@@ -222,6 +226,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
     public static final Log LOG = HiveMetaStore.LOG;
     private static boolean createDefaultDB = false;
     private static boolean defaultRolesCreated = false;
+    private static boolean adminUsersAdded = false;
     private String rawStoreClassName;
     private final HiveConf hiveConf; // stores datastore (jpox) properties,
                                      // right now they come from jpox.properties
@@ -383,7 +388,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
 
       synchronized (HMSHandler.class) {
         createDefaultDB();
-        createDefaultRolesNAddUsers();
+        createDefaultRoles();
+        addAdminUsers();
       }
 
       if (hiveConf.getBoolean("hive.metastore.metrics.enabled", false)) {
@@ -518,12 +524,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       }
     }
 
-    private void createDefaultRolesNAddUsers() throws MetaException {
+    private boolean areWeAllowedToCreate() {
 
-      if(defaultRolesCreated) {
-        LOG.debug("Admin role already created previously.");
-        return;
-      }
       Class<?> authCls;
       Class<?> authIface;
       try {
@@ -531,13 +533,27 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         authIface = Class.forName("org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizerFactory");
       } catch (ClassNotFoundException e) {
         LOG.debug("No auth manager specified", e);
-        return;
+        return false;
       }
       if(!authIface.isAssignableFrom(authCls)){
-        LOG.warn("Configured auth manager "+authCls.getName()+" doesn't implement "+ ConfVars.
-          HIVE_AUTHENTICATOR_MANAGER+ " admin role will not be created.");
+        LOG.warn("Configured auth manager "+authCls.getName()+" doesn't implement "+ ConfVars.HIVE_AUTHENTICATOR_MANAGER);
+        return false;
+      }
+
+      return true;
+    }
+
+    private void createDefaultRoles() throws MetaException {
+
+      if(defaultRolesCreated) {
+        LOG.debug("Admin role already created previously.");
         return;
       }
+
+      if(!areWeAllowedToCreate()) {
+        return;
+      }
+
       RawStore ms = getMS();
       try {
         ms.addRole(ADMIN, ADMIN);
@@ -572,6 +588,18 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         LOG.warn("Failed while granting global privs to admin", e);
       }
 
+      defaultRolesCreated = true;
+    }
+
+    private void addAdminUsers() throws MetaException {
+
+      if(adminUsersAdded) {
+        LOG.debug("Admin users already added.");
+        return;
+      }
+      if(!areWeAllowedToCreate()) {
+        return;
+      }
       // now add pre-configured users to admin role
       String userStr = HiveConf.getVar(hiveConf,ConfVars.USERS_IN_ADMIN_ROLE,"").trim();
       if (userStr.isEmpty()) {
@@ -581,15 +609,14 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       // Since user names need to be valid unix user names, per IEEE Std 1003.1-2001 they cannot
       // contain comma, so we can safely split above string on comma.
 
-     Iterator<String> users = Splitter.on(",").trimResults().omitEmptyStrings().split(userStr).
-       iterator();
+     Iterator<String> users = Splitter.on(",").trimResults().omitEmptyStrings().split(userStr).iterator();
       if (!users.hasNext()) {
         LOG.info("No user is added in admin role, since config value "+ userStr +
-          " is in incorrect format.");
+          " is in incorrect format. We accept comma seprated list of users.");
         return;
       }
-      LOG.info("Added " + userStr + " to admin role");
       Role adminRole;
+      RawStore ms = getMS();
       try {
         adminRole = ms.getRole(ADMIN);
       } catch (NoSuchObjectException e) {
@@ -600,13 +627,14 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         String userName = users.next();
         try {
           ms.grantRole(adminRole, userName, PrincipalType.USER, ADMIN, PrincipalType.ROLE, true);
+          LOG.info("Added " + userName + " to admin role");
         } catch (NoSuchObjectException e) {
           LOG.error("Failed to add "+ userName + " in admin role",e);
         } catch (InvalidObjectException e) {
           LOG.debug(userName + " already in admin role", e);
         }
       }
-      defaultRolesCreated = true;
+      adminUsersAdded = true;
     }
 
     private void logInfo(String m) {
@@ -2873,9 +2901,9 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         } catch (NoSuchObjectException e) {
           throw new UnknownTableException(e.getMessage());
         }
-        boolean getColsFromSerDe = SerDeUtils.shouldGetColsFromSerDe(
-            tbl.getSd().getSerdeInfo().getSerializationLib());
-        if (!getColsFromSerDe) {
+        if (null == tbl.getSd().getSerdeInfo().getSerializationLib() ||
+          hiveConf.getStringCollection(ConfVars.SERDESUSINGMETASTOREFORSCHEMA.varname).contains
+          (tbl.getSd().getSerdeInfo().getSerializationLib())) {
           ret = tbl.getSd().getCols();
         } else {
           try {
@@ -4025,6 +4053,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       }
     }
 
+
+
     @Override
     public boolean create_role(final Role role)
         throws MetaException, TException {
@@ -4846,7 +4876,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       }
     }
 
-    @Override 
+    @Override
     public void heartbeat(HeartbeatRequest ids)
         throws NoSuchLockException, NoSuchTxnException, TxnAbortedException, TException {
       try {
@@ -4873,7 +4903,51 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         throw new TException(e);
       }
     }
+
+    @Override
+    public GetPrincipalsInRoleResponse get_principals_in_role(GetPrincipalsInRoleRequest request)
+        throws MetaException, TException {
+
+      incrementCounter("get_principals_in_role");
+      String role_name = request.getRoleName();
+      List<RolePrincipalGrant> rolePrinGrantList = new ArrayList<RolePrincipalGrant>();
+      Exception ex = null;
+      try {
+        List<MRoleMap> roleMaps = getMS().listRoleMembers(role_name);
+        if (roleMaps != null) {
+          //convert each MRoleMap object into a thrift RolePrincipalGrant object
+          for (MRoleMap roleMap : roleMaps) {
+            String mapRoleName = roleMap.getRole().getRoleName();
+            if (!role_name.equals(mapRoleName)) {
+              // should not happen
+              throw new AssertionError("Role name " + mapRoleName + " does not match role name arg "
+                  + role_name);
+            }
+            RolePrincipalGrant rolePrinGrant = new RolePrincipalGrant(
+                role_name,
+                roleMap.getPrincipalName(),
+                PrincipalType.valueOf(roleMap.getPrincipalType()),
+                roleMap.getGrantOption(),
+                roleMap.getAddTime(),
+                roleMap.getGrantor(),
+                PrincipalType.valueOf(roleMap.getGrantorType())
+                );
+            rolePrinGrantList.add(rolePrinGrant);
+          }
+        }
+
+      } catch (MetaException e) {
+        throw e;
+      } catch (Exception e) {
+        ex = e;
+        rethrowException(e);
+      } finally {
+        endFunction("get_principals_in_role", ex == null, ex);
+      }
+      return new GetPrincipalsInRoleResponse(rolePrinGrantList);
+    }
   }
+
 
   public static IHMSHandler newHMSHandler(String name, HiveConf hiveConf) throws MetaException {
     return RetryingHMSHandler.getProxy(hiveConf, name);

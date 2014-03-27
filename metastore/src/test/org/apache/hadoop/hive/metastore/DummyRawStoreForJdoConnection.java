@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.metastore;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import junit.framework.Assert;
 
@@ -494,6 +493,11 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
+  public List<MRoleMap> listRoleMembers(String roleName) {
+    return null;
+  }
+
+  @Override
   public Partition getPartitionWithAuth(String dbName, String tblName, List<String> partVals,
       String user_name, List<String> group_names) throws MetaException, NoSuchObjectException,
       InvalidObjectException {
@@ -643,6 +647,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
 
+  @Override
   public boolean deletePartitionColumnStatistics(String dbName, String tableName,
     String partName, List<String> partVals, String colName)
     throws NoSuchObjectException, MetaException, InvalidObjectException,
@@ -657,6 +662,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
     return false;
   }
 
+  @Override
   public boolean updatePartitionColumnStatistics(ColumnStatistics statsObj,List<String> partVals)
     throws NoSuchObjectException, MetaException, InvalidObjectException {
     return false;
@@ -698,6 +704,7 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   public void dropPartitions(String dbName, String tblName, List<String> partNames) {
   }
 
+  @Override
   public void createFunction(Function func) throws InvalidObjectException,
       MetaException {
   }
@@ -724,6 +731,8 @@ public class DummyRawStoreForJdoConnection implements RawStore {
       throws MetaException {
     return null;
   }
+
+
 }
 
 

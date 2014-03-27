@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.metastore.api.CompactionType;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
@@ -39,10 +40,15 @@ import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.CompactionType;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Function;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
+import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleRequest;
+import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleResponse;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
 import org.apache.hadoop.hive.metastore.api.Index;
@@ -50,15 +56,24 @@ import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
+import org.apache.hadoop.hive.metastore.api.LockRequest;
+import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
+import org.apache.hadoop.hive.metastore.api.OpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
+import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
+import org.apache.hadoop.hive.metastore.api.TxnOpenException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
@@ -1050,60 +1065,6 @@ public interface IMetaStoreClient {
   public List<String> getFunctions(String dbName, String pattern)
       throws MetaException, TException;
 
-  // Transaction and locking methods
-  public interface ValidTxnList {
-
-    /**
-     * Key used to store valid txn list in a {@link org.apache.hadoop.conf.Configuration} object.
-     */
-    public static final String VALID_TXNS_KEY = "hive.txn.valid.txns";
-
-    /**
-     * The response to a range query.  NONE means no values in this range match,
-     * SOME mean that some do, and ALL means that every value does.
-     */
-    public enum RangeResponse {NONE, SOME, ALL};
-
-    /**
-     * Indicates whether a given transaction has been committed and should be
-     * viewed as valid for read.
-     * @param txnid id for the transaction
-     * @return true if committed, false otherwise
-     */
-    public boolean isTxnCommitted(long txnid);
-
-    /**
-     * Find out if a range of transaction ids have been committed.
-     * @param minTxnId minimum txnid to look for, inclusive
-     * @param maxTxnId maximum txnid to look for, inclusive
-     * @return Indicate whether none, some, or all of these transactions have been committed.
-     */
-    public RangeResponse isTxnRangeCommitted(long minTxnId, long maxTxnId);
-
-    /**
-     * Get at the underlying OpenTxn structure.  This is useful if the user
-     * wishes to get a list of all open transactions for more efficient
-     * filtering.
-     * @return open transactions
-     */
-    public GetOpenTxnsResponse getOpenTxns();
-
-    /**
-     * Write this validTxnList into a string.  Obviously all implementations will already
-     * implement this, but it is being called out specifically here to make clear that the
-     * implementation needs to override the default implementation.  This should produce a string
-     * that can be used by {@link #fromString(String)} to populate a validTxnsList.
-     */
-    public String toString();
-
-    /**
-     * Populate this validTxnList from the string.  It is assumed that the string was created via
-     * {@link #toString()}.
-     * @param src source string.
-     */
-    public void fromString(String src);
-  }
-
   /**
    * Get a structure that details valid transactions.
    * @return list of valid transactions
@@ -1312,4 +1273,16 @@ public interface IMetaStoreClient {
       super(message);
     }
   }
+
+  /**
+   * get all role-grants for users/roles that have been granted the given role
+   * Note that in the returned list of RolePrincipalGrants, the roleName is
+   * redundant as it would match the role_name argument of this function
+   * @param getPrincRoleReq
+   * @return
+   * @throws MetaException
+   * @throws TException
+   */
+  GetPrincipalsInRoleResponse get_principals_in_role(GetPrincipalsInRoleRequest getPrincRoleReq) throws MetaException,
+      TException;
 }

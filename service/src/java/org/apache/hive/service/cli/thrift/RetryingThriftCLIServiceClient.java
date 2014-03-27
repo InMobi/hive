@@ -33,6 +33,7 @@ import javax.security.sasl.SaslException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.auth.PlainSaslHelper;
 import org.apache.hive.service.cli.CLIServiceClient;
 import org.apache.hive.service.cli.FetchOrientation;
@@ -194,6 +195,24 @@ public class RetryingThriftCLIServiceClient implements InvocationHandler {
       } catch (Exception exc) {
         LOG.warn("Error closing transport", exc);
       }
+    }
+
+    @Override
+    public String getDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
+        String owner, String renewer) throws HiveSQLException {
+      return cliService.getDelegationToken(sessionHandle, authFactory, owner, renewer);
+    }
+
+    @Override
+    public void cancelDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
+        String tokenStr) throws HiveSQLException {
+      cliService.cancelDelegationToken(sessionHandle, authFactory, tokenStr);
+    }
+
+    @Override
+    public void renewDelegationToken(SessionHandle sessionHandle, HiveAuthFactory authFactory,
+        String tokenStr) throws HiveSQLException {
+      cliService.renewDelegationToken(sessionHandle, authFactory, tokenStr);
     }
   }
 

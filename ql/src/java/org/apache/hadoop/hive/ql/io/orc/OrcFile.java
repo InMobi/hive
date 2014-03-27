@@ -24,7 +24,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.io.orc.Reader.FileMetaInfo;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 /**
@@ -96,13 +95,40 @@ public final class OrcFile {
     }
   }
 
-  // the table properties that control ORC files
-  public static final String COMPRESSION = "orc.compress";
-  public static final String COMPRESSION_BLOCK_SIZE = "orc.compress.size";
-  public static final String STRIPE_SIZE = "orc.stripe.size";
-  public static final String ROW_INDEX_STRIDE = "orc.row.index.stride";
-  public static final String ENABLE_INDEXES = "orc.create.index";
-  public static final String BLOCK_PADDING = "orc.block.padding";
+
+  // Note : these string definitions for table properties are deprecated,
+  // and retained only for backward compatibility, please do not add to
+  // them, add to OrcTableProperties below instead
+  @Deprecated public static final String COMPRESSION = "orc.compress";
+  @Deprecated public static final String COMPRESSION_BLOCK_SIZE = "orc.compress.size";
+  @Deprecated public static final String STRIPE_SIZE = "orc.stripe.size";
+  @Deprecated public static final String ROW_INDEX_STRIDE = "orc.row.index.stride";
+  @Deprecated public static final String ENABLE_INDEXES = "orc.create.index";
+  @Deprecated public static final String BLOCK_PADDING = "orc.block.padding";
+
+  /**
+   * Enum container for all orc table properties.
+   * If introducing a new orc-specific table property,
+   * add it here.
+   */
+  public static enum OrcTableProperties {
+    COMPRESSION("orc.compress"),
+    COMPRESSION_BLOCK_SIZE("orc.compress.size"),
+    STRIPE_SIZE("orc.stripe.size"),
+    ROW_INDEX_STRIDE("orc.row.index.stride"),
+    ENABLE_INDEXES("orc.create.index"),
+    BLOCK_PADDING("orc.block.padding");
+
+    private final String propName;
+
+    OrcTableProperties(String propName) {
+      this.propName = propName;
+    }
+
+    public String getPropName(){
+      return this.propName;
+    }
+  }
 
   // unused
   private OrcFile() {}
@@ -114,15 +140,70 @@ public final class OrcFile {
    * @return a new ORC file reader.
    * @throws IOException
    */
-  public static Reader createReader(FileSystem fs, Path path,
-                                    Configuration conf) throws IOException {
-    return new ReaderImpl(fs, path, conf);
+  public static Reader createReader(FileSystem fs, Path path
+  ) throws IOException {
+    ReaderOptions opts = new ReaderOptions(new Configuration());
+    opts.filesystem(fs);
+    return new ReaderImpl(path, opts);
   }
 
-  public static Reader createReader(FileSystem fs, Path path,
-      FileMetaInfo fileMetaInfo, Configuration conf)
-      throws IOException {
-    return new ReaderImpl(fs, path, fileMetaInfo, conf);
+  public static class ReaderOptions {
+    private final Configuration conf;
+    private FileSystem filesystem;
+    private ReaderImpl.FileMetaInfo fileMetaInfo;
+    private long maxLength = Long.MAX_VALUE;
+
+    ReaderOptions(Configuration conf) {
+      this.conf = conf;
+    }
+    ReaderOptions fileMetaInfo(ReaderImpl.FileMetaInfo info) {
+      fileMetaInfo = info;
+      return this;
+    }
+
+    public ReaderOptions filesystem(FileSystem fs) {
+      this.filesystem = fs;
+      return this;
+    }
+
+    public ReaderOptions maxLength(long val) {
+      maxLength = val;
+      return this;
+    }
+
+    Configuration getConfiguration() {
+      return conf;
+    }
+
+    FileSystem getFilesystem() {
+      return filesystem;
+    }
+
+    ReaderImpl.FileMetaInfo getFileMetaInfo() {
+      return fileMetaInfo;
+    }
+
+    long getMaxLength() {
+      return maxLength;
+    }
+  }
+
+  public static ReaderOptions readerOptions(Configuration conf) {
+    return new ReaderOptions(conf);
+  }
+
+  public static Reader createReader(Path path,
+                                    ReaderOptions options) throws IOException {
+    return new ReaderImpl(path, options);
+  }
+
+  public static interface WriterContext {
+    Writer getWriter();
+  }
+
+  public static interface WriterCallback {
+    public void preStripeWrite(WriterContext context) throws IOException;
+    public void preFooterWrite(WriterContext context) throws IOException;
   }
 
   /**
@@ -139,6 +220,7 @@ public final class OrcFile {
     private CompressionKind compressValue;
     private MemoryManager memoryManagerValue;
     private Version versionValue;
+    private WriterCallback callback;
 
     WriterOptions(Configuration conf) {
       configuration = conf;
@@ -244,12 +326,23 @@ public final class OrcFile {
     }
 
     /**
+     * Add a listener for when the stripe and file are about to be closed.
+     * @param callback the object to be called when the stripe is closed
+     * @return
+     */
+    public WriterOptions callback(WriterCallback callback) {
+      this.callback = callback;
+      return this;
+    }
+
+    /**
      * A package local option to set the memory manager.
      */
     WriterOptions memory(MemoryManager value) {
       memoryManagerValue = value;
       return this;
     }
+
   }
 
   /**
@@ -263,7 +356,7 @@ public final class OrcFile {
    * Create an ORC file writer. This is the public interface for creating
    * writers going forward and new options will only be added to this method.
    * @param path filename to write to
-   * @param options the options
+   * @param opts the options
    * @return a new ORC file writer
    * @throws IOException
    */
@@ -277,7 +370,7 @@ public final class OrcFile {
                           opts.stripeSizeValue, opts.compressValue,
                           opts.bufferSizeValue, opts.rowIndexStrideValue,
                           opts.memoryManagerValue, opts.blockPaddingValue,
-                          opts.versionValue);
+                          opts.versionValue, opts.callback);
   }
 
   /**

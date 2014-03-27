@@ -502,6 +502,7 @@ public class BeeLine {
     List<String> commands = new LinkedList<String>();
     List<String> files = new LinkedList<String>();
     String driver = null, user = null, pass = null, url = null, cmd = null;
+    String auth = null;
 
     for (int i = 0; i < args.length; i++) {
       if (args[i].equals("--help") || args[i].equals("-h")) {
@@ -554,6 +555,9 @@ public class BeeLine {
         driver = args[i++ + 1];
       } else if (args[i].equals("-n")) {
         user = args[i++ + 1];
+      } else if (args[i].equals("-a")) {
+        auth = args[i++ + 1];
+        getOpts().setAuthType(auth);
       } else if (args[i].equals("-p")) {
         pass = args[i++ + 1];
       } else if (args[i].equals("-u")) {
@@ -714,6 +718,10 @@ public class BeeLine {
       handleException(e);
     }
 
+    if (inputStream instanceof FileInputStream) {
+      // from script.. no need to load history and no need of completor, either
+      return consoleReader;
+    }
     try {
       // now load in the previous history
       if (historyBuffer != null) {
@@ -771,19 +779,27 @@ public class BeeLine {
       for (int i = 0; i < commandHandlers.length; i++) {
         String match = commandHandlers[i].matches(line);
         if (match != null) {
-          cmdMap.put(match, commandHandlers[i]);
+          CommandHandler prev = cmdMap.put(match, commandHandlers[i]);
+          if (prev != null) {
+            return error(loc("multiple-matches",
+                Arrays.asList(prev.getName(), commandHandlers[i].getName())));
+          }
         }
       }
 
       if (cmdMap.size() == 0) {
         return error(loc("unknown-command", line));
-      } else if (cmdMap.size() > 1) {
-        return error(loc("multiple-matches",
-            cmdMap.keySet().toString()));
-      } else {
-        return cmdMap.values().iterator().next()
-            .execute(line);
       }
+      if (cmdMap.size() > 1) {
+        // any exact match?
+        CommandHandler handler = cmdMap.get(line);
+        if (handler == null) {
+          return error(loc("multiple-matches", cmdMap.keySet().toString()));
+        }
+        return handler.execute(line);
+      }
+      return cmdMap.values().iterator().next()
+          .execute(line);
     } else {
       return commands.sql(line);
     }

@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
+import org.apache.hive.common.HiveCompat;
 
 import javax.security.auth.login.LoginException;
 import java.io.*;
@@ -125,8 +126,6 @@ public class HiveConf extends Configuration {
       HiveConf.ConfVars.USERS_IN_ADMIN_ROLE,
       HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER,
       HiveConf.ConfVars.HIVE_TXN_MANAGER,
-      HiveConf.ConfVars.HIVE_TXN_JDBC_DRIVER,
-      HiveConf.ConfVars.HIVE_TXN_JDBC_CONNECT_STRING,
       HiveConf.ConfVars.HIVE_TXN_TIMEOUT,
       HiveConf.ConfVars.HIVE_TXN_MAX_OPEN_BATCH,
       };
@@ -220,6 +219,9 @@ public class HiveConf extends Configuration {
 
     // Max number of lines of footer user can set for a table file.
     HIVE_FILE_MAX_FOOTER("hive.file.max.footer", 100),
+
+    // Make column names unique in the result set by using table alias if needed
+    HIVE_RESULTSET_USE_UNIQUE_COLUMN_NAMES("hive.resultset.use.unique.column.names", true),
 
     // Hadoop Configuration Properties
     // Properties with null values are ignored and exist only for the purpose of giving us
@@ -456,6 +458,11 @@ public class HiveConf extends Configuration {
     HIVEDEFAULTRCFILESERDE("hive.default.rcfile.serde",
                            "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe"),
 
+    SERDESUSINGMETASTOREFORSCHEMA("hive.serdes.using.metastore.for.schema","org.apache.hadoop.hive.ql.io.orc.OrcSerde,"
+      + "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe,org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe,"
+      + "org.apache.hadoop.hive.serde2.dynamic_type.DynamicSerDe,org.apache.hadoop.hive.serde2.MetadataTypedColumnsetSerDe,"
+      + "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe,org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe,"
+      + "org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe"),
     //Location of Hive run time structured log file
     HIVEHISTORYFILELOC("hive.querylog.location", System.getProperty("java.io.tmpdir") + File.separator + System.getProperty("user.name")),
 
@@ -527,7 +534,6 @@ public class HiveConf extends Configuration {
         true),
     // Define the default compression codec for ORC file
     HIVE_ORC_DEFAULT_COMPRESS("hive.exec.orc.default.compress", "ZLIB"),
-
     HIVE_ORC_INCLUDE_FILE_FOOTER_IN_SPLITS("hive.orc.splits.include.file.footer", false),
     HIVE_ORC_CACHE_STRIPE_DETAILS_SIZE("hive.orc.cache.stripe.details.size", 10000),
     HIVE_ORC_COMPUTE_SPLITS_NUM_THREADS("hive.orc.compute.splits.num.threads", 10),
@@ -551,6 +557,7 @@ public class HiveConf extends Configuration {
     HIVELIMITOPTENABLE("hive.limit.optimize.enable", false),
     HIVELIMITOPTMAXFETCH("hive.limit.optimize.fetch.max", 50000),
     HIVELIMITPUSHDOWNMEMORYUSAGE("hive.limit.pushdown.memory.usage", -1f),
+    HIVELIMITTABLESCANPARTITION("hive.limit.query.max.table.partition", -1),
 
     HIVEHASHTABLETHRESHOLD("hive.hashtable.initialCapacity", 100000),
     HIVEHASHTABLELOADFACTOR("hive.hashtable.loadfactor", (float) 0.75),
@@ -599,6 +606,10 @@ public class HiveConf extends Configuration {
     HIVEOPTSORTMERGEBUCKETMAPJOIN("hive.optimize.bucketmapjoin.sortedmerge", false), // try to use sorted merge bucket map join
     HIVEOPTREDUCEDEDUPLICATION("hive.optimize.reducededuplication", true),
     HIVEOPTREDUCEDEDUPLICATIONMINREDUCER("hive.optimize.reducededuplication.min.reducer", 4),
+    // when enabled dynamic partitioning column will be globally sorted.
+    // this way we can keep only one record writer open for each partition value
+    // in the reducer thereby reducing the memory pressure on reducers
+    HIVEOPTSORTDYNAMICPARTITION("hive.optimize.sort.dynamic.partition", true),
 
     HIVESAMPLINGFORORDERBY("hive.optimize.sampling.orderby", false),
     HIVESAMPLINGNUMBERFORORDERBY("hive.optimize.sampling.orderby.number", 1000),
@@ -650,6 +661,10 @@ public class HiveConf extends Configuration {
     CLIENT_STATS_COUNTERS("hive.client.stats.counters", ""),
     //Subset of counters that should be of interest for hive.client.stats.publishers (when one wants to limit their publishing). Non-display names should be used".
     HIVE_STATS_RELIABLE("hive.stats.reliable", false),
+    // number of threads used by partialscan/noscan stats gathering for partitioned tables.
+    // This is applicable only for file formats that implement StatsProvidingRecordReader
+    // interface (like ORC)
+    HIVE_STATS_GATHER_NUM_THREADS("hive.stats.gather.num.threads", 10),
     // Collect table access keys information for operators that can benefit from bucketing
     HIVE_STATS_COLLECT_TABLEKEYS("hive.stats.collect.tablekeys", false),
     // Collect column access information
@@ -700,8 +715,6 @@ public class HiveConf extends Configuration {
     // Transactions
     HIVE_TXN_MANAGER("hive.txn.manager",
         "org.apache.hadoop.hive.ql.lockmgr.DummyTxnManager"),
-    HIVE_TXN_JDBC_DRIVER("hive.txn.driver", ""),
-    HIVE_TXN_JDBC_CONNECT_STRING("hive.txn.connection.string", ""),
     // time after which transactions are declared aborted if the client has
     // not sent a heartbeat, in seconds.
     HIVE_TXN_TIMEOUT("hive.txn.timeout", 300),
@@ -828,7 +841,7 @@ public class HiveConf extends Configuration {
     HIVE_DRIVER_RUN_HOOKS("hive.exec.driver.run.hooks", ""),
     HIVE_DDL_OUTPUT_FORMAT("hive.ddl.output.format", null),
     HIVE_ENTITY_SEPARATOR("hive.entity.separator", "@"),
-
+    HIVE_DISPLAY_PARTITION_COLUMNS_SEPARATELY("hive.display.partition.cols.separately",true),
     HIVE_SERVER2_MAX_START_ATTEMPTS("hive.server2.max.start.attempts", 30L,
         new LongRangeValidator(0L, Long.MAX_VALUE)),
 
@@ -876,6 +889,7 @@ public class HiveConf extends Configuration {
     // HiveServer2 auth configuration
     HIVE_SERVER2_AUTHENTICATION("hive.server2.authentication", "NONE",
         new StringsValidator("NOSASL", "NONE", "LDAP", "KERBEROS", "PAM", "CUSTOM")),
+    HIVE_SERVER2_ALLOW_USER_SUBSTITUTION("hive.server2.allow.user.substitution", true),
     HIVE_SERVER2_KERBEROS_KEYTAB("hive.server2.authentication.kerberos.keytab", ""),
     HIVE_SERVER2_KERBEROS_PRINCIPAL("hive.server2.authentication.kerberos.principal", ""),
     HIVE_SERVER2_PLAIN_LDAP_URL("hive.server2.authentication.ldap.url", null),
@@ -942,7 +956,7 @@ public class HiveConf extends Configuration {
 
     HIVE_EXECUTION_ENGINE("hive.execution.engine", "mr",
         new StringsValidator("mr", "tez")),
-    HIVE_JAR_DIRECTORY("hive.jar.directory", "hdfs:///user/hive/"),
+    HIVE_JAR_DIRECTORY("hive.jar.directory", null),
     HIVE_USER_INSTALL_DIR("hive.user.install.directory", "hdfs:///user/"),
 
     // Vectorization enabled
@@ -979,7 +993,13 @@ public class HiveConf extends Configuration {
     // column: implies column names can contain any character.
     HIVE_QUOTEDID_SUPPORT("hive.support.quoted.identifiers", "column",
         new PatternValidator("none", "column")),
-    USERS_IN_ADMIN_ROLE("hive.users.in.admin.role","")
+    USERS_IN_ADMIN_ROLE("hive.users.in.admin.role",""),
+
+    // Enable (configurable) deprecated behaviors by setting desired level of backward compatbility
+    // Setting to 0.12:
+    //   Maintains division behavior: int / int => double
+    // Setting to 0.13:
+    HIVE_COMPAT("hive.compat", HiveCompat.DEFAULT_COMPAT_LEVEL)
     ;
 
     public final String varname;

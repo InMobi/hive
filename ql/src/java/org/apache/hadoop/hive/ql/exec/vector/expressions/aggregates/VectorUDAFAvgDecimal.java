@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hive.common.type.Decimal128;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpression;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.aggregates.VectorAggregateExpression;
@@ -81,6 +82,13 @@ public class VectorUDAFAvgDecimal extends VectorAggregateExpression {
       @Override
       public int getVariableSize() {
         throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void reset() {
+        isNull = true;
+        sum.zeroClear();
+        count = 0L;
       }
     }
 
@@ -462,7 +470,7 @@ public class VectorUDAFAvgDecimal extends VectorAggregateExpression {
     @Override
     public void reset(AggregationBuffer agg) throws HiveException {
       Aggregation myAgg = (Aggregation) agg;
-      myAgg.isNull = true;
+      myAgg.reset();
     }
 
     @Override
@@ -475,8 +483,7 @@ public class VectorUDAFAvgDecimal extends VectorAggregateExpression {
       else {
         assert(0 < myagg.count);
         resultCount.set (myagg.count);
-        int bufferIndex = myagg.sum.fastSerializeForHiveDecimal(scratch);
-        resultSum.set(scratch.getBytes(bufferIndex), (int) sumScale);
+        resultSum.set(HiveDecimal.create(myagg.sum.toBigDecimal()));
         return partialResult;
       }
     }

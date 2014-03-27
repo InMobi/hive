@@ -22,40 +22,47 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hive.service.cli.session.SessionManager;
 import org.apache.thrift.TException;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TSaslServerTransport;
 
-public class TUGIContainingProcessor implements TProcessor{
+/**
+ *
+ * Wraps the underlying thrift processor's process call,
+ * to assume the client user's UGI/Subject for the doAs calls.
+ * Gets the client's username from a threadlocal in SessionManager which is
+ * set in the ThriftHttpServlet, and constructs a client UGI object from that.
+ *
+ */
 
-  private final TProcessor wrapped;
+public class HttpCLIServiceUGIProcessor implements TProcessor {
+
+  private final TProcessor underlyingProcessor;
   private final HadoopShims shim;
-  private final boolean isFsCacheDisabled;
 
-  public TUGIContainingProcessor(TProcessor wrapped, Configuration conf) {
-    this.wrapped = wrapped;
-    this.isFsCacheDisabled = conf.getBoolean(String.format("fs.%s.impl.disable.cache",
-      FileSystem.getDefaultUri(conf).getScheme()), false);
+  public HttpCLIServiceUGIProcessor(TProcessor underlyingProcessor) {
+    this.underlyingProcessor = underlyingProcessor;
     this.shim = ShimLoader.getHadoopShims();
   }
 
   @Override
   public boolean process(final TProtocol in, final TProtocol out) throws TException {
+    /**
+     * Build the client UGI from threadlocal username [SessionManager.getUserName()].
+     * The threadlocal username is set in the ThriftHttpServlet.
+     */
     UserGroupInformation clientUgi = null;
-
     try {
-      clientUgi = shim.createRemoteUser(((TSaslServerTransport)in.getTransport()).
-          getSaslServer().getAuthorizationID(), new ArrayList<String>());
+      clientUgi = shim.createRemoteUser(SessionManager.getUserName(), new ArrayList<String>());
       return shim.doAs(clientUgi, new PrivilegedExceptionAction<Boolean>() {
+        @Override
         public Boolean run() {
           try {
-            return wrapped.process(in, out);
+            return underlyingProcessor.process(in, out);
           } catch (TException te) {
             throw new RuntimeException(te);
           }

@@ -23,6 +23,7 @@ class TProtocolVersion:
   HIVE_CLI_SERVICE_PROTOCOL_V4 = 3
   HIVE_CLI_SERVICE_PROTOCOL_V5 = 4
   HIVE_CLI_SERVICE_PROTOCOL_V6 = 5
+  HIVE_CLI_SERVICE_PROTOCOL_V7 = 6
 
   _VALUES_TO_NAMES = {
     0: "HIVE_CLI_SERVICE_PROTOCOL_V1",
@@ -31,6 +32,7 @@ class TProtocolVersion:
     3: "HIVE_CLI_SERVICE_PROTOCOL_V4",
     4: "HIVE_CLI_SERVICE_PROTOCOL_V5",
     5: "HIVE_CLI_SERVICE_PROTOCOL_V6",
+    6: "HIVE_CLI_SERVICE_PROTOCOL_V7",
   }
 
   _NAMES_TO_VALUES = {
@@ -40,6 +42,7 @@ class TProtocolVersion:
     "HIVE_CLI_SERVICE_PROTOCOL_V4": 3,
     "HIVE_CLI_SERVICE_PROTOCOL_V5": 4,
     "HIVE_CLI_SERVICE_PROTOCOL_V6": 5,
+    "HIVE_CLI_SERVICE_PROTOCOL_V7": 6,
   }
 
 class TTypeId:
@@ -5958,17 +5961,27 @@ class TFetchResultsResp:
   def __ne__(self, other):
     return not (self == other)
 
+<<<<<<< HEAD
 class TGetQueryPlanReq:
   """
   Attributes:
    - sessionHandle
    - statement
    - confOverlay
+=======
+class TGetDelegationTokenReq:
+  """
+  Attributes:
+   - sessionHandle
+   - owner
+   - renewer
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.STRUCT, 'sessionHandle', (TSessionHandle, TSessionHandle.thrift_spec), None, ), # 1
+<<<<<<< HEAD
     (2, TType.STRING, 'statement', None, None, ), # 2
     (3, TType.MAP, 'confOverlay', (TType.STRING,None,TType.STRING,None), None, ), # 3
   )
@@ -5977,6 +5990,16 @@ class TGetQueryPlanReq:
     self.sessionHandle = sessionHandle
     self.statement = statement
     self.confOverlay = confOverlay
+=======
+    (2, TType.STRING, 'owner', None, None, ), # 2
+    (3, TType.STRING, 'renewer', None, None, ), # 3
+  )
+
+  def __init__(self, sessionHandle=None, owner=None, renewer=None,):
+    self.sessionHandle = sessionHandle
+    self.owner = owner
+    self.renewer = renewer
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -5995,6 +6018,7 @@ class TGetQueryPlanReq:
           iprot.skip(ftype)
       elif fid == 2:
         if ftype == TType.STRING:
+<<<<<<< HEAD
           self.statement = iprot.readString();
         else:
           iprot.skip(ftype)
@@ -6007,6 +6031,14 @@ class TGetQueryPlanReq:
             _val165 = iprot.readString();
             self.confOverlay[_key164] = _val165
           iprot.readMapEnd()
+=======
+          self.owner = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.renewer = iprot.readString();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         else:
           iprot.skip(ftype)
       else:
@@ -6018,11 +6050,16 @@ class TGetQueryPlanReq:
     if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
+<<<<<<< HEAD
     oprot.writeStructBegin('TGetQueryPlanReq')
+=======
+    oprot.writeStructBegin('TGetDelegationTokenReq')
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     if self.sessionHandle is not None:
       oprot.writeFieldBegin('sessionHandle', TType.STRUCT, 1)
       self.sessionHandle.write(oprot)
       oprot.writeFieldEnd()
+<<<<<<< HEAD
     if self.statement is not None:
       oprot.writeFieldBegin('statement', TType.STRING, 2)
       oprot.writeString(self.statement)
@@ -6034,6 +6071,15 @@ class TGetQueryPlanReq:
         oprot.writeString(kiter166)
         oprot.writeString(viter167)
       oprot.writeMapEnd()
+=======
+    if self.owner is not None:
+      oprot.writeFieldBegin('owner', TType.STRING, 2)
+      oprot.writeString(self.owner)
+      oprot.writeFieldEnd()
+    if self.renewer is not None:
+      oprot.writeFieldBegin('renewer', TType.STRING, 3)
+      oprot.writeString(self.renewer)
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -6041,8 +6087,15 @@ class TGetQueryPlanReq:
   def validate(self):
     if self.sessionHandle is None:
       raise TProtocol.TProtocolException(message='Required field sessionHandle is unset!')
+<<<<<<< HEAD
     if self.statement is None:
       raise TProtocol.TProtocolException(message='Required field statement is unset!')
+=======
+    if self.owner is None:
+      raise TProtocol.TProtocolException(message='Required field owner is unset!')
+    if self.renewer is None:
+      raise TProtocol.TProtocolException(message='Required field renewer is unset!')
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     return
 
 
@@ -6057,22 +6110,39 @@ class TGetQueryPlanReq:
   def __ne__(self, other):
     return not (self == other)
 
+<<<<<<< HEAD
 class TGetQueryPlanResp:
   """
   Attributes:
    - status
    - plan
+=======
+class TGetDelegationTokenResp:
+  """
+  Attributes:
+   - status
+   - delegationToken
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   """
 
   thrift_spec = (
     None, # 0
     (1, TType.STRUCT, 'status', (TStatus, TStatus.thrift_spec), None, ), # 1
+<<<<<<< HEAD
     (2, TType.STRING, 'plan', None, None, ), # 2
   )
 
   def __init__(self, status=None, plan=None,):
     self.status = status
     self.plan = plan
+=======
+    (2, TType.STRING, 'delegationToken', None, None, ), # 2
+  )
+
+  def __init__(self, status=None, delegationToken=None,):
+    self.status = status
+    self.delegationToken = delegationToken
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -6091,7 +6161,11 @@ class TGetQueryPlanResp:
           iprot.skip(ftype)
       elif fid == 2:
         if ftype == TType.STRING:
+<<<<<<< HEAD
           self.plan = iprot.readString();
+=======
+          self.delegationToken = iprot.readString();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         else:
           iprot.skip(ftype)
       else:
@@ -6103,14 +6177,23 @@ class TGetQueryPlanResp:
     if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
+<<<<<<< HEAD
     oprot.writeStructBegin('TGetQueryPlanResp')
+=======
+    oprot.writeStructBegin('TGetDelegationTokenResp')
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     if self.status is not None:
       oprot.writeFieldBegin('status', TType.STRUCT, 1)
       self.status.write(oprot)
       oprot.writeFieldEnd()
+<<<<<<< HEAD
     if self.plan is not None:
       oprot.writeFieldBegin('plan', TType.STRING, 2)
       oprot.writeString(self.plan)
+=======
+    if self.delegationToken is not None:
+      oprot.writeFieldBegin('delegationToken', TType.STRING, 2)
+      oprot.writeString(self.delegationToken)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -6118,8 +6201,292 @@ class TGetQueryPlanResp:
   def validate(self):
     if self.status is None:
       raise TProtocol.TProtocolException(message='Required field status is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class TCancelDelegationTokenReq:
+  """
+  Attributes:
+   - sessionHandle
+   - delegationToken
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'sessionHandle', (TSessionHandle, TSessionHandle.thrift_spec), None, ), # 1
+    (2, TType.STRING, 'delegationToken', None, None, ), # 2
+  )
+
+  def __init__(self, sessionHandle=None, delegationToken=None,):
+    self.sessionHandle = sessionHandle
+    self.delegationToken = delegationToken
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.sessionHandle = TSessionHandle()
+          self.sessionHandle.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.delegationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('TCancelDelegationTokenReq')
+    if self.sessionHandle is not None:
+      oprot.writeFieldBegin('sessionHandle', TType.STRUCT, 1)
+      self.sessionHandle.write(oprot)
+      oprot.writeFieldEnd()
+    if self.delegationToken is not None:
+      oprot.writeFieldBegin('delegationToken', TType.STRING, 2)
+      oprot.writeString(self.delegationToken)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.sessionHandle is None:
+      raise TProtocol.TProtocolException(message='Required field sessionHandle is unset!')
+    if self.delegationToken is None:
+      raise TProtocol.TProtocolException(message='Required field delegationToken is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class TCancelDelegationTokenResp:
+  """
+  Attributes:
+   - status
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'status', (TStatus, TStatus.thrift_spec), None, ), # 1
+  )
+
+  def __init__(self, status=None,):
+    self.status = status
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.status = TStatus()
+          self.status.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('TCancelDelegationTokenResp')
+    if self.status is not None:
+      oprot.writeFieldBegin('status', TType.STRUCT, 1)
+      self.status.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.status is None:
+      raise TProtocol.TProtocolException(message='Required field status is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class TRenewDelegationTokenReq:
+  """
+  Attributes:
+   - sessionHandle
+   - delegationToken
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'sessionHandle', (TSessionHandle, TSessionHandle.thrift_spec), None, ), # 1
+    (2, TType.STRING, 'delegationToken', None, None, ), # 2
+  )
+
+  def __init__(self, sessionHandle=None, delegationToken=None,):
+    self.sessionHandle = sessionHandle
+    self.delegationToken = delegationToken
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.sessionHandle = TSessionHandle()
+          self.sessionHandle.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.delegationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('TRenewDelegationTokenReq')
+    if self.sessionHandle is not None:
+      oprot.writeFieldBegin('sessionHandle', TType.STRUCT, 1)
+      self.sessionHandle.write(oprot)
+      oprot.writeFieldEnd()
+    if self.delegationToken is not None:
+      oprot.writeFieldBegin('delegationToken', TType.STRING, 2)
+      oprot.writeString(self.delegationToken)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.sessionHandle is None:
+      raise TProtocol.TProtocolException(message='Required field sessionHandle is unset!')
+    if self.delegationToken is None:
+      raise TProtocol.TProtocolException(message='Required field delegationToken is unset!')
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class TRenewDelegationTokenResp:
+  """
+  Attributes:
+   - status
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'status', (TStatus, TStatus.thrift_spec), None, ), # 1
+  )
+
+  def __init__(self, status=None,):
+    self.status = status
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.status = TStatus()
+          self.status.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('TRenewDelegationTokenResp')
+    if self.status is not None:
+      oprot.writeFieldBegin('status', TType.STRUCT, 1)
+      self.status.write(oprot)
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    if self.status is None:
+      raise TProtocol.TProtocolException(message='Required field status is unset!')
+<<<<<<< HEAD
     if self.plan is None:
       raise TProtocol.TProtocolException(message='Required field plan is unset!')
+=======
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     return
 
 

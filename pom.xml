@@ -14,7 +14,11 @@
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
+  <parent>
+    <groupId>org.apache</groupId>
+    <artifactId>apache</artifactId>
+    <version>14</version>
+  </parent>
   <groupId>org.apache.hive</groupId>
   <artifactId>hive</artifactId>
   <version>0.13.0-SNAPSHOT</version>
@@ -60,7 +64,7 @@
   </modules>
 
   <properties>
-    <hive.version.shortname>0.14.0</hive.version.shortname>
+    <hive.version.shortname>0.13.0</hive.version.shortname>
 
     <!-- Build Properties -->
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -94,9 +98,9 @@
     <antlr.version>3.4</antlr.version>
     <avro.version>1.7.5</avro.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
-    <datanucleus-api-jdo.version>3.2.1</datanucleus-api-jdo.version>
-    <datanucleus-core.version>3.2.2</datanucleus-core.version>
-    <datanucleus-rdbms.version>3.2.1</datanucleus-rdbms.version>
+    <datanucleus-api-jdo.version>3.2.6</datanucleus-api-jdo.version>
+    <datanucleus-core.version>3.2.10</datanucleus-core.version>
+    <datanucleus-rdbms.version>3.2.9</datanucleus-rdbms.version>
     <commons-cli.version>1.2</commons-cli.version>
     <commons-codec.version>1.4</commons-codec.version>
     <commons-compress.version>1.4.1</commons-compress.version>
@@ -115,8 +119,8 @@
     <hbase.hadoop1.version>0.96.0-hadoop1</hbase.hadoop1.version>
     <hbase.hadoop2.version>0.96.0-hadoop2</hbase.hadoop2.version>
     <!-- httpcomponents are not always in version sync -->
-    <httpcomponents.client.version>4.3.2</httpcomponents.client.version>
-    <httpcomponents.core.version>4.3.1</httpcomponents.core.version>
+    <httpcomponents.client.version>4.2.5</httpcomponents.client.version>
+    <httpcomponents.core.version>4.2.5</httpcomponents.core.version>
     <jackson.version>1.9.2</jackson.version>
     <javaewah.version>0.3.2</javaewah.version>
     <javolution.version>5.5.1</javolution.version>
@@ -134,7 +138,7 @@
     <libfb303.version>0.9.0</libfb303.version>
     <libthrift.version>0.9.0</libthrift.version>
     <log4j.version>1.2.16</log4j.version>
-    <mockito-all.version>1.8.2</mockito-all.version>
+    <mockito-all.version>1.9.5</mockito-all.version>
     <mina.version>2.0.0-M5</mina.version>
     <!--netty is not a direct dependency but due to a change
         in artifact name and given that zookeeper < 3.5
@@ -229,6 +233,11 @@
         <groupId>com.sun.jersey.contribs</groupId>
         <artifactId>wadl-resourcedoc-doclet</artifactId>
         <version>${wadl-resourcedoc-doclet.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.jersey</groupId>
+        <artifactId>jersey-servlet</artifactId>
+        <version>${jersey.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>
@@ -946,6 +955,11 @@
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-server</artifactId>
             <version>${hbase.hadoop2.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-minicluster</artifactId>
+            <version>${hadoop-23.version}</version>
           </dependency>
         </dependencies>
       </dependencyManagement>

@@ -67,7 +67,15 @@ public class TCLIService {
 
     public TFetchResultsResp FetchResults(TFetchResultsReq req) throws org.apache.thrift.TException;
 
+<<<<<<< HEAD
     public TGetQueryPlanResp GetQueryPlan(TGetQueryPlanReq req) throws org.apache.thrift.TException;
+=======
+    public TGetDelegationTokenResp GetDelegationToken(TGetDelegationTokenReq req) throws org.apache.thrift.TException;
+
+    public TCancelDelegationTokenResp CancelDelegationToken(TCancelDelegationTokenReq req) throws org.apache.thrift.TException;
+
+    public TRenewDelegationTokenResp RenewDelegationToken(TRenewDelegationTokenReq req) throws org.apache.thrift.TException;
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   }
 
@@ -105,7 +113,15 @@ public class TCLIService {
 
     public void FetchResults(TFetchResultsReq req, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.FetchResults_call> resultHandler) throws org.apache.thrift.TException;
 
+<<<<<<< HEAD
     public void GetQueryPlan(TGetQueryPlanReq req, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.GetQueryPlan_call> resultHandler) throws org.apache.thrift.TException;
+=======
+    public void GetDelegationToken(TGetDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.GetDelegationToken_call> resultHandler) throws org.apache.thrift.TException;
+
+    public void CancelDelegationToken(TCancelDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.CancelDelegationToken_call> resultHandler) throws org.apache.thrift.TException;
+
+    public void RenewDelegationToken(TRenewDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<AsyncClient.RenewDelegationToken_call> resultHandler) throws org.apache.thrift.TException;
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   }
 
@@ -497,6 +513,7 @@ public class TCLIService {
       throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "FetchResults failed: unknown result");
     }
 
+<<<<<<< HEAD
     public TGetQueryPlanResp GetQueryPlan(TGetQueryPlanReq req) throws org.apache.thrift.TException
     {
       send_GetQueryPlan(req);
@@ -518,6 +535,75 @@ public class TCLIService {
         return result.success;
       }
       throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "GetQueryPlan failed: unknown result");
+=======
+    public TGetDelegationTokenResp GetDelegationToken(TGetDelegationTokenReq req) throws org.apache.thrift.TException
+    {
+      send_GetDelegationToken(req);
+      return recv_GetDelegationToken();
+    }
+
+    public void send_GetDelegationToken(TGetDelegationTokenReq req) throws org.apache.thrift.TException
+    {
+      GetDelegationToken_args args = new GetDelegationToken_args();
+      args.setReq(req);
+      sendBase("GetDelegationToken", args);
+    }
+
+    public TGetDelegationTokenResp recv_GetDelegationToken() throws org.apache.thrift.TException
+    {
+      GetDelegationToken_result result = new GetDelegationToken_result();
+      receiveBase(result, "GetDelegationToken");
+      if (result.isSetSuccess()) {
+        return result.success;
+      }
+      throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "GetDelegationToken failed: unknown result");
+    }
+
+    public TCancelDelegationTokenResp CancelDelegationToken(TCancelDelegationTokenReq req) throws org.apache.thrift.TException
+    {
+      send_CancelDelegationToken(req);
+      return recv_CancelDelegationToken();
+    }
+
+    public void send_CancelDelegationToken(TCancelDelegationTokenReq req) throws org.apache.thrift.TException
+    {
+      CancelDelegationToken_args args = new CancelDelegationToken_args();
+      args.setReq(req);
+      sendBase("CancelDelegationToken", args);
+    }
+
+    public TCancelDelegationTokenResp recv_CancelDelegationToken() throws org.apache.thrift.TException
+    {
+      CancelDelegationToken_result result = new CancelDelegationToken_result();
+      receiveBase(result, "CancelDelegationToken");
+      if (result.isSetSuccess()) {
+        return result.success;
+      }
+      throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "CancelDelegationToken failed: unknown result");
+    }
+
+    public TRenewDelegationTokenResp RenewDelegationToken(TRenewDelegationTokenReq req) throws org.apache.thrift.TException
+    {
+      send_RenewDelegationToken(req);
+      return recv_RenewDelegationToken();
+    }
+
+    public void send_RenewDelegationToken(TRenewDelegationTokenReq req) throws org.apache.thrift.TException
+    {
+      RenewDelegationToken_args args = new RenewDelegationToken_args();
+      args.setReq(req);
+      sendBase("RenewDelegationToken", args);
+    }
+
+    public TRenewDelegationTokenResp recv_RenewDelegationToken() throws org.apache.thrift.TException
+    {
+      RenewDelegationToken_result result = new RenewDelegationToken_result();
+      receiveBase(result, "RenewDelegationToken");
+      if (result.isSetSuccess()) {
+        return result.success;
+      }
+      throw new org.apache.thrift.TApplicationException(org.apache.thrift.TApplicationException.MISSING_RESULT, "RenewDelegationToken failed: unknown result");
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     }
 
   }
@@ -1050,35 +1136,124 @@ public class TCLIService {
       }
     }
 
+<<<<<<< HEAD
     public void GetQueryPlan(TGetQueryPlanReq req, org.apache.thrift.async.AsyncMethodCallback<GetQueryPlan_call> resultHandler) throws org.apache.thrift.TException {
       checkReady();
       GetQueryPlan_call method_call = new GetQueryPlan_call(req, resultHandler, this, ___protocolFactory, ___transport);
+=======
+    public void GetDelegationToken(TGetDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<GetDelegationToken_call> resultHandler) throws org.apache.thrift.TException {
+      checkReady();
+      GetDelegationToken_call method_call = new GetDelegationToken_call(req, resultHandler, this, ___protocolFactory, ___transport);
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       this.___currentMethod = method_call;
       ___manager.call(method_call);
     }
 
+<<<<<<< HEAD
     public static class GetQueryPlan_call extends org.apache.thrift.async.TAsyncMethodCall {
       private TGetQueryPlanReq req;
       public GetQueryPlan_call(TGetQueryPlanReq req, org.apache.thrift.async.AsyncMethodCallback<GetQueryPlan_call> resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+=======
+    public static class GetDelegationToken_call extends org.apache.thrift.async.TAsyncMethodCall {
+      private TGetDelegationTokenReq req;
+      public GetDelegationToken_call(TGetDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<GetDelegationToken_call> resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         super(client, protocolFactory, transport, resultHandler, false);
         this.req = req;
       }
 
       public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
+<<<<<<< HEAD
         prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("GetQueryPlan", org.apache.thrift.protocol.TMessageType.CALL, 0));
         GetQueryPlan_args args = new GetQueryPlan_args();
+=======
+        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("GetDelegationToken", org.apache.thrift.protocol.TMessageType.CALL, 0));
+        GetDelegationToken_args args = new GetDelegationToken_args();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         args.setReq(req);
         args.write(prot);
         prot.writeMessageEnd();
       }
 
+<<<<<<< HEAD
       public TGetQueryPlanResp getResult() throws org.apache.thrift.TException {
+=======
+      public TGetDelegationTokenResp getResult() throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
           throw new IllegalStateException("Method call not finished!");
         }
         org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
         org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
+<<<<<<< HEAD
         return (new Client(prot)).recv_GetQueryPlan();
+=======
+        return (new Client(prot)).recv_GetDelegationToken();
+      }
+    }
+
+    public void CancelDelegationToken(TCancelDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<CancelDelegationToken_call> resultHandler) throws org.apache.thrift.TException {
+      checkReady();
+      CancelDelegationToken_call method_call = new CancelDelegationToken_call(req, resultHandler, this, ___protocolFactory, ___transport);
+      this.___currentMethod = method_call;
+      ___manager.call(method_call);
+    }
+
+    public static class CancelDelegationToken_call extends org.apache.thrift.async.TAsyncMethodCall {
+      private TCancelDelegationTokenReq req;
+      public CancelDelegationToken_call(TCancelDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<CancelDelegationToken_call> resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+        super(client, protocolFactory, transport, resultHandler, false);
+        this.req = req;
+      }
+
+      public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
+        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("CancelDelegationToken", org.apache.thrift.protocol.TMessageType.CALL, 0));
+        CancelDelegationToken_args args = new CancelDelegationToken_args();
+        args.setReq(req);
+        args.write(prot);
+        prot.writeMessageEnd();
+      }
+
+      public TCancelDelegationTokenResp getResult() throws org.apache.thrift.TException {
+        if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
+          throw new IllegalStateException("Method call not finished!");
+        }
+        org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
+        org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
+        return (new Client(prot)).recv_CancelDelegationToken();
+      }
+    }
+
+    public void RenewDelegationToken(TRenewDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<RenewDelegationToken_call> resultHandler) throws org.apache.thrift.TException {
+      checkReady();
+      RenewDelegationToken_call method_call = new RenewDelegationToken_call(req, resultHandler, this, ___protocolFactory, ___transport);
+      this.___currentMethod = method_call;
+      ___manager.call(method_call);
+    }
+
+    public static class RenewDelegationToken_call extends org.apache.thrift.async.TAsyncMethodCall {
+      private TRenewDelegationTokenReq req;
+      public RenewDelegationToken_call(TRenewDelegationTokenReq req, org.apache.thrift.async.AsyncMethodCallback<RenewDelegationToken_call> resultHandler, org.apache.thrift.async.TAsyncClient client, org.apache.thrift.protocol.TProtocolFactory protocolFactory, org.apache.thrift.transport.TNonblockingTransport transport) throws org.apache.thrift.TException {
+        super(client, protocolFactory, transport, resultHandler, false);
+        this.req = req;
+      }
+
+      public void write_args(org.apache.thrift.protocol.TProtocol prot) throws org.apache.thrift.TException {
+        prot.writeMessageBegin(new org.apache.thrift.protocol.TMessage("RenewDelegationToken", org.apache.thrift.protocol.TMessageType.CALL, 0));
+        RenewDelegationToken_args args = new RenewDelegationToken_args();
+        args.setReq(req);
+        args.write(prot);
+        prot.writeMessageEnd();
+      }
+
+      public TRenewDelegationTokenResp getResult() throws org.apache.thrift.TException {
+        if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
+          throw new IllegalStateException("Method call not finished!");
+        }
+        org.apache.thrift.transport.TMemoryInputTransport memoryTransport = new org.apache.thrift.transport.TMemoryInputTransport(getFrameBuffer().array());
+        org.apache.thrift.protocol.TProtocol prot = client.getProtocolFactory().getProtocol(memoryTransport);
+        return (new Client(prot)).recv_RenewDelegationToken();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       }
     }
 
@@ -1111,7 +1286,13 @@ public class TCLIService {
       processMap.put("CloseOperation", new CloseOperation());
       processMap.put("GetResultSetMetadata", new GetResultSetMetadata());
       processMap.put("FetchResults", new FetchResults());
+<<<<<<< HEAD
       processMap.put("GetQueryPlan", new GetQueryPlan());
+=======
+      processMap.put("GetDelegationToken", new GetDelegationToken());
+      processMap.put("CancelDelegationToken", new CancelDelegationToken());
+      processMap.put("RenewDelegationToken", new RenewDelegationToken());
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       return processMap;
     }
 
@@ -1435,6 +1616,7 @@ public class TCLIService {
       }
     }
 
+<<<<<<< HEAD
     public static class GetQueryPlan<I extends Iface> extends org.apache.thrift.ProcessFunction<I, GetQueryPlan_args> {
       public GetQueryPlan() {
         super("GetQueryPlan");
@@ -1442,15 +1624,70 @@ public class TCLIService {
 
       public GetQueryPlan_args getEmptyArgsInstance() {
         return new GetQueryPlan_args();
+=======
+    public static class GetDelegationToken<I extends Iface> extends org.apache.thrift.ProcessFunction<I, GetDelegationToken_args> {
+      public GetDelegationToken() {
+        super("GetDelegationToken");
+      }
+
+      public GetDelegationToken_args getEmptyArgsInstance() {
+        return new GetDelegationToken_args();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       }
 
       protected boolean isOneway() {
         return false;
       }
 
+<<<<<<< HEAD
       public GetQueryPlan_result getResult(I iface, GetQueryPlan_args args) throws org.apache.thrift.TException {
         GetQueryPlan_result result = new GetQueryPlan_result();
         result.success = iface.GetQueryPlan(args.req);
+=======
+      public GetDelegationToken_result getResult(I iface, GetDelegationToken_args args) throws org.apache.thrift.TException {
+        GetDelegationToken_result result = new GetDelegationToken_result();
+        result.success = iface.GetDelegationToken(args.req);
+        return result;
+      }
+    }
+
+    public static class CancelDelegationToken<I extends Iface> extends org.apache.thrift.ProcessFunction<I, CancelDelegationToken_args> {
+      public CancelDelegationToken() {
+        super("CancelDelegationToken");
+      }
+
+      public CancelDelegationToken_args getEmptyArgsInstance() {
+        return new CancelDelegationToken_args();
+      }
+
+      protected boolean isOneway() {
+        return false;
+      }
+
+      public CancelDelegationToken_result getResult(I iface, CancelDelegationToken_args args) throws org.apache.thrift.TException {
+        CancelDelegationToken_result result = new CancelDelegationToken_result();
+        result.success = iface.CancelDelegationToken(args.req);
+        return result;
+      }
+    }
+
+    public static class RenewDelegationToken<I extends Iface> extends org.apache.thrift.ProcessFunction<I, RenewDelegationToken_args> {
+      public RenewDelegationToken() {
+        super("RenewDelegationToken");
+      }
+
+      public RenewDelegationToken_args getEmptyArgsInstance() {
+        return new RenewDelegationToken_args();
+      }
+
+      protected boolean isOneway() {
+        return false;
+      }
+
+      public RenewDelegationToken_result getResult(I iface, RenewDelegationToken_args args) throws org.apache.thrift.TException {
+        RenewDelegationToken_result result = new RenewDelegationToken_result();
+        result.success = iface.RenewDelegationToken(args.req);
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         return result;
       }
     }
@@ -13073,18 +13310,31 @@ public class TCLIService {
 
   }
 
+<<<<<<< HEAD
   public static class GetQueryPlan_args implements org.apache.thrift.TBase<GetQueryPlan_args, GetQueryPlan_args._Fields>, java.io.Serializable, Cloneable   {
     private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("GetQueryPlan_args");
+=======
+  public static class GetDelegationToken_args implements org.apache.thrift.TBase<GetDelegationToken_args, GetDelegationToken_args._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("GetDelegationToken_args");
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
     private static final org.apache.thrift.protocol.TField REQ_FIELD_DESC = new org.apache.thrift.protocol.TField("req", org.apache.thrift.protocol.TType.STRUCT, (short)1);
 
     private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
     static {
+<<<<<<< HEAD
       schemes.put(StandardScheme.class, new GetQueryPlan_argsStandardSchemeFactory());
       schemes.put(TupleScheme.class, new GetQueryPlan_argsTupleSchemeFactory());
     }
 
     private TGetQueryPlanReq req; // required
+=======
+      schemes.put(StandardScheme.class, new GetDelegationToken_argsStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new GetDelegationToken_argsTupleSchemeFactory());
+    }
+
+    private TGetDelegationTokenReq req; // required
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
     /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
     public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -13149,6 +13399,7 @@ public class TCLIService {
     static {
       Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
       tmpMap.put(_Fields.REQ, new org.apache.thrift.meta_data.FieldMetaData("req", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+<<<<<<< HEAD
           new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TGetQueryPlanReq.class)));
       metaDataMap = Collections.unmodifiableMap(tmpMap);
       org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GetQueryPlan_args.class, metaDataMap);
@@ -13159,6 +13410,18 @@ public class TCLIService {
 
     public GetQueryPlan_args(
       TGetQueryPlanReq req)
+=======
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TGetDelegationTokenReq.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GetDelegationToken_args.class, metaDataMap);
+    }
+
+    public GetDelegationToken_args() {
+    }
+
+    public GetDelegationToken_args(
+      TGetDelegationTokenReq req)
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     {
       this();
       this.req = req;
@@ -13167,6 +13430,7 @@ public class TCLIService {
     /**
      * Performs a deep copy on <i>other</i>.
      */
+<<<<<<< HEAD
     public GetQueryPlan_args(GetQueryPlan_args other) {
       if (other.isSetReq()) {
         this.req = new TGetQueryPlanReq(other.req);
@@ -13175,6 +13439,16 @@ public class TCLIService {
 
     public GetQueryPlan_args deepCopy() {
       return new GetQueryPlan_args(this);
+=======
+    public GetDelegationToken_args(GetDelegationToken_args other) {
+      if (other.isSetReq()) {
+        this.req = new TGetDelegationTokenReq(other.req);
+      }
+    }
+
+    public GetDelegationToken_args deepCopy() {
+      return new GetDelegationToken_args(this);
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     }
 
     @Override
@@ -13182,11 +13456,19 @@ public class TCLIService {
       this.req = null;
     }
 
+<<<<<<< HEAD
     public TGetQueryPlanReq getReq() {
       return this.req;
     }
 
     public void setReq(TGetQueryPlanReq req) {
+=======
+    public TGetDelegationTokenReq getReq() {
+      return this.req;
+    }
+
+    public void setReq(TGetDelegationTokenReq req) {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       this.req = req;
     }
 
@@ -13211,7 +13493,11 @@ public class TCLIService {
         if (value == null) {
           unsetReq();
         } else {
+<<<<<<< HEAD
           setReq((TGetQueryPlanReq)value);
+=======
+          setReq((TGetDelegationTokenReq)value);
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         }
         break;
 
@@ -13244,12 +13530,21 @@ public class TCLIService {
     public boolean equals(Object that) {
       if (that == null)
         return false;
+<<<<<<< HEAD
       if (that instanceof GetQueryPlan_args)
         return this.equals((GetQueryPlan_args)that);
       return false;
     }
 
     public boolean equals(GetQueryPlan_args that) {
+=======
+      if (that instanceof GetDelegationToken_args)
+        return this.equals((GetDelegationToken_args)that);
+      return false;
+    }
+
+    public boolean equals(GetDelegationToken_args that) {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       if (that == null)
         return false;
 
@@ -13277,13 +13572,21 @@ public class TCLIService {
       return builder.toHashCode();
     }
 
+<<<<<<< HEAD
     public int compareTo(GetQueryPlan_args other) {
+=======
+    public int compareTo(GetDelegationToken_args other) {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       if (!getClass().equals(other.getClass())) {
         return getClass().getName().compareTo(other.getClass().getName());
       }
 
       int lastComparison = 0;
+<<<<<<< HEAD
       GetQueryPlan_args typedOther = (GetQueryPlan_args)other;
+=======
+      GetDelegationToken_args typedOther = (GetDelegationToken_args)other;
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
       lastComparison = Boolean.valueOf(isSetReq()).compareTo(typedOther.isSetReq());
       if (lastComparison != 0) {
@@ -13312,7 +13615,11 @@ public class TCLIService {
 
     @Override
     public String toString() {
+<<<<<<< HEAD
       StringBuilder sb = new StringBuilder("GetQueryPlan_args(");
+=======
+      StringBuilder sb = new StringBuilder("GetDelegationToken_args(");
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       boolean first = true;
 
       sb.append("req:");
@@ -13350,6 +13657,7 @@ public class TCLIService {
       }
     }
 
+<<<<<<< HEAD
     private static class GetQueryPlan_argsStandardSchemeFactory implements SchemeFactory {
       public GetQueryPlan_argsStandardScheme getScheme() {
         return new GetQueryPlan_argsStandardScheme();
@@ -13359,6 +13667,17 @@ public class TCLIService {
     private static class GetQueryPlan_argsStandardScheme extends StandardScheme<GetQueryPlan_args> {
 
       public void read(org.apache.thrift.protocol.TProtocol iprot, GetQueryPlan_args struct) throws org.apache.thrift.TException {
+=======
+    private static class GetDelegationToken_argsStandardSchemeFactory implements SchemeFactory {
+      public GetDelegationToken_argsStandardScheme getScheme() {
+        return new GetDelegationToken_argsStandardScheme();
+      }
+    }
+
+    private static class GetDelegationToken_argsStandardScheme extends StandardScheme<GetDelegationToken_args> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, GetDelegationToken_args struct) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         org.apache.thrift.protocol.TField schemeField;
         iprot.readStructBegin();
         while (true)
@@ -13370,7 +13689,11 @@ public class TCLIService {
           switch (schemeField.id) {
             case 1: // REQ
               if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+<<<<<<< HEAD
                 struct.req = new TGetQueryPlanReq();
+=======
+                struct.req = new TGetDelegationTokenReq();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
                 struct.req.read(iprot);
                 struct.setReqIsSet(true);
               } else { 
@@ -13386,7 +13709,11 @@ public class TCLIService {
         struct.validate();
       }
 
+<<<<<<< HEAD
       public void write(org.apache.thrift.protocol.TProtocol oprot, GetQueryPlan_args struct) throws org.apache.thrift.TException {
+=======
+      public void write(org.apache.thrift.protocol.TProtocol oprot, GetDelegationToken_args struct) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         struct.validate();
 
         oprot.writeStructBegin(STRUCT_DESC);
@@ -13401,6 +13728,7 @@ public class TCLIService {
 
     }
 
+<<<<<<< HEAD
     private static class GetQueryPlan_argsTupleSchemeFactory implements SchemeFactory {
       public GetQueryPlan_argsTupleScheme getScheme() {
         return new GetQueryPlan_argsTupleScheme();
@@ -13411,6 +13739,18 @@ public class TCLIService {
 
       @Override
       public void write(org.apache.thrift.protocol.TProtocol prot, GetQueryPlan_args struct) throws org.apache.thrift.TException {
+=======
+    private static class GetDelegationToken_argsTupleSchemeFactory implements SchemeFactory {
+      public GetDelegationToken_argsTupleScheme getScheme() {
+        return new GetDelegationToken_argsTupleScheme();
+      }
+    }
+
+    private static class GetDelegationToken_argsTupleScheme extends TupleScheme<GetDelegationToken_args> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, GetDelegationToken_args struct) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         TTupleProtocol oprot = (TTupleProtocol) prot;
         BitSet optionals = new BitSet();
         if (struct.isSetReq()) {
@@ -13423,11 +13763,19 @@ public class TCLIService {
       }
 
       @Override
+<<<<<<< HEAD
       public void read(org.apache.thrift.protocol.TProtocol prot, GetQueryPlan_args struct) throws org.apache.thrift.TException {
         TTupleProtocol iprot = (TTupleProtocol) prot;
         BitSet incoming = iprot.readBitSet(1);
         if (incoming.get(0)) {
           struct.req = new TGetQueryPlanReq();
+=======
+      public void read(org.apache.thrift.protocol.TProtocol prot, GetDelegationToken_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.req = new TGetDelegationTokenReq();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
           struct.req.read(iprot);
           struct.setReqIsSet(true);
         }
@@ -13436,18 +13784,31 @@ public class TCLIService {
 
   }
 
+<<<<<<< HEAD
   public static class GetQueryPlan_result implements org.apache.thrift.TBase<GetQueryPlan_result, GetQueryPlan_result._Fields>, java.io.Serializable, Cloneable   {
     private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("GetQueryPlan_result");
+=======
+  public static class GetDelegationToken_result implements org.apache.thrift.TBase<GetDelegationToken_result, GetDelegationToken_result._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("GetDelegationToken_result");
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
     private static final org.apache.thrift.protocol.TField SUCCESS_FIELD_DESC = new org.apache.thrift.protocol.TField("success", org.apache.thrift.protocol.TType.STRUCT, (short)0);
 
     private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
     static {
+<<<<<<< HEAD
       schemes.put(StandardScheme.class, new GetQueryPlan_resultStandardSchemeFactory());
       schemes.put(TupleScheme.class, new GetQueryPlan_resultTupleSchemeFactory());
     }
 
     private TGetQueryPlanResp success; // required
+=======
+      schemes.put(StandardScheme.class, new GetDelegationToken_resultStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new GetDelegationToken_resultTupleSchemeFactory());
+    }
+
+    private TGetDelegationTokenResp success; // required
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
     /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
     public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -13512,6 +13873,7 @@ public class TCLIService {
     static {
       Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
       tmpMap.put(_Fields.SUCCESS, new org.apache.thrift.meta_data.FieldMetaData("success", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+<<<<<<< HEAD
           new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TGetQueryPlanResp.class)));
       metaDataMap = Collections.unmodifiableMap(tmpMap);
       org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GetQueryPlan_result.class, metaDataMap);
@@ -13522,6 +13884,18 @@ public class TCLIService {
 
     public GetQueryPlan_result(
       TGetQueryPlanResp success)
+=======
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TGetDelegationTokenResp.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GetDelegationToken_result.class, metaDataMap);
+    }
+
+    public GetDelegationToken_result() {
+    }
+
+    public GetDelegationToken_result(
+      TGetDelegationTokenResp success)
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     {
       this();
       this.success = success;
@@ -13530,6 +13904,7 @@ public class TCLIService {
     /**
      * Performs a deep copy on <i>other</i>.
      */
+<<<<<<< HEAD
     public GetQueryPlan_result(GetQueryPlan_result other) {
       if (other.isSetSuccess()) {
         this.success = new TGetQueryPlanResp(other.success);
@@ -13538,6 +13913,16 @@ public class TCLIService {
 
     public GetQueryPlan_result deepCopy() {
       return new GetQueryPlan_result(this);
+=======
+    public GetDelegationToken_result(GetDelegationToken_result other) {
+      if (other.isSetSuccess()) {
+        this.success = new TGetDelegationTokenResp(other.success);
+      }
+    }
+
+    public GetDelegationToken_result deepCopy() {
+      return new GetDelegationToken_result(this);
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     }
 
     @Override
@@ -13545,11 +13930,19 @@ public class TCLIService {
       this.success = null;
     }
 
+<<<<<<< HEAD
     public TGetQueryPlanResp getSuccess() {
       return this.success;
     }
 
     public void setSuccess(TGetQueryPlanResp success) {
+=======
+    public TGetDelegationTokenResp getSuccess() {
+      return this.success;
+    }
+
+    public void setSuccess(TGetDelegationTokenResp success) {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       this.success = success;
     }
 
@@ -13574,7 +13967,11 @@ public class TCLIService {
         if (value == null) {
           unsetSuccess();
         } else {
+<<<<<<< HEAD
           setSuccess((TGetQueryPlanResp)value);
+=======
+          setSuccess((TGetDelegationTokenResp)value);
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         }
         break;
 
@@ -13607,12 +14004,21 @@ public class TCLIService {
     public boolean equals(Object that) {
       if (that == null)
         return false;
+<<<<<<< HEAD
       if (that instanceof GetQueryPlan_result)
         return this.equals((GetQueryPlan_result)that);
       return false;
     }
 
     public boolean equals(GetQueryPlan_result that) {
+=======
+      if (that instanceof GetDelegationToken_result)
+        return this.equals((GetDelegationToken_result)that);
+      return false;
+    }
+
+    public boolean equals(GetDelegationToken_result that) {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       if (that == null)
         return false;
 
@@ -13640,13 +14046,21 @@ public class TCLIService {
       return builder.toHashCode();
     }
 
+<<<<<<< HEAD
     public int compareTo(GetQueryPlan_result other) {
+=======
+    public int compareTo(GetDelegationToken_result other) {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       if (!getClass().equals(other.getClass())) {
         return getClass().getName().compareTo(other.getClass().getName());
       }
 
       int lastComparison = 0;
+<<<<<<< HEAD
       GetQueryPlan_result typedOther = (GetQueryPlan_result)other;
+=======
+      GetDelegationToken_result typedOther = (GetDelegationToken_result)other;
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
       lastComparison = Boolean.valueOf(isSetSuccess()).compareTo(typedOther.isSetSuccess());
       if (lastComparison != 0) {
@@ -13675,7 +14089,11 @@ public class TCLIService {
 
     @Override
     public String toString() {
+<<<<<<< HEAD
       StringBuilder sb = new StringBuilder("GetQueryPlan_result(");
+=======
+      StringBuilder sb = new StringBuilder("GetDelegationToken_result(");
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       boolean first = true;
 
       sb.append("success:");
@@ -13713,6 +14131,7 @@ public class TCLIService {
       }
     }
 
+<<<<<<< HEAD
     private static class GetQueryPlan_resultStandardSchemeFactory implements SchemeFactory {
       public GetQueryPlan_resultStandardScheme getScheme() {
         return new GetQueryPlan_resultStandardScheme();
@@ -13722,6 +14141,17 @@ public class TCLIService {
     private static class GetQueryPlan_resultStandardScheme extends StandardScheme<GetQueryPlan_result> {
 
       public void read(org.apache.thrift.protocol.TProtocol iprot, GetQueryPlan_result struct) throws org.apache.thrift.TException {
+=======
+    private static class GetDelegationToken_resultStandardSchemeFactory implements SchemeFactory {
+      public GetDelegationToken_resultStandardScheme getScheme() {
+        return new GetDelegationToken_resultStandardScheme();
+      }
+    }
+
+    private static class GetDelegationToken_resultStandardScheme extends StandardScheme<GetDelegationToken_result> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, GetDelegationToken_result struct) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         org.apache.thrift.protocol.TField schemeField;
         iprot.readStructBegin();
         while (true)
@@ -13733,7 +14163,11 @@ public class TCLIService {
           switch (schemeField.id) {
             case 0: // SUCCESS
               if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+<<<<<<< HEAD
                 struct.success = new TGetQueryPlanResp();
+=======
+                struct.success = new TGetDelegationTokenResp();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
                 struct.success.read(iprot);
                 struct.setSuccessIsSet(true);
               } else { 
@@ -13749,7 +14183,11 @@ public class TCLIService {
         struct.validate();
       }
 
+<<<<<<< HEAD
       public void write(org.apache.thrift.protocol.TProtocol oprot, GetQueryPlan_result struct) throws org.apache.thrift.TException {
+=======
+      public void write(org.apache.thrift.protocol.TProtocol oprot, GetDelegationToken_result struct) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         struct.validate();
 
         oprot.writeStructBegin(STRUCT_DESC);
@@ -13764,6 +14202,7 @@ public class TCLIService {
 
     }
 
+<<<<<<< HEAD
     private static class GetQueryPlan_resultTupleSchemeFactory implements SchemeFactory {
       public GetQueryPlan_resultTupleScheme getScheme() {
         return new GetQueryPlan_resultTupleScheme();
@@ -13774,6 +14213,18 @@ public class TCLIService {
 
       @Override
       public void write(org.apache.thrift.protocol.TProtocol prot, GetQueryPlan_result struct) throws org.apache.thrift.TException {
+=======
+    private static class GetDelegationToken_resultTupleSchemeFactory implements SchemeFactory {
+      public GetDelegationToken_resultTupleScheme getScheme() {
+        return new GetDelegationToken_resultTupleScheme();
+      }
+    }
+
+    private static class GetDelegationToken_resultTupleScheme extends TupleScheme<GetDelegationToken_result> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, GetDelegationToken_result struct) throws org.apache.thrift.TException {
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         TTupleProtocol oprot = (TTupleProtocol) prot;
         BitSet optionals = new BitSet();
         if (struct.isSetSuccess()) {
@@ -13786,11 +14237,1471 @@ public class TCLIService {
       }
 
       @Override
+<<<<<<< HEAD
       public void read(org.apache.thrift.protocol.TProtocol prot, GetQueryPlan_result struct) throws org.apache.thrift.TException {
         TTupleProtocol iprot = (TTupleProtocol) prot;
         BitSet incoming = iprot.readBitSet(1);
         if (incoming.get(0)) {
           struct.success = new TGetQueryPlanResp();
+=======
+      public void read(org.apache.thrift.protocol.TProtocol prot, GetDelegationToken_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.success = new TGetDelegationTokenResp();
+          struct.success.read(iprot);
+          struct.setSuccessIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class CancelDelegationToken_args implements org.apache.thrift.TBase<CancelDelegationToken_args, CancelDelegationToken_args._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("CancelDelegationToken_args");
+
+    private static final org.apache.thrift.protocol.TField REQ_FIELD_DESC = new org.apache.thrift.protocol.TField("req", org.apache.thrift.protocol.TType.STRUCT, (short)1);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new CancelDelegationToken_argsStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new CancelDelegationToken_argsTupleSchemeFactory());
+    }
+
+    private TCancelDelegationTokenReq req; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      REQ((short)1, "req");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 1: // REQ
+            return REQ;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.REQ, new org.apache.thrift.meta_data.FieldMetaData("req", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TCancelDelegationTokenReq.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(CancelDelegationToken_args.class, metaDataMap);
+    }
+
+    public CancelDelegationToken_args() {
+    }
+
+    public CancelDelegationToken_args(
+      TCancelDelegationTokenReq req)
+    {
+      this();
+      this.req = req;
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public CancelDelegationToken_args(CancelDelegationToken_args other) {
+      if (other.isSetReq()) {
+        this.req = new TCancelDelegationTokenReq(other.req);
+      }
+    }
+
+    public CancelDelegationToken_args deepCopy() {
+      return new CancelDelegationToken_args(this);
+    }
+
+    @Override
+    public void clear() {
+      this.req = null;
+    }
+
+    public TCancelDelegationTokenReq getReq() {
+      return this.req;
+    }
+
+    public void setReq(TCancelDelegationTokenReq req) {
+      this.req = req;
+    }
+
+    public void unsetReq() {
+      this.req = null;
+    }
+
+    /** Returns true if field req is set (has been assigned a value) and false otherwise */
+    public boolean isSetReq() {
+      return this.req != null;
+    }
+
+    public void setReqIsSet(boolean value) {
+      if (!value) {
+        this.req = null;
+      }
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case REQ:
+        if (value == null) {
+          unsetReq();
+        } else {
+          setReq((TCancelDelegationTokenReq)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case REQ:
+        return getReq();
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case REQ:
+        return isSetReq();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof CancelDelegationToken_args)
+        return this.equals((CancelDelegationToken_args)that);
+      return false;
+    }
+
+    public boolean equals(CancelDelegationToken_args that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_req = true && this.isSetReq();
+      boolean that_present_req = true && that.isSetReq();
+      if (this_present_req || that_present_req) {
+        if (!(this_present_req && that_present_req))
+          return false;
+        if (!this.req.equals(that.req))
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      HashCodeBuilder builder = new HashCodeBuilder();
+
+      boolean present_req = true && (isSetReq());
+      builder.append(present_req);
+      if (present_req)
+        builder.append(req);
+
+      return builder.toHashCode();
+    }
+
+    public int compareTo(CancelDelegationToken_args other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+      CancelDelegationToken_args typedOther = (CancelDelegationToken_args)other;
+
+      lastComparison = Boolean.valueOf(isSetReq()).compareTo(typedOther.isSetReq());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetReq()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.req, typedOther.req);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("CancelDelegationToken_args(");
+      boolean first = true;
+
+      sb.append("req:");
+      if (this.req == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.req);
+      }
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+      if (req != null) {
+        req.validate();
+      }
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class CancelDelegationToken_argsStandardSchemeFactory implements SchemeFactory {
+      public CancelDelegationToken_argsStandardScheme getScheme() {
+        return new CancelDelegationToken_argsStandardScheme();
+      }
+    }
+
+    private static class CancelDelegationToken_argsStandardScheme extends StandardScheme<CancelDelegationToken_args> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, CancelDelegationToken_args struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 1: // REQ
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.req = new TCancelDelegationTokenReq();
+                struct.req.read(iprot);
+                struct.setReqIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, CancelDelegationToken_args struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.req != null) {
+          oprot.writeFieldBegin(REQ_FIELD_DESC);
+          struct.req.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class CancelDelegationToken_argsTupleSchemeFactory implements SchemeFactory {
+      public CancelDelegationToken_argsTupleScheme getScheme() {
+        return new CancelDelegationToken_argsTupleScheme();
+      }
+    }
+
+    private static class CancelDelegationToken_argsTupleScheme extends TupleScheme<CancelDelegationToken_args> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, CancelDelegationToken_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetReq()) {
+          optionals.set(0);
+        }
+        oprot.writeBitSet(optionals, 1);
+        if (struct.isSetReq()) {
+          struct.req.write(oprot);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, CancelDelegationToken_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.req = new TCancelDelegationTokenReq();
+          struct.req.read(iprot);
+          struct.setReqIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class CancelDelegationToken_result implements org.apache.thrift.TBase<CancelDelegationToken_result, CancelDelegationToken_result._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("CancelDelegationToken_result");
+
+    private static final org.apache.thrift.protocol.TField SUCCESS_FIELD_DESC = new org.apache.thrift.protocol.TField("success", org.apache.thrift.protocol.TType.STRUCT, (short)0);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new CancelDelegationToken_resultStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new CancelDelegationToken_resultTupleSchemeFactory());
+    }
+
+    private TCancelDelegationTokenResp success; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      SUCCESS((short)0, "success");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 0: // SUCCESS
+            return SUCCESS;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.SUCCESS, new org.apache.thrift.meta_data.FieldMetaData("success", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TCancelDelegationTokenResp.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(CancelDelegationToken_result.class, metaDataMap);
+    }
+
+    public CancelDelegationToken_result() {
+    }
+
+    public CancelDelegationToken_result(
+      TCancelDelegationTokenResp success)
+    {
+      this();
+      this.success = success;
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public CancelDelegationToken_result(CancelDelegationToken_result other) {
+      if (other.isSetSuccess()) {
+        this.success = new TCancelDelegationTokenResp(other.success);
+      }
+    }
+
+    public CancelDelegationToken_result deepCopy() {
+      return new CancelDelegationToken_result(this);
+    }
+
+    @Override
+    public void clear() {
+      this.success = null;
+    }
+
+    public TCancelDelegationTokenResp getSuccess() {
+      return this.success;
+    }
+
+    public void setSuccess(TCancelDelegationTokenResp success) {
+      this.success = success;
+    }
+
+    public void unsetSuccess() {
+      this.success = null;
+    }
+
+    /** Returns true if field success is set (has been assigned a value) and false otherwise */
+    public boolean isSetSuccess() {
+      return this.success != null;
+    }
+
+    public void setSuccessIsSet(boolean value) {
+      if (!value) {
+        this.success = null;
+      }
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case SUCCESS:
+        if (value == null) {
+          unsetSuccess();
+        } else {
+          setSuccess((TCancelDelegationTokenResp)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case SUCCESS:
+        return getSuccess();
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case SUCCESS:
+        return isSetSuccess();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof CancelDelegationToken_result)
+        return this.equals((CancelDelegationToken_result)that);
+      return false;
+    }
+
+    public boolean equals(CancelDelegationToken_result that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_success = true && this.isSetSuccess();
+      boolean that_present_success = true && that.isSetSuccess();
+      if (this_present_success || that_present_success) {
+        if (!(this_present_success && that_present_success))
+          return false;
+        if (!this.success.equals(that.success))
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      HashCodeBuilder builder = new HashCodeBuilder();
+
+      boolean present_success = true && (isSetSuccess());
+      builder.append(present_success);
+      if (present_success)
+        builder.append(success);
+
+      return builder.toHashCode();
+    }
+
+    public int compareTo(CancelDelegationToken_result other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+      CancelDelegationToken_result typedOther = (CancelDelegationToken_result)other;
+
+      lastComparison = Boolean.valueOf(isSetSuccess()).compareTo(typedOther.isSetSuccess());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetSuccess()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.success, typedOther.success);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+      }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("CancelDelegationToken_result(");
+      boolean first = true;
+
+      sb.append("success:");
+      if (this.success == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.success);
+      }
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+      if (success != null) {
+        success.validate();
+      }
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class CancelDelegationToken_resultStandardSchemeFactory implements SchemeFactory {
+      public CancelDelegationToken_resultStandardScheme getScheme() {
+        return new CancelDelegationToken_resultStandardScheme();
+      }
+    }
+
+    private static class CancelDelegationToken_resultStandardScheme extends StandardScheme<CancelDelegationToken_result> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, CancelDelegationToken_result struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 0: // SUCCESS
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.success = new TCancelDelegationTokenResp();
+                struct.success.read(iprot);
+                struct.setSuccessIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, CancelDelegationToken_result struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.success != null) {
+          oprot.writeFieldBegin(SUCCESS_FIELD_DESC);
+          struct.success.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class CancelDelegationToken_resultTupleSchemeFactory implements SchemeFactory {
+      public CancelDelegationToken_resultTupleScheme getScheme() {
+        return new CancelDelegationToken_resultTupleScheme();
+      }
+    }
+
+    private static class CancelDelegationToken_resultTupleScheme extends TupleScheme<CancelDelegationToken_result> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, CancelDelegationToken_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetSuccess()) {
+          optionals.set(0);
+        }
+        oprot.writeBitSet(optionals, 1);
+        if (struct.isSetSuccess()) {
+          struct.success.write(oprot);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, CancelDelegationToken_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.success = new TCancelDelegationTokenResp();
+          struct.success.read(iprot);
+          struct.setSuccessIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class RenewDelegationToken_args implements org.apache.thrift.TBase<RenewDelegationToken_args, RenewDelegationToken_args._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("RenewDelegationToken_args");
+
+    private static final org.apache.thrift.protocol.TField REQ_FIELD_DESC = new org.apache.thrift.protocol.TField("req", org.apache.thrift.protocol.TType.STRUCT, (short)1);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new RenewDelegationToken_argsStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new RenewDelegationToken_argsTupleSchemeFactory());
+    }
+
+    private TRenewDelegationTokenReq req; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      REQ((short)1, "req");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 1: // REQ
+            return REQ;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.REQ, new org.apache.thrift.meta_data.FieldMetaData("req", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TRenewDelegationTokenReq.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(RenewDelegationToken_args.class, metaDataMap);
+    }
+
+    public RenewDelegationToken_args() {
+    }
+
+    public RenewDelegationToken_args(
+      TRenewDelegationTokenReq req)
+    {
+      this();
+      this.req = req;
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public RenewDelegationToken_args(RenewDelegationToken_args other) {
+      if (other.isSetReq()) {
+        this.req = new TRenewDelegationTokenReq(other.req);
+      }
+    }
+
+    public RenewDelegationToken_args deepCopy() {
+      return new RenewDelegationToken_args(this);
+    }
+
+    @Override
+    public void clear() {
+      this.req = null;
+    }
+
+    public TRenewDelegationTokenReq getReq() {
+      return this.req;
+    }
+
+    public void setReq(TRenewDelegationTokenReq req) {
+      this.req = req;
+    }
+
+    public void unsetReq() {
+      this.req = null;
+    }
+
+    /** Returns true if field req is set (has been assigned a value) and false otherwise */
+    public boolean isSetReq() {
+      return this.req != null;
+    }
+
+    public void setReqIsSet(boolean value) {
+      if (!value) {
+        this.req = null;
+      }
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case REQ:
+        if (value == null) {
+          unsetReq();
+        } else {
+          setReq((TRenewDelegationTokenReq)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case REQ:
+        return getReq();
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case REQ:
+        return isSetReq();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof RenewDelegationToken_args)
+        return this.equals((RenewDelegationToken_args)that);
+      return false;
+    }
+
+    public boolean equals(RenewDelegationToken_args that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_req = true && this.isSetReq();
+      boolean that_present_req = true && that.isSetReq();
+      if (this_present_req || that_present_req) {
+        if (!(this_present_req && that_present_req))
+          return false;
+        if (!this.req.equals(that.req))
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      HashCodeBuilder builder = new HashCodeBuilder();
+
+      boolean present_req = true && (isSetReq());
+      builder.append(present_req);
+      if (present_req)
+        builder.append(req);
+
+      return builder.toHashCode();
+    }
+
+    public int compareTo(RenewDelegationToken_args other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+      RenewDelegationToken_args typedOther = (RenewDelegationToken_args)other;
+
+      lastComparison = Boolean.valueOf(isSetReq()).compareTo(typedOther.isSetReq());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetReq()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.req, typedOther.req);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("RenewDelegationToken_args(");
+      boolean first = true;
+
+      sb.append("req:");
+      if (this.req == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.req);
+      }
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+      if (req != null) {
+        req.validate();
+      }
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class RenewDelegationToken_argsStandardSchemeFactory implements SchemeFactory {
+      public RenewDelegationToken_argsStandardScheme getScheme() {
+        return new RenewDelegationToken_argsStandardScheme();
+      }
+    }
+
+    private static class RenewDelegationToken_argsStandardScheme extends StandardScheme<RenewDelegationToken_args> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, RenewDelegationToken_args struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 1: // REQ
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.req = new TRenewDelegationTokenReq();
+                struct.req.read(iprot);
+                struct.setReqIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, RenewDelegationToken_args struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.req != null) {
+          oprot.writeFieldBegin(REQ_FIELD_DESC);
+          struct.req.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class RenewDelegationToken_argsTupleSchemeFactory implements SchemeFactory {
+      public RenewDelegationToken_argsTupleScheme getScheme() {
+        return new RenewDelegationToken_argsTupleScheme();
+      }
+    }
+
+    private static class RenewDelegationToken_argsTupleScheme extends TupleScheme<RenewDelegationToken_args> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, RenewDelegationToken_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetReq()) {
+          optionals.set(0);
+        }
+        oprot.writeBitSet(optionals, 1);
+        if (struct.isSetReq()) {
+          struct.req.write(oprot);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, RenewDelegationToken_args struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.req = new TRenewDelegationTokenReq();
+          struct.req.read(iprot);
+          struct.setReqIsSet(true);
+        }
+      }
+    }
+
+  }
+
+  public static class RenewDelegationToken_result implements org.apache.thrift.TBase<RenewDelegationToken_result, RenewDelegationToken_result._Fields>, java.io.Serializable, Cloneable   {
+    private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("RenewDelegationToken_result");
+
+    private static final org.apache.thrift.protocol.TField SUCCESS_FIELD_DESC = new org.apache.thrift.protocol.TField("success", org.apache.thrift.protocol.TType.STRUCT, (short)0);
+
+    private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+    static {
+      schemes.put(StandardScheme.class, new RenewDelegationToken_resultStandardSchemeFactory());
+      schemes.put(TupleScheme.class, new RenewDelegationToken_resultTupleSchemeFactory());
+    }
+
+    private TRenewDelegationTokenResp success; // required
+
+    /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
+    public enum _Fields implements org.apache.thrift.TFieldIdEnum {
+      SUCCESS((short)0, "success");
+
+      private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
+
+      static {
+        for (_Fields field : EnumSet.allOf(_Fields.class)) {
+          byName.put(field.getFieldName(), field);
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, or null if its not found.
+       */
+      public static _Fields findByThriftId(int fieldId) {
+        switch(fieldId) {
+          case 0: // SUCCESS
+            return SUCCESS;
+          default:
+            return null;
+        }
+      }
+
+      /**
+       * Find the _Fields constant that matches fieldId, throwing an exception
+       * if it is not found.
+       */
+      public static _Fields findByThriftIdOrThrow(int fieldId) {
+        _Fields fields = findByThriftId(fieldId);
+        if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+        return fields;
+      }
+
+      /**
+       * Find the _Fields constant that matches name, or null if its not found.
+       */
+      public static _Fields findByName(String name) {
+        return byName.get(name);
+      }
+
+      private final short _thriftId;
+      private final String _fieldName;
+
+      _Fields(short thriftId, String fieldName) {
+        _thriftId = thriftId;
+        _fieldName = fieldName;
+      }
+
+      public short getThriftFieldId() {
+        return _thriftId;
+      }
+
+      public String getFieldName() {
+        return _fieldName;
+      }
+    }
+
+    // isset id assignments
+    public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
+    static {
+      Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+      tmpMap.put(_Fields.SUCCESS, new org.apache.thrift.meta_data.FieldMetaData("success", org.apache.thrift.TFieldRequirementType.DEFAULT, 
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TRenewDelegationTokenResp.class)));
+      metaDataMap = Collections.unmodifiableMap(tmpMap);
+      org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(RenewDelegationToken_result.class, metaDataMap);
+    }
+
+    public RenewDelegationToken_result() {
+    }
+
+    public RenewDelegationToken_result(
+      TRenewDelegationTokenResp success)
+    {
+      this();
+      this.success = success;
+    }
+
+    /**
+     * Performs a deep copy on <i>other</i>.
+     */
+    public RenewDelegationToken_result(RenewDelegationToken_result other) {
+      if (other.isSetSuccess()) {
+        this.success = new TRenewDelegationTokenResp(other.success);
+      }
+    }
+
+    public RenewDelegationToken_result deepCopy() {
+      return new RenewDelegationToken_result(this);
+    }
+
+    @Override
+    public void clear() {
+      this.success = null;
+    }
+
+    public TRenewDelegationTokenResp getSuccess() {
+      return this.success;
+    }
+
+    public void setSuccess(TRenewDelegationTokenResp success) {
+      this.success = success;
+    }
+
+    public void unsetSuccess() {
+      this.success = null;
+    }
+
+    /** Returns true if field success is set (has been assigned a value) and false otherwise */
+    public boolean isSetSuccess() {
+      return this.success != null;
+    }
+
+    public void setSuccessIsSet(boolean value) {
+      if (!value) {
+        this.success = null;
+      }
+    }
+
+    public void setFieldValue(_Fields field, Object value) {
+      switch (field) {
+      case SUCCESS:
+        if (value == null) {
+          unsetSuccess();
+        } else {
+          setSuccess((TRenewDelegationTokenResp)value);
+        }
+        break;
+
+      }
+    }
+
+    public Object getFieldValue(_Fields field) {
+      switch (field) {
+      case SUCCESS:
+        return getSuccess();
+
+      }
+      throw new IllegalStateException();
+    }
+
+    /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+    public boolean isSet(_Fields field) {
+      if (field == null) {
+        throw new IllegalArgumentException();
+      }
+
+      switch (field) {
+      case SUCCESS:
+        return isSetSuccess();
+      }
+      throw new IllegalStateException();
+    }
+
+    @Override
+    public boolean equals(Object that) {
+      if (that == null)
+        return false;
+      if (that instanceof RenewDelegationToken_result)
+        return this.equals((RenewDelegationToken_result)that);
+      return false;
+    }
+
+    public boolean equals(RenewDelegationToken_result that) {
+      if (that == null)
+        return false;
+
+      boolean this_present_success = true && this.isSetSuccess();
+      boolean that_present_success = true && that.isSetSuccess();
+      if (this_present_success || that_present_success) {
+        if (!(this_present_success && that_present_success))
+          return false;
+        if (!this.success.equals(that.success))
+          return false;
+      }
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      HashCodeBuilder builder = new HashCodeBuilder();
+
+      boolean present_success = true && (isSetSuccess());
+      builder.append(present_success);
+      if (present_success)
+        builder.append(success);
+
+      return builder.toHashCode();
+    }
+
+    public int compareTo(RenewDelegationToken_result other) {
+      if (!getClass().equals(other.getClass())) {
+        return getClass().getName().compareTo(other.getClass().getName());
+      }
+
+      int lastComparison = 0;
+      RenewDelegationToken_result typedOther = (RenewDelegationToken_result)other;
+
+      lastComparison = Boolean.valueOf(isSetSuccess()).compareTo(typedOther.isSetSuccess());
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+      if (isSetSuccess()) {
+        lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.success, typedOther.success);
+        if (lastComparison != 0) {
+          return lastComparison;
+        }
+      }
+      return 0;
+    }
+
+    public _Fields fieldForId(int fieldId) {
+      return _Fields.findByThriftId(fieldId);
+    }
+
+    public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
+      schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
+    }
+
+    public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+      schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
+      }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("RenewDelegationToken_result(");
+      boolean first = true;
+
+      sb.append("success:");
+      if (this.success == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.success);
+      }
+      first = false;
+      sb.append(")");
+      return sb.toString();
+    }
+
+    public void validate() throws org.apache.thrift.TException {
+      // check for required fields
+      // check for sub-struct validity
+      if (success != null) {
+        success.validate();
+      }
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+      try {
+        write(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(out)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      try {
+        read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
+      } catch (org.apache.thrift.TException te) {
+        throw new java.io.IOException(te);
+      }
+    }
+
+    private static class RenewDelegationToken_resultStandardSchemeFactory implements SchemeFactory {
+      public RenewDelegationToken_resultStandardScheme getScheme() {
+        return new RenewDelegationToken_resultStandardScheme();
+      }
+    }
+
+    private static class RenewDelegationToken_resultStandardScheme extends StandardScheme<RenewDelegationToken_result> {
+
+      public void read(org.apache.thrift.protocol.TProtocol iprot, RenewDelegationToken_result struct) throws org.apache.thrift.TException {
+        org.apache.thrift.protocol.TField schemeField;
+        iprot.readStructBegin();
+        while (true)
+        {
+          schemeField = iprot.readFieldBegin();
+          if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+            break;
+          }
+          switch (schemeField.id) {
+            case 0: // SUCCESS
+              if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+                struct.success = new TRenewDelegationTokenResp();
+                struct.success.read(iprot);
+                struct.setSuccessIsSet(true);
+              } else { 
+                org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+              }
+              break;
+            default:
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+          }
+          iprot.readFieldEnd();
+        }
+        iprot.readStructEnd();
+        struct.validate();
+      }
+
+      public void write(org.apache.thrift.protocol.TProtocol oprot, RenewDelegationToken_result struct) throws org.apache.thrift.TException {
+        struct.validate();
+
+        oprot.writeStructBegin(STRUCT_DESC);
+        if (struct.success != null) {
+          oprot.writeFieldBegin(SUCCESS_FIELD_DESC);
+          struct.success.write(oprot);
+          oprot.writeFieldEnd();
+        }
+        oprot.writeFieldStop();
+        oprot.writeStructEnd();
+      }
+
+    }
+
+    private static class RenewDelegationToken_resultTupleSchemeFactory implements SchemeFactory {
+      public RenewDelegationToken_resultTupleScheme getScheme() {
+        return new RenewDelegationToken_resultTupleScheme();
+      }
+    }
+
+    private static class RenewDelegationToken_resultTupleScheme extends TupleScheme<RenewDelegationToken_result> {
+
+      @Override
+      public void write(org.apache.thrift.protocol.TProtocol prot, RenewDelegationToken_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol oprot = (TTupleProtocol) prot;
+        BitSet optionals = new BitSet();
+        if (struct.isSetSuccess()) {
+          optionals.set(0);
+        }
+        oprot.writeBitSet(optionals, 1);
+        if (struct.isSetSuccess()) {
+          struct.success.write(oprot);
+        }
+      }
+
+      @Override
+      public void read(org.apache.thrift.protocol.TProtocol prot, RenewDelegationToken_result struct) throws org.apache.thrift.TException {
+        TTupleProtocol iprot = (TTupleProtocol) prot;
+        BitSet incoming = iprot.readBitSet(1);
+        if (incoming.get(0)) {
+          struct.success = new TRenewDelegationTokenResp();
+>>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
           struct.success.read(iprot);
           struct.setSuccessIsSet(true);
         }
