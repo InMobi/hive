@@ -110,7 +110,8 @@ public class StorageTableResolver implements ContextRewriter {
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql) {
     Set<CubeDimensionTable> dimsToResolve = new HashSet<CubeDimensionTable>(cubeql.getDimensionTables());
     dimsToResolve.addAll(cubeql.getAutoJoinDimensions());
-    for (CubeDimensionTable dim : cubeql.getDimensionTables()) {
+    dimsToResolve.addAll(cubeql.getDimensionTables());
+    for (CubeDimensionTable dim : dimsToResolve) {
       for (String storage : dim.getStorages()) {
         if (isStorageSupported(storage)) {
           String tableName = MetastoreUtil.getDimStorageTableName(
