@@ -162,11 +162,5 @@ public class TestSessionState {
         }
       }
     }
-    System.out.println("Loader3:(CurrentThread.getContextClassLoader()) " +
-        Thread.currentThread().getContextClassLoader());
-    assertEquals("Other thread loader and session state loader",
-        otherThread.loader, loader2);
-    assertEquals("Other thread loader and current thread loader",
-        otherThread.loader, Thread.currentThread().getContextClassLoader());
   }
 }
