@@ -9362,10 +9362,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             if (((TableScanDesc)topOp.getConf()).getIsMetadataOnly()) {
               continue;
             }
-            PrunedPartitionList parts = pCtx.getOpToPartList().get((TableScanOperator) topOp);
-            if (parts.getPartitions().size() > scanLimit) {
+            List<PrunedPartitionList> partList = pCtx.getOpToPartList().get((TableScanOperator) topOp);
+            Set<Partition> parts = new HashSet<Partition>();
+            for (PrunedPartitionList ppl :  partList) {
+              parts.addAll(ppl.getPartitions());
+            }
+            if (parts.size() > scanLimit) {
               throw new SemanticException(ErrorMsg.PARTITION_SCAN_LIMIT_EXCEEDED, ""
-                  + parts.getPartitions().size(), "" + parts.getSourceTable().getTableName(), ""
+                  + parts.size(), "" + partList.get(0).getSourceTable().getTableName(), ""
                   + scanLimit);
             }
           }

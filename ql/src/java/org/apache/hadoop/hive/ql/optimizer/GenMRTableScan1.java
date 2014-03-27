@@ -147,7 +147,8 @@ public class GenMRTableScan1 implements NodeProcessor {
                 .getConfirmedPartitionsForScan(parseInfo);
             if (confirmedPartns.size() > 0) {
               Table source = parseCtx.getQB().getMetaData().getTableForAlias(alias);
-              PrunedPartitionList partList = new PrunedPartitionList(source, confirmedPartns, false);
+              List<PrunedPartitionList> partList = new ArrayList<PrunedPartitionList>();
+              partList.add(new PrunedPartitionList(source, confirmedPartns, false));
               GenMapRedUtils.setTaskPlan(currAliasId, currTopOp, currTask, false, ctx, partList);
             } else { // non-partitioned table
               GenMapRedUtils.setTaskPlan(currAliasId, currTopOp, currTask, false, ctx);
