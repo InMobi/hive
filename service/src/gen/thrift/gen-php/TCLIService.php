@@ -32,13 +32,10 @@ interface TCLIServiceIf {
   public function CloseOperation(\TCloseOperationReq $req);
   public function GetResultSetMetadata(\TGetResultSetMetadataReq $req);
   public function FetchResults(\TFetchResultsReq $req);
-<<<<<<< HEAD
   public function GetQueryPlan(\TGetQueryPlanReq $req);
-=======
   public function GetDelegationToken(\TGetDelegationTokenReq $req);
   public function CancelDelegationToken(\TCancelDelegationTokenReq $req);
   public function RenewDelegationToken(\TRenewDelegationTokenReq $req);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 }
 
 class TCLIServiceClient implements \TCLIServiceIf {
@@ -868,7 +865,6 @@ class TCLIServiceClient implements \TCLIServiceIf {
     throw new \Exception("FetchResults failed: unknown result");
   }
 
-<<<<<<< HEAD
   public function GetQueryPlan(\TGetQueryPlanReq $req)
   {
     $this->send_GetQueryPlan($req);
@@ -878,51 +874,25 @@ class TCLIServiceClient implements \TCLIServiceIf {
   public function send_GetQueryPlan(\TGetQueryPlanReq $req)
   {
     $args = new \TCLIService_GetQueryPlan_args();
-=======
-  public function GetDelegationToken(\TGetDelegationTokenReq $req)
-  {
-    $this->send_GetDelegationToken($req);
-    return $this->recv_GetDelegationToken();
-  }
-
-  public function send_GetDelegationToken(\TGetDelegationTokenReq $req)
-  {
-    $args = new \TCLIService_GetDelegationToken_args();
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     $args->req = $req;
     $bin_accel = ($this->output_ instanceof TProtocol::$TBINARYPROTOCOLACCELERATED) && function_exists('thrift_protocol_write_binary');
     if ($bin_accel)
     {
-<<<<<<< HEAD
       thrift_protocol_write_binary($this->output_, 'GetQueryPlan', TMessageType::CALL, $args, $this->seqid_, $this->output_->isStrictWrite());
     }
     else
     {
       $this->output_->writeMessageBegin('GetQueryPlan', TMessageType::CALL, $this->seqid_);
-=======
-      thrift_protocol_write_binary($this->output_, 'GetDelegationToken', TMessageType::CALL, $args, $this->seqid_, $this->output_->isStrictWrite());
-    }
-    else
-    {
-      $this->output_->writeMessageBegin('GetDelegationToken', TMessageType::CALL, $this->seqid_);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       $args->write($this->output_);
       $this->output_->writeMessageEnd();
       $this->output_->getTransport()->flush();
     }
   }
 
-<<<<<<< HEAD
   public function recv_GetQueryPlan()
   {
     $bin_accel = ($this->input_ instanceof TProtocol::$TBINARYPROTOCOLACCELERATED) && function_exists('thrift_protocol_read_binary');
     if ($bin_accel) $result = thrift_protocol_read_binary($this->input_, '\TCLIService_GetQueryPlan_result', $this->input_->isStrictRead());
-=======
-  public function recv_GetDelegationToken()
-  {
-    $bin_accel = ($this->input_ instanceof TProtocol::$TBINARYPROTOCOLACCELERATED) && function_exists('thrift_protocol_read_binary');
-    if ($bin_accel) $result = thrift_protocol_read_binary($this->input_, '\TCLIService_GetDelegationToken_result', $this->input_->isStrictRead());
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     else
     {
       $rseqid = 0;
@@ -936,20 +906,64 @@ class TCLIServiceClient implements \TCLIServiceIf {
         $this->input_->readMessageEnd();
         throw $x;
       }
-<<<<<<< HEAD
       $result = new \TCLIService_GetQueryPlan_result();
-=======
-      $result = new \TCLIService_GetDelegationToken_result();
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
       $result->read($this->input_);
       $this->input_->readMessageEnd();
     }
     if ($result->success !== null) {
       return $result->success;
     }
-<<<<<<< HEAD
     throw new \Exception("GetQueryPlan failed: unknown result");
-=======
+  }
+
+  public function GetDelegationToken(\TGetDelegationTokenReq $req)
+  {
+    $this->send_GetDelegationToken($req);
+    return $this->recv_GetDelegationToken();
+  }
+
+  public function send_GetDelegationToken(\TGetDelegationTokenReq $req)
+  {
+    $args = new \TCLIService_GetDelegationToken_args();
+    $args->req = $req;
+    $bin_accel = ($this->output_ instanceof TProtocol::$TBINARYPROTOCOLACCELERATED) && function_exists('thrift_protocol_write_binary');
+    if ($bin_accel)
+    {
+      thrift_protocol_write_binary($this->output_, 'GetDelegationToken', TMessageType::CALL, $args, $this->seqid_, $this->output_->isStrictWrite());
+    }
+    else
+    {
+      $this->output_->writeMessageBegin('GetDelegationToken', TMessageType::CALL, $this->seqid_);
+      $args->write($this->output_);
+      $this->output_->writeMessageEnd();
+      $this->output_->getTransport()->flush();
+    }
+  }
+
+  public function recv_GetDelegationToken()
+  {
+    $bin_accel = ($this->input_ instanceof TProtocol::$TBINARYPROTOCOLACCELERATED) && function_exists('thrift_protocol_read_binary');
+    if ($bin_accel) $result = thrift_protocol_read_binary($this->input_, '\TCLIService_GetDelegationToken_result', $this->input_->isStrictRead());
+    else
+    {
+      $rseqid = 0;
+      $fname = null;
+      $mtype = 0;
+
+      $this->input_->readMessageBegin($fname, $mtype, $rseqid);
+      if ($mtype == TMessageType::EXCEPTION) {
+        $x = new TApplicationException();
+        $x->read($this->input_);
+        $this->input_->readMessageEnd();
+        throw $x;
+      }
+      $result = new \TCLIService_GetDelegationToken_result();
+      $result->read($this->input_);
+      $this->input_->readMessageEnd();
+    }
+    if ($result->success !== null) {
+      return $result->success;
+    }
     throw new \Exception("GetDelegationToken failed: unknown result");
   }
 
@@ -1053,7 +1067,6 @@ class TCLIServiceClient implements \TCLIServiceIf {
       return $result->success;
     }
     throw new \Exception("RenewDelegationToken failed: unknown result");
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
 }
@@ -3524,11 +3537,7 @@ class TCLIService_FetchResults_result {
 
 }
 
-<<<<<<< HEAD
 class TCLIService_GetQueryPlan_args {
-=======
-class TCLIService_GetDelegationToken_args {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   static $_TSPEC;
 
   public $req = null;
@@ -3539,11 +3548,7 @@ class TCLIService_GetDelegationToken_args {
         1 => array(
           'var' => 'req',
           'type' => TType::STRUCT,
-<<<<<<< HEAD
           'class' => '\TGetQueryPlanReq',
-=======
-          'class' => '\TGetDelegationTokenReq',
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
           ),
         );
     }
@@ -3555,11 +3560,7 @@ class TCLIService_GetDelegationToken_args {
   }
 
   public function getName() {
-<<<<<<< HEAD
     return 'TCLIService_GetQueryPlan_args';
-=======
-    return 'TCLIService_GetDelegationToken_args';
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
   public function read($input)
@@ -3579,11 +3580,7 @@ class TCLIService_GetDelegationToken_args {
       {
         case 1:
           if ($ftype == TType::STRUCT) {
-<<<<<<< HEAD
             $this->req = new \TGetQueryPlanReq();
-=======
-            $this->req = new \TGetDelegationTokenReq();
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
             $xfer += $this->req->read($input);
           } else {
             $xfer += $input->skip($ftype);
@@ -3601,11 +3598,7 @@ class TCLIService_GetDelegationToken_args {
 
   public function write($output) {
     $xfer = 0;
-<<<<<<< HEAD
     $xfer += $output->writeStructBegin('TCLIService_GetQueryPlan_args');
-=======
-    $xfer += $output->writeStructBegin('TCLIService_GetDelegationToken_args');
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     if ($this->req !== null) {
       if (!is_object($this->req)) {
         throw new TProtocolException('Bad type in structure.', TProtocolException::INVALID_DATA);
@@ -3621,11 +3614,7 @@ class TCLIService_GetDelegationToken_args {
 
 }
 
-<<<<<<< HEAD
 class TCLIService_GetQueryPlan_result {
-=======
-class TCLIService_GetDelegationToken_result {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   static $_TSPEC;
 
   public $success = null;
@@ -3636,11 +3625,7 @@ class TCLIService_GetDelegationToken_result {
         0 => array(
           'var' => 'success',
           'type' => TType::STRUCT,
-<<<<<<< HEAD
           'class' => '\TGetQueryPlanResp',
-=======
-          'class' => '\TGetDelegationTokenResp',
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
           ),
         );
     }
@@ -3652,11 +3637,7 @@ class TCLIService_GetDelegationToken_result {
   }
 
   public function getName() {
-<<<<<<< HEAD
     return 'TCLIService_GetQueryPlan_result';
-=======
-    return 'TCLIService_GetDelegationToken_result';
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
   public function read($input)
@@ -3676,11 +3657,7 @@ class TCLIService_GetDelegationToken_result {
       {
         case 0:
           if ($ftype == TType::STRUCT) {
-<<<<<<< HEAD
             $this->success = new \TGetQueryPlanResp();
-=======
-            $this->success = new \TGetDelegationTokenResp();
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
             $xfer += $this->success->read($input);
           } else {
             $xfer += $input->skip($ftype);
@@ -3698,9 +3675,160 @@ class TCLIService_GetDelegationToken_result {
 
   public function write($output) {
     $xfer = 0;
-<<<<<<< HEAD
     $xfer += $output->writeStructBegin('TCLIService_GetQueryPlan_result');
-=======
+    if ($this->success !== null) {
+      if (!is_object($this->success)) {
+        throw new TProtocolException('Bad type in structure.', TProtocolException::INVALID_DATA);
+      }
+      $xfer += $output->writeFieldBegin('success', TType::STRUCT, 0);
+      $xfer += $this->success->write($output);
+      $xfer += $output->writeFieldEnd();
+    }
+    $xfer += $output->writeFieldStop();
+    $xfer += $output->writeStructEnd();
+    return $xfer;
+  }
+
+}
+
+class TCLIService_GetDelegationToken_args {
+  static $_TSPEC;
+
+  public $req = null;
+
+  public function __construct($vals=null) {
+    if (!isset(self::$_TSPEC)) {
+      self::$_TSPEC = array(
+        1 => array(
+          'var' => 'req',
+          'type' => TType::STRUCT,
+          'class' => '\TGetDelegationTokenReq',
+          ),
+        );
+    }
+    if (is_array($vals)) {
+      if (isset($vals['req'])) {
+        $this->req = $vals['req'];
+      }
+    }
+  }
+
+  public function getName() {
+    return 'TCLIService_GetDelegationToken_args';
+  }
+
+  public function read($input)
+  {
+    $xfer = 0;
+    $fname = null;
+    $ftype = 0;
+    $fid = 0;
+    $xfer += $input->readStructBegin($fname);
+    while (true)
+    {
+      $xfer += $input->readFieldBegin($fname, $ftype, $fid);
+      if ($ftype == TType::STOP) {
+        break;
+      }
+      switch ($fid)
+      {
+        case 1:
+          if ($ftype == TType::STRUCT) {
+            $this->req = new \TGetDelegationTokenReq();
+            $xfer += $this->req->read($input);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        default:
+          $xfer += $input->skip($ftype);
+          break;
+      }
+      $xfer += $input->readFieldEnd();
+    }
+    $xfer += $input->readStructEnd();
+    return $xfer;
+  }
+
+  public function write($output) {
+    $xfer = 0;
+    $xfer += $output->writeStructBegin('TCLIService_GetDelegationToken_args');
+    if ($this->req !== null) {
+      if (!is_object($this->req)) {
+        throw new TProtocolException('Bad type in structure.', TProtocolException::INVALID_DATA);
+      }
+      $xfer += $output->writeFieldBegin('req', TType::STRUCT, 1);
+      $xfer += $this->req->write($output);
+      $xfer += $output->writeFieldEnd();
+    }
+    $xfer += $output->writeFieldStop();
+    $xfer += $output->writeStructEnd();
+    return $xfer;
+  }
+
+}
+
+class TCLIService_GetDelegationToken_result {
+  static $_TSPEC;
+
+  public $success = null;
+
+  public function __construct($vals=null) {
+    if (!isset(self::$_TSPEC)) {
+      self::$_TSPEC = array(
+        0 => array(
+          'var' => 'success',
+          'type' => TType::STRUCT,
+          'class' => '\TGetDelegationTokenResp',
+          ),
+        );
+    }
+    if (is_array($vals)) {
+      if (isset($vals['success'])) {
+        $this->success = $vals['success'];
+      }
+    }
+  }
+
+  public function getName() {
+    return 'TCLIService_GetDelegationToken_result';
+  }
+
+  public function read($input)
+  {
+    $xfer = 0;
+    $fname = null;
+    $ftype = 0;
+    $fid = 0;
+    $xfer += $input->readStructBegin($fname);
+    while (true)
+    {
+      $xfer += $input->readFieldBegin($fname, $ftype, $fid);
+      if ($ftype == TType::STOP) {
+        break;
+      }
+      switch ($fid)
+      {
+        case 0:
+          if ($ftype == TType::STRUCT) {
+            $this->success = new \TGetDelegationTokenResp();
+            $xfer += $this->success->read($input);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
+        default:
+          $xfer += $input->skip($ftype);
+          break;
+      }
+      $xfer += $input->readFieldEnd();
+    }
+    $xfer += $input->readStructEnd();
+    return $xfer;
+  }
+
+  public function write($output) {
+    $xfer = 0;
     $xfer += $output->writeStructBegin('TCLIService_GetDelegationToken_result');
     if ($this->success !== null) {
       if (!is_object($this->success)) {
@@ -4010,7 +4138,6 @@ class TCLIService_RenewDelegationToken_result {
   public function write($output) {
     $xfer = 0;
     $xfer += $output->writeStructBegin('TCLIService_RenewDelegationToken_result');
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     if ($this->success !== null) {
       if (!is_object($this->success)) {
         throw new TProtocolException('Bad type in structure.', TProtocolException::INVALID_DATA);

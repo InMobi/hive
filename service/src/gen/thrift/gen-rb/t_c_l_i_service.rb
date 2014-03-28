@@ -251,7 +251,6 @@ module TCLIService
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'FetchResults failed: unknown result')
     end
 
-<<<<<<< HEAD
     def GetQueryPlan(req)
       send_GetQueryPlan(req)
       return recv_GetQueryPlan()
@@ -265,7 +264,8 @@ module TCLIService
       result = receive_message(GetQueryPlan_result)
       return result.success unless result.success.nil?
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'GetQueryPlan failed: unknown result')
-=======
+    end
+
     def GetDelegationToken(req)
       send_GetDelegationToken(req)
       return recv_GetDelegationToken()
@@ -309,7 +309,6 @@ module TCLIService
       result = receive_message(RenewDelegationToken_result)
       return result.success unless result.success.nil?
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'RenewDelegationToken failed: unknown result')
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     end
 
   end
@@ -429,13 +428,13 @@ module TCLIService
       write_result(result, oprot, 'FetchResults', seqid)
     end
 
-<<<<<<< HEAD
     def process_GetQueryPlan(seqid, iprot, oprot)
       args = read_args(iprot, GetQueryPlan_args)
       result = GetQueryPlan_result.new()
       result.success = @handler.GetQueryPlan(args.req)
       write_result(result, oprot, 'GetQueryPlan', seqid)
-=======
+    end
+
     def process_GetDelegationToken(seqid, iprot, oprot)
       args = read_args(iprot, GetDelegationToken_args)
       result = GetDelegationToken_result.new()
@@ -455,7 +454,6 @@ module TCLIService
       result = RenewDelegationToken_result.new()
       result.success = @handler.RenewDelegationToken(args.req)
       write_result(result, oprot, 'RenewDelegationToken', seqid)
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     end
 
   end
@@ -974,20 +972,12 @@ module TCLIService
     ::Thrift::Struct.generate_accessors self
   end
 
-<<<<<<< HEAD
   class GetQueryPlan_args
-=======
-  class GetDelegationToken_args
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     include ::Thrift::Struct, ::Thrift::Struct_Union
     REQ = 1
 
     FIELDS = {
-<<<<<<< HEAD
       REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::TGetQueryPlanReq}
-=======
-      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::TGetDelegationTokenReq}
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     }
 
     def struct_fields; FIELDS; end
@@ -998,18 +988,43 @@ module TCLIService
     ::Thrift::Struct.generate_accessors self
   end
 
-<<<<<<< HEAD
   class GetQueryPlan_result
-=======
-  class GetDelegationToken_result
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     include ::Thrift::Struct, ::Thrift::Struct_Union
     SUCCESS = 0
 
     FIELDS = {
-<<<<<<< HEAD
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TGetQueryPlanResp}
-=======
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class GetDelegationToken_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQ = 1
+
+    FIELDS = {
+      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::TGetDelegationTokenReq}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class GetDelegationToken_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    SUCCESS = 0
+
+    FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TGetDelegationTokenResp}
     }
 
@@ -1075,7 +1090,6 @@ module TCLIService
 
     FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::TRenewDelegationTokenResp}
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     }
 
     def struct_fields; FIELDS; end

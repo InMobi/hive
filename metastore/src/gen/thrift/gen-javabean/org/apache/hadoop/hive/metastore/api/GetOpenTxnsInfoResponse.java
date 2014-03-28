@@ -447,7 +447,7 @@ public class GetOpenTxnsInfoResponse implements org.apache.thrift.TBase<GetOpenT
                 struct.open_txns = new ArrayList<TxnInfo>(_list370.size);
                 for (int _i371 = 0; _i371 < _list370.size; ++_i371)
                 {
-                  TxnInfo _elem372; // optional
+                  TxnInfo _elem372; // required
                   _elem372 = new TxnInfo();
                   _elem372.read(iprot);
                   struct.open_txns.add(_elem372);
@@ -524,7 +524,7 @@ public class GetOpenTxnsInfoResponse implements org.apache.thrift.TBase<GetOpenT
         struct.open_txns = new ArrayList<TxnInfo>(_list375.size);
         for (int _i376 = 0; _i376 < _list375.size; ++_i376)
         {
-          TxnInfo _elem377; // optional
+          TxnInfo _elem377; // required
           _elem377 = new TxnInfo();
           _elem377.read(iprot);
           struct.open_txns.add(_elem377);

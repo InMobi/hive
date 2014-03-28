@@ -645,7 +645,7 @@ public class PartitionsStatsRequest implements org.apache.thrift.TBase<Partition
                 struct.colNames = new ArrayList<String>(_list306.size);
                 for (int _i307 = 0; _i307 < _list306.size; ++_i307)
                 {
-                  String _elem308; // optional
+                  String _elem308; // required
                   _elem308 = iprot.readString();
                   struct.colNames.add(_elem308);
                 }
@@ -663,7 +663,7 @@ public class PartitionsStatsRequest implements org.apache.thrift.TBase<Partition
                 struct.partNames = new ArrayList<String>(_list309.size);
                 for (int _i310 = 0; _i310 < _list309.size; ++_i310)
                 {
-                  String _elem311; // optional
+                  String _elem311; // required
                   _elem311 = iprot.readString();
                   struct.partNames.add(_elem311);
                 }
@@ -768,7 +768,7 @@ public class PartitionsStatsRequest implements org.apache.thrift.TBase<Partition
         struct.colNames = new ArrayList<String>(_list316.size);
         for (int _i317 = 0; _i317 < _list316.size; ++_i317)
         {
-          String _elem318; // optional
+          String _elem318; // required
           _elem318 = iprot.readString();
           struct.colNames.add(_elem318);
         }
@@ -779,7 +779,7 @@ public class PartitionsStatsRequest implements org.apache.thrift.TBase<Partition
         struct.partNames = new ArrayList<String>(_list319.size);
         for (int _i320 = 0; _i320 < _list319.size; ++_i320)
         {
-          String _elem321; // optional
+          String _elem321; // required
           _elem321 = iprot.readString();
           struct.partNames.add(_elem321);
         }

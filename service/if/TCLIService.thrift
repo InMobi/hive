@@ -1183,6 +1183,8 @@ service TCLIService {
 
   TFetchResultsResp FetchResults(1:TFetchResultsReq req);
 
+  TGetQueryPlanResp GetQueryPlan(1:TGetQueryPlanReq req);
+
   TGetDelegationTokenResp GetDelegationToken(1:TGetDelegationTokenReq req);
 
   TCancelDelegationTokenResp CancelDelegationToken(1:TCancelDelegationTokenReq req);

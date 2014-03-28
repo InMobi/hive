@@ -3752,7 +3752,6 @@ class TFetchResultsResp {
 
 void swap(TFetchResultsResp &a, TFetchResultsResp &b);
 
-<<<<<<< HEAD
 typedef struct _TGetQueryPlanReq__isset {
   _TGetQueryPlanReq__isset() : confOverlay(false) {}
   bool confOverlay;
@@ -3774,29 +3773,11 @@ class TGetQueryPlanReq {
   std::map<std::string, std::string>  confOverlay;
 
   _TGetQueryPlanReq__isset __isset;
-=======
-
-class TGetDelegationTokenReq {
- public:
-
-  static const char* ascii_fingerprint; // = "07EA0311716A27924914E4354ED22D6C";
-  static const uint8_t binary_fingerprint[16]; // = {0x07,0xEA,0x03,0x11,0x71,0x6A,0x27,0x92,0x49,0x14,0xE4,0x35,0x4E,0xD2,0x2D,0x6C};
-
-  TGetDelegationTokenReq() : owner(), renewer() {
-  }
-
-  virtual ~TGetDelegationTokenReq() throw() {}
-
-  TSessionHandle sessionHandle;
-  std::string owner;
-  std::string renewer;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   void __set_sessionHandle(const TSessionHandle& val) {
     sessionHandle = val;
   }
 
-<<<<<<< HEAD
   void __set_statement(const std::string& val) {
     statement = val;
   }
@@ -3823,7 +3804,78 @@ class TGetDelegationTokenReq {
   }
 
   bool operator < (const TGetQueryPlanReq & ) const;
-=======
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(TGetQueryPlanReq &a, TGetQueryPlanReq &b);
+
+
+class TGetQueryPlanResp {
+ public:
+
+  static const char* ascii_fingerprint; // = "08A7F68AF7400F358E5CF08185165CB7";
+  static const uint8_t binary_fingerprint[16]; // = {0x08,0xA7,0xF6,0x8A,0xF7,0x40,0x0F,0x35,0x8E,0x5C,0xF0,0x81,0x85,0x16,0x5C,0xB7};
+
+  TGetQueryPlanResp() : plan() {
+  }
+
+  virtual ~TGetQueryPlanResp() throw() {}
+
+  TStatus status;
+  std::string plan;
+
+  void __set_status(const TStatus& val) {
+    status = val;
+  }
+
+  void __set_plan(const std::string& val) {
+    plan = val;
+  }
+
+  bool operator == (const TGetQueryPlanResp & rhs) const
+  {
+    if (!(status == rhs.status))
+      return false;
+    if (!(plan == rhs.plan))
+      return false;
+    return true;
+  }
+  bool operator != (const TGetQueryPlanResp &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TGetQueryPlanResp & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(TGetQueryPlanResp &a, TGetQueryPlanResp &b);
+
+
+class TGetDelegationTokenReq {
+ public:
+
+  static const char* ascii_fingerprint; // = "07EA0311716A27924914E4354ED22D6C";
+  static const uint8_t binary_fingerprint[16]; // = {0x07,0xEA,0x03,0x11,0x71,0x6A,0x27,0x92,0x49,0x14,0xE4,0x35,0x4E,0xD2,0x2D,0x6C};
+
+  TGetDelegationTokenReq() : owner(), renewer() {
+  }
+
+  virtual ~TGetDelegationTokenReq() throw() {}
+
+  TSessionHandle sessionHandle;
+  std::string owner;
+  std::string renewer;
+
+  void __set_sessionHandle(const TSessionHandle& val) {
+    sessionHandle = val;
+  }
+
   void __set_owner(const std::string& val) {
     owner = val;
   }
@@ -3847,31 +3899,12 @@ class TGetDelegationTokenReq {
   }
 
   bool operator < (const TGetDelegationTokenReq & ) const;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-<<<<<<< HEAD
-void swap(TGetQueryPlanReq &a, TGetQueryPlanReq &b);
-
-
-class TGetQueryPlanResp {
- public:
-
-  static const char* ascii_fingerprint; // = "08A7F68AF7400F358E5CF08185165CB7";
-  static const uint8_t binary_fingerprint[16]; // = {0x08,0xA7,0xF6,0x8A,0xF7,0x40,0x0F,0x35,0x8E,0x5C,0xF0,0x81,0x85,0x16,0x5C,0xB7};
-
-  TGetQueryPlanResp() : plan() {
-  }
-
-  virtual ~TGetQueryPlanResp() throw() {}
-
-  TStatus status;
-  std::string plan;
-=======
 void swap(TGetDelegationTokenReq &a, TGetDelegationTokenReq &b);
 
 typedef struct _TGetDelegationTokenResp__isset {
@@ -3894,31 +3927,11 @@ class TGetDelegationTokenResp {
   std::string delegationToken;
 
   _TGetDelegationTokenResp__isset __isset;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   void __set_status(const TStatus& val) {
     status = val;
   }
 
-<<<<<<< HEAD
-  void __set_plan(const std::string& val) {
-    plan = val;
-  }
-
-  bool operator == (const TGetQueryPlanResp & rhs) const
-  {
-    if (!(status == rhs.status))
-      return false;
-    if (!(plan == rhs.plan))
-      return false;
-    return true;
-  }
-  bool operator != (const TGetQueryPlanResp &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const TGetQueryPlanResp & ) const;
-=======
   void __set_delegationToken(const std::string& val) {
     delegationToken = val;
     __isset.delegationToken = true;
@@ -4101,18 +4114,13 @@ class TRenewDelegationTokenResp {
   }
 
   bool operator < (const TRenewDelegationTokenResp & ) const;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-<<<<<<< HEAD
-void swap(TGetQueryPlanResp &a, TGetQueryPlanResp &b);
-=======
 void swap(TRenewDelegationTokenResp &a, TRenewDelegationTokenResp &b);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
 }}}}} // namespace
 

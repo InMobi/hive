@@ -350,7 +350,7 @@ public class ShowLocksResponse implements org.apache.thrift.TBase<ShowLocksRespo
                 struct.locks = new ArrayList<ShowLocksResponseElement>(_list402.size);
                 for (int _i403 = 0; _i403 < _list402.size; ++_i403)
                 {
-                  ShowLocksResponseElement _elem404; // optional
+                  ShowLocksResponseElement _elem404; // required
                   _elem404 = new ShowLocksResponseElement();
                   _elem404.read(iprot);
                   struct.locks.add(_elem404);
@@ -430,7 +430,7 @@ public class ShowLocksResponse implements org.apache.thrift.TBase<ShowLocksRespo
           struct.locks = new ArrayList<ShowLocksResponseElement>(_list407.size);
           for (int _i408 = 0; _i408 < _list407.size; ++_i408)
           {
-            ShowLocksResponseElement _elem409; // optional
+            ShowLocksResponseElement _elem409; // required
             _elem409 = new ShowLocksResponseElement();
             _elem409.read(iprot);
             struct.locks.add(_elem409);

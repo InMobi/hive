@@ -1304,7 +1304,7 @@ public class StorageDescriptor implements org.apache.thrift.TBase<StorageDescrip
                 struct.cols = new ArrayList<FieldSchema>(_list148.size);
                 for (int _i149 = 0; _i149 < _list148.size; ++_i149)
                 {
-                  FieldSchema _elem150; // optional
+                  FieldSchema _elem150; // required
                   _elem150 = new FieldSchema();
                   _elem150.read(iprot);
                   struct.cols.add(_elem150);
@@ -1372,7 +1372,7 @@ public class StorageDescriptor implements org.apache.thrift.TBase<StorageDescrip
                 struct.bucketCols = new ArrayList<String>(_list151.size);
                 for (int _i152 = 0; _i152 < _list151.size; ++_i152)
                 {
-                  String _elem153; // optional
+                  String _elem153; // required
                   _elem153 = iprot.readString();
                   struct.bucketCols.add(_elem153);
                 }
@@ -1390,7 +1390,7 @@ public class StorageDescriptor implements org.apache.thrift.TBase<StorageDescrip
                 struct.sortCols = new ArrayList<Order>(_list154.size);
                 for (int _i155 = 0; _i155 < _list154.size; ++_i155)
                 {
-                  Order _elem156; // optional
+                  Order _elem156; // required
                   _elem156 = new Order();
                   _elem156.read(iprot);
                   struct.sortCols.add(_elem156);
@@ -1667,7 +1667,7 @@ public class StorageDescriptor implements org.apache.thrift.TBase<StorageDescrip
           struct.cols = new ArrayList<FieldSchema>(_list169.size);
           for (int _i170 = 0; _i170 < _list169.size; ++_i170)
           {
-            FieldSchema _elem171; // optional
+            FieldSchema _elem171; // required
             _elem171 = new FieldSchema();
             _elem171.read(iprot);
             struct.cols.add(_elem171);
@@ -1706,7 +1706,7 @@ public class StorageDescriptor implements org.apache.thrift.TBase<StorageDescrip
           struct.bucketCols = new ArrayList<String>(_list172.size);
           for (int _i173 = 0; _i173 < _list172.size; ++_i173)
           {
-            String _elem174; // optional
+            String _elem174; // required
             _elem174 = iprot.readString();
             struct.bucketCols.add(_elem174);
           }
@@ -1719,7 +1719,7 @@ public class StorageDescriptor implements org.apache.thrift.TBase<StorageDescrip
           struct.sortCols = new ArrayList<Order>(_list175.size);
           for (int _i176 = 0; _i176 < _list175.size; ++_i176)
           {
-            Order _elem177; // optional
+            Order _elem177; // required
             _elem177 = new Order();
             _elem177.read(iprot);
             struct.sortCols.add(_elem177);

@@ -419,6 +419,8 @@ public class ThriftCLIServiceClient extends CLIServiceClient {
       return resp.getPlan();
     } catch (HiveSQLException e) {
       throw e;
+    } catch (Exception e) {
+      throw new HiveSQLException(e);
     }
   }
 

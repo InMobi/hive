@@ -156,6 +156,9 @@ public interface HiveSession extends HiveSessionBase {
   public void cancelDelegationToken(HiveAuthFactory authFactory, String tokenStr)
       throws HiveSQLException;
 
+  public void renewDelegationToken(HiveAuthFactory authFactory, String tokenStr)
+      throws HiveSQLException;
+
   public String getQueryPlan(String statement, Map<String, String> confOverlay)
       throws HiveSQLException;
 

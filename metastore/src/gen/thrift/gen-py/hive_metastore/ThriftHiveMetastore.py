@@ -4370,111 +4370,12 @@ class Client(fb303.FacebookService.Client, Iface):
     self.send_get_open_txns()
     return self.recv_get_open_txns()
 
-<<<<<<< HEAD
-class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
-  def __init__(self, handler):
-    fb303.FacebookService.Processor.__init__(self, handler)
-    self._processMap["create_database"] = Processor.process_create_database
-    self._processMap["get_database"] = Processor.process_get_database
-    self._processMap["drop_database"] = Processor.process_drop_database
-    self._processMap["get_databases"] = Processor.process_get_databases
-    self._processMap["get_all_databases"] = Processor.process_get_all_databases
-    self._processMap["alter_database"] = Processor.process_alter_database
-    self._processMap["get_type"] = Processor.process_get_type
-    self._processMap["create_type"] = Processor.process_create_type
-    self._processMap["drop_type"] = Processor.process_drop_type
-    self._processMap["get_type_all"] = Processor.process_get_type_all
-    self._processMap["get_fields"] = Processor.process_get_fields
-    self._processMap["get_schema"] = Processor.process_get_schema
-    self._processMap["create_table"] = Processor.process_create_table
-    self._processMap["create_table_with_environment_context"] = Processor.process_create_table_with_environment_context
-    self._processMap["drop_table"] = Processor.process_drop_table
-    self._processMap["drop_table_with_environment_context"] = Processor.process_drop_table_with_environment_context
-    self._processMap["get_tables"] = Processor.process_get_tables
-    self._processMap["get_all_tables"] = Processor.process_get_all_tables
-    self._processMap["get_table"] = Processor.process_get_table
-    self._processMap["get_table_objects_by_name"] = Processor.process_get_table_objects_by_name
-    self._processMap["get_table_names_by_filter"] = Processor.process_get_table_names_by_filter
-    self._processMap["alter_table"] = Processor.process_alter_table
-    self._processMap["alter_table_with_environment_context"] = Processor.process_alter_table_with_environment_context
-    self._processMap["add_partition"] = Processor.process_add_partition
-    self._processMap["add_partition_with_environment_context"] = Processor.process_add_partition_with_environment_context
-    self._processMap["add_partitions"] = Processor.process_add_partitions
-    self._processMap["append_partition"] = Processor.process_append_partition
-    self._processMap["add_partitions_req"] = Processor.process_add_partitions_req
-    self._processMap["append_partition_with_environment_context"] = Processor.process_append_partition_with_environment_context
-    self._processMap["append_partition_by_name"] = Processor.process_append_partition_by_name
-    self._processMap["append_partition_by_name_with_environment_context"] = Processor.process_append_partition_by_name_with_environment_context
-    self._processMap["drop_partition"] = Processor.process_drop_partition
-    self._processMap["drop_partition_with_environment_context"] = Processor.process_drop_partition_with_environment_context
-    self._processMap["drop_partition_by_name"] = Processor.process_drop_partition_by_name
-    self._processMap["drop_partition_by_name_with_environment_context"] = Processor.process_drop_partition_by_name_with_environment_context
-    self._processMap["drop_partitions_req"] = Processor.process_drop_partitions_req
-    self._processMap["get_partition"] = Processor.process_get_partition
-    self._processMap["exchange_partition"] = Processor.process_exchange_partition
-    self._processMap["get_partition_with_auth"] = Processor.process_get_partition_with_auth
-    self._processMap["get_partition_by_name"] = Processor.process_get_partition_by_name
-    self._processMap["get_partitions"] = Processor.process_get_partitions
-    self._processMap["get_partitions_with_auth"] = Processor.process_get_partitions_with_auth
-    self._processMap["get_partition_names"] = Processor.process_get_partition_names
-    self._processMap["get_partitions_ps"] = Processor.process_get_partitions_ps
-    self._processMap["get_partitions_ps_with_auth"] = Processor.process_get_partitions_ps_with_auth
-    self._processMap["get_partition_names_ps"] = Processor.process_get_partition_names_ps
-    self._processMap["get_partitions_by_filter"] = Processor.process_get_partitions_by_filter
-    self._processMap["get_num_partitions_by_filter"] = Processor.process_get_num_partitions_by_filter
-    self._processMap["get_partitions_by_expr"] = Processor.process_get_partitions_by_expr
-    self._processMap["get_partitions_by_names"] = Processor.process_get_partitions_by_names
-    self._processMap["alter_partition"] = Processor.process_alter_partition
-    self._processMap["alter_partitions"] = Processor.process_alter_partitions
-    self._processMap["alter_partition_with_environment_context"] = Processor.process_alter_partition_with_environment_context
-    self._processMap["rename_partition"] = Processor.process_rename_partition
-    self._processMap["partition_name_has_valid_characters"] = Processor.process_partition_name_has_valid_characters
-    self._processMap["get_config_value"] = Processor.process_get_config_value
-    self._processMap["partition_name_to_vals"] = Processor.process_partition_name_to_vals
-    self._processMap["partition_name_to_spec"] = Processor.process_partition_name_to_spec
-    self._processMap["markPartitionForEvent"] = Processor.process_markPartitionForEvent
-    self._processMap["isPartitionMarkedForEvent"] = Processor.process_isPartitionMarkedForEvent
-    self._processMap["add_index"] = Processor.process_add_index
-    self._processMap["alter_index"] = Processor.process_alter_index
-    self._processMap["drop_index_by_name"] = Processor.process_drop_index_by_name
-    self._processMap["get_index_by_name"] = Processor.process_get_index_by_name
-    self._processMap["get_indexes"] = Processor.process_get_indexes
-    self._processMap["get_index_names"] = Processor.process_get_index_names
-    self._processMap["update_table_column_statistics"] = Processor.process_update_table_column_statistics
-    self._processMap["update_partition_column_statistics"] = Processor.process_update_partition_column_statistics
-    self._processMap["get_table_column_statistics"] = Processor.process_get_table_column_statistics
-    self._processMap["get_partition_column_statistics"] = Processor.process_get_partition_column_statistics
-    self._processMap["get_table_statistics_req"] = Processor.process_get_table_statistics_req
-    self._processMap["get_partitions_statistics_req"] = Processor.process_get_partitions_statistics_req
-    self._processMap["delete_partition_column_statistics"] = Processor.process_delete_partition_column_statistics
-    self._processMap["delete_table_column_statistics"] = Processor.process_delete_table_column_statistics
-    self._processMap["create_function"] = Processor.process_create_function
-    self._processMap["drop_function"] = Processor.process_drop_function
-    self._processMap["alter_function"] = Processor.process_alter_function
-    self._processMap["get_functions"] = Processor.process_get_functions
-    self._processMap["get_function"] = Processor.process_get_function
-    self._processMap["create_role"] = Processor.process_create_role
-    self._processMap["drop_role"] = Processor.process_drop_role
-    self._processMap["get_role_names"] = Processor.process_get_role_names
-    self._processMap["grant_role"] = Processor.process_grant_role
-    self._processMap["revoke_role"] = Processor.process_revoke_role
-    self._processMap["list_roles"] = Processor.process_list_roles
-    self._processMap["get_privilege_set"] = Processor.process_get_privilege_set
-    self._processMap["list_privileges"] = Processor.process_list_privileges
-    self._processMap["grant_privileges"] = Processor.process_grant_privileges
-    self._processMap["revoke_privileges"] = Processor.process_revoke_privileges
-    self._processMap["set_ugi"] = Processor.process_set_ugi
-    self._processMap["get_delegation_token"] = Processor.process_get_delegation_token
-    self._processMap["renew_delegation_token"] = Processor.process_renew_delegation_token
-    self._processMap["cancel_delegation_token"] = Processor.process_cancel_delegation_token
-=======
   def send_get_open_txns(self, ):
     self._oprot.writeMessageBegin('get_open_txns', TMessageType.CALL, self._seqid)
     args = get_open_txns_args()
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
->>>>>>> 376aed5024a9f25d7fedc6950e5b49e80810eae2
 
   def recv_get_open_txns(self, ):
     (fname, mtype, rseqid) = self._iprot.readMessageBegin()
@@ -4882,6 +4783,7 @@ class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
     self._processMap["get_partitions_ps_with_auth"] = Processor.process_get_partitions_ps_with_auth
     self._processMap["get_partition_names_ps"] = Processor.process_get_partition_names_ps
     self._processMap["get_partitions_by_filter"] = Processor.process_get_partitions_by_filter
+    self._processMap["get_num_partitions_by_filter"] = Processor.process_get_num_partitions_by_filter
     self._processMap["get_partitions_by_expr"] = Processor.process_get_partitions_by_expr
     self._processMap["get_partitions_by_names"] = Processor.process_get_partitions_by_names
     self._processMap["alter_partition"] = Processor.process_alter_partition
@@ -5282,17 +5184,6 @@ class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
     except UnknownDBException as o3:
       result.o3 = o3
     oprot.writeMessageBegin("get_table_objects_by_name", TMessageType.REPLY, seqid)
-    result.write(oprot)
-    oprot.writeMessageEnd()
-    oprot.trans.flush()
-
-  def process_get_num_partitions_by_filter(self, seqid, iprot, oprot):
-    args = get_num_partitions_by_filter_args()
-    args.read(iprot)
-    iprot.readMessageEnd()
-    result = get_num_partitions_by_filter_result()
-    result.success = self._handler.get_num_partitions_by_filter(args.db_name, args.tbl_name, args.filter)
-    oprot.writeMessageBegin("get_num_partitions_by_filter", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -5745,6 +5636,17 @@ class Processor(fb303.FacebookService.Processor, Iface, TProcessor):
     except NoSuchObjectException as o2:
       result.o2 = o2
     oprot.writeMessageBegin("get_partitions_by_filter", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_get_num_partitions_by_filter(self, seqid, iprot, oprot):
+    args = get_num_partitions_by_filter_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = get_num_partitions_by_filter_result()
+    result.success = self._handler.get_num_partitions_by_filter(args.db_name, args.tbl_name, args.filter)
+    oprot.writeMessageBegin("get_num_partitions_by_filter", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -14805,6 +14707,149 @@ class get_partitions_by_filter_result:
   def __ne__(self, other):
     return not (self == other)
 
+class get_num_partitions_by_filter_args:
+  """
+  Attributes:
+   - db_name
+   - tbl_name
+   - filter
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'db_name', None, None, ), # 1
+    (2, TType.STRING, 'tbl_name', None, None, ), # 2
+    (3, TType.STRING, 'filter', None, None, ), # 3
+  )
+
+  def __init__(self, db_name=None, tbl_name=None, filter=None,):
+    self.db_name = db_name
+    self.tbl_name = tbl_name
+    self.filter = filter
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.db_name = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.tbl_name = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.filter = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('get_num_partitions_by_filter_args')
+    if self.db_name is not None:
+      oprot.writeFieldBegin('db_name', TType.STRING, 1)
+      oprot.writeString(self.db_name)
+      oprot.writeFieldEnd()
+    if self.tbl_name is not None:
+      oprot.writeFieldBegin('tbl_name', TType.STRING, 2)
+      oprot.writeString(self.tbl_name)
+      oprot.writeFieldEnd()
+    if self.filter is not None:
+      oprot.writeFieldBegin('filter', TType.STRING, 3)
+      oprot.writeString(self.filter)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class get_num_partitions_by_filter_result:
+  """
+  Attributes:
+   - success
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+  )
+
+  def __init__(self, success=None,):
+    self.success = success
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('get_num_partitions_by_filter_result')
+    if self.success is not None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def validate(self):
+    return
+
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class get_partitions_by_expr_args:
   """
   Attributes:
@@ -16849,149 +16894,6 @@ class isPartitionMarkedForEvent_result:
     if self.o6 is not None:
       oprot.writeFieldBegin('o6', TType.STRUCT, 6)
       self.o6.write(oprot)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-
-  def validate(self):
-    return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class get_num_partitions_by_filter_args:
-  """
-  Attributes:
-   - db_name
-   - tbl_name
-   - filter
-  """
-
-  thrift_spec = (
-    None, # 0
-    (1, TType.STRING, 'db_name', None, None, ), # 1
-    (2, TType.STRING, 'tbl_name', None, None, ), # 2
-    (3, TType.STRING, 'filter', None, None, ), # 3
-  )
-
-  def __init__(self, db_name=None, tbl_name=None, filter=None,):
-    self.db_name = db_name
-    self.tbl_name = tbl_name
-    self.filter = filter
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 1:
-        if ftype == TType.STRING:
-          self.db_name = iprot.readString();
-        else:
-          iprot.skip(ftype)
-      elif fid == 2:
-        if ftype == TType.STRING:
-          self.tbl_name = iprot.readString();
-        else:
-          iprot.skip(ftype)
-      elif fid == 3:
-        if ftype == TType.STRING:
-          self.filter = iprot.readString();
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('get_num_partitions_by_filter_args')
-    if self.db_name is not None:
-      oprot.writeFieldBegin('db_name', TType.STRING, 1)
-      oprot.writeString(self.db_name)
-      oprot.writeFieldEnd()
-    if self.tbl_name is not None:
-      oprot.writeFieldBegin('tbl_name', TType.STRING, 2)
-      oprot.writeString(self.tbl_name)
-      oprot.writeFieldEnd()
-    if self.filter is not None:
-      oprot.writeFieldBegin('filter', TType.STRING, 3)
-      oprot.writeString(self.filter)
-      oprot.writeFieldEnd()
-    oprot.writeFieldStop()
-    oprot.writeStructEnd()
-
-  def validate(self):
-    return
-
-
-  def __repr__(self):
-    L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
-    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-  def __eq__(self, other):
-    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-  def __ne__(self, other):
-    return not (self == other)
-
-class get_num_partitions_by_filter_result:
-  """
-  Attributes:
-   - success
-  """
-
-  thrift_spec = (
-    (0, TType.I32, 'success', None, None, ), # 0
-  )
-
-  def __init__(self, success=None,):
-    self.success = success
-
-  def read(self, iprot):
-    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
-      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
-      return
-    iprot.readStructBegin()
-    while True:
-      (fname, ftype, fid) = iprot.readFieldBegin()
-      if ftype == TType.STOP:
-        break
-      if fid == 0:
-        if ftype == TType.I32:
-          self.success = iprot.readI32();
-        else:
-          iprot.skip(ftype)
-      else:
-        iprot.skip(ftype)
-      iprot.readFieldEnd()
-    iprot.readStructEnd()
-
-  def write(self, oprot):
-    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
-      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
-      return
-    oprot.writeStructBegin('get_num_partitions_by_filter_result')
-    if self.success is not None:
-      oprot.writeFieldBegin('success', TType.I32, 0)
-      oprot.writeI32(self.success)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

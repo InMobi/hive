@@ -2600,11 +2600,7 @@ uint32_t TCLIService_FetchResults_presult::read(::apache::thrift::protocol::TPro
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TCLIService_GetQueryPlan_args::read(::apache::thrift::protocol::TProtocol* iprot) {
-=======
-uint32_t TCLIService_GetDelegationToken_args::read(::apache::thrift::protocol::TProtocol* iprot) {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t xfer = 0;
   std::string fname;
@@ -2644,15 +2640,9 @@ uint32_t TCLIService_GetDelegationToken_args::read(::apache::thrift::protocol::T
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TCLIService_GetQueryPlan_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("TCLIService_GetQueryPlan_args");
-=======
-uint32_t TCLIService_GetDelegationToken_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
-  uint32_t xfer = 0;
-  xfer += oprot->writeStructBegin("TCLIService_GetDelegationToken_args");
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   xfer += oprot->writeFieldBegin("req", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += this->req.write(oprot);
@@ -2663,15 +2653,9 @@ uint32_t TCLIService_GetDelegationToken_args::write(::apache::thrift::protocol::
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TCLIService_GetQueryPlan_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("TCLIService_GetQueryPlan_pargs");
-=======
-uint32_t TCLIService_GetDelegationToken_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
-  uint32_t xfer = 0;
-  xfer += oprot->writeStructBegin("TCLIService_GetDelegationToken_pargs");
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   xfer += oprot->writeFieldBegin("req", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += (*(this->req)).write(oprot);
@@ -2682,11 +2666,7 @@ uint32_t TCLIService_GetDelegationToken_pargs::write(::apache::thrift::protocol:
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TCLIService_GetQueryPlan_result::read(::apache::thrift::protocol::TProtocol* iprot) {
-=======
-uint32_t TCLIService_GetDelegationToken_result::read(::apache::thrift::protocol::TProtocol* iprot) {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t xfer = 0;
   std::string fname;
@@ -2726,19 +2706,11 @@ uint32_t TCLIService_GetDelegationToken_result::read(::apache::thrift::protocol:
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TCLIService_GetQueryPlan_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
   uint32_t xfer = 0;
 
   xfer += oprot->writeStructBegin("TCLIService_GetQueryPlan_result");
-=======
-uint32_t TCLIService_GetDelegationToken_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
-
-  uint32_t xfer = 0;
-
-  xfer += oprot->writeStructBegin("TCLIService_GetDelegationToken_result");
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   if (this->__isset.success) {
     xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
@@ -2750,9 +2722,168 @@ uint32_t TCLIService_GetDelegationToken_result::write(::apache::thrift::protocol
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TCLIService_GetQueryPlan_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
-=======
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t TCLIService_GetDelegationToken_args::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->req.read(iprot);
+          this->__isset.req = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t TCLIService_GetDelegationToken_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("TCLIService_GetDelegationToken_args");
+
+  xfer += oprot->writeFieldBegin("req", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->req.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+uint32_t TCLIService_GetDelegationToken_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("TCLIService_GetDelegationToken_pargs");
+
+  xfer += oprot->writeFieldBegin("req", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->req)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+uint32_t TCLIService_GetDelegationToken_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t TCLIService_GetDelegationToken_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("TCLIService_GetDelegationToken_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 uint32_t TCLIService_GetDelegationToken_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   uint32_t xfer = 0;
@@ -3078,7 +3209,6 @@ uint32_t TCLIService_RenewDelegationToken_result::write(::apache::thrift::protoc
 }
 
 uint32_t TCLIService_RenewDelegationToken_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t xfer = 0;
   std::string fname;
@@ -4046,6 +4176,64 @@ void TCLIServiceClient::recv_FetchResults(TFetchResultsResp& _return)
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "FetchResults failed: unknown result");
 }
 
+void TCLIServiceClient::GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req)
+{
+  send_GetQueryPlan(req);
+  recv_GetQueryPlan(_return);
+}
+
+void TCLIServiceClient::send_GetQueryPlan(const TGetQueryPlanReq& req)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("GetQueryPlan", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  TCLIService_GetQueryPlan_pargs args;
+  args.req = &req;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void TCLIServiceClient::recv_GetQueryPlan(TGetQueryPlanResp& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("GetQueryPlan") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  TCLIService_GetQueryPlan_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetQueryPlan failed: unknown result");
+}
+
 void TCLIServiceClient::GetDelegationToken(TGetDelegationTokenResp& _return, const TGetDelegationTokenReq& req)
 {
   send_GetDelegationToken(req);
@@ -4218,64 +4406,6 @@ void TCLIServiceClient::recv_RenewDelegationToken(TRenewDelegationTokenResp& _re
     return;
   }
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "RenewDelegationToken failed: unknown result");
-}
-
-void TCLIServiceClient::GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req)
-{
-  send_GetQueryPlan(req);
-  recv_GetQueryPlan(_return);
-}
-
-void TCLIServiceClient::send_GetQueryPlan(const TGetQueryPlanReq& req)
-{
-  int32_t cseqid = 0;
-  oprot_->writeMessageBegin("GetQueryPlan", ::apache::thrift::protocol::T_CALL, cseqid);
-
-  TCLIService_GetQueryPlan_pargs args;
-  args.req = &req;
-  args.write(oprot_);
-
-  oprot_->writeMessageEnd();
-  oprot_->getTransport()->writeEnd();
-  oprot_->getTransport()->flush();
-}
-
-void TCLIServiceClient::recv_GetQueryPlan(TGetQueryPlanResp& _return)
-{
-
-  int32_t rseqid = 0;
-  std::string fname;
-  ::apache::thrift::protocol::TMessageType mtype;
-
-  iprot_->readMessageBegin(fname, mtype, rseqid);
-  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-    ::apache::thrift::TApplicationException x;
-    x.read(iprot_);
-    iprot_->readMessageEnd();
-    iprot_->getTransport()->readEnd();
-    throw x;
-  }
-  if (mtype != ::apache::thrift::protocol::T_REPLY) {
-    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-    iprot_->readMessageEnd();
-    iprot_->getTransport()->readEnd();
-  }
-  if (fname.compare("GetQueryPlan") != 0) {
-    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-    iprot_->readMessageEnd();
-    iprot_->getTransport()->readEnd();
-  }
-  TCLIService_GetQueryPlan_presult result;
-  result.success = &_return;
-  result.read(iprot_);
-  iprot_->readMessageEnd();
-  iprot_->getTransport()->readEnd();
-
-  if (result.__isset.success) {
-    // _return pointer has now been filled
-    return;
-  }
-  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetQueryPlan failed: unknown result");
 }
 
 bool TCLIServiceProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, const std::string& fname, int32_t seqid, void* callContext) {
@@ -5161,7 +5291,6 @@ void TCLIServiceProcessor::process_FetchResults(int32_t seqid, ::apache::thrift:
   }
 }
 
-<<<<<<< HEAD
 void TCLIServiceProcessor::process_GetQueryPlan(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
 {
   void* ctx = NULL;
@@ -5175,27 +5304,11 @@ void TCLIServiceProcessor::process_GetQueryPlan(int32_t seqid, ::apache::thrift:
   }
 
   TCLIService_GetQueryPlan_args args;
-=======
-void TCLIServiceProcessor::process_GetDelegationToken(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
-{
-  void* ctx = NULL;
-  if (this->eventHandler_.get() != NULL) {
-    ctx = this->eventHandler_->getContext("TCLIService.GetDelegationToken", callContext);
-  }
-  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "TCLIService.GetDelegationToken");
-
-  if (this->eventHandler_.get() != NULL) {
-    this->eventHandler_->preRead(ctx, "TCLIService.GetDelegationToken");
-  }
-
-  TCLIService_GetDelegationToken_args args;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   args.read(iprot);
   iprot->readMessageEnd();
   uint32_t bytes = iprot->getTransport()->readEnd();
 
   if (this->eventHandler_.get() != NULL) {
-<<<<<<< HEAD
     this->eventHandler_->postRead(ctx, "TCLIService.GetQueryPlan", bytes);
   }
 
@@ -5210,7 +5323,46 @@ void TCLIServiceProcessor::process_GetDelegationToken(int32_t seqid, ::apache::t
 
     ::apache::thrift::TApplicationException x(e.what());
     oprot->writeMessageBegin("GetQueryPlan", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-=======
+    x.write(oprot);
+    oprot->writeMessageEnd();
+    oprot->getTransport()->writeEnd();
+    oprot->getTransport()->flush();
+    return;
+  }
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->preWrite(ctx, "TCLIService.GetQueryPlan");
+  }
+
+  oprot->writeMessageBegin("GetQueryPlan", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->postWrite(ctx, "TCLIService.GetQueryPlan", bytes);
+  }
+}
+
+void TCLIServiceProcessor::process_GetDelegationToken(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = NULL;
+  if (this->eventHandler_.get() != NULL) {
+    ctx = this->eventHandler_->getContext("TCLIService.GetDelegationToken", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "TCLIService.GetDelegationToken");
+
+  if (this->eventHandler_.get() != NULL) {
+    this->eventHandler_->preRead(ctx, "TCLIService.GetDelegationToken");
+  }
+
+  TCLIService_GetDelegationToken_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != NULL) {
     this->eventHandler_->postRead(ctx, "TCLIService.GetDelegationToken", bytes);
   }
 
@@ -5225,7 +5377,6 @@ void TCLIServiceProcessor::process_GetDelegationToken(int32_t seqid, ::apache::t
 
     ::apache::thrift::TApplicationException x(e.what());
     oprot->writeMessageBegin("GetDelegationToken", ::apache::thrift::protocol::T_EXCEPTION, seqid);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     x.write(oprot);
     oprot->writeMessageEnd();
     oprot->getTransport()->writeEnd();
@@ -5234,26 +5385,16 @@ void TCLIServiceProcessor::process_GetDelegationToken(int32_t seqid, ::apache::t
   }
 
   if (this->eventHandler_.get() != NULL) {
-<<<<<<< HEAD
-    this->eventHandler_->preWrite(ctx, "TCLIService.GetQueryPlan");
-  }
-
-  oprot->writeMessageBegin("GetQueryPlan", ::apache::thrift::protocol::T_REPLY, seqid);
-=======
     this->eventHandler_->preWrite(ctx, "TCLIService.GetDelegationToken");
   }
 
   oprot->writeMessageBegin("GetDelegationToken", ::apache::thrift::protocol::T_REPLY, seqid);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   result.write(oprot);
   oprot->writeMessageEnd();
   bytes = oprot->getTransport()->writeEnd();
   oprot->getTransport()->flush();
 
   if (this->eventHandler_.get() != NULL) {
-<<<<<<< HEAD
-    this->eventHandler_->postWrite(ctx, "TCLIService.GetQueryPlan", bytes);
-=======
     this->eventHandler_->postWrite(ctx, "TCLIService.GetDelegationToken", bytes);
   }
 }
@@ -5363,7 +5504,6 @@ void TCLIServiceProcessor::process_RenewDelegationToken(int32_t seqid, ::apache:
 
   if (this->eventHandler_.get() != NULL) {
     this->eventHandler_->postWrite(ctx, "TCLIService.RenewDelegationToken", bytes);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 }
 

@@ -31,13 +31,10 @@ class TCLIServiceIf {
   virtual void CloseOperation(TCloseOperationResp& _return, const TCloseOperationReq& req) = 0;
   virtual void GetResultSetMetadata(TGetResultSetMetadataResp& _return, const TGetResultSetMetadataReq& req) = 0;
   virtual void FetchResults(TFetchResultsResp& _return, const TFetchResultsReq& req) = 0;
-<<<<<<< HEAD
   virtual void GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req) = 0;
-=======
   virtual void GetDelegationToken(TGetDelegationTokenResp& _return, const TGetDelegationTokenReq& req) = 0;
   virtual void CancelDelegationToken(TCancelDelegationTokenResp& _return, const TCancelDelegationTokenReq& req) = 0;
   virtual void RenewDelegationToken(TRenewDelegationTokenResp& _return, const TRenewDelegationTokenReq& req) = 0;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 };
 
 class TCLIServiceIfFactory {
@@ -115,9 +112,9 @@ class TCLIServiceNull : virtual public TCLIServiceIf {
   void FetchResults(TFetchResultsResp& /* _return */, const TFetchResultsReq& /* req */) {
     return;
   }
-<<<<<<< HEAD
   void GetQueryPlan(TGetQueryPlanResp& /* _return */, const TGetQueryPlanReq& /* req */) {
-=======
+    return;
+  }
   void GetDelegationToken(TGetDelegationTokenResp& /* _return */, const TGetDelegationTokenReq& /* req */) {
     return;
   }
@@ -125,7 +122,6 @@ class TCLIServiceNull : virtual public TCLIServiceIf {
     return;
   }
   void RenewDelegationToken(TRenewDelegationTokenResp& /* _return */, const TRenewDelegationTokenReq& /* req */) {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     return;
   }
 };
@@ -1858,7 +1854,6 @@ class TCLIService_FetchResults_presult {
 
 };
 
-<<<<<<< HEAD
 typedef struct _TCLIService_GetQueryPlan_args__isset {
   _TCLIService_GetQueryPlan_args__isset() : req(false) {}
   bool req;
@@ -1881,48 +1876,16 @@ class TCLIService_GetQueryPlan_args {
   }
 
   bool operator == (const TCLIService_GetQueryPlan_args & rhs) const
-=======
-typedef struct _TCLIService_GetDelegationToken_args__isset {
-  _TCLIService_GetDelegationToken_args__isset() : req(false) {}
-  bool req;
-} _TCLIService_GetDelegationToken_args__isset;
-
-class TCLIService_GetDelegationToken_args {
- public:
-
-  TCLIService_GetDelegationToken_args() {
-  }
-
-  virtual ~TCLIService_GetDelegationToken_args() throw() {}
-
-  TGetDelegationTokenReq req;
-
-  _TCLIService_GetDelegationToken_args__isset __isset;
-
-  void __set_req(const TGetDelegationTokenReq& val) {
-    req = val;
-  }
-
-  bool operator == (const TCLIService_GetDelegationToken_args & rhs) const
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   {
     if (!(req == rhs.req))
       return false;
     return true;
   }
-<<<<<<< HEAD
   bool operator != (const TCLIService_GetQueryPlan_args &rhs) const {
     return !(*this == rhs);
   }
 
   bool operator < (const TCLIService_GetQueryPlan_args & ) const;
-=======
-  bool operator != (const TCLIService_GetDelegationToken_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const TCLIService_GetDelegationToken_args & ) const;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -1930,7 +1893,6 @@ class TCLIService_GetDelegationToken_args {
 };
 
 
-<<<<<<< HEAD
 class TCLIService_GetQueryPlan_pargs {
  public:
 
@@ -1938,21 +1900,11 @@ class TCLIService_GetQueryPlan_pargs {
   virtual ~TCLIService_GetQueryPlan_pargs() throw() {}
 
   const TGetQueryPlanReq* req;
-=======
-class TCLIService_GetDelegationToken_pargs {
- public:
-
-
-  virtual ~TCLIService_GetDelegationToken_pargs() throw() {}
-
-  const TGetDelegationTokenReq* req;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-<<<<<<< HEAD
 typedef struct _TCLIService_GetQueryPlan_result__isset {
   _TCLIService_GetQueryPlan_result__isset() : success(false) {}
   bool success;
@@ -1975,7 +1927,92 @@ class TCLIService_GetQueryPlan_result {
   }
 
   bool operator == (const TCLIService_GetQueryPlan_result & rhs) const
-=======
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const TCLIService_GetQueryPlan_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TCLIService_GetQueryPlan_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _TCLIService_GetQueryPlan_presult__isset {
+  _TCLIService_GetQueryPlan_presult__isset() : success(false) {}
+  bool success;
+} _TCLIService_GetQueryPlan_presult__isset;
+
+class TCLIService_GetQueryPlan_presult {
+ public:
+
+
+  virtual ~TCLIService_GetQueryPlan_presult() throw() {}
+
+  TGetQueryPlanResp* success;
+
+  _TCLIService_GetQueryPlan_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _TCLIService_GetDelegationToken_args__isset {
+  _TCLIService_GetDelegationToken_args__isset() : req(false) {}
+  bool req;
+} _TCLIService_GetDelegationToken_args__isset;
+
+class TCLIService_GetDelegationToken_args {
+ public:
+
+  TCLIService_GetDelegationToken_args() {
+  }
+
+  virtual ~TCLIService_GetDelegationToken_args() throw() {}
+
+  TGetDelegationTokenReq req;
+
+  _TCLIService_GetDelegationToken_args__isset __isset;
+
+  void __set_req(const TGetDelegationTokenReq& val) {
+    req = val;
+  }
+
+  bool operator == (const TCLIService_GetDelegationToken_args & rhs) const
+  {
+    if (!(req == rhs.req))
+      return false;
+    return true;
+  }
+  bool operator != (const TCLIService_GetDelegationToken_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const TCLIService_GetDelegationToken_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class TCLIService_GetDelegationToken_pargs {
+ public:
+
+
+  virtual ~TCLIService_GetDelegationToken_pargs() throw() {}
+
+  const TGetDelegationTokenReq* req;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
 typedef struct _TCLIService_GetDelegationToken_result__isset {
   _TCLIService_GetDelegationToken_result__isset() : success(false) {}
   bool success;
@@ -1998,47 +2035,22 @@ class TCLIService_GetDelegationToken_result {
   }
 
   bool operator == (const TCLIService_GetDelegationToken_result & rhs) const
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   {
     if (!(success == rhs.success))
       return false;
     return true;
   }
-<<<<<<< HEAD
-  bool operator != (const TCLIService_GetQueryPlan_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const TCLIService_GetQueryPlan_result & ) const;
-=======
   bool operator != (const TCLIService_GetDelegationToken_result &rhs) const {
     return !(*this == rhs);
   }
 
   bool operator < (const TCLIService_GetDelegationToken_result & ) const;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-<<<<<<< HEAD
-typedef struct _TCLIService_GetQueryPlan_presult__isset {
-  _TCLIService_GetQueryPlan_presult__isset() : success(false) {}
-  bool success;
-} _TCLIService_GetQueryPlan_presult__isset;
-
-class TCLIService_GetQueryPlan_presult {
- public:
-
-
-  virtual ~TCLIService_GetQueryPlan_presult() throw() {}
-
-  TGetQueryPlanResp* success;
-
-  _TCLIService_GetQueryPlan_presult__isset __isset;
-=======
 typedef struct _TCLIService_GetDelegationToken_presult__isset {
   _TCLIService_GetDelegationToken_presult__isset() : success(false) {}
   bool success;
@@ -2269,7 +2281,6 @@ class TCLIService_RenewDelegationToken_presult {
   TRenewDelegationTokenResp* success;
 
   _TCLIService_RenewDelegationToken_presult__isset __isset;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -2343,11 +2354,9 @@ class TCLIServiceClient : virtual public TCLIServiceIf {
   void FetchResults(TFetchResultsResp& _return, const TFetchResultsReq& req);
   void send_FetchResults(const TFetchResultsReq& req);
   void recv_FetchResults(TFetchResultsResp& _return);
-<<<<<<< HEAD
   void GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req);
   void send_GetQueryPlan(const TGetQueryPlanReq& req);
   void recv_GetQueryPlan(TGetQueryPlanResp& _return);
-=======
   void GetDelegationToken(TGetDelegationTokenResp& _return, const TGetDelegationTokenReq& req);
   void send_GetDelegationToken(const TGetDelegationTokenReq& req);
   void recv_GetDelegationToken(TGetDelegationTokenResp& _return);
@@ -2357,7 +2366,6 @@ class TCLIServiceClient : virtual public TCLIServiceIf {
   void RenewDelegationToken(TRenewDelegationTokenResp& _return, const TRenewDelegationTokenReq& req);
   void send_RenewDelegationToken(const TRenewDelegationTokenReq& req);
   void recv_RenewDelegationToken(TRenewDelegationTokenResp& _return);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
  protected:
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -2389,13 +2397,10 @@ class TCLIServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_CloseOperation(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetResultSetMetadata(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_FetchResults(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-<<<<<<< HEAD
   void process_GetQueryPlan(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-=======
   void process_GetDelegationToken(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_CancelDelegationToken(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_RenewDelegationToken(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
  public:
   TCLIServiceProcessor(boost::shared_ptr<TCLIServiceIf> iface) :
     iface_(iface) {
@@ -2415,13 +2420,10 @@ class TCLIServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["CloseOperation"] = &TCLIServiceProcessor::process_CloseOperation;
     processMap_["GetResultSetMetadata"] = &TCLIServiceProcessor::process_GetResultSetMetadata;
     processMap_["FetchResults"] = &TCLIServiceProcessor::process_FetchResults;
-<<<<<<< HEAD
     processMap_["GetQueryPlan"] = &TCLIServiceProcessor::process_GetQueryPlan;
-=======
     processMap_["GetDelegationToken"] = &TCLIServiceProcessor::process_GetDelegationToken;
     processMap_["CancelDelegationToken"] = &TCLIServiceProcessor::process_CancelDelegationToken;
     processMap_["RenewDelegationToken"] = &TCLIServiceProcessor::process_RenewDelegationToken;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
   virtual ~TCLIServiceProcessor() {}
@@ -2610,7 +2612,6 @@ class TCLIServiceMultiface : virtual public TCLIServiceIf {
     return;
   }
 
-<<<<<<< HEAD
   void GetQueryPlan(TGetQueryPlanResp& _return, const TGetQueryPlanReq& req) {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -2618,7 +2619,9 @@ class TCLIServiceMultiface : virtual public TCLIServiceIf {
       ifaces_[i]->GetQueryPlan(_return, req);
     }
     ifaces_[i]->GetQueryPlan(_return, req);
-=======
+    return;
+  }
+
   void GetDelegationToken(TGetDelegationTokenResp& _return, const TGetDelegationTokenReq& req) {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -2646,7 +2649,6 @@ class TCLIServiceMultiface : virtual public TCLIServiceIf {
       ifaces_[i]->RenewDelegationToken(_return, req);
     }
     ifaces_[i]->RenewDelegationToken(_return, req);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     return;
   }
 

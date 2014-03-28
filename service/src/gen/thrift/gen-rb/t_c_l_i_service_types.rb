@@ -1646,7 +1646,6 @@ class TFetchResultsResp
   ::Thrift::Struct.generate_accessors self
 end
 
-<<<<<<< HEAD
 class TGetQueryPlanReq
   include ::Thrift::Struct, ::Thrift::Struct_Union
   SESSIONHANDLE = 1
@@ -1657,7 +1656,38 @@ class TGetQueryPlanReq
     SESSIONHANDLE => {:type => ::Thrift::Types::STRUCT, :name => 'sessionHandle', :class => ::TSessionHandle},
     STATEMENT => {:type => ::Thrift::Types::STRING, :name => 'statement'},
     CONFOVERLAY => {:type => ::Thrift::Types::MAP, :name => 'confOverlay', :key => {:type => ::Thrift::Types::STRING}, :value => {:type => ::Thrift::Types::STRING}, :optional => true}
-=======
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field sessionHandle is unset!') unless @sessionHandle
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field statement is unset!') unless @statement
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class TGetQueryPlanResp
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  STATUS = 1
+  PLAN = 2
+
+  FIELDS = {
+    STATUS => {:type => ::Thrift::Types::STRUCT, :name => 'status', :class => ::TStatus},
+    PLAN => {:type => ::Thrift::Types::STRING, :name => 'plan'}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field status is unset!') unless @status
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field plan is unset!') unless @plan
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
 class TGetDelegationTokenReq
   include ::Thrift::Struct, ::Thrift::Struct_Union
   SESSIONHANDLE = 1
@@ -1668,34 +1698,19 @@ class TGetDelegationTokenReq
     SESSIONHANDLE => {:type => ::Thrift::Types::STRUCT, :name => 'sessionHandle', :class => ::TSessionHandle},
     OWNER => {:type => ::Thrift::Types::STRING, :name => 'owner'},
     RENEWER => {:type => ::Thrift::Types::STRING, :name => 'renewer'}
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
   def struct_fields; FIELDS; end
 
   def validate
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field sessionHandle is unset!') unless @sessionHandle
-<<<<<<< HEAD
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field statement is unset!') unless @statement
-=======
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field owner is unset!') unless @owner
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field renewer is unset!') unless @renewer
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   end
 
   ::Thrift::Struct.generate_accessors self
 end
 
-<<<<<<< HEAD
-class TGetQueryPlanResp
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  STATUS = 1
-  PLAN = 2
-
-  FIELDS = {
-    STATUS => {:type => ::Thrift::Types::STRUCT, :name => 'status', :class => ::TStatus},
-    PLAN => {:type => ::Thrift::Types::STRING, :name => 'plan'}
-=======
 class TGetDelegationTokenResp
   include ::Thrift::Struct, ::Thrift::Struct_Union
   STATUS = 1
@@ -1778,17 +1793,12 @@ class TRenewDelegationTokenResp
 
   FIELDS = {
     STATUS => {:type => ::Thrift::Types::STRUCT, :name => 'status', :class => ::TStatus}
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   }
 
   def struct_fields; FIELDS; end
 
   def validate
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field status is unset!') unless @status
-<<<<<<< HEAD
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field plan is unset!') unless @plan
-=======
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   end
 
   ::Thrift::Struct.generate_accessors self

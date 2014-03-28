@@ -39,13 +39,10 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  TCloseOperationResp CloseOperation(TCloseOperationReq req)'
   print '  TGetResultSetMetadataResp GetResultSetMetadata(TGetResultSetMetadataReq req)'
   print '  TFetchResultsResp FetchResults(TFetchResultsReq req)'
-<<<<<<< HEAD
   print '  TGetQueryPlanResp GetQueryPlan(TGetQueryPlanReq req)'
-=======
   print '  TGetDelegationTokenResp GetDelegationToken(TGetDelegationTokenReq req)'
   print '  TCancelDelegationTokenResp CancelDelegationToken(TCancelDelegationTokenReq req)'
   print '  TRenewDelegationTokenResp RenewDelegationToken(TRenewDelegationTokenReq req)'
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   print ''
   sys.exit(0)
 
@@ -193,13 +190,12 @@ elif cmd == 'FetchResults':
     sys.exit(1)
   pp.pprint(client.FetchResults(eval(args[0]),))
 
-<<<<<<< HEAD
 elif cmd == 'GetQueryPlan':
   if len(args) != 1:
     print 'GetQueryPlan requires 1 args'
     sys.exit(1)
   pp.pprint(client.GetQueryPlan(eval(args[0]),))
-=======
+
 elif cmd == 'GetDelegationToken':
   if len(args) != 1:
     print 'GetDelegationToken requires 1 args'
@@ -217,7 +213,6 @@ elif cmd == 'RenewDelegationToken':
     print 'RenewDelegationToken requires 1 args'
     sys.exit(1)
   pp.pprint(client.RenewDelegationToken(eval(args[0]),))
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
 else:
   print 'Unrecognized method %s' % cmd

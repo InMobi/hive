@@ -6370,17 +6370,10 @@ void swap(TFetchResultsResp &a, TFetchResultsResp &b) {
   swap(a.__isset, b.__isset);
 }
 
-<<<<<<< HEAD
 const char* TGetQueryPlanReq::ascii_fingerprint = "4CDA19909D21B7D9907F85E3387EAB27";
 const uint8_t TGetQueryPlanReq::binary_fingerprint[16] = {0x4C,0xDA,0x19,0x90,0x9D,0x21,0xB7,0xD9,0x90,0x7F,0x85,0xE3,0x38,0x7E,0xAB,0x27};
 
 uint32_t TGetQueryPlanReq::read(::apache::thrift::protocol::TProtocol* iprot) {
-=======
-const char* TGetDelegationTokenReq::ascii_fingerprint = "07EA0311716A27924914E4354ED22D6C";
-const uint8_t TGetDelegationTokenReq::binary_fingerprint[16] = {0x07,0xEA,0x03,0x11,0x71,0x6A,0x27,0x92,0x49,0x14,0xE4,0x35,0x4E,0xD2,0x2D,0x6C};
-
-uint32_t TGetDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* iprot) {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t xfer = 0;
   std::string fname;
@@ -6392,12 +6385,7 @@ uint32_t TGetDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* ipr
   using ::apache::thrift::protocol::TProtocolException;
 
   bool isset_sessionHandle = false;
-<<<<<<< HEAD
   bool isset_statement = false;
-=======
-  bool isset_owner = false;
-  bool isset_renewer = false;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   while (true)
   {
@@ -6417,19 +6405,13 @@ uint32_t TGetDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* ipr
         break;
       case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
-<<<<<<< HEAD
           xfer += iprot->readString(this->statement);
           isset_statement = true;
-=======
-          xfer += iprot->readString(this->owner);
-          isset_owner = true;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         } else {
           xfer += iprot->skip(ftype);
         }
         break;
       case 3:
-<<<<<<< HEAD
         if (ftype == ::apache::thrift::protocol::T_MAP) {
           {
             this->confOverlay.clear();
@@ -6448,11 +6430,6 @@ uint32_t TGetDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* ipr
             xfer += iprot->readMapEnd();
           }
           this->__isset.confOverlay = true;
-=======
-        if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->renewer);
-          isset_renewer = true;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -6468,32 +6445,19 @@ uint32_t TGetDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* ipr
 
   if (!isset_sessionHandle)
     throw TProtocolException(TProtocolException::INVALID_DATA);
-<<<<<<< HEAD
   if (!isset_statement)
-=======
-  if (!isset_owner)
-    throw TProtocolException(TProtocolException::INVALID_DATA);
-  if (!isset_renewer)
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     throw TProtocolException(TProtocolException::INVALID_DATA);
   return xfer;
 }
 
-<<<<<<< HEAD
 uint32_t TGetQueryPlanReq::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("TGetQueryPlanReq");
-=======
-uint32_t TGetDelegationTokenReq::write(::apache::thrift::protocol::TProtocol* oprot) const {
-  uint32_t xfer = 0;
-  xfer += oprot->writeStructBegin("TGetDelegationTokenReq");
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   xfer += oprot->writeFieldBegin("sessionHandle", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += this->sessionHandle.write(oprot);
   xfer += oprot->writeFieldEnd();
 
-<<<<<<< HEAD
   xfer += oprot->writeFieldBegin("statement", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->statement);
   xfer += oprot->writeFieldEnd();
@@ -6510,7 +6474,177 @@ uint32_t TGetDelegationTokenReq::write(::apache::thrift::protocol::TProtocol* op
       }
       xfer += oprot->writeMapEnd();
     }
-=======
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(TGetQueryPlanReq &a, TGetQueryPlanReq &b) {
+  using ::std::swap;
+  swap(a.sessionHandle, b.sessionHandle);
+  swap(a.statement, b.statement);
+  swap(a.confOverlay, b.confOverlay);
+  swap(a.__isset, b.__isset);
+}
+
+const char* TGetQueryPlanResp::ascii_fingerprint = "08A7F68AF7400F358E5CF08185165CB7";
+const uint8_t TGetQueryPlanResp::binary_fingerprint[16] = {0x08,0xA7,0xF6,0x8A,0xF7,0x40,0x0F,0x35,0x8E,0x5C,0xF0,0x81,0x85,0x16,0x5C,0xB7};
+
+uint32_t TGetQueryPlanResp::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+  bool isset_status = false;
+  bool isset_plan = false;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->status.read(iprot);
+          isset_status = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->plan);
+          isset_plan = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  if (!isset_status)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  if (!isset_plan)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  return xfer;
+}
+
+uint32_t TGetQueryPlanResp::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("TGetQueryPlanResp");
+
+  xfer += oprot->writeFieldBegin("status", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->status.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("plan", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->plan);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(TGetQueryPlanResp &a, TGetQueryPlanResp &b) {
+  using ::std::swap;
+  swap(a.status, b.status);
+  swap(a.plan, b.plan);
+}
+
+const char* TGetDelegationTokenReq::ascii_fingerprint = "07EA0311716A27924914E4354ED22D6C";
+const uint8_t TGetDelegationTokenReq::binary_fingerprint[16] = {0x07,0xEA,0x03,0x11,0x71,0x6A,0x27,0x92,0x49,0x14,0xE4,0x35,0x4E,0xD2,0x2D,0x6C};
+
+uint32_t TGetDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+  bool isset_sessionHandle = false;
+  bool isset_owner = false;
+  bool isset_renewer = false;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->sessionHandle.read(iprot);
+          isset_sessionHandle = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->owner);
+          isset_owner = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->renewer);
+          isset_renewer = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  if (!isset_sessionHandle)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  if (!isset_owner)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  if (!isset_renewer)
+    throw TProtocolException(TProtocolException::INVALID_DATA);
+  return xfer;
+}
+
+uint32_t TGetDelegationTokenReq::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  xfer += oprot->writeStructBegin("TGetDelegationTokenReq");
+
+  xfer += oprot->writeFieldBegin("sessionHandle", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->sessionHandle.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldBegin("owner", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->owner);
   xfer += oprot->writeFieldEnd();
@@ -6596,7 +6730,6 @@ uint32_t TGetDelegationTokenResp::write(::apache::thrift::protocol::TProtocol* o
   if (this->__isset.delegationToken) {
     xfer += oprot->writeFieldBegin("delegationToken", ::apache::thrift::protocol::T_STRING, 2);
     xfer += oprot->writeString(this->delegationToken);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     xfer += oprot->writeFieldEnd();
   }
   xfer += oprot->writeFieldStop();
@@ -6604,20 +6737,6 @@ uint32_t TGetDelegationTokenResp::write(::apache::thrift::protocol::TProtocol* o
   return xfer;
 }
 
-<<<<<<< HEAD
-void swap(TGetQueryPlanReq &a, TGetQueryPlanReq &b) {
-  using ::std::swap;
-  swap(a.sessionHandle, b.sessionHandle);
-  swap(a.statement, b.statement);
-  swap(a.confOverlay, b.confOverlay);
-  swap(a.__isset, b.__isset);
-}
-
-const char* TGetQueryPlanResp::ascii_fingerprint = "08A7F68AF7400F358E5CF08185165CB7";
-const uint8_t TGetQueryPlanResp::binary_fingerprint[16] = {0x08,0xA7,0xF6,0x8A,0xF7,0x40,0x0F,0x35,0x8E,0x5C,0xF0,0x81,0x85,0x16,0x5C,0xB7};
-
-uint32_t TGetQueryPlanResp::read(::apache::thrift::protocol::TProtocol* iprot) {
-=======
 void swap(TGetDelegationTokenResp &a, TGetDelegationTokenResp &b) {
   using ::std::swap;
   swap(a.status, b.status);
@@ -6709,7 +6828,6 @@ const char* TCancelDelegationTokenResp::ascii_fingerprint = "7142E89F09DC7C5F6FA
 const uint8_t TCancelDelegationTokenResp::binary_fingerprint[16] = {0x71,0x42,0xE8,0x9F,0x09,0xDC,0x7C,0x5F,0x6F,0xA9,0x16,0xC7,0x39,0x3F,0x46,0xC2};
 
 uint32_t TCancelDelegationTokenResp::read(::apache::thrift::protocol::TProtocol* iprot) {
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   uint32_t xfer = 0;
   std::string fname;
@@ -6721,10 +6839,6 @@ uint32_t TCancelDelegationTokenResp::read(::apache::thrift::protocol::TProtocol*
   using ::apache::thrift::protocol::TProtocolException;
 
   bool isset_status = false;
-<<<<<<< HEAD
-  bool isset_plan = false;
-=======
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 
   while (true)
   {
@@ -6742,12 +6856,6 @@ uint32_t TCancelDelegationTokenResp::read(::apache::thrift::protocol::TProtocol*
           xfer += iprot->skip(ftype);
         }
         break;
-<<<<<<< HEAD
-      case 2:
-        if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->plan);
-          isset_plan = true;
-=======
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -6817,7 +6925,6 @@ uint32_t TRenewDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* i
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->delegationToken);
           isset_delegationToken = true;
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -6831,31 +6938,13 @@ uint32_t TRenewDelegationTokenReq::read(::apache::thrift::protocol::TProtocol* i
 
   xfer += iprot->readStructEnd();
 
-<<<<<<< HEAD
-  if (!isset_status)
-    throw TProtocolException(TProtocolException::INVALID_DATA);
-  if (!isset_plan)
-=======
   if (!isset_sessionHandle)
     throw TProtocolException(TProtocolException::INVALID_DATA);
   if (!isset_delegationToken)
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
     throw TProtocolException(TProtocolException::INVALID_DATA);
   return xfer;
 }
 
-<<<<<<< HEAD
-uint32_t TGetQueryPlanResp::write(::apache::thrift::protocol::TProtocol* oprot) const {
-  uint32_t xfer = 0;
-  xfer += oprot->writeStructBegin("TGetQueryPlanResp");
-
-  xfer += oprot->writeFieldBegin("status", ::apache::thrift::protocol::T_STRUCT, 1);
-  xfer += this->status.write(oprot);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("plan", ::apache::thrift::protocol::T_STRING, 2);
-  xfer += oprot->writeString(this->plan);
-=======
 uint32_t TRenewDelegationTokenReq::write(::apache::thrift::protocol::TProtocol* oprot) const {
   uint32_t xfer = 0;
   xfer += oprot->writeStructBegin("TRenewDelegationTokenReq");
@@ -6931,7 +7020,6 @@ uint32_t TRenewDelegationTokenResp::write(::apache::thrift::protocol::TProtocol*
 
   xfer += oprot->writeFieldBegin("status", ::apache::thrift::protocol::T_STRUCT, 1);
   xfer += this->status.write(oprot);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -6939,16 +7027,9 @@ uint32_t TRenewDelegationTokenResp::write(::apache::thrift::protocol::TProtocol*
   return xfer;
 }
 
-<<<<<<< HEAD
-void swap(TGetQueryPlanResp &a, TGetQueryPlanResp &b) {
-  using ::std::swap;
-  swap(a.status, b.status);
-  swap(a.plan, b.plan);
-=======
 void swap(TRenewDelegationTokenResp &a, TRenewDelegationTokenResp &b) {
   using ::std::swap;
   swap(a.status, b.status);
->>>>>>> c8a718b14d25fdf2fcee641889136d192c082391
 }
 
 }}}}} // namespace
