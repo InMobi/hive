@@ -597,9 +597,9 @@ public class TestCubeRewriter {
         + " ON statetable.id = citytable.stateid " +
         "INNER JOIN c1_ziptable" +
         " ziptable ON citytable.zipcode = ziptable.code";
-    String actualExpr = "join statetable on testcube.stateid = statetable.id" +
-    		"  join ziptable on testcube.zipcode = ziptable.zipcode" +
-    		"  join citytable on testcube.cityid = citytable.id ";
+    String actualExpr = "join c1_statetable statetable on testcube.stateid = statetable.id and (statetable.dt = 'latest')" +
+      "  join c1_ziptable ziptable on testcube.zipcode = ziptable.zipcode and (ziptable.dt = 'latest')  " +
+      "join c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')";
     expected = getExpectedQuery(cubeName, "SELECT ( citytable  .  name ) g1 ," +
     		"  case  when (( citytable  .  name ) ==  'NULL' ) then  'NULL'  when (( citytable  .  name ) ==  'X' )" +
     		" then  'X-NAME'  when (( citytable  .  name ) ==  'Y' ) then  'Y-NAME'" +
