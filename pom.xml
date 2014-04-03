@@ -225,11 +225,11 @@
       <name>InMobi release Repository</name>
       <url>https://github.com/InMobi/mvn-repo/raw/master/releases</url>
     </repository>
-    <snaphsotRepository>
+    <snapshotRepository>
       <id>InMobiSnapshots</id>
       <name>InMobi snapshot Repository</name>
       <url>https://github.com/InMobi/mvn-repo/raw/master/snapshots</url>
-    </snaphsotRepository>
+    </snapshotRepository>
   </distributionManagement>
 
 
