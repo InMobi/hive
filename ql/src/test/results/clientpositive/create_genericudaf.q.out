@@ -1,0 +1,93 @@
+PREHOOK: query: EXPLAIN
+CREATE TEMPORARY FUNCTION test_avg AS 'org.apache.hadoop.hive.ql.udf.generic.GenericUDAFAverage'
+PREHOOK: type: CREATEFUNCTION
+POSTHOOK: query: EXPLAIN
+CREATE TEMPORARY FUNCTION test_avg AS 'org.apache.hadoop.hive.ql.udf.generic.GenericUDAFAverage'
+POSTHOOK: type: CREATEFUNCTION
+STAGE DEPENDENCIES:
+  Stage-0 is a root stage
+
+STAGE PLANS:
+  Stage: Stage-0
+
+PREHOOK: query: CREATE TEMPORARY FUNCTION test_avg AS 'org.apache.hadoop.hive.ql.udf.generic.GenericUDAFAverage'
+PREHOOK: type: CREATEFUNCTION
+POSTHOOK: query: CREATE TEMPORARY FUNCTION test_avg AS 'org.apache.hadoop.hive.ql.udf.generic.GenericUDAFAverage'
+POSTHOOK: type: CREATEFUNCTION
+PREHOOK: query: EXPLAIN
+SELECT
+    test_avg(1),
+    test_avg(substr(value,5))
+FROM src
+PREHOOK: type: QUERY
+POSTHOOK: query: EXPLAIN
+SELECT
+    test_avg(1),
+    test_avg(substr(value,5))
+FROM src
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 is a root stage
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: src
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: value (type: string)
+              outputColumnNames: value
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: test_avg(1), test_avg(substr(value, 5))
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+                Reduce Output Operator
+                  sort order: 
+                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+                  value expressions: _col0 (type: struct<count:bigint,sum:double,input:int>), _col1 (type: struct<count:bigint,sum:double,input:string>)
+      Reduce Operator Tree:
+        Group By Operator
+          aggregations: test_avg(VALUE._col0), test_avg(VALUE._col1)
+          mode: mergepartial
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: double), _col1 (type: double)
+            outputColumnNames: _col0, _col1
+            Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: -1
+
+PREHOOK: query: SELECT
+    test_avg(1),
+    test_avg(substr(value,5))
+FROM src
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT
+    test_avg(1),
+    test_avg(substr(value,5))
+FROM src
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+#### A masked pattern was here ####
+1.0	260.182
+PREHOOK: query: DROP TEMPORARY FUNCTIOn test_avg
+PREHOOK: type: DROPFUNCTION
+POSTHOOK: query: DROP TEMPORARY FUNCTIOn test_avg
+POSTHOOK: type: DROPFUNCTION

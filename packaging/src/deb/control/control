@@ -1,0 +1,9 @@
+Package: inmobi-hive
+Version: [[project.version]] 
+Section:  misc
+Priority: high
+Architecture: all 
+Depends: sun-java6-jre | java2-runtime
+Maintainer: Inmobi
+Description: Apache Hive enhanced at Inmobi
+Distribution: aplha

@@ -1,0 +1,77 @@
+PREHOOK: query: CREATE TEMPORARY FUNCTION example_avg AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleAvg'
+PREHOOK: type: CREATEFUNCTION
+POSTHOOK: query: CREATE TEMPORARY FUNCTION example_avg AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleAvg'
+POSTHOOK: type: CREATEFUNCTION
+PREHOOK: query: EXPLAIN
+SELECT example_avg(substr(value,5)),
+       example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
+FROM src
+PREHOOK: type: QUERY
+POSTHOOK: query: EXPLAIN
+SELECT example_avg(substr(value,5)),
+       example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
+FROM src
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 is a root stage
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: src
+            Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: value (type: string)
+              outputColumnNames: value
+              Statistics: Num rows: 58 Data size: 5812 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: example_avg(substr(value, 5)), example_avg(if((substr(value, 5) > 250), null, substr(value, 5)))
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+                Reduce Output Operator
+                  sort order: 
+                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+                  value expressions: _col0 (type: struct<mcount:bigint,msum:double>), _col1 (type: struct<mcount:bigint,msum:double>)
+      Reduce Operator Tree:
+        Group By Operator
+          aggregations: example_avg(VALUE._col0), example_avg(VALUE._col1)
+          mode: mergepartial
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: double), _col1 (type: double)
+            outputColumnNames: _col0, _col1
+            Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: -1
+
+PREHOOK: query: SELECT example_avg(substr(value,5)),
+       example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
+FROM src
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT example_avg(substr(value,5)),
+       example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
+FROM src
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+#### A masked pattern was here ####
+260.182	134.82926829268294
+PREHOOK: query: DROP TEMPORARY FUNCTION example_avg
+PREHOOK: type: DROPFUNCTION
+POSTHOOK: query: DROP TEMPORARY FUNCTION example_avg
+POSTHOOK: type: DROPFUNCTION
