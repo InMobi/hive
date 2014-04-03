@@ -219,6 +219,20 @@
      </repository>
   </repositories>
 
+  <distributionManagement>
+    <repository>
+      <id>InMobiReleases</id>
+      <name>InMobi release Repository</name>
+      <url>https://github.com/InMobi/mvn-repo/raw/master/releases</url>
+    </repository>
+    <repository>
+      <id>InMobiSnapshots</id>
+      <name>InMobi snapshot Repository</name>
+      <url>https://github.com/InMobi/mvn-repo/raw/master/snapshots</url>
+    </repository>
+  </distributionManagement>
+
+
   <!-- Hadoop dependency management is done at the bottom under profiles -->
   <dependencyManagement>
     <dependencies>
