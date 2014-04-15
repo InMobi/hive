@@ -1050,7 +1050,7 @@ public class CubeQueryContext {
     Iterator<CubeDimensionTable> it = dimensions.iterator();
     if (it.hasNext()) {
       CubeDimensionTable dim = it.next();
-      appendWhereClause(dim, whereBuf, fact != null);
+      appendWhereClause(dim, whereBuf, originalWhere != null || fact != null);
       while (it.hasNext()) {
         dim = it.next();
         appendWhereClause(dim, whereBuf, true);

@@ -777,6 +777,20 @@ public class TestCubeRewriter {
       "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
+    hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
+        " c where name != 'xyz' ");
+    expected = getExpectedQuery("c", "select c.name, c.stateid from ",
+        " c.name != 'xyz' ", null,
+        "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
+        " c where name != 'xyz' order by name");
+    expected = getExpectedQuery("c", "select c.name, c.stateid from ",
+        " c.name != 'xyz' ", " order by c.name",
+        "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C2");
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     hqlQuery = rewrite(driver, "select name, stateid from citytable");

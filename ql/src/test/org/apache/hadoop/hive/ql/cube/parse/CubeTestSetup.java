@@ -389,16 +389,35 @@ public class CubeTestSetup {
   }
 
   public static String getExpectedQuery(String dimName, String selExpr, String postWhereExpr,
-                          String storageTable, boolean hasPart) {
+      String storageTable, boolean hasPart) {
+    return getExpectedQuery(dimName, selExpr, null, postWhereExpr, storageTable, hasPart);
+  }
+
+  public static String getExpectedQuery(String dimName, String selExpr, String whereExpr,
+      String postWhereExpr, String storageTable, boolean hasPart) {
     StringBuilder expected = new StringBuilder();
+    String partWhere = null;
+    if (hasPart) {
+      partWhere = StorageUtil.getWherePartClause("dt",
+          dimName, StorageConstants.getPartitionsForLatest());
+    }
     expected.append(selExpr);
     expected.append(storageTable);
     expected.append(" ");
     expected.append(dimName);
-    if (hasPart) {
+    if (whereExpr != null || hasPart) {
       expected.append(" WHERE ");
-      expected.append(StorageUtil.getWherePartClause("dt",
-        dimName, StorageConstants.getPartitionsForLatest()));
+      expected.append("(");
+      if (whereExpr != null) {
+        expected.append(whereExpr);
+        if (partWhere != null) {
+          expected.append(" AND ");
+        }
+      }
+      if (partWhere != null) {
+        expected.append(partWhere);
+      }
+      expected.append(")");
     }
     if (postWhereExpr != null) {
       expected.append(postWhereExpr);
