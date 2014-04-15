@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hive.ql.io.orc;
 
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_ORC_ZEROCOPY;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -30,8 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,10 +42,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
-import org.apache.hadoop.hive.conf.HiveConf;
-import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_ORC_ZEROCOPY;
-import org.apache.hadoop.hive.ql.exec.vector.*;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
@@ -60,14 +60,15 @@ import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.typeinfo.HiveDecimalUtils;
+import org.apache.hadoop.hive.shims.HadoopShims.ByteBufferPoolShim;
+import org.apache.hadoop.hive.shims.HadoopShims.ZeroCopyReaderShim;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hadoop.hive.shims.HadoopShims.*;
 
 import com.google.common.collect.ComparisonChain;
 
@@ -187,44 +188,77 @@ class RecordReaderImpl implements RecordReader {
     }
   }
 
-  RecordReaderImpl(Iterable<StripeInformation> stripes,
+  /**
+   * Given a list of column names, find the given column and return the index.
+   * @param columnNames the list of potential column names
+   * @param columnName the column name to look for
+   * @param rootColumn offset the result with the rootColumn
+   * @return the column number or -1 if the column wasn't found
+   */
+  static int findColumns(String[] columnNames,
+                         String columnName,
+                         int rootColumn) {
+    for(int i=0; i < columnNames.length; ++i) {
+      if (columnName.equals(columnNames[i])) {
+        return i + rootColumn;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Find the mapping from predicate leaves to columns.
+   * @param sargLeaves the search argument that we need to map
+   * @param columnNames the names of the columns
+   * @param rootColumn the offset of the top level row, which offsets the
+   *                   result
+   * @return an array mapping the sarg leaves to concrete column numbers
+   */
+  static int[] mapSargColumns(List<PredicateLeaf> sargLeaves,
+                             String[] columnNames,
+                             int rootColumn) {
+    int[] result = new int[sargLeaves.size()];
+    Arrays.fill(result, -1);
+    for(int i=0; i < result.length; ++i) {
+      String colName = sargLeaves.get(i).getColumnName();
+      result[i] = findColumns(columnNames, colName, rootColumn);
+    }
+    return result;
+  }
+
+  RecordReaderImpl(List<StripeInformation> stripes,
                    FileSystem fileSystem,
                    Path path,
-                   long offset, long length,
+                   Reader.Options options,
                    List<OrcProto.Type> types,
                    CompressionCodec codec,
                    int bufferSize,
-                   boolean[] included,
                    long strideRate,
-                   SearchArgument sarg,
-                   String[] columnNames,
                    Configuration conf
                   ) throws IOException {
     this.file = fileSystem.open(path);
     this.codec = codec;
     this.types = types;
     this.bufferSize = bufferSize;
-    this.included = included;
+    this.included = options.getInclude();
     this.conf = conf;
-    this.sarg = sarg;
+    this.sarg = options.getSearchArgument();
     if (sarg != null) {
       sargLeaves = sarg.getLeaves();
-      filterColumns = new int[sargLeaves.size()];
-      for(int i=0; i < filterColumns.length; ++i) {
-        String colName = sargLeaves.get(i).getColumnName();
-        filterColumns[i] = findColumns(columnNames, colName);
-      }
+      filterColumns = mapSargColumns(sargLeaves, options.getColumnNames(), 0);
     } else {
       sargLeaves = null;
       filterColumns = null;
     }
     long rows = 0;
     long skippedRows = 0;
+    long offset = options.getOffset();
+    long maxOffset = options.getMaxOffset();
     for(StripeInformation stripe: stripes) {
       long stripeStart = stripe.getOffset();
       if (offset > stripeStart) {
         skippedRows += stripe.getNumberOfRows();
-      } else if (stripeStart < offset + length) {
+      } else if (stripeStart < maxOffset) {
         this.stripes.add(stripe);
         rows += stripe.getNumberOfRows();
       }
@@ -248,16 +282,6 @@ class RecordReaderImpl implements RecordReader {
     indexes = new OrcProto.RowIndex[types.size()];
     rowIndexStride = strideRate;
     advanceToNextRow(0L);
-  }
-
-  static int findColumns(String[] columnNames,
-                                 String columnName) {
-    for(int i=0; i < columnNames.length; ++i) {
-      if (columnName.equals(columnNames[i])) {
-        return i;
-      }
-    }
-    return -1;
   }
 
   private static final class PositionProviderImpl implements PositionProvider {
@@ -1068,7 +1092,7 @@ class RecordReaderImpl implements RecordReader {
 
     private static int parseNanos(long serialized) {
       int zeros = 7 & (int) serialized;
-      int result = (int) serialized >>> 3;
+      int result = (int) (serialized >>> 3);
       if (zeros != 0) {
         for(int i =0; i <= zeros; ++i) {
           result *= 10;
@@ -2226,7 +2250,7 @@ class RecordReaderImpl implements RecordReader {
    *   predicate.
    */
   static TruthValue evaluatePredicate(OrcProto.ColumnStatistics index,
-                               PredicateLeaf predicate) {
+                                      PredicateLeaf predicate) {
     ColumnStatistics cs = ColumnStatisticsImpl.deserialize(index);
     Object minValue = getMin(cs);
     // if we didn't have any values, everything must have been null
@@ -2244,25 +2268,29 @@ class RecordReaderImpl implements RecordReader {
   static TruthValue evaluatePredicateRange(PredicateLeaf predicate, Object min,
       Object max) {
     Location loc;
+    try {
+      // Predicate object and stats object can be one of the following base types
+      // LONG, DOUBLE, STRING, DATE, DECIMAL
+      // Out of these DATE is not implicitly convertible to other types and rest
+      // others are implicitly convertible. In cases where DATE cannot be converted
+      // the stats object is converted to text and comparison is performed.
+      // When STRINGs are converted to other base types, NumberFormat exception
+      // can occur in which case TruthValue.YES_NO_NULL value is returned
+      Object baseObj = predicate.getLiteral();
+      Object minValue = getConvertedStatsObj(min, baseObj);
+      Object maxValue = getConvertedStatsObj(max, baseObj);
+      Object predObj = getBaseObjectForComparison(baseObj, minValue);
 
-    // column statistics for char/varchar columns are stored as strings, so convert char/varchar
-    // type predicates to string
-    Object predObj = predicate.getLiteral();
-    Object minValue = getPrimitiveObject(predObj, min);
-    Object maxValue = getPrimitiveObject(predObj, max);
-
-    switch (predicate.getOperator()) {
+      switch (predicate.getOperator()) {
       case NULL_SAFE_EQUALS:
-        loc = compareToRange((Comparable) predicate.getLiteral(),
-            minValue, maxValue);
+        loc = compareToRange((Comparable) predObj, minValue, maxValue);
         if (loc == Location.BEFORE || loc == Location.AFTER) {
           return TruthValue.NO;
         } else {
           return TruthValue.YES_NO;
         }
       case EQUALS:
-        loc = compareToRange((Comparable) predicate.getLiteral(),
-            minValue, maxValue);
+        loc = compareToRange((Comparable) predObj, minValue, maxValue);
         if (minValue.equals(maxValue) && loc == Location.MIN) {
           return TruthValue.YES_NULL;
         } else if (loc == Location.BEFORE || loc == Location.AFTER) {
@@ -2271,8 +2299,7 @@ class RecordReaderImpl implements RecordReader {
           return TruthValue.YES_NO_NULL;
         }
       case LESS_THAN:
-        loc = compareToRange((Comparable) predicate.getLiteral(),
-            minValue, maxValue);
+        loc = compareToRange((Comparable) predObj, minValue, maxValue);
         if (loc == Location.AFTER) {
           return TruthValue.YES_NULL;
         } else if (loc == Location.BEFORE || loc == Location.MIN) {
@@ -2281,8 +2308,7 @@ class RecordReaderImpl implements RecordReader {
           return TruthValue.YES_NO_NULL;
         }
       case LESS_THAN_EQUALS:
-        loc = compareToRange((Comparable) predicate.getLiteral(),
-            minValue, maxValue);
+        loc = compareToRange((Comparable) predObj, minValue, maxValue);
         if (loc == Location.AFTER || loc == Location.MAX) {
           return TruthValue.YES_NULL;
         } else if (loc == Location.BEFORE) {
@@ -2294,10 +2320,9 @@ class RecordReaderImpl implements RecordReader {
         if (minValue.equals(maxValue)) {
           // for a single value, look through to see if that value is in the
           // set
-          for(Object arg: predicate.getLiteralList()) {
-            minValue = getPrimitiveObject(arg, min);
-            maxValue = getPrimitiveObject(arg, max);
-            loc = compareToRange((Comparable) arg, minValue, maxValue);
+          for (Object arg : predicate.getLiteralList()) {
+            predObj = getBaseObjectForComparison(arg, minValue);
+            loc = compareToRange((Comparable) predObj, minValue, maxValue);
             if (loc == Location.MIN) {
               return TruthValue.YES_NULL;
             }
@@ -2305,10 +2330,9 @@ class RecordReaderImpl implements RecordReader {
           return TruthValue.NO_NULL;
         } else {
           // are all of the values outside of the range?
-          for(Object arg: predicate.getLiteralList()) {
-            minValue = getPrimitiveObject(arg, min);
-            maxValue = getPrimitiveObject(arg, max);
-            loc = compareToRange((Comparable) arg, minValue, maxValue);
+          for (Object arg : predicate.getLiteralList()) {
+            predObj = getBaseObjectForComparison(arg, minValue);
+            loc = compareToRange((Comparable) predObj, minValue, maxValue);
             if (loc == Location.MIN || loc == Location.MIDDLE ||
                 loc == Location.MAX) {
               return TruthValue.YES_NO_NULL;
@@ -2318,17 +2342,13 @@ class RecordReaderImpl implements RecordReader {
         }
       case BETWEEN:
         List<Object> args = predicate.getLiteralList();
-        minValue = getPrimitiveObject(args.get(0), min);
-        maxValue = getPrimitiveObject(args.get(0), max);
+        Object predObj1 = getBaseObjectForComparison(args.get(0), minValue);
 
-        loc = compareToRange((Comparable) args.get(0), minValue, maxValue);
+        loc = compareToRange((Comparable) predObj1, minValue, maxValue);
         if (loc == Location.BEFORE || loc == Location.MIN) {
-          Object predObj2 = args.get(1);
-          minValue = getPrimitiveObject(predObj2, min);
-          maxValue = getPrimitiveObject(predObj2, max);
+          Object predObj2 = getBaseObjectForComparison(args.get(1), minValue);
 
-          Location loc2 = compareToRange((Comparable) predObj2, minValue,
-              maxValue);
+          Location loc2 = compareToRange((Comparable) predObj2, minValue, maxValue);
           if (loc2 == Location.AFTER || loc2 == Location.MAX) {
             return TruthValue.YES_NULL;
           } else if (loc2 == Location.BEFORE) {
@@ -2345,39 +2365,61 @@ class RecordReaderImpl implements RecordReader {
         return TruthValue.YES_NO;
       default:
         return TruthValue.YES_NO_NULL;
+      }
+
+      // in case failed conversion, return the default YES_NO_NULL truth value
+    } catch (NumberFormatException nfe) {
+      return TruthValue.YES_NO_NULL;
     }
   }
 
-  private static Object getPrimitiveObject(Object predObj, Object obj) {
-    if (obj instanceof DateWritable) {
-      DateWritable dobj = (DateWritable) obj;
-      if (predObj instanceof String || predObj instanceof HiveChar
-          || predObj instanceof HiveVarchar) {
-        return dobj.toString();
+  private static Object getBaseObjectForComparison(Object predObj, Object statsObj) {
+    if (predObj != null) {
+      // following are implicitly convertible
+      if (statsObj instanceof Long) {
+        if (predObj instanceof Double) {
+          return ((Double) predObj).longValue();
+        } else if (predObj instanceof HiveDecimal) {
+          return ((HiveDecimal) predObj).longValue();
+        } else if (predObj instanceof String) {
+          return Long.valueOf(predObj.toString());
+        }
+      } else if (statsObj instanceof Double) {
+        if (predObj instanceof Long) {
+          return ((Long) predObj).doubleValue();
+        } else if (predObj instanceof HiveDecimal) {
+          return ((HiveDecimal) predObj).doubleValue();
+        } else if (predObj instanceof String) {
+          return Double.valueOf(predObj.toString());
+        }
+      } else if (statsObj instanceof String) {
+        return predObj.toString();
+      } else if (statsObj instanceof HiveDecimal) {
+        if (predObj instanceof Long) {
+          return HiveDecimal.create(((Long) predObj));
+        } else if (predObj instanceof Double) {
+          return HiveDecimal.create(predObj.toString());
+        } else if (predObj instanceof String) {
+          return HiveDecimal.create(predObj.toString());
+        }
       }
-    } else if (obj instanceof HiveDecimal) {
-      HiveDecimal hdObj = (HiveDecimal) obj;
-      if (predObj instanceof Float) {
-        return hdObj.floatValue();
-      } else if (predObj instanceof Double) {
-        return hdObj.doubleValue();
-      } else if (predObj instanceof Short) {
-        return hdObj.shortValue();
-      } else if (predObj instanceof Integer) {
-        return hdObj.intValue();
-      } else if (predObj instanceof Long) {
-        return hdObj.longValue();
-      } else if (predObj instanceof String || predObj instanceof HiveChar
-          || predObj instanceof HiveVarchar) {
-        // primitive type of char/varchar is Text (i.e trailing white spaces trimmed string)
-        return StringUtils.stripEnd(hdObj.toString(), null);
-      }
-    } else if (obj instanceof String || obj instanceof HiveChar || obj instanceof HiveVarchar) {
-      // primitive type of char/varchar is Text (i.e trailing white spaces trimmed string)
-      return StringUtils.stripEnd(obj.toString(), null);
+    }
+    return predObj;
+  }
+
+  private static Object getConvertedStatsObj(Object statsObj, Object predObj) {
+
+    // converting between date and other types is not implicit, so convert to
+    // text for comparison
+    if (((predObj instanceof DateWritable) && !(statsObj instanceof DateWritable))
+        || ((statsObj instanceof DateWritable) && !(predObj instanceof DateWritable))) {
+      return StringUtils.stripEnd(statsObj.toString(), null);
     }
 
-    return obj;
+    if (statsObj instanceof String) {
+      return StringUtils.stripEnd(statsObj.toString(), null);
+    }
+    return statsObj;
   }
 
   /**
@@ -2948,6 +2990,10 @@ class RecordReaderImpl implements RecordReader {
     // find the next row
     rowInStripe += 1;
     advanceToNextRow(rowInStripe + rowBaseInStripe);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("row from " + reader.path);
+      LOG.debug("orc row = " + result);
+    }
     return result;
   }
 

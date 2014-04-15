@@ -46,6 +46,10 @@
            <string>key,value</string> 
           </void> 
           <void method="put"> 
+           <string>columns.comments</string> 
+           <string>default<char code="#0"/>default</string> 
+          </void> 
+          <void method="put"> 
            <string>bucket_count</string> 
            <string>-1</string> 
           </void> 
@@ -104,6 +108,10 @@
             <void method="put"> 
              <string>rawDataSize</string> 
              <string>0</string> 
+            </void> 
+            <void method="put"> 
+             <string>columns.comments</string> 
+             <string>default<char code="#0"/>default</string> 
             </void> 
             <void method="put"> 
              <string>numRows</string> 
@@ -166,6 +174,11 @@
                    <void property="dirName"> 
                     <object class="org.apache.hadoop.fs.Path"> 
                      #### A masked pattern was here #### 
+                    </object> 
+                   </void> 
+                   <void property="dpSortState"> 
+                    <object class="org.apache.hadoop.hive.ql.plan.FileSinkDesc$DPSortState" method="valueOf"> 
+                     <string>NONE</string> 
                     </object> 
                    </void> 
                    <void property="numFiles"> 
@@ -1955,6 +1968,10 @@
           <void method="put"> 
            <string>rawDataSize</string> 
            <string>0</string> 
+          </void> 
+          <void method="put"> 
+           <string>columns.comments</string> 
+           <string>default<char code="#0"/>default</string> 
           </void> 
           <void method="put"> 
            <string>numRows</string> 

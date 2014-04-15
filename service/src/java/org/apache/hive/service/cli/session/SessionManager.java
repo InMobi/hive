@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.hooks.HookUtils;
 import org.apache.hive.service.CompositeService;
+import org.apache.hive.service.auth.TSetIpAddressProcessor;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.SessionHandle;
 import org.apache.hive.service.cli.operation.OperationManager;
@@ -144,23 +145,21 @@ public class SessionManager extends CompositeService {
 
   public SessionHandle openSession(TProtocolVersion protocol, String username, String password,
       Map<String, String> sessionConf, boolean withImpersonation, String delegationToken)
-      throws HiveSQLException {
-    if (username == null) {
-      username = threadLocalUserName.get();
-    }
+          throws HiveSQLException {
     HiveSession session;
     if (withImpersonation) {
       HiveSessionImplwithUGI hiveSessionUgi;
       if (sessionImplWithUGIclassName == null) {
         hiveSessionUgi = new HiveSessionImplwithUGI(protocol, username, password,
-            hiveConf, sessionConf, delegationToken);
+            hiveConf, sessionConf, TSetIpAddressProcessor.getUserIpAddress(), delegationToken);
       } else {
         try {
           Class<?> clazz = Class.forName(sessionImplWithUGIclassName);
           Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class,
-              String.class, String.class, HiveConf.class, Map.class, String.class);
+              String.class, String.class, HiveConf.class, Map.class, String.class, String.class);
           hiveSessionUgi = (HiveSessionImplwithUGI) constructor.newInstance(new Object[]
-              {protocol, username, password, hiveConf, sessionConf, delegationToken});
+              {protocol, username, password, hiveConf, sessionConf,
+              TSetIpAddressProcessor.getUserIpAddress(), delegationToken});
         } catch (Exception e) {
           throw new HiveSQLException("Cannot initilize session class:" + sessionImplWithUGIclassName);
         }
@@ -169,14 +168,15 @@ public class SessionManager extends CompositeService {
       hiveSessionUgi.setProxySession(session);
     } else {
       if (sessionImplclassName == null) {
-        session = new HiveSessionImpl(protocol, username, password, hiveConf, sessionConf);
+        session = new HiveSessionImpl(protocol, username, password, hiveConf, sessionConf,
+            TSetIpAddressProcessor.getUserIpAddress());
       } else {
         try {
           Class<?> clazz = Class.forName(sessionImplclassName);
           Constructor<?> constructor = clazz.getConstructor(TProtocolVersion.class,
-              String.class, String.class, HiveConf.class, Map.class);
+              String.class, String.class, HiveConf.class, Map.class, String.class);
           session = (HiveSession) constructor.newInstance(new Object[]
-              {protocol, username, password, hiveConf, sessionConf});
+              {protocol, username, password, hiveConf, sessionConf, TSetIpAddressProcessor.getUserIpAddress()});
         } catch (Exception e) {
           throw new HiveSQLException("Cannot initilize session class:" + sessionImplclassName);
         }
@@ -189,7 +189,7 @@ public class SessionManager extends CompositeService {
     }
     session.setSessionManager(this);
     session.setOperationManager(operationManager);
-
+    session.open();
     handleToSession.put(session.getSessionHandle(), session);
 
     try {
@@ -231,8 +231,12 @@ public class SessionManager extends CompositeService {
     threadLocalIpAddress.set(ipAddress);
   }
 
-  private void clearIpAddress() {
+  public static void clearIpAddress() {
     threadLocalIpAddress.remove();
+  }
+
+  public static String getIpAddress() {
+    return threadLocalIpAddress.get();
   }
 
   private static ThreadLocal<String> threadLocalUserName = new ThreadLocal<String>(){
@@ -246,8 +250,12 @@ public class SessionManager extends CompositeService {
     threadLocalUserName.set(userName);
   }
 
-  private void clearUserName() {
+  public static void clearUserName() {
     threadLocalUserName.remove();
+  }
+
+  public static String getUserName() {
+    return threadLocalUserName.get();
   }
 
   // execute session hooks
@@ -352,3 +360,4 @@ public class SessionManager extends CompositeService {
     }
   }
 }
+

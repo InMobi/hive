@@ -3169,7 +3169,7 @@ public class ObjectStore implements RawStore, Configurable {
       if (mRol != null) {
         // first remove all the membership, the membership that this role has
         // been granted
-        List<MRoleMap> roleMap = listRoleMembers(mRol);
+        List<MRoleMap> roleMap = listRoleMembers(mRol.getRoleName());
         if (roleMap.size() > 0) {
           pm.deletePersistentAll(roleMap);
         }
@@ -4117,8 +4117,8 @@ public class ObjectStore implements RawStore, Configurable {
   }
 
   @SuppressWarnings("unchecked")
-  private List<MRoleMap> listRoleMembers(
-      MRole mRol) {
+  @Override
+  public List<MRoleMap> listRoleMembers(String roleName) {
     boolean success = false;
     List<MRoleMap> mRoleMemeberList = null;
     try {
@@ -4129,7 +4129,7 @@ public class ObjectStore implements RawStore, Configurable {
       query.declareParameters("java.lang.String t1");
       query.setUnique(false);
       mRoleMemeberList = (List<MRoleMap>) query.execute(
-          mRol.getRoleName());
+          roleName);
       LOG.debug("Done executing query for listMSecurityUserRoleMember");
       pm.retrieveAll(mRoleMemeberList);
       success = commitTransaction();
@@ -4210,11 +4210,11 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPrincipalDBGrants");
-      Query query = pm.newQuery(MDBPrivilege.class,
-          "principalName == t1 && principalType == t2 && database.name == t3");
-      query
-          .declareParameters("java.lang.String t1, java.lang.String t2, java.lang.String t3");
-      mSecurityDBList = (List<MDBPrivilege>) query.executeWithArray(principalName, principalType.toString(), dbName);
+        Query query = pm.newQuery(MDBPrivilege.class,
+            "principalName == t1 && principalType == t2 && database.name == t3");
+        query
+            .declareParameters("java.lang.String t1, java.lang.String t2, java.lang.String t3");
+        mSecurityDBList = (List<MDBPrivilege>) query.executeWithArray(principalName, principalType.toString(), dbName);
       LOG.debug("Done executing query for listPrincipalDBGrants");
       pm.retrieveAll(mSecurityDBList);
       success = commitTransaction();
@@ -4263,11 +4263,16 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPrincipalAllDBGrant");
-      Query query = pm.newQuery(MDBPrivilege.class,
-          "principalName == t1 && principalType == t2");
-      query
-          .declareParameters("java.lang.String t1, java.lang.String t2");
-      mSecurityDBList = (List<MDBPrivilege>) query.execute(principalName, principalType.toString());
+      if (principalName != null && principalType != null) {
+        Query query = pm.newQuery(MDBPrivilege.class,
+            "principalName == t1 && principalType == t2");
+        query
+            .declareParameters("java.lang.String t1, java.lang.String t2");
+        mSecurityDBList = (List<MDBPrivilege>) query.execute(principalName, principalType.toString());
+      } else {
+        Query query = pm.newQuery(MDBPrivilege.class);
+        mSecurityDBList = (List<MDBPrivilege>) query.execute();
+      }
       LOG.debug("Done executing query for listPrincipalAllDBGrant");
       pm.retrieveAll(mSecurityDBList);
       success = commitTransaction();
@@ -4668,11 +4673,17 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPrincipalPartitionColumnGrantsAll");
-      Query query = pm.newQuery(MPartitionColumnPrivilege.class,
-          "principalName == t1 && principalType == t2");
-      query.declareParameters("java.lang.String t1, java.lang.String t2");
-      List<MPartitionColumnPrivilege> mSecurityTabPartList = (List<MPartitionColumnPrivilege>)
-          query.executeWithArray(principalName, principalType.toString());
+      List<MPartitionColumnPrivilege> mSecurityTabPartList;
+      if (principalName != null && principalType != null) {
+        Query query = pm.newQuery(MPartitionColumnPrivilege.class,
+            "principalName == t1 && principalType == t2");
+        query.declareParameters("java.lang.String t1, java.lang.String t2");
+        mSecurityTabPartList = (List<MPartitionColumnPrivilege>)
+            query.executeWithArray(principalName, principalType.toString());
+      } else {
+        Query query = pm.newQuery(MPartitionColumnPrivilege.class);
+        mSecurityTabPartList = (List<MPartitionColumnPrivilege>) query.execute();
+      }
       LOG.debug("Done executing query for listPrincipalPartitionColumnGrantsAll");
       pm.retrieveAll(mSecurityTabPartList);
       List<HiveObjectPrivilege> result = convertPartCols(mSecurityTabPartList);
@@ -4767,11 +4778,17 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPrincipalAllTableGrants");
-      Query query = pm.newQuery(MTablePrivilege.class,
-          "principalName == t1 && principalType == t2");
-      query.declareParameters("java.lang.String t1, java.lang.String t2");
-      List<MTablePrivilege> mSecurityTabPartList = (List<MTablePrivilege>) query.execute(
-          principalName, principalType.toString());
+      List<MTablePrivilege> mSecurityTabPartList;
+      if (principalName != null && principalType != null) {
+        Query query = pm.newQuery(MTablePrivilege.class,
+            "principalName == t1 && principalType == t2");
+        query.declareParameters("java.lang.String t1, java.lang.String t2");
+        mSecurityTabPartList = (List<MTablePrivilege>) query.execute(
+            principalName, principalType.toString());
+      } else {
+        Query query = pm.newQuery(MTablePrivilege.class);
+        mSecurityTabPartList = (List<MTablePrivilege>) query.execute();
+      }
       LOG.debug("Done executing query for listPrincipalAllTableGrants");
       pm.retrieveAll(mSecurityTabPartList);
       List<HiveObjectPrivilege> result = convertTable(mSecurityTabPartList);
@@ -4862,11 +4879,17 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPrincipalPartitionGrantsAll");
-      Query query = pm.newQuery(MPartitionPrivilege.class,
-          "principalName == t1 && principalType == t2");
-      query.declareParameters("java.lang.String t1, java.lang.String t2");
-      List<MPartitionPrivilege> mSecurityTabPartList = (List<MPartitionPrivilege>)
-          query.execute(principalName, principalType.toString());
+      List<MPartitionPrivilege> mSecurityTabPartList;
+      if (principalName != null && principalType != null) {
+        Query query = pm.newQuery(MPartitionPrivilege.class,
+            "principalName == t1 && principalType == t2");
+        query.declareParameters("java.lang.String t1, java.lang.String t2");
+        mSecurityTabPartList = (List<MPartitionPrivilege>)
+            query.execute(principalName, principalType.toString());
+      } else {
+        Query query = pm.newQuery(MPartitionPrivilege.class);
+        mSecurityTabPartList = (List<MPartitionPrivilege>) query.execute();
+      }
       LOG.debug("Done executing query for listPrincipalPartitionGrantsAll");
       pm.retrieveAll(mSecurityTabPartList);
       List<HiveObjectPrivilege> result = convertPartition(mSecurityTabPartList);
@@ -4959,11 +4982,18 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPrincipalTableColumnGrantsAll");
-      Query query = pm.newQuery(MTableColumnPrivilege.class,
-          "principalName == t1 && principalType == t2");
-      query.declareParameters("java.lang.String t1, java.lang.String t2");
-      List<MTableColumnPrivilege> mSecurityTabPartList = (List<MTableColumnPrivilege>)
-          query.execute(principalName, principalType.toString());
+
+      List<MTableColumnPrivilege> mSecurityTabPartList;
+      if (principalName != null && principalType != null) {
+        Query query = pm.newQuery(MTableColumnPrivilege.class,
+            "principalName == t1 && principalType == t2");
+        query.declareParameters("java.lang.String t1, java.lang.String t2");
+        mSecurityTabPartList = (List<MTableColumnPrivilege>)
+            query.execute(principalName, principalType.toString());
+      } else {
+        Query query = pm.newQuery(MTableColumnPrivilege.class);
+        mSecurityTabPartList = (List<MTableColumnPrivilege>) query.execute();
+      }
       LOG.debug("Done executing query for listPrincipalTableColumnGrantsAll");
       pm.retrieveAll(mSecurityTabPartList);
       List<HiveObjectPrivilege> result = convertTableCols(mSecurityTabPartList);

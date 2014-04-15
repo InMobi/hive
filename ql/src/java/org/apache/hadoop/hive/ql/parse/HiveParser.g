@@ -284,6 +284,7 @@ TOK_REVOKE_ROLE;
 TOK_SHOW_ROLE_GRANT;
 TOK_SHOW_ROLES;
 TOK_SHOW_SET_ROLE;
+TOK_SHOW_ROLE_PRINCIPALS;
 TOK_SHOWINDEXES;
 TOK_SHOWDBLOCKS;
 TOK_INDEXCOMMENT;
@@ -328,6 +329,9 @@ TOK_FILE;
 TOK_JAR;
 TOK_RESOURCE_URI;
 TOK_RESOURCE_LIST;
+TOK_COMPACT;
+TOK_SHOW_COMPACTIONS;
+TOK_SHOW_TRANSACTIONS;
 }
 
 
@@ -352,6 +356,8 @@ import java.util.HashMap;
     xlateMap.put("KW_TRUE", "TRUE");
     xlateMap.put("KW_FALSE", "FALSE");
     xlateMap.put("KW_ALL", "ALL");
+    xlateMap.put("KW_NONE", "NONE");
+    xlateMap.put("KW_DEFAULT", "DEFAULT");
     xlateMap.put("KW_AND", "AND");
     xlateMap.put("KW_OR", "OR");
     xlateMap.put("KW_NOT", "NOT");
@@ -678,6 +684,7 @@ ddlStatement
     | revokePrivileges
     | showGrants
     | showRoleGrants
+    | showRolePrincipals
     | showRoles
     | grantRole
     | revokeRole
@@ -1120,6 +1127,7 @@ alterTblPartitionStatementSuffix
   | alterStatementSuffixBucketNum
   | alterTblPartitionStatementSuffixSkewedLocation
   | alterStatementSuffixClusterbySortby
+  | alterStatementSuffixCompact
   ;
 
 alterStatementSuffixFileFormat
@@ -1236,6 +1244,14 @@ alterStatementSuffixBucketNum
     -> ^(TOK_TABLEBUCKETS $num)
     ;
 
+alterStatementSuffixCompact
+@init { msgs.push("compaction request"); }
+@after { msgs.pop(); }
+    : KW_COMPACT compactType=StringLiteral
+    -> ^(TOK_COMPACT $compactType)
+    ;
+
+
 fileFormat
 @init { pushMsg("file format specification", state); }
 @after { popMsg(state); }
@@ -1306,6 +1322,8 @@ showStatement
     | KW_SHOW KW_LOCKS KW_DATABASE (dbName=Identifier) (isExtended=KW_EXTENDED)? -> ^(TOK_SHOWDBLOCKS $dbName $isExtended?)
     | KW_SHOW (showOptions=KW_FORMATTED)? (KW_INDEX|KW_INDEXES) KW_ON showStmtIdentifier ((KW_FROM|KW_IN) db_name=identifier)?
     -> ^(TOK_SHOWINDEXES showStmtIdentifier $showOptions? $db_name?)
+    | KW_SHOW KW_COMPACTIONS -> ^(TOK_SHOW_COMPACTIONS)
+    | KW_SHOW KW_TRANSACTIONS -> ^(TOK_SHOW_TRANSACTIONS)
     ;
 
 lockStatement
@@ -1390,6 +1408,7 @@ showRoleGrants
     -> ^(TOK_SHOW_ROLE_GRANT principalName)
     ;
 
+
 showRoles
 @init {pushMsg("show roles", state);}
 @after {popMsg(state);}
@@ -1417,6 +1436,14 @@ showGrants
     : KW_SHOW KW_GRANT principalName? (KW_ON privilegeIncludeColObject)?
     -> ^(TOK_SHOW_GRANT principalName? privilegeIncludeColObject?)
     ;
+
+showRolePrincipals
+@init {pushMsg("show role principals", state);}
+@after {popMsg(state);}
+    : KW_SHOW KW_PRINCIPALS roleName=identifier
+    -> ^(TOK_SHOW_ROLE_PRINCIPALS $roleName)
+    ;
+
 
 privilegeIncludeColObject
 @init {pushMsg("privilege object including columns", state);}

@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -177,7 +178,7 @@ public class Partition implements Serializable {
    * @throws HiveException
    *           Thrown if we cannot initialize the partition
    */
-  private void initialize(Table table,
+  protected void initialize(Table table,
       org.apache.hadoop.hive.metastore.api.Partition tPartition) throws HiveException {
 
     this.table = table;
@@ -212,11 +213,13 @@ public class Partition implements Serializable {
       }
     }
 
-    // This will set up field: inputFormatClass
-    getInputFormatClass();
-    // This will set up field: outputFormatClass
-    getOutputFormatClass();
-    getDeserializer();
+    // Note that we do not set up fields like inputFormatClass, outputFormatClass
+    // and deserializer because the Partition needs to be accessed from across
+    // the metastore side as well, which will result in attempting to load
+    // the class associated with them, which might not be available, and
+    // the main reason to instantiate them would be to pre-cache them for
+    // performance. Since those fields are null/cache-check by their accessors
+    // anyway, that's not a concern.
   }
 
   public String getName() {
@@ -499,12 +502,12 @@ public class Partition implements Serializable {
   }
 
   public List<FieldSchema> getCols() {
-    if (!SerDeUtils.shouldGetColsFromSerDe(
-        tPartition.getSd().getSerdeInfo().getSerializationLib())) {
-      return tPartition.getSd().getCols();
-    }
 
     try {
+      if (Hive.get().getConf().getStringCollection(ConfVars.SERDESUSINGMETASTOREFORSCHEMA.varname)
+        .contains(tPartition.getSd().getSerdeInfo().getSerializationLib())) {
+        return tPartition.getSd().getCols();
+      }
       return Hive.getFieldsFromDeserializer(table.getTableName(), getDeserializer());
     } catch (HiveException e) {
       LOG.error("Unable to get cols from serde: " +

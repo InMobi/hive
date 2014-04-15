@@ -54,6 +54,9 @@ enum TProtocolVersion {
 
   // V6 uses binary type for binary payload (was string) and uses columnar result set
   HIVE_CLI_SERVICE_PROTOCOL_V6
+
+  // V7 adds support for delegation token based connection
+  HIVE_CLI_SERVICE_PROTOCOL_V7
 }
 
 enum TTypeId {
@@ -1095,6 +1098,57 @@ struct TGetQueryPlanResp {
 	2: required string plan
 }
 
+// GetDelegationToken()
+// Retrieve delegation token for the current user
+struct  TGetDelegationTokenReq {
+  // session handle
+  1: required TSessionHandle sessionHandle
+
+  // userid for the proxy user
+  2: required string owner
+
+  // designated renewer userid
+  3: required string renewer
+}
+
+struct TGetDelegationTokenResp {
+  // status of the request
+  1: required TStatus status
+
+  // delegation token string
+  2: optional string delegationToken
+}
+
+// CancelDelegationToken()
+// Cancel the given delegation token
+struct TCancelDelegationTokenReq {
+  // session handle
+  1: required TSessionHandle sessionHandle
+
+  // delegation token to cancel
+  2: required string delegationToken
+}
+
+struct TCancelDelegationTokenResp {
+  // status of the request
+  1: required TStatus status
+}
+
+// RenewDelegationToken()
+// Renew the given delegation token
+struct TRenewDelegationTokenReq {
+  // session handle
+  1: required TSessionHandle sessionHandle
+
+  // delegation token to renew
+  2: required string delegationToken
+}
+
+struct TRenewDelegationTokenResp {
+  // status of the request
+  1: required TStatus status
+}
+
 service TCLIService {
 
   TOpenSessionResp OpenSession(1:TOpenSessionReq req);
@@ -1126,8 +1180,14 @@ service TCLIService {
   TCloseOperationResp CloseOperation(1:TCloseOperationReq req);
 
   TGetResultSetMetadataResp GetResultSetMetadata(1:TGetResultSetMetadataReq req);
-  
+
   TFetchResultsResp FetchResults(1:TFetchResultsReq req);
-  
+
   TGetQueryPlanResp GetQueryPlan(1:TGetQueryPlanReq req);
+
+  TGetDelegationTokenResp GetDelegationToken(1:TGetDelegationTokenReq req);
+
+  TCancelDelegationTokenResp CancelDelegationToken(1:TCancelDelegationTokenReq req);
+
+  TRenewDelegationTokenResp RenewDelegationToken(1:TRenewDelegationTokenReq req);
 }

@@ -49,6 +49,7 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.ql.processors.DfsProcessor;
 import org.apache.hadoop.hive.ql.processors.SetProcessor;
 import org.apache.hive.common.util.HiveVersionInfo;
@@ -260,7 +261,7 @@ public class TestJdbcDriver2 {
     try{
       DriverManager.getConnection(url, "", "");
       fail("should have thrown IllegalArgumentException but did not ");
-    }catch(IllegalArgumentException i){
+    } catch(SQLException i) {
       assertTrue(i.getMessage().contains("Bad URL format. Hostname not found "
           + " in authority part of the url"));
     }
@@ -910,16 +911,17 @@ public class TestJdbcDriver2 {
     assertEquals(
         "Unexpected column count", expectedColCount, meta.getColumnCount());
 
+    String colQualifier = ((tableName != null) && !tableName.isEmpty()) ? tableName.toLowerCase() + "."  : "";
     boolean moreRow = res.next();
     while (moreRow) {
       try {
         i++;
-        assertEquals(res.getInt(1), res.getInt("under_col"));
-        assertEquals(res.getString(1), res.getString("under_col"));
-        assertEquals(res.getString(2), res.getString("value"));
+        assertEquals(res.getInt(1), res.getInt(colQualifier + "under_col"));
+        assertEquals(res.getString(1), res.getString(colQualifier + "under_col"));
+        assertEquals(res.getString(2), res.getString(colQualifier + "value"));
         if (isPartitionTable) {
           assertEquals(res.getString(3), partitionedColumnValue);
-          assertEquals(res.getString(3), res.getString(partitionedColumnName));
+          assertEquals(res.getString(3), res.getString(colQualifier + partitionedColumnName));
         }
         assertFalse("Last result value was not null", res.wasNull());
         assertNull("No warnings should be found on ResultSet", res
@@ -1865,7 +1867,7 @@ public class TestJdbcDriver2 {
    */
   @Test
   public void testFetchFirstNonMR() throws Exception {
-    execFetchFirst("select * from " + dataTypeTableName, "c4", false);
+    execFetchFirst("select * from " + dataTypeTableName, dataTypeTableName.toLowerCase() + "." + "c4", false);
   }
 
   /**
@@ -2004,5 +2006,69 @@ public class TestJdbcDriver2 {
     assertTrue(res.next());
     assertEquals("role1", res.getString(1));
     res.close();
+  }
+
+  /**
+   * Test the cancellation of a query that is running.
+   * We spawn 2 threads - one running the query and
+   * the other attempting to cancel.
+   * We're using a dummy udf to simulate a query,
+   * that runs for a sufficiently long time.
+   * @throws Exception
+   */
+  @Test
+  public void testQueryCancel() throws Exception {
+    String udfName = SleepUDF.class.getName();
+    Statement stmt1 = con.createStatement();
+    stmt1.execute("create temporary function sleepUDF as '" + udfName + "'");
+    stmt1.close();
+    final Statement stmt = con.createStatement();
+    // Thread executing the query
+    Thread tExecute = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          System.out.println("Executing query: ");
+          stmt.executeQuery("select sleepUDF(t1.under_col) as u0, t1.under_col as u1, " +
+              "t2.under_col as u2 from " + tableName +  "t1 join " + tableName +
+              " t2 on t1.under_col = t2.under_col");
+          fail("Expecting SQLException");
+        } catch (SQLException e) {
+          // This thread should throw an exception
+          assertNotNull(e);
+          System.out.println(e.toString());
+        }
+      }
+    });
+    // Thread cancelling the query
+    Thread tCancel = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          Thread.sleep(1000);
+          System.out.println("Cancelling query: ");
+          stmt.cancel();
+        } catch (Exception e) {
+          // No-op
+        }
+      }
+    });
+    tExecute.start();
+    tCancel.start();
+    tExecute.join();
+    tCancel.join();
+    stmt.close();
+  }
+
+  // A udf which sleeps for 100ms to simulate a long running query
+  public static class SleepUDF extends UDF {
+    public Integer evaluate(final Integer value) {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        // No-op
+      }
+      return value;
+    }
   }
 }

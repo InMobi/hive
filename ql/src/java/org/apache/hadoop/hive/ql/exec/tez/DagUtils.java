@@ -598,24 +598,8 @@ public class DagUtils {
     // need to localize the additional jars and files
 
     // we need the directory on hdfs to which we shall put all these files
-    String hdfsDirPathStr = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_JAR_DIRECTORY);
-    Path hdfsDirPath = new Path(hdfsDirPathStr);
-    FileSystem fs = hdfsDirPath.getFileSystem(conf);
-    if (!(fs instanceof DistributedFileSystem)) {
-      throw new IOException(ErrorMsg.INVALID_HDFS_URI.format(hdfsDirPathStr));
-    }
-
-    FileStatus fstatus = null;
-    try {
-      fstatus = fs.getFileStatus(hdfsDirPath);
-    } catch (FileNotFoundException fe) {
-      // do nothing
-    }
-
-    if ((fstatus == null) || (!fstatus.isDir())) {
-      Path destDir = getDefaultDestDir(conf);
-      hdfsDirPathStr = destDir.toString();
-    }
+    // Use HIVE_JAR_DIRECTORY only if it's set explicitly; otherwise use default directory
+    String hdfsDirPathStr = getHiveJarDirectory(conf);
 
     String allFiles = auxJars + "," + addedJars + "," + addedFiles + "," + addedArchives;
     String[] allFilesArr = allFiles.split(",");
@@ -630,6 +614,29 @@ public class DagUtils {
     }
 
     return tmpResources;
+  }
+
+  public String getHiveJarDirectory(Configuration conf) throws IOException, LoginException {
+    FileStatus fstatus = null;
+    String hdfsDirPathStr = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_JAR_DIRECTORY, null);
+    if (hdfsDirPathStr != null) {
+      Path hdfsDirPath = new Path(hdfsDirPathStr);
+      FileSystem fs = hdfsDirPath.getFileSystem(conf);
+      if (!(fs instanceof DistributedFileSystem)) {
+        throw new IOException(ErrorMsg.INVALID_HDFS_URI.format(hdfsDirPathStr));
+      }
+      try {
+        fstatus = fs.getFileStatus(hdfsDirPath);
+      } catch (FileNotFoundException fe) {
+        // do nothing
+      }
+    }
+
+    if ((fstatus == null) || (!fstatus.isDir())) {
+      Path destDir = getDefaultDestDir(conf);
+      hdfsDirPathStr = destDir.toString();
+    }
+    return hdfsDirPathStr;
   }
 
   // the api that finds the jar being used by this class on disk

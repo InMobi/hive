@@ -48,6 +48,7 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.commons.exec.ExecuteException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.PseudoAuthenticator;
 import org.apache.hive.hcatalog.templeton.LauncherDelegator.JobType;
@@ -1094,13 +1095,19 @@ public class Server {
     if (theSecurityContext == null) { 
       return null;
     }
+    String userName = null;
     if (theSecurityContext.getUserPrincipal() == null) {
+      userName = Main.UserNameHandler.getUserName(request);
+    }
+    else {
+      userName = theSecurityContext.getUserPrincipal().getName();
+    }
+    if(userName == null) {
       return null;
     }
     //map hue/foo.bar@something.com->hue since user group checks 
     // and config files are in terms of short name
-    return UserGroupInformation.createRemoteUser(
-        theSecurityContext.getUserPrincipal().getName()).getShortUserName();
+    return UserGroupInformation.createRemoteUser(userName).getShortUserName();
   }
 
   /**
@@ -1149,5 +1156,8 @@ public class Server {
   private void checkEnableLogPrerequisite(boolean enablelog, String statusdir) throws BadParam {
     if (enablelog && !TempletonUtils.isset(statusdir))
       throw new BadParam("enablelog is only applicable when statusdir is set");
+    if(enablelog && "0.23".equalsIgnoreCase(ShimLoader.getMajorVersion())) {
+      throw new BadParam("enablelog=true is only supported with Hadoop 1.x");
+    }
   }
 }

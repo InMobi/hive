@@ -70,10 +70,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -82,6 +78,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
 
 import org.antlr.runtime.CommonToken;
 import org.apache.commons.codec.binary.Base64;
@@ -1994,6 +1993,14 @@ public final class Utilities {
     return names;
   }
 
+  public static List<String> getInternalColumnNamesFromSignature(List<ColumnInfo> colInfos) {
+    List<String> names = new ArrayList<String>();
+    for (ColumnInfo ci : colInfos) {
+      names.add(ci.getInternalName());
+    }
+    return names;
+  }
+
   public static List<String> getColumnNames(Properties props) {
     List<String> names = new ArrayList<String>();
     String colNames = props.getProperty(serdeConstants.LIST_COLUMNS);
@@ -2030,6 +2037,9 @@ public final class Utilities {
    * @throws HiveException
    */
   public static String[] getDbTableName(String dbtable) throws HiveException{
+    if(dbtable == null){
+      return new String[2];
+    }
     String[] names =  dbtable.split("\\.");
     switch (names.length) {
     case 2:
@@ -2092,6 +2102,13 @@ public final class Utilities {
    *          configuration which receives configured properties
    */
   public static void copyTableJobPropertiesToConf(TableDesc tbl, JobConf job) {
+    String bucketString = tbl.getProperties()
+        .getProperty(hive_metastoreConstants.BUCKET_COUNT);
+    // copy the bucket count
+    if (bucketString != null) {
+      job.set(hive_metastoreConstants.BUCKET_COUNT, bucketString);
+    }
+
     Map<String, String> jobProperties = tbl.getJobProperties();
     if (jobProperties == null) {
       return;
@@ -2099,9 +2116,6 @@ public final class Utilities {
     for (Map.Entry<String, String> entry : jobProperties.entrySet()) {
       job.set(entry.getKey(), entry.getValue());
     }
-    // copy the bucket count
-    job.set(hive_metastoreConstants.BUCKET_COUNT,
-        tbl.getProperties().getProperty(hive_metastoreConstants.BUCKET_COUNT));
   }
 
   private static final Object INPUT_SUMMARY_LOCK = new Object();
@@ -2285,12 +2299,16 @@ public final class Utilities {
     }
   }
 
-  // return sum of lengths except one alias. returns -1 if any of other alias is unknown
+  public static long sumOf(Map<String, Long> aliasToSize, Set<String> aliases) {
+    return sumOfExcept(aliasToSize, aliases, null);
+  }
+
+  // return sum of lengths except some aliases. returns -1 if any of other alias is unknown
   public static long sumOfExcept(Map<String, Long> aliasToSize,
-      Set<String> aliases, String except) {
+      Set<String> aliases, Set<String> excepts) {
     long total = 0;
     for (String alias : aliases) {
-      if (alias.equals(except)) {
+      if (excepts != null && excepts.contains(alias)) {
         continue;
       }
       Long size = aliasToSize.get(alias);

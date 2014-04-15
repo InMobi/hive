@@ -22,6 +22,8 @@ import com.jolbox.bonecp.BoneCPConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.common.ValidTxnListImpl;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.util.StringUtils;
@@ -75,10 +77,8 @@ public class TxnHandler {
     checkQFileTestHack();
 
     // Set up the JDBC connection pool
-    String connString =
-        HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_TXN_JDBC_CONNECT_STRING);
     try {
-      setupJdbcConnectionPool(connString);
+      setupJdbcConnectionPool();
     } catch (SQLException e) {
       String msg = "Unable to instantiate JDBC connection pooling, " + e.getMessage();
       LOG.error(msg);
@@ -194,6 +194,17 @@ public class TxnHandler {
     }
   }
 
+  public static ValidTxnList createValidTxnList(GetOpenTxnsResponse txns) {
+    long highWater = txns.getTxn_high_water_mark();
+    Set<Long> open = txns.getOpen_txns();
+    long[] exceptions = new long[open.size()];
+    int i = 0;
+    for(long txn: open) {
+      exceptions[i++] = txn;
+    }
+    return new ValidTxnListImpl(exceptions, highWater);
+  }
+
   public OpenTxnsResponse openTxns(OpenTxnRequest rqst) throws MetaException {
     int numTxns = rqst.getNum_txns();
     Connection dbConn = getDbConn();
@@ -205,7 +216,7 @@ public class TxnHandler {
 
       Statement stmt = dbConn.createStatement();
       LOG.debug("Going to execute query <select ntxn_next from NEXT_TXN_ID " +
-          "for update>");
+          " for update>");
       ResultSet rs =
           stmt.executeQuery("select ntxn_next from NEXT_TXN_ID for update");
       if (!rs.next()) {
@@ -806,7 +817,7 @@ public class TxnHandler {
       if (txnid > 0) {
         // We need to check whether this transaction is valid and open
         String s = "select txn_state from TXNS where txn_id = " +
-            txnid + "for update";
+            txnid + " for update";
         LOG.debug("Going to execute query <" + s + ">");
         ResultSet rs = stmt.executeQuery(s);
         if (!rs.next()) {
@@ -1157,7 +1168,7 @@ public class TxnHandler {
       long now = System.currentTimeMillis();
       // We need to check whether this transaction is valid and open
       String s = "select txn_state from TXNS where txn_id = " +
-          txnid + "for update";
+          txnid + " for update";
       LOG.debug("Going to execute query <" + s + ">");
       ResultSet rs = stmt.executeQuery(s);
       if (!rs.next()) {
@@ -1261,13 +1272,19 @@ public class TxnHandler {
     }
   }
 
-  private synchronized void setupJdbcConnectionPool(String driverUrl) throws SQLException {
+  private synchronized void setupJdbcConnectionPool() throws SQLException {
     if (connPool != null) return;
+
+    String driverUrl = HiveConf.getVar(conf, HiveConf.ConfVars.METASTORECONNECTURLKEY);
+    String user = HiveConf.getVar(conf, HiveConf.ConfVars.METASTORE_CONNECTION_USER_NAME);
+    String passwd = HiveConf.getVar(conf, HiveConf.ConfVars.METASTOREPWD);
 
     BoneCPConfig config = new BoneCPConfig();
     config.setJdbcUrl(driverUrl);
     config.setMaxConnectionsPerPartition(10);
     config.setPartitionCount(1);
+    config.setUser(user);
+    config.setPassword(passwd);
     connPool = new BoneCP(config);
   }
 

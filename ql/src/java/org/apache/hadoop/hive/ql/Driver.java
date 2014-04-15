@@ -19,10 +19,24 @@
 
 package org.apache.hadoop.hive.ql;
 
+import java.io.DataInput;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -67,13 +81,6 @@ import org.apache.hadoop.mapred.ClusterStatus;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 
-import java.io.DataInput;
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
-
 public class Driver implements CommandProcessor {
 
   static final private String CLASS_NAME = Driver.class.getName();
@@ -88,6 +95,7 @@ public class Driver implements CommandProcessor {
   private HiveConf conf;
   private DataInput resStream;
   private Context ctx;
+  private DriverContext driverCxt;
   private QueryPlan plan;
   private Schema schema;
   private String errorMessage;
@@ -99,9 +107,9 @@ public class Driver implements CommandProcessor {
   private int maxthreads;
   private static final int SLEEP_TIME = 2000;
   protected int tryCount = Integer.MAX_VALUE;
-  private DriverContext driverCxt;
   private boolean logRedirecionEnabled;
 
+  private boolean destroyed;
 
   private String userName;
 
@@ -280,6 +288,7 @@ public class Driver implements CommandProcessor {
 
   /**
    * Compile a new query. Any currently-planned query associated with this Driver is discarded.
+   * Do not reset id for inner queries(index, etc). Task ids are used for task identity check.
    *
    * @param command
    *          The SQL query to compile.
@@ -808,8 +817,8 @@ public class Driver implements CommandProcessor {
   // the input format.
   private int recordValidTxns() {
     try {
-      IMetaStoreClient.ValidTxnList txns = txnMgr.getValidTxns();
-      ctx.getConf().set(IMetaStoreClient.ValidTxnList.VALID_TXNS_KEY, txns.toString());
+      ValidTxnList txns = txnMgr.getValidTxns();
+      ctx.getConf().set(ValidTxnList.VALID_TXNS_KEY, txns.toString());
       return 0;
     } catch (LockException e) {
       errorMessage = "FAILED: Error in determing valid transactions: " + e.getMessage();
@@ -1210,13 +1219,12 @@ public class Driver implements CommandProcessor {
       // At any time, at most maxthreads tasks can be running
       // The main thread polls the TaskRunners to check if they have finished.
 
-      Queue<Task<? extends Serializable>> runnable = new ConcurrentLinkedQueue<Task<? extends Serializable>>();
-      Map<TaskResult, TaskRunner> running = new HashMap<TaskResult, TaskRunner>();
-
-      this.driverCxt = new DriverContext(runnable, ctx);
+      this.driverCxt = new DriverContext(ctx);
       driverCxt.prepare(plan);
 
       ctx.setHDFSCleanup(true);
+
+      this.driverCxt = driverCxt; // for canceling the query (should be bound to session?)
 
       SessionState.get().setLastMapRedStatsList(new ArrayList<MapRedStats>());
       SessionState.get().setStackTraces(new HashMap<String, List<List<String>>>());
@@ -1233,27 +1241,32 @@ public class Driver implements CommandProcessor {
       perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TIME_TO_SUBMIT);
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.RUN_TASKS);
       // Loop while you either have tasks running, or tasks queued up
-      while (running.size() != 0 || runnable.peek() != null) {
+      while (!destroyed && driverCxt.isRunning()) {
+
         // Launch upto maxthreads tasks
-        while (runnable.peek() != null && running.size() < maxthreads) {
-          Task<? extends Serializable> tsk = runnable.remove();
-          perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TASK + tsk.getName() + "." + tsk.getId());
-          launchTask(tsk, queryId, noName, running, jobname, jobs, driverCxt);
+        Task<? extends Serializable> task;
+        while ((task = driverCxt.getRunnable(maxthreads)) != null) {
+          perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TASK + task.getName() + "." + task.getId());
+          TaskRunner runner = launchTask(task, queryId, noName, jobname, jobs, driverCxt);
+          if (!runner.isRunning()) {
+            break;
+          }
         }
 
         // poll the Tasks to see which one completed
-        TaskResult tskRes = pollTasks(running.keySet());
-        TaskRunner tskRun = running.remove(tskRes);
-        Task<? extends Serializable> tsk = tskRun.getTask();
-        perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TASK + tsk.getName() + "." + tsk.getId());
+        TaskRunner tskRun = driverCxt.pollFinished();
+        if (tskRun == null) {
+          continue;
+        }
         hookContext.addCompleteTask(tskRun);
 
-        int exitVal = tskRes.getExitVal();
+        Task<? extends Serializable> tsk = tskRun.getTask();
+        TaskResult result = tskRun.getTaskResult();
+
+        int exitVal = result.getExitVal();
         if (exitVal != 0) {
           if (tsk.ifRetryCmdWhenFail()) {
-            if (!running.isEmpty()) {
-              taskCleanup(running);
-            }
+            driverCxt.shutdown();
             // in case we decided to run everything in local mode, restore the
             // the jobtracker setting to its initial value
             ctx.restoreOriginalTracker();
@@ -1261,7 +1274,7 @@ public class Driver implements CommandProcessor {
           }
           Task<? extends Serializable> backupTask = tsk.getAndInitBackupTask();
           if (backupTask != null) {
-            setErrorMsgAndDetail(exitVal, tskRes.getTaskError(), tsk);
+            setErrorMsgAndDetail(exitVal, result.getTaskError(), tsk);
             console.printError(errorMessage);
             errorMessage = "ATTEMPT: Execute BackupTask: " + backupTask.getClass().getName();
             console.printError(errorMessage);
@@ -1282,12 +1295,10 @@ public class Driver implements CommandProcessor {
 
               perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.FAILURE_HOOK + ofh.getClass().getName());
             }
-            setErrorMsgAndDetail(exitVal, tskRes.getTaskError(), tsk);
+            setErrorMsgAndDetail(exitVal, result.getTaskError(), tsk);
             SQLState = "08S01";
             console.printError(errorMessage);
-            if (!running.isEmpty()) {
-              taskCleanup(running);
-            }
+            driverCxt.shutdown();
             // in case we decided to run everything in local mode, restore the
             // the jobtracker setting to its initial value
             ctx.restoreOriginalTracker();
@@ -1316,6 +1327,13 @@ public class Driver implements CommandProcessor {
       // in case we decided to run everything in local mode, restore the
       // the jobtracker setting to its initial value
       ctx.restoreOriginalTracker();
+
+      if (driverCxt.isShutdown()) {
+        SQLState = "HY008";
+        errorMessage = "FAILED: Operation cancelled";
+        console.printError(errorMessage);
+        return 1000;
+      }
 
       // remove incomplete outputs.
       // Some incomplete outputs may be added at the beginning, for eg: for dynamic partitions.
@@ -1438,10 +1456,8 @@ public class Driver implements CommandProcessor {
    * @param cxt
    *          the driver context
    */
-
-  public void launchTask(Task<? extends Serializable> tsk, String queryId, boolean noName,
-      Map<TaskResult, TaskRunner> running, String jobname, int jobs, DriverContext cxt) {
-
+  private TaskRunner launchTask(Task<? extends Serializable> tsk, String queryId, boolean noName,
+      String jobname, int jobs, DriverContext cxt) throws HiveException {
     if (SessionState.get() != null) {
       SessionState.get().getHiveHistory().startTask(queryId, tsk, tsk.getClass().getName());
     }
@@ -1466,8 +1482,7 @@ public class Driver implements CommandProcessor {
     TaskResult tskRes = new TaskResult();
     TaskRunner tskRun = new TaskRunner(tsk, tskRes);
 
-    cxt.prepare(tskRun);
-
+    cxt.launching(tskRun);
     // Launch Task
     if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.EXECPARALLEL) && tsk.isMapRedTask()) {
       // Launch it in the parallel mode, as a separate thread only for MR tasks
@@ -1475,53 +1490,7 @@ public class Driver implements CommandProcessor {
     } else {
       tskRun.runSequential();
     }
-    running.put(tskRes, tskRun);
-  }
-
-  /**
-   * Cleans up remaining tasks in case of failure
-   */
-  public void taskCleanup(Map<TaskResult, TaskRunner> running) {
-    for (Map.Entry<TaskResult, TaskRunner> entry : running.entrySet()) {
-      if (entry.getKey().isRunning()) {
-        Task<?> task = entry.getValue().getTask();
-        try {
-          task.shutdown();
-        } catch (Exception e) {
-          console.printError("Exception on shutting down task " + task.getId() + ": " + e);
-        }
-      }
-    }
-    running.clear();
-  }
-
-  /**
-   * Polls running tasks to see if a task has ended.
-   *
-   * @param results
-   *          Set of result objects for running tasks
-   * @return The result object for any completed/failed task
-   */
-
-  public TaskResult pollTasks(Set<TaskResult> results) {
-    Iterator<TaskResult> resultIterator = results.iterator();
-    while (true) {
-      while (resultIterator.hasNext()) {
-        TaskResult tskRes = resultIterator.next();
-        if (!tskRes.isRunning()) {
-          return tskRes;
-        }
-      }
-
-      // In this loop, nothing was found
-      // Sleep 10 seconds and restart
-      try {
-        Thread.sleep(SLEEP_TIME);
-      } catch (InterruptedException ie) {
-        // Do Nothing
-      }
-      resultIterator = results.iterator();
-    }
+    return tskRun;
   }
 
   public boolean isFetchingTable() {
@@ -1529,6 +1498,9 @@ public class Driver implements CommandProcessor {
   }
 
   public boolean getResults(List res) throws IOException, CommandNeedRetryException {
+    if (destroyed) {
+      throw new IOException("FAILED: Operation cancelled");
+    }
     if (isFetchingTable()) {
       FetchTask ft = plan.getFetchTask();
       ft.setMaxRows(maxRows);
@@ -1619,6 +1591,10 @@ public class Driver implements CommandProcessor {
           }
         }
       }
+      if (driverCxt != null) {
+        driverCxt.shutdown();
+        driverCxt = null;
+      }
       if (ctx != null) {
         ctx.clear();
       }
@@ -1639,6 +1615,10 @@ public class Driver implements CommandProcessor {
   }
 
   public void destroy() {
+    if (destroyed) {
+      return;
+    }
+    destroyed = true;
     if (ctx != null) {
       try {
         releaseLocks(ctx.getHiveLocks());

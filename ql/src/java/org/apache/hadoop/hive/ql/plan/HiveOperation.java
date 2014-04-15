@@ -88,6 +88,7 @@ public enum HiveOperation {
   GRANT_ROLE("GRANT_ROLE", null, null),
   REVOKE_ROLE("REVOKE_ROLE", null, null),
   SHOW_ROLES("SHOW_ROLES", null, null),
+  SHOW_ROLE_PRINCIPALS("SHOW_ROLE_PRINCIPALS", null, null),
   SHOW_ROLE_GRANT("SHOW_ROLE_GRANT", null, null),
   ALTERTABLE_PROTECTMODE("ALTERTABLE_PROTECTMODE", new Privilege[]{Privilege.ALTER_METADATA}, null),
   ALTERPARTITION_PROTECTMODE("ALTERPARTITION_PROTECTMODE", new Privilege[]{Privilege.ALTER_METADATA}, null),
@@ -110,6 +111,10 @@ public enum HiveOperation {
       new Privilege[] {Privilege.ALTER_DATA}, null),
   ALTERTABLE_PARTCOLTYPE("ALTERTABLE_PARTCOLTYPE", new Privilege[] { Privilege.SELECT }, new Privilege[] { Privilege.ALTER_DATA }),
   ALTERVIEW_RENAME("ALTERVIEW_RENAME", new Privilege[] {Privilege.ALTER_METADATA}, null),
+  ALTERTABLE_COMPACT("ALTERTABLE_COMPACT", new Privilege[]{Privilege.SELECT},
+      new Privilege[]{Privilege.ALTER_DATA}),
+  SHOW_COMPACTIONS("SHOW COMPACTIONS", null, null),
+  SHOW_TRANSACTIONS("SHOW TRANSACTIONS", null, null);
   ;
 
   private String operationName;
