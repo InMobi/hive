@@ -130,13 +130,8 @@ public class JoinResolver implements ContextRewriter {
         for (TableRelationship rel : chain) {
           StringBuilder clause = new StringBuilder(joinType)
           .append(" join ");
-          String alias = cubeql.getAliasForTabName(rel.getToTable().getName());
-
-          if (!alias.equalsIgnoreCase(rel.getToTable().getName())) {
-            clause.append(rel.getToTable().getName()).append(' ').append(alias);
-          } else {
-            clause.append(rel.getToTable().getName());
-          }
+          // Add storage table name followed by alias
+          clause.append(cubeql.getStorageString(rel.getToTable()));
 
           clause.append(" on ")
           .append(cubeql.getAliasForTabName(rel.getFromTable().getName())).append(".").append(rel.getFromColumn())
