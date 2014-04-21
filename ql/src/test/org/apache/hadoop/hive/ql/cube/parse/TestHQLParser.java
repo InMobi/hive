@@ -39,7 +39,7 @@ public class TestHQLParser {
     Assert.assertEquals(expected, HQLParser.getString(groupby).trim());
 
     ASTNode orderby = HQLParser.findNodeByPath(node, TOK_INSERT, HiveParser.TOK_ORDERBY);
-    String expectedOrderBy = "a , g( b ), ( e  /  100 )";
+    String expectedOrderBy = "a  asc , g( b ) asc , ( e  /  100 ) asc";
     Assert.assertEquals(expectedOrderBy, HQLParser.getString(orderby).trim());
   }
 
