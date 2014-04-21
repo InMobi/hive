@@ -202,7 +202,8 @@ public class HiveSessionImpl implements HiveSession {
 
   protected synchronized void release() {
     assert sessionState != null;
-    SessionState.detachSession();
+    //  no need to release sessionState
+    //SessionState.detachSession();
   }
 
   @Override
