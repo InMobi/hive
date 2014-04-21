@@ -118,10 +118,13 @@ public class OpTraitsRulesProcFactory {
 
     public boolean checkBucketedTable(Table tbl, 
         ParseContext pGraphContext,
-        PrunedPartitionList prunedParts) throws SemanticException {
+        List<PrunedPartitionList> prunedParts) throws SemanticException {
 
       if (tbl.isPartitioned()) {
-        List<Partition> partitions = prunedParts.getNotDeniedPartns();
+        List<Partition> partitions = new ArrayList<Partition>();
+        for (PrunedPartitionList pp : prunedParts) {
+          partitions.addAll(pp.getNotDeniedPartns());
+        }
         // construct a mapping of (Partition->bucket file names) and (Partition -> bucket number)
         if (!partitions.isEmpty()) {
           for (Partition p : partitions) {
@@ -156,7 +159,7 @@ public class OpTraitsRulesProcFactory {
       TableScanOperator ts = (TableScanOperator)nd;
       AnnotateOpTraitsProcCtx opTraitsCtx = (AnnotateOpTraitsProcCtx)procCtx;
       Table table = opTraitsCtx.getParseContext().getTopToTable().get(ts);
-      PrunedPartitionList prunedPartList = null;
+      List<PrunedPartitionList> prunedPartList = null;
       try {
         prunedPartList =
             opTraitsCtx.getParseContext().getPrunedPartitions(ts.getConf().getAlias(), ts);
