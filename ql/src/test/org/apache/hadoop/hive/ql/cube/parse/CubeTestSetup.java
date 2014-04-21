@@ -18,7 +18,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
 
 import static org.junit.Assert.assertEquals;
@@ -91,10 +91,10 @@ public class CubeTestSetup {
 
   public static String HOUR_FMT = "yyyy-MM-dd-HH";
   public static final SimpleDateFormat HOUR_PARSER = new SimpleDateFormat(
-    HOUR_FMT);
+      HOUR_FMT);
   public static String MONTH_FMT = "yyyy-MM";
   public static final SimpleDateFormat MONTH_PARSER = new SimpleDateFormat(
-    MONTH_FMT);
+      MONTH_FMT);
   private Set<CubeMeasure> cubeMeasures;
   private Set<CubeDimension> cubeDimensions;
   public static final String TEST_CUBE_NAME= "testCube";
@@ -104,6 +104,9 @@ public class CubeTestSetup {
   public static Date twoMonthsBack;
   public static String twoMonthsRangeUptoMonth;
   public static String twoMonthsRangeUptoHours;
+  public static String twoDaysRangeBefore4days;
+  public static Date before4daysStart;
+  public static Date before4daysEnd;
   private static boolean zerothHour;
   public static Map<String, String> dimProps = new HashMap<String, String>();
   private static String c1 = "C1";
@@ -118,17 +121,29 @@ public class CubeTestSetup {
     cal.add(Calendar.DAY_OF_MONTH, -2);
     twodaysBack = cal.getTime();
     System.out.println("Test twodaysBack:" + twodaysBack);
-    cal = Calendar.getInstance();
+   
+    // two months back
+    cal.setTime(now);
     cal.add(Calendar.MONTH, -2);
     twoMonthsBack = cal.getTime();
     System.out.println("Test twoMonthsBack:" + twoMonthsBack);
 
+    // Before 4days
+    cal.setTime(now);
+    cal.add(Calendar.DAY_OF_MONTH, -4);
+    before4daysEnd = cal.getTime();
+    cal.add(Calendar.DAY_OF_MONTH, -2);
+    before4daysStart = cal.getTime();
+    twoDaysRangeBefore4days = "time_range_in('dt', '" +
+        CubeTestSetup.getDateUptoHours(before4daysStart) + "','" +
+        CubeTestSetup.getDateUptoHours(before4daysEnd) + "')";
+
     twoDaysRange = "time_range_in('dt', '" + getDateUptoHours(
-      twodaysBack) + "','" + getDateUptoHours(now) + "')";
+        twodaysBack) + "','" + getDateUptoHours(now) + "')";
     twoMonthsRangeUptoMonth = "time_range_in('dt', '" +
-      getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
+        getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
     twoMonthsRangeUptoHours = "time_range_in('dt', '" +
-      getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
+        getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
 
     dimProps.put(MetastoreConstants.TIMED_DIMENSION,
         TestCubeMetastoreClient.getDatePartitionKey());
@@ -156,8 +171,8 @@ public class CubeTestSetup {
   }
 
   public static String getExpectedQuery(String cubeName, String selExpr,
-                                 String whereExpr, String postWhereExpr,
-                                 Map<String, String> storageTableToWhereClause) {
+      String whereExpr, String postWhereExpr,
+      Map<String, String> storageTableToWhereClause) {
     StringBuilder expected = new StringBuilder();
     int numTabs = storageTableToWhereClause.size();
     assertEquals(1, numTabs);
@@ -187,28 +202,28 @@ public class CubeTestSetup {
       String whereExpr, String postWhereExpr,
       String rangeWhere, String storageTable) {
     StringBuilder expected = new StringBuilder();
-      expected.append(selExpr);
-      expected.append(storageTable);
-      expected.append(" ");
-      expected.append(cubeName);
-      expected.append(" WHERE ");
-      expected.append("(");
-      if (whereExpr != null) {
-        expected.append(whereExpr);
-        expected.append(" AND ");
-      }
-      expected.append(rangeWhere);
-      expected.append(")");
-      if (postWhereExpr != null) {
-        expected.append(postWhereExpr);
-      }
+    expected.append(selExpr);
+    expected.append(storageTable);
+    expected.append(" ");
+    expected.append(cubeName);
+    expected.append(" WHERE ");
+    expected.append("(");
+    if (whereExpr != null) {
+      expected.append(whereExpr);
+      expected.append(" AND ");
+    }
+    expected.append(rangeWhere);
+    expected.append(")");
+    if (postWhereExpr != null) {
+      expected.append(postWhereExpr);
+    }
     return expected.toString();
   }
 
   public static String getExpectedQuery(String cubeName, String selExpr,
-                                 String joinExpr, String whereExpr, String postWhereExpr,
-                                 List<String> joinWhereConds,
-                                 Map<String, String> storageTableToWhereClause) {
+      String joinExpr, String whereExpr, String postWhereExpr,
+      List<String> joinWhereConds,
+      Map<String, String> storageTableToWhereClause) {
     StringBuilder expected = new StringBuilder();
     int numTabs = storageTableToWhereClause.size();
     assertEquals(1, numTabs);
@@ -242,7 +257,7 @@ public class CubeTestSetup {
   }
 
   public static Map<String, String> getWhereForDailyAndHourly2days(String cubeName,
-                                                             String... storageTables) {
+      String... storageTables) {
     return getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "dt", storageTables);
   }
 
@@ -255,7 +270,7 @@ public class CubeTestSetup {
   public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(
       String cubeName, String timedDimension, Date from, Date to, String... storageTables) {
     Map<String, String> storageTableToWhereClause =
-      new LinkedHashMap<String, String>();
+        new LinkedHashMap<String, String>();
     String whereClause = getWhereForDailyAndHourly2daysWithTimeDim(cubeName,
         timedDimension, from,
         to);
@@ -271,17 +286,17 @@ public class CubeTestSetup {
     Date dayStart;
     if (!CubeTestSetup.isZerothHour()) {
       addParts(hourlyparts, UpdatePeriod.HOURLY, from,
-        DateUtil.getCeilDate(from, UpdatePeriod.DAILY));
+          DateUtil.getCeilDate(from, UpdatePeriod.DAILY));
       addParts(hourlyparts, UpdatePeriod.HOURLY,
-        DateUtil.getFloorDate(to, UpdatePeriod.DAILY),
-        DateUtil.getFloorDate(to, UpdatePeriod.HOURLY));
+          DateUtil.getFloorDate(to, UpdatePeriod.DAILY),
+          DateUtil.getFloorDate(to, UpdatePeriod.HOURLY));
       dayStart = DateUtil.getCeilDate(
           from, UpdatePeriod.DAILY);
     } else {
       dayStart = from;
     }
     addParts(dailyparts, UpdatePeriod.DAILY, dayStart,
-      DateUtil.getFloorDate(to, UpdatePeriod.DAILY));
+        DateUtil.getFloorDate(to, UpdatePeriod.DAILY));
     List<String> parts = new ArrayList<String>();
     parts.addAll(hourlyparts);
     parts.addAll(dailyparts);
@@ -290,9 +305,9 @@ public class CubeTestSetup {
   }
 
   public static Map<String, String> getWhereForMonthlyDailyAndHourly2months(
-    String... storageTables) {
+      String... storageTables) {
     Map<String, String> storageTableToWhereClause =
-      new LinkedHashMap<String, String>();
+        new LinkedHashMap<String, String>();
     List<String> hourlyparts = new ArrayList<String>();
     List<String> dailyparts = new ArrayList<String>();
     List<String> monthlyparts = new ArrayList<String>();
@@ -300,27 +315,27 @@ public class CubeTestSetup {
     Date monthStart = twoMonthsBack;
     if (!CubeTestSetup.isZerothHour()) {
       addParts(hourlyparts, UpdatePeriod.HOURLY, twoMonthsBack,
-        DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.DAILY));
+          DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.DAILY));
       addParts(hourlyparts, UpdatePeriod.HOURLY,
-        DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
-        DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+          DateUtil.getFloorDate(now, UpdatePeriod.DAILY),
+          DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
       dayStart = DateUtil.getCeilDate(
-        twoMonthsBack, UpdatePeriod.DAILY);
+          twoMonthsBack, UpdatePeriod.DAILY);
       monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
     }
     Calendar cal = new GregorianCalendar();
     cal.setTime(dayStart);
     if (cal.get(Calendar.DAY_OF_MONTH) != 1) {
       addParts(dailyparts, UpdatePeriod.DAILY, dayStart,
-        DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
+          DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY));
       monthStart = DateUtil.getCeilDate(twoMonthsBack, UpdatePeriod.MONTHLY);
     }
     addParts(dailyparts, UpdatePeriod.DAILY,
-      DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY),
-      DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
+        DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY),
+        DateUtil.getFloorDate(now, UpdatePeriod.DAILY));
     addParts(monthlyparts, UpdatePeriod.MONTHLY,
-      monthStart,
-      DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
+        monthStart,
+        DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
     List<String> parts = new ArrayList<String>();
     parts.addAll(dailyparts);
     parts.addAll(hourlyparts);
@@ -341,35 +356,35 @@ public class CubeTestSetup {
     }
     Collections.sort(parts);
     storageTableToWhereClause.put(tables.toString(),
-      StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
+        StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
 
   public static Map<String, String> getWhereForMonthly2months(String monthlyTable) {
     Map<String, String> storageTableToWhereClause =
-      new LinkedHashMap<String, String>();
+        new LinkedHashMap<String, String>();
     List<String> parts = new ArrayList<String>();
     addParts(parts, UpdatePeriod.MONTHLY,
-      twoMonthsBack,
-      DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
+        twoMonthsBack,
+        DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
     storageTableToWhereClause.put(monthlyTable,
-      StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
+        StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
 
   public static Map<String, String> getWhereForHourly2days(String hourlyTable) {
     Map<String, String> storageTableToWhereClause =
-      new LinkedHashMap<String, String>();
+        new LinkedHashMap<String, String>();
     List<String> parts = new ArrayList<String>();
     addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
-      DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
+        DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
     storageTableToWhereClause.put(hourlyTable,
-      StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
+        StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
 
   public static void addParts(List<String> partitions, UpdatePeriod updatePeriod,
-                        Date from, Date to) {
+      Date from, Date to) {
     DateFormat fmt = updatePeriod.format();
     Calendar cal = Calendar.getInstance();
     cal.setTime(from);
@@ -383,7 +398,7 @@ public class CubeTestSetup {
   }
 
   public static String rewrite(CubeQueryRewriter driver, String query)
-    throws SemanticException, ParseException {
+      throws SemanticException, ParseException {
     CubeQueryContext rewrittenQuery = driver.rewrite(query);
     return rewrittenQuery.toHQL();
   }
@@ -619,10 +634,10 @@ public class CubeTestSetup {
   }
 
   private void createCubeFactOnlyHourlyRaw(CubeMetastoreClient client)
-    throws HiveException {
+      throws HiveException {
     String factName = "testFact2_raw";
     List<FieldSchema> factColumns = new ArrayList<FieldSchema>(
-      cubeMeasures.size());
+        cubeMeasures.size());
     for (CubeMeasure measure : cubeMeasures) {
       factColumns.add(measure.getColumn());
     }
@@ -632,7 +647,7 @@ public class CubeTestSetup {
     factColumns.add(new FieldSchema("cityid","int", "city id"));
 
     Map<String, Set<UpdatePeriod>> storageAggregatePeriods =
-      new HashMap<String, Set<UpdatePeriod>>();
+        new HashMap<String, Set<UpdatePeriod>>();
     Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.HOURLY);
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
@@ -656,7 +671,7 @@ public class CubeTestSetup {
     properties.put(MetastoreConstants.FACT_AGGREGATED_PROPERTY, "false");
 
     client.createCubeFactTable(cubeNames, factName, factColumns,
-      storageAggregatePeriods, 100L, properties, storageTables);
+        storageAggregatePeriods, 100L, properties, storageTables);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
     Calendar cal = Calendar.getInstance();
@@ -666,7 +681,7 @@ public class CubeTestSetup {
       Map<String, Date> timeParts = new HashMap<String, Date>();
       timeParts.put(TestCubeMetastoreClient.getDatePartitionKey(), temp);
       StoragePartitionDesc sPartSpec = new StoragePartitionDesc(fact2.getName(),
-        timeParts, null, UpdatePeriod.HOURLY);
+          timeParts, null, UpdatePeriod.HOURLY);
       client.addPartition(sPartSpec, c1);
       cal.add(Calendar.HOUR_OF_DAY, 1);
       temp = cal.getTime();
@@ -872,7 +887,7 @@ public class CubeTestSetup {
   }
 
   private void createCyclicDim1(CubeMetastoreClient client)
-    throws HiveException {
+      throws HiveException {
     String dimName = "cycleDim1";
 
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
@@ -881,7 +896,7 @@ public class CubeTestSetup {
     dimColumns.add(new FieldSchema("cyleDim2Id", "string", "link to cyclic dim 2"));
 
     Map<String, List<TableReference>> dimensionReferences =
-      new HashMap<String, List<TableReference>>();
+        new HashMap<String, List<TableReference>>();
     dimensionReferences.put("cyleDim2Id", Arrays.asList(new TableReference("cycleDim2", "id")));
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
@@ -910,7 +925,7 @@ public class CubeTestSetup {
   }
 
   private void createCyclicDim2(CubeMetastoreClient client)
-    throws HiveException {
+      throws HiveException {
     String dimName = "cycleDim2";
 
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
@@ -919,7 +934,7 @@ public class CubeTestSetup {
     dimColumns.add(new FieldSchema("cyleDim1Id", "string", "link to cyclic dim 1"));
 
     Map<String, List<TableReference>> dimensionReferences =
-      new HashMap<String, List<TableReference>>();
+        new HashMap<String, List<TableReference>>();
     dimensionReferences.put("cyleDim1Id", Arrays.asList(new TableReference("cycleDim1", "id")));
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
