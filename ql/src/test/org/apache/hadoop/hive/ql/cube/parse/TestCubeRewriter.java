@@ -570,7 +570,7 @@ public class TestCubeRewriter {
       " order by rzc");
     expected = getExpectedQuery(cubeName, "select round(testcube.zipcode) rzc,"
       + " sum(testcube.msr2) FROM ", null,
-      " group by testcube.zipcode  order by rzc",
+      " group by testcube.zipcode  order by rzc asc",
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
 
@@ -771,12 +771,20 @@ public class TestCubeRewriter {
       " citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
+    // run a query with time range function
+    hqlQuery = rewrite(driver, "select name, stateid from citytable where " + twoDaysRange);
+    expected = getExpectedQuery("citytable", "select citytable.name," +
+        " citytable.stateid from ", twoDaysRange,  null, "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
+    // query with alias
     hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
       " c");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ", null,
       "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
+    // query with where clause
     hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
         " c where name != 'xyz' ");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ",
@@ -784,10 +792,27 @@ public class TestCubeRewriter {
         "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
+    // query with orderby
     hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
         " c where name != 'xyz' order by name");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ",
-        " c.name != 'xyz' ", " order by c.name",
+        " c.name != 'xyz' ", " order by c.name asc",
+        "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
+    // query with where and orderby
+    hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
+        " c where name != 'xyz' order by name");
+    expected = getExpectedQuery("c", "select c.name, c.stateid from ",
+        " c.name != 'xyz' ", " order by c.name asc ",
+        "c1_citytable", true);
+    compareQueries(expected, hqlQuery);
+
+    // query with orderby with order specified
+    hqlQuery = rewrite(driver, "select name, c.stateid from citytable" +
+        " c where name != 'xyz' order by name desc ");
+    expected = getExpectedQuery("c", "select c.name, c.stateid from ",
+        " c.name != 'xyz' ", " order by c.name desc",
         "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
@@ -824,7 +849,7 @@ public class TestCubeRewriter {
     hqlQuery = rewrite(driver, "select name n, count(1) from citytable"
       + " group by name order by n ");
     expected = getExpectedQuery("citytable", "select citytable.name n," +
-      " count(1) from ", "groupby citytable.name order by n", "c2_citytable",
+      " count(1) from ", "groupby citytable.name order by n asc", "c2_citytable",
       false);
     compareQueries(expected, hqlQuery);
 
@@ -834,9 +859,11 @@ public class TestCubeRewriter {
     hqlQuery = rewrite(driver, "select count(1) from citytable"
       + " group by name order by name ");
     expected = getExpectedQuery("citytable", "select citytable.name," +
-      " count(1) from ", "groupby citytable.name order by citytable.name",
+      " count(1) from ", "groupby citytable.name order by citytable.name asc ",
       "c2_citytable", false);
     compareQueries(expected, hqlQuery);
+    
+
   }
 
   @Test
@@ -1063,7 +1090,7 @@ public class TestCubeRewriter {
         cubeName, "C2_testfact")),
       getExpectedQuery(cubeName, "SELECT testCube.cityid, sum(testCube.msr2)" +
         " FROM ", " testcube.msr2 > 100 ", " group by testcube.cityid having" +
-        " sum(testCube.msr2 < 1000) orderby testCube.cityid",
+        " sum(testCube.msr2 < 1000) orderby testCube.cityid asc",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact")),
     };
 
