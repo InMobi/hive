@@ -40,6 +40,8 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 
@@ -48,6 +50,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
  *
  */
 public class TestJdbcDriver extends TestCase {
+  private static final Log LOG = LogFactory.getLog(TestJdbcDriver.class);
   private static final String driverName = "org.apache.hadoop.hive.jdbc.HiveDriver";
   private static final String tableName = "testHiveJdbcDriver_Table";
   private static final String tableComment = "Simple table";
@@ -644,7 +647,7 @@ public class TestJdbcDriver extends TestCase {
     tests.put("", new Object[]{});
 
     for (String checkPattern: tests.keySet()) {
-      ResultSet rs = (ResultSet)con.getMetaData().getTables("default", null, checkPattern, null);
+      ResultSet rs = con.getMetaData().getTables("default", null, checkPattern, null);
       int cnt = 0;
       while (rs.next()) {
         String resultTableName = rs.getString("TABLE_NAME");
@@ -663,7 +666,7 @@ public class TestJdbcDriver extends TestCase {
     }
 
     // only ask for the views.
-    ResultSet rs = (ResultSet)con.getMetaData().getTables("default", null, null
+    ResultSet rs = con.getMetaData().getTables("default", null, null
             , new String[]{"VIEW"});
     int cnt=0;
     while (rs.next()) {
@@ -674,7 +677,7 @@ public class TestJdbcDriver extends TestCase {
   }
 
   public void testMetaDataGetCatalogs() throws SQLException {
-    ResultSet rs = (ResultSet)con.getMetaData().getCatalogs();
+    ResultSet rs = con.getMetaData().getCatalogs();
     int cnt = 0;
     while (rs.next()) {
       String catalogname = rs.getString("TABLE_CAT");
@@ -694,7 +697,7 @@ public class TestJdbcDriver extends TestCase {
   }
 
   public void testMetaDataGetSchemas() throws SQLException {
-    ResultSet rs = (ResultSet)con.getMetaData().getSchemas();
+    ResultSet rs = con.getMetaData().getSchemas();
     int cnt = 0;
     while (rs.next()) {
       cnt++;
@@ -704,7 +707,7 @@ public class TestJdbcDriver extends TestCase {
   }
 
   public void testMetaDataGetTableTypes() throws SQLException {
-    ResultSet rs = (ResultSet)con.getMetaData().getTableTypes();
+    ResultSet rs = con.getMetaData().getTableTypes();
     Set<String> tabletypes = new HashSet();
     tabletypes.add("TABLE");
     tabletypes.add("EXTERNAL TABLE");
@@ -772,7 +775,7 @@ public class TestJdbcDriver extends TestCase {
    * Validate the Metadata for the result set of a metadata getColumns call.
    */
   public void testMetaDataGetColumnsMetaData() throws SQLException {
-    ResultSet rs = (ResultSet)con.getMetaData().getColumns(null, null
+    ResultSet rs = con.getMetaData().getColumns(null, null
             , "testhivejdbcdriver\\_table", null);
 
     ResultSetMetaData rsmd = rs.getMetaData();
@@ -791,6 +794,7 @@ public class TestJdbcDriver extends TestCase {
             , Arrays.asList("long")
             , Arrays.asList(1234, "1234", "abc")) {
       private int cnt=1;
+      @Override
       public boolean next() throws SQLException {
         if (cnt<data.size()) {
           row = Arrays.asList(data.get(cnt));
@@ -1164,13 +1168,21 @@ public class TestJdbcDriver extends TestCase {
 
   public void testShowRoleGrant() throws SQLException {
     Statement stmt = con.createStatement();
+
+    // drop role. ignore error.
+    try {
+      stmt.execute("drop role role1");
+    } catch (Exception ex) {
+      LOG.warn("Ignoring error during drop role: " + ex);
+    }
+
     stmt.execute("create role role1");
     stmt.execute("grant role role1 to user hive_test_user");
     stmt.execute("show role grant user hive_test_user");
 
     ResultSet res = stmt.getResultSet();
     assertTrue(res.next());
-    assertEquals("PUBLIC", res.getString(1));
+    assertEquals("public", res.getString(1));
     assertTrue(res.next());
     assertEquals("role1", res.getString(1));
     res.close();

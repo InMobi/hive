@@ -74,7 +74,7 @@ import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
-import org.apache.hadoop.hive.metastore.api.Role;
+import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponseElement;
@@ -172,7 +172,6 @@ import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilege;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeInfo;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivilegeObjectType;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveRole;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveRoleGrant;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde.serdeConstants;
@@ -933,8 +932,8 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
         db.dropRole(roleDDLDesc.getName());
       } else if (operation.equals(RoleDDLDesc.RoleOperation.SHOW_ROLE_GRANT)) {
         boolean testMode = conf.getBoolVar(HiveConf.ConfVars.HIVE_IN_TEST);
-        List<Role> roles = db.showRoleGrant(roleDDLDesc.getName(), roleDDLDesc.getPrincipalType());
-        writeToFile(writeRoleInfo(roles, testMode), roleDDLDesc.getResFile());
+        List<RolePrincipalGrant> roleGrants = db.getRoleGrantInfoForPrincipal(roleDDLDesc.getName(), roleDDLDesc.getPrincipalType());
+        writeToFile(writeRoleGrantsInfo(roleGrants, testMode), roleDDLDesc.getResFile());
       } else if (operation.equals(RoleDDLDesc.RoleOperation.SHOW_ROLES)) {
         List<String> roleNames = db.getAllRoleNames();
         //sort the list to get sorted (deterministic) output (for ease of testing)
@@ -984,20 +983,16 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       break;
     case SHOW_ROLE_GRANT:
       boolean testMode = conf.getBoolVar(HiveConf.ConfVars.HIVE_IN_TEST);
-      List<HiveRole> roles = authorizer.getRoles(new HivePrincipal(roleDDLDesc.getName(),
-          getHivePrincipalType(roleDDLDesc.getPrincipalType())));
-      writeToFile(writeHiveRoleInfo(roles, testMode), roleDDLDesc.getResFile());
+      List<HiveRoleGrant> roles = authorizer.getRoleGrantInfoForPrincipal(
+          new HivePrincipal(roleDDLDesc.getName(), getHivePrincipalType(roleDDLDesc.getPrincipalType())));
+      writeToFile(writeRolesGrantedInfo(roles, testMode), roleDDLDesc.getResFile());
       break;
     case SHOW_ROLES:
       List<String> allRoles = authorizer.getAllRoles();
       writeListToFileAfterSort(allRoles, roleDDLDesc.getResFile());
       break;
     case SHOW_CURRENT_ROLE:
-      List<HiveRole> currentRoles = authorizer.getCurrentRoles();
-      List<String> roleNames = new ArrayList<String>(currentRoles.size());
-      for (HiveRole role : currentRoles) {
-        roleNames.add(role.getRoleName());
-      }
+      List<String> roleNames = authorizer.getCurrentRoleNames();
       writeListToFileAfterSort(roleNames, roleDDLDesc.getResFile());
       break;
     case SET_ROLE:
@@ -1005,7 +1000,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       break;
     case SHOW_ROLE_PRINCIPALS:
       testMode = conf.getBoolVar(HiveConf.ConfVars.HIVE_IN_TEST);
-      List<HiveRoleGrant> roleGrants = authorizer.getPrincipalsInRoleInfo(roleDDLDesc.getName());
+      List<HiveRoleGrant> roleGrants = authorizer.getPrincipalGrantInfoForRole(roleDDLDesc.getName());
       writeToFile(writeHiveRoleGrantInfo(roleGrants, testMode), roleDDLDesc.getResFile());
       break;
     default:
@@ -1116,7 +1111,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
             MetaStoreUtils.getIndexTableName(SessionState.get().getCurrentDatabase(),
                 crtIndex.getTableName(), crtIndex.getIndexName());
           Table indexTable = db.getTable(indexTableName);
-          work.getOutputs().add(new WriteEntity(indexTable, WriteEntity.WriteType.DDL));
+          work.getOutputs().add(new WriteEntity(indexTable, WriteEntity.WriteType.DDL_NO_LOCK));
     }
     return 0;
   }
@@ -1235,7 +1230,8 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     Partition newPart = db
         .getPartition(tbl, renamePartitionDesc.getNewPartSpec(), false);
     work.getInputs().add(new ReadEntity(oldPart));
-    work.getOutputs().add(new WriteEntity(newPart, WriteEntity.WriteType.DDL));
+    // We've already obtained a lock on the table, don't lock the partition too
+    work.getOutputs().add(new WriteEntity(newPart, WriteEntity.WriteType.DDL_NO_LOCK));
     return 0;
   }
 
@@ -1277,7 +1273,8 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     }
 
     work.getInputs().add(new ReadEntity(tbl));
-    work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL));
+    // We've already locked the table as the input, don't relock it as the output.
+    work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
 
     return 0;
   }
@@ -1306,7 +1303,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
         throw new HiveException("Uable to update table");
       }
       work.getInputs().add(new ReadEntity(tbl));
-      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_METADATA_ONLY));
+      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
     } else {
       Partition part = db.getPartition(tbl, touchDesc.getPartSpec(), false);
       if (part == null) {
@@ -1318,7 +1315,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
         throw new HiveException(e);
       }
       work.getInputs().add(new ReadEntity(part));
-      work.getOutputs().add(new WriteEntity(part, WriteEntity.WriteType.DDL_METADATA_ONLY));
+      work.getOutputs().add(new WriteEntity(part, WriteEntity.WriteType.DDL_NO_LOCK));
     }
     return 0;
   }
@@ -2791,30 +2788,32 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       os.writeBytes("Start Time");
       os.write(terminator);
 
-      for (ShowCompactResponseElement e : rsp.getCompacts()) {
-        os.writeBytes(e.getDbname());
-        os.write(separator);
-        os.writeBytes(e.getTablename());
-        os.write(separator);
-        String part = e.getPartitionname();
-        os.writeBytes(part == null ? "NULL" : part);
-        os.write(separator);
-        os.writeBytes(e.getType().toString());
-        os.write(separator);
-        os.writeBytes(e.getState());
-        os.write(separator);
-        String wid = e.getWorkerid();
-        os.writeBytes(wid == null ? "NULL" : wid);
-        os.write(separator);
-        os.writeBytes(Long.toString(e.getStart()));
-        os.write(terminator);
+      if (rsp.getCompacts() != null) {
+        for (ShowCompactResponseElement e : rsp.getCompacts()) {
+          os.writeBytes(e.getDbname());
+          os.write(separator);
+          os.writeBytes(e.getTablename());
+          os.write(separator);
+          String part = e.getPartitionname();
+          os.writeBytes(part == null ? "NULL" : part);
+          os.write(separator);
+          os.writeBytes(e.getType().toString());
+          os.write(separator);
+          os.writeBytes(e.getState());
+          os.write(separator);
+          String wid = e.getWorkerid();
+          os.writeBytes(wid == null ? "NULL" : wid);
+          os.write(separator);
+          os.writeBytes(Long.toString(e.getStart()));
+          os.write(terminator);
+        }
       }
       os.close();
     } catch (IOException e) {
       LOG.warn("show compactions: " + stringifyException(e));
       return 1;
     } finally {
-      IOUtils.closeStream((FSDataOutputStream)os);
+      IOUtils.closeStream(os);
     }
     return 0;
   }
@@ -2855,7 +2854,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       LOG.warn("show transactions: " + stringifyException(e));
       return 1;
     } finally {
-      IOUtils.closeStream((FSDataOutputStream)os);
+      IOUtils.closeStream(os);
     }
     return 0;
   }
@@ -3412,37 +3411,31 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     return builder.toString();
   }
 
-  static String writeRoleInfo(List<Role> roles, boolean testMode) {
-    if (roles == null || roles.isEmpty()) {
+  static String writeRoleGrantsInfo(List<RolePrincipalGrant> roleGrants, boolean testMode) {
+    if (roleGrants == null || roleGrants.isEmpty()) {
       return "";
     }
     StringBuilder builder = new StringBuilder();
     //sort the list to get sorted (deterministic) output (for ease of testing)
-    Collections.sort(roles);
-    for (Role role : roles) {
-      appendNonNull(builder, role.getRoleName(), true);
-      appendNonNull(builder, testMode ? -1 : role.getCreateTime() * 1000L);
-      appendNonNull(builder, role.getPrincipalName());
-      appendNonNull(builder, role.getPrincipalType());
-      appendNonNull(builder, role.isGrantOption());
-      appendNonNull(builder, testMode ? -1 : role.getGrantTime() * 1000L);
-      appendNonNull(builder, role.getGrantor());
+    Collections.sort(roleGrants);
+    for (RolePrincipalGrant roleGrant : roleGrants) {
+      appendNonNull(builder, roleGrant.getRoleName(), true);
+      appendNonNull(builder, roleGrant.isGrantOption());
+      appendNonNull(builder, testMode ? -1 : roleGrant.getGrantTime() * 1000L);
+      appendNonNull(builder, roleGrant.getGrantorName());
     }
     return builder.toString();
   }
 
-  static String writeHiveRoleInfo(List<HiveRole> roles, boolean testMode) {
+  static String writeRolesGrantedInfo(List<HiveRoleGrant> roles, boolean testMode) {
     if (roles == null || roles.isEmpty()) {
       return "";
     }
     StringBuilder builder = new StringBuilder();
     //sort the list to get sorted (deterministic) output (for ease of testing)
     Collections.sort(roles);
-    for (HiveRole role : roles) {
+    for (HiveRoleGrant role : roles) {
       appendNonNull(builder, role.getRoleName(), true);
-      appendNonNull(builder, testMode ? -1 : role.getCreateTime() * 1000L);
-      appendNonNull(builder, role.getPrincipalName());
-      appendNonNull(builder, role.getPrincipalType());
       appendNonNull(builder, role.isGrantOption());
       appendNonNull(builder, testMode ? -1 : role.getGrantTime() * 1000L);
       appendNonNull(builder, role.getGrantor());
@@ -3817,19 +3810,20 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     // contains the new table. This is needed for rename - both the old and the
     // new table names are
     // passed
+    // Don't acquire locks for any of these, we have already asked for them in DDLSemanticAnalyzer.
     if(part != null) {
       work.getInputs().add(new ReadEntity(part));
-      work.getOutputs().add(new WriteEntity(part, WriteEntity.WriteType.DDL));
+      work.getOutputs().add(new WriteEntity(part, WriteEntity.WriteType.DDL_NO_LOCK));
     }
     else if (allPartitions != null ){
       for (Partition tmpPart: allPartitions) {
         work.getInputs().add(new ReadEntity(tmpPart));
-        work.getOutputs().add(new WriteEntity(tmpPart, WriteEntity.WriteType.DDL));
+        work.getOutputs().add(new WriteEntity(tmpPart, WriteEntity.WriteType.DDL_NO_LOCK));
       }
     }
     else {
       work.getInputs().add(new ReadEntity(oldTbl));
-      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL));
+      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
     }
     return 0;
   }
@@ -3867,7 +3861,8 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
         dropTbl.getPartSpecs(), true, dropTbl.getIgnoreProtection(), true);
     for (Partition partition : droppedParts) {
       console.printInfo("Dropped the partition " + partition.getName());
-      work.getOutputs().add(new WriteEntity(partition, WriteEntity.WriteType.DDL));
+      // We have already locked the table, don't lock the partitions.
+      work.getOutputs().add(new WriteEntity(partition, WriteEntity.WriteType.DDL_NO_LOCK));
     };
   }
 
@@ -3921,7 +3916,8 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
     // drop the table
     db.dropTable(dropTbl.getTableName());
     if (tbl != null) {
-      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL));
+      // We have already locked the table in DDLSemenaticAnalyzer, don't do it again here
+      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
     }
   }
 
@@ -4196,7 +4192,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
 
     // create the table
     db.createTable(tbl, crtTbl.getIfNotExists());
-    work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL));
+    work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
     return 0;
   }
 
@@ -4304,7 +4300,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
 
     // create the table
     db.createTable(tbl, crtTbl.getIfNotExists());
-    work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL));
+    work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
     return 0;
   }
 
@@ -4340,7 +4336,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       } catch (InvalidOperationException e) {
         throw new HiveException(e);
       }
-      work.getOutputs().add(new WriteEntity(oldview, WriteEntity.WriteType.DDL));
+      work.getOutputs().add(new WriteEntity(oldview, WriteEntity.WriteType.DDL_NO_LOCK));
     } else {
       // create new view
       Table tbl = db.newTable(crtView.getViewName());
@@ -4367,7 +4363,7 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
       }
 
       db.createTable(tbl, crtView.getIfNotExists());
-      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL));
+      work.getOutputs().add(new WriteEntity(tbl, WriteEntity.WriteType.DDL_NO_LOCK));
     }
     return 0;
   }

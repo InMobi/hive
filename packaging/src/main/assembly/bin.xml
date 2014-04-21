@@ -52,6 +52,7 @@
         <include>org.apache.hive.hcatalog:hive-hcatalog-core</include>
         <include>org.apache.hive.hcatalog:hive-hcatalog-pig-adapter</include>
         <include>org.apache.hive.hcatalog:hive-hcatalog-server-extensions</include>
+        <include>org.apache.hive.hcatalog:hive-hcatalog-streaming</include>
       </includes>
     </dependencySet>
     <dependencySet>
@@ -280,6 +281,7 @@
       <includes>
         <include>webhcat-default.xml</include>
         <include>webhcat-log4j.properties</include>
+        <include>override-container-log4j.properties</include>
       </includes>
       <outputDirectory>hcatalog/etc/webhcat</outputDirectory>
     </fileSet>

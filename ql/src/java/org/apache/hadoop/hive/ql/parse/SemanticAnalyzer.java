@@ -4126,12 +4126,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             getColumnInternalName(inputField), "", false);
         reduceValues.add(exprDesc);
         inputField++;
-        outputValueColumnNames.add(getColumnInternalName(reduceValues.size() - 1));
-        String field = Utilities.ReduceField.VALUE.toString() + "."
-            + getColumnInternalName(reduceValues.size() - 1);
+        String outputColName = getColumnInternalName(reduceValues.size() - 1);
+        outputValueColumnNames.add(outputColName);
+        String internalName = Utilities.ReduceField.VALUE.toString() + "."
+            + outputColName;
         reduceSinkOutputRowResolver.putExpression(entry.getValue(),
-            new ColumnInfo(field, type, null, false));
-        colExprMap.put(field, exprDesc);
+            new ColumnInfo(internalName, type, null, false));
+        colExprMap.put(internalName, exprDesc);
       }
     }
 
@@ -6355,17 +6356,16 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // signature and generate field expressions for those
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     ArrayList<ExprNodeDesc> valueCols = new ArrayList<ExprNodeDesc>();
+    ArrayList<String> outputColumns = new ArrayList<String>();
+    int i = 0;
     for (ColumnInfo colInfo : inputRR.getColumnInfos()) {
+      String internalName = getColumnInternalName(i++);
+      outputColumns.add(internalName);
       valueCols.add(new ExprNodeColumnDesc(colInfo.getType(), colInfo
           .getInternalName(), colInfo.getTabAlias(), colInfo
           .getIsVirtualCol()));
-      colExprMap.put(colInfo.getInternalName(), valueCols
+      colExprMap.put(internalName, valueCols
           .get(valueCols.size() - 1));
-    }
-
-    ArrayList<String> outputColumns = new ArrayList<String>();
-    for (int i = 0; i < valueCols.size(); i++) {
-      outputColumns.add(getColumnInternalName(i));
     }
 
     StringBuilder order = new StringBuilder();
@@ -6474,20 +6474,19 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     // For the generation of the values expression just get the inputs
     // signature and generate field expressions for those
+    ArrayList<String> outputColumns = new ArrayList<String>();
     Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
     ArrayList<ExprNodeDesc> valueCols = new ArrayList<ExprNodeDesc>();
+    int i = 0;
     for (ColumnInfo colInfo : inputRR.getColumnInfos()) {
+      String internalName = getColumnInternalName(i++);
+      outputColumns.add(internalName);
       valueCols.add(new ExprNodeColumnDesc(colInfo.getType(), colInfo
           .getInternalName(), colInfo.getTabAlias(), colInfo
           .getIsVirtualCol()));
-      colExprMap.put(colInfo.getInternalName(), valueCols
-          .get(valueCols.size() - 1));
+      colExprMap.put(internalName, valueCols.get(valueCols.size() - 1));
     }
 
-    ArrayList<String> outputColumns = new ArrayList<String>();
-    for (int i = 0; i < valueCols.size(); i++) {
-      outputColumns.add(getColumnInternalName(i));
-    }
     Operator interim = putOpInsertMap(OperatorFactory.getAndMakeChild(PlanUtils
         .getReduceSinkDesc(sortCols, valueCols, outputColumns, false, -1,
             partitionCols, order.toString(), numReducers),
@@ -8624,10 +8623,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       for (Table tab : tabs) {
       for (FieldSchema part_col : tab.getPartCols()) {
         LOG.trace("Adding partition col: " + part_col);
-        // TODO: use the right type by calling part_col.getType() instead of
-        // String.class. See HIVE-3059.
         rwsch.put(alias, part_col.getName(), new ColumnInfo(part_col.getName(),
-            TypeInfoFactory.stringTypeInfo, alias, true));
+            TypeInfoFactory.getPrimitiveTypeInfo(part_col.getType()), alias, true));
       }
       }
 
@@ -8867,7 +8864,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       tsDesc.setStatsAggPrefix(tab.getDbName()+"."+k);
 
       // set up WritenEntity for replication
-      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_METADATA_ONLY));
+      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_SHARED));
 
       // add WriteEntity for each matching partition
       if (tab.isPartitioned()) {
@@ -8878,7 +8875,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         if (partitions != null) {
           for (Partition partn : partitions) {
             // inputs.add(new ReadEntity(partn)); // is this needed at all?
-            outputs.add(new WriteEntity(partn, WriteEntity.WriteType.DDL_METADATA_ONLY));
+            outputs.add(new WriteEntity(partn, WriteEntity.WriteType.DDL_NO_LOCK));
           }
         }
       }
@@ -9986,7 +9983,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     String[] qualified = Hive.getQualifiedNames(tableName);
     String dbName = qualified.length == 1 ? SessionState.get().getCurrentDatabase() : qualified[0];
     Database database  = getDatabase(dbName);
-    outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL_METADATA_ONLY));
+    outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL_SHARED));
     // Handle different types of CREATE TABLE command
     CreateTableDesc crtTblDesc = null;
     switch (command_type) {
@@ -10951,13 +10948,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             .getInternalName(), colInfo.getTabAlias(), colInfo
             .getIsVirtualCol());
         valueCols.add(valueColExpr);
-        colExprMap.put(colInfo.getInternalName(), valueColExpr);
-        String outColName = SemanticAnalyzer.getColumnInternalName(pos++);
-        outputColumnNames.add(outColName);
+        String internalName = SemanticAnalyzer.getColumnInternalName(pos++);
+        outputColumnNames.add(internalName);
+        colExprMap.put(internalName, valueColExpr);
 
         String[] alias = inputRR.reverseLookup(colInfo.getInternalName());
         ColumnInfo newColInfo = new ColumnInfo(
-            outColName, colInfo.getType(), alias[0],
+            internalName, colInfo.getType(), alias[0],
             colInfo.getIsVirtualCol(), colInfo.isHiddenVirtualCol());
         rsOpRR.put(alias[0], alias[1], newColInfo);
     }
@@ -11198,13 +11195,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
             .getInternalName(), colInfo.getTabAlias(), colInfo
             .getIsVirtualCol());
         valueCols.add(valueColExpr);
-        colExprMap.put(colInfo.getInternalName(), valueColExpr);
-        String outColName = SemanticAnalyzer.getColumnInternalName(pos++);
-        outputColumnNames.add(outColName);
+        String internalName = SemanticAnalyzer.getColumnInternalName(pos++);
+        outputColumnNames.add(internalName);
+        colExprMap.put(internalName, valueColExpr);
 
         String[] alias = inputRR.reverseLookup(colInfo.getInternalName());
         ColumnInfo newColInfo = new ColumnInfo(
-            outColName, colInfo.getType(), alias[0],
+            internalName, colInfo.getType(), alias[0],
             colInfo.getIsVirtualCol(), colInfo.isHiddenVirtualCol());
         rsNewRR.put(alias[0], alias[1], newColInfo);
         String[] altMapping = inputRR.getAlternateMappings(colInfo.getInternalName());

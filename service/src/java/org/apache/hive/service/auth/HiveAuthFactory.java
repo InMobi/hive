@@ -53,7 +53,8 @@ public class HiveAuthFactory {
     NONE("NONE"),
     LDAP("LDAP"),
     KERBEROS("KERBEROS"),
-    CUSTOM("CUSTOM");
+    CUSTOM("CUSTOM"),
+    PAM("PAM");
 
     private String authType;
 
@@ -126,9 +127,7 @@ public class HiveAuthFactory {
   }
 
   public TTransportFactory getAuthTransFactory() throws LoginException {
-
     TTransportFactory transportFactory;
-
     if (authTypeStr.equalsIgnoreCase(AuthTypes.KERBEROS.getAuthName())) {
       try {
         transportFactory = saslServer.createTransportFactory(getSaslProperties());
@@ -138,6 +137,8 @@ public class HiveAuthFactory {
     } else if (authTypeStr.equalsIgnoreCase(AuthTypes.NONE.getAuthName())) {
       transportFactory = PlainSaslHelper.getPlainTransportFactory(authTypeStr);
     } else if (authTypeStr.equalsIgnoreCase(AuthTypes.LDAP.getAuthName())) {
+      transportFactory = PlainSaslHelper.getPlainTransportFactory(authTypeStr);
+    } else if (authTypeStr.equalsIgnoreCase(AuthTypes.PAM.getAuthName())) {
       transportFactory = PlainSaslHelper.getPlainTransportFactory(authTypeStr);
     } else if (authTypeStr.equalsIgnoreCase(AuthTypes.NOSASL.getAuthName())) {
       transportFactory = new TTransportFactory();
@@ -172,7 +173,11 @@ public class HiveAuthFactory {
   }
 
   public String getIpAddress() {
-    return saslServer != null ? saslServer.getRemoteAddress().toString() : null;
+    if (saslServer != null && saslServer.getRemoteAddress() != null) {
+      return saslServer.getRemoteAddress().getHostAddress();
+    } else {
+      return null;
+    }
   }
 
   // Perform kerberos login using the hadoop shim API if the configuration is available
@@ -182,7 +187,22 @@ public class HiveAuthFactory {
     if (!principal.isEmpty() && !keyTabFile.isEmpty()) {
       ShimLoader.getHadoopShims().loginUserFromKeytab(principal, keyTabFile);
     } else {
-      throw new IOException ("HiveServer2 kerberos principal or keytab is not correctly configured");
+      throw new IOException ("HiveServer2 kerberos principal or keytab " +
+          "is not correctly configured");
+    }
+  }
+
+  // Perform spnego login using the hadoop shim API if the configuration is available
+  public static UserGroupInformation loginFromSpnegoKeytabAndReturnUGI(
+      HiveConf hiveConf) throws IOException {
+    String principal = hiveConf.getVar(ConfVars.HIVE_SERVER2_SPNEGO_PRINCIPAL);
+    String keyTabFile = hiveConf.getVar(ConfVars.HIVE_SERVER2_SPNEGO_KEYTAB);
+    if (!principal.isEmpty() && !keyTabFile.isEmpty()) {
+      return ShimLoader.getHadoopShims().loginUserFromKeytabAndReturnUGI(
+          principal, keyTabFile);
+    } else {
+      throw new IOException ("HiveServer2 SPNego principal or keytab " +
+          "is not correctly configured");
     }
   }
 

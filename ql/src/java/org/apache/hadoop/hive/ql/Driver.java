@@ -121,10 +121,6 @@ public class Driver implements CommandProcessor {
         throw new SemanticException(e.getMessage(), e);
       }
     }
-    // the reason that we set the txn manager for the cxt here is because each
-    // query has its own ctx object. The txn mgr is shared across the
-    // same instance of Driver, which can run multiple queries.
-    ctx.setHiveTxnManager(txnMgr);
   }
 
   private boolean checkConcurrency() throws SemanticException {
@@ -818,7 +814,7 @@ public class Driver implements CommandProcessor {
   private int recordValidTxns() {
     try {
       ValidTxnList txns = txnMgr.getValidTxns();
-      ctx.getConf().set(ValidTxnList.VALID_TXNS_KEY, txns.toString());
+      conf.set(ValidTxnList.VALID_TXNS_KEY, txns.toString());
       return 0;
     } catch (LockException e) {
       errorMessage = "FAILED: Error in determing valid transactions: " + e.getMessage();
@@ -997,13 +993,6 @@ public class Driver implements CommandProcessor {
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TIME_TO_SUBMIT);
 
     int ret;
-    if (!alreadyCompiled) {
-      ret = compileInternal(command);
-      if (ret != 0) {
-        return new CommandProcessorResponse(ret, errorMessage, SQLState);
-      }
-    }
-
     boolean requireLock = false;
     boolean ckLock = false;
     try {
@@ -1018,6 +1007,20 @@ public class Driver implements CommandProcessor {
       ret = 10;
       return new CommandProcessorResponse(ret, errorMessage, SQLState);
     }
+    ret = recordValidTxns();
+    if (ret != 0) return new CommandProcessorResponse(ret, errorMessage, SQLState);
+
+    if (!alreadyCompiled) {
+      ret = compileInternal(command);
+      if (ret != 0) {
+        return new CommandProcessorResponse(ret, errorMessage, SQLState);
+      }
+    }
+
+    // the reason that we set the txn manager for the cxt here is because each
+    // query has its own ctx object. The txn mgr is shared across the
+    // same instance of Driver, which can run multiple queries.
+    ctx.setHiveTxnManager(txnMgr);
 
     if (ckLock) {
       boolean lockOnlyMapred = HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_LOCK_MAPRED_ONLY);
@@ -1043,9 +1046,6 @@ public class Driver implements CommandProcessor {
         requireLock = true;
       }
     }
-
-    ret = recordValidTxns();
-    if (ret != 0) return new CommandProcessorResponse(ret, errorMessage, SQLState);
 
     if (requireLock) {
       ret = acquireReadWriteLocks();

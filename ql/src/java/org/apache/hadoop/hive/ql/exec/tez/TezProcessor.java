@@ -118,11 +118,15 @@ public class TezProcessor implements LogicalIOProcessor {
     String taskAttemptIdStr = taskAttemptIdBuilder.toString();
     this.jobConf.set("mapred.task.id", taskAttemptIdStr);
     this.jobConf.set("mapreduce.task.attempt.id", taskAttemptIdStr);
+    this.jobConf.setInt("mapred.task.partition",processorContext.getTaskIndex());
   }
 
   @Override
   public void run(Map<String, LogicalInput> inputs, Map<String, LogicalOutput> outputs)
       throws Exception {
+    
+    Exception processingException = null;
+    
     try{
       perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_RUN_PROCESSOR);
       // in case of broadcast-join read the broadcast edge inputs
@@ -146,6 +150,7 @@ public class TezProcessor implements LogicalIOProcessor {
       // Start the actual Inputs. After MRInput initialization.
       for (Entry<String, LogicalInput> inputEntry : inputs.entrySet()) {
         if (!cacheAccess.isInputCached(inputEntry.getKey())) {
+          LOG.info("Input: " + inputEntry.getKey() + " is not cached");
           inputEntry.getValue().start();
         } else {
           LOG.info("Input: " + inputEntry.getKey() + " is already cached. Skipping start");
@@ -160,9 +165,20 @@ public class TezProcessor implements LogicalIOProcessor {
 
       //done - output does not need to be committed as hive does not use outputcommitter
       perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_RUN_PROCESSOR);
+    } catch (Exception e) {
+      processingException = e;
     } finally {
-      if(rproc != null){
-        rproc.close();
+      try {
+        if(rproc != null){
+          rproc.close();
+        }
+      } catch (Exception e) {
+        if (processingException == null) {
+          processingException = e;
+        }
+      }
+      if (processingException != null) {
+        throw processingException;
       }
     }
   }

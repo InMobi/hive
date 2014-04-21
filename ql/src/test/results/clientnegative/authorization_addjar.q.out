@@ -1,0 +1,16 @@
+PREHOOK: query: -- running a sql query to initialize the authorization - not needed in real HS2 mode
+show tables
+PREHOOK: type: SHOWTABLES
+POSTHOOK: query: -- running a sql query to initialize the authorization - not needed in real HS2 mode
+show tables
+POSTHOOK: type: SHOWTABLES
+alltypesorc
+src
+src1
+src_json
+src_sequencefile
+src_thrift
+srcbucket
+srcbucket2
+srcpart
+Failed processing command add Insufficient privileges to execute add

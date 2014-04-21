@@ -138,16 +138,6 @@ struct Role {
   1: string roleName,
   2: i32 createTime,
   3: string ownerName,
-
-  // Following fields are populated by list_roles
-  // They are ignored during other commands such as role creation
-  // See RolePrincipalGrant which gives a 'normalized' representation
-  // of this information
-  4: optional string principalName,
-  5: optional string principalType,
-  6: optional bool grantOption,
-  7: optional i32 grantTime,
-  8: optional string grantor
 }
 
 // Representation of a grant for a principal to a role
@@ -161,12 +151,21 @@ struct RolePrincipalGrant {
   7: PrincipalType grantorPrincipalType
 }
 
+struct GetRoleGrantsForPrincipalRequest {
+  1: required string principal_name,
+  2: required PrincipalType principal_type
+}
+
+struct GetRoleGrantsForPrincipalResponse {
+  1: required list<RolePrincipalGrant> principalGrants;
+}
+
 struct GetPrincipalsInRoleRequest {
-  1: string roleName;
+  1: required string roleName;
 }
 
 struct GetPrincipalsInRoleResponse {
-  1: list<RolePrincipalGrant> principalGrants;
+  1: required list<RolePrincipalGrant> principalGrants;
 }
 
 // namespace for tables
@@ -291,12 +290,26 @@ struct BinaryColumnStatsData {
 3: required i64 numNulls
 }
 
+
+struct Decimal {
+1: required binary unscaled,
+3: required i16 scale
+}
+
+struct DecimalColumnStatsData {
+1: required Decimal lowValue,
+2: required Decimal highValue,
+3: required i64 numNulls,
+4: required i64 numDVs
+}
+
 union ColumnStatisticsData {
 1: BooleanColumnStatsData booleanStats,
 2: LongColumnStatsData longStats,
 3: DoubleColumnStatsData doubleStats,
 4: StringColumnStatsData stringStats,
-5: BinaryColumnStatsData binaryStats
+5: BinaryColumnStatsData binaryStats,
+6: DecimalColumnStatsData decimalStats
 }
 
 struct ColumnStatisticsObj {
@@ -526,6 +539,16 @@ struct ShowLocksResponse {
 struct HeartbeatRequest {
     1: optional i64 lockid,
     2: optional i64 txnid
+}
+
+struct HeartbeatTxnRangeRequest {
+    1: required i64 min,
+    2: required i64 max
+}
+
+struct HeartbeatTxnRangeResponse {
+    1: required set<i64> aborted,
+    2: required set<i64> nosuch
 }
 
 struct CompactionRequest {
@@ -948,6 +971,11 @@ service ThriftHiveMetastore extends fb303.FacebookService
   // redundant as it would match the role_name argument of this function
   GetPrincipalsInRoleResponse get_principals_in_role(1: GetPrincipalsInRoleRequest request) throws(1:MetaException o1)
 
+  // get grant information of all roles granted to the given principal
+  // Note that in the returned list of RolePrincipalGrants, the principal name,type is
+  // redundant as it would match the principal name,type arguments of this function
+  GetRoleGrantsForPrincipalResponse get_role_grants_for_principal(1: GetRoleGrantsForPrincipalRequest request) throws(1:MetaException o1)
+
   PrincipalPrivilegeSet get_privilege_set(1:HiveObjectRef hiveObject, 2:string user_name,
     3: list<string> group_names) throws(1:MetaException o1)
   list<HiveObjectPrivilege> list_privileges(1:string principal_name, 2:PrincipalType principal_type,
@@ -987,6 +1015,7 @@ service ThriftHiveMetastore extends fb303.FacebookService
   void unlock(1:UnlockRequest rqst) throws (1:NoSuchLockException o1, 2:TxnOpenException o2)
   ShowLocksResponse show_locks(1:ShowLocksRequest rqst)
   void heartbeat(1:HeartbeatRequest ids) throws (1:NoSuchLockException o1, 2:NoSuchTxnException o2, 3:TxnAbortedException o3)
+  HeartbeatTxnRangeResponse heartbeat_txn_range(1:HeartbeatTxnRangeRequest txns)
   void compact(1:CompactionRequest rqst) 
   ShowCompactResponse show_compact(1:ShowCompactRequest rqst)
 }
@@ -1020,6 +1049,7 @@ const string META_TABLE_DB        = "db",
 const string META_TABLE_LOCATION  = "location",
 const string META_TABLE_SERDE     = "serde",
 const string META_TABLE_PARTITION_COLUMNS = "partition_columns",
+const string META_TABLE_PARTITION_COLUMN_TYPES = "partition_columns.types",
 const string FILE_INPUT_FORMAT    = "file.inputformat",
 const string FILE_OUTPUT_FORMAT   = "file.outputformat",
 const string META_TABLE_STORAGE   = "storage_handler",

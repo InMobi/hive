@@ -621,24 +621,19 @@ class PrincipalPrivilegeSet {
 void swap(PrincipalPrivilegeSet &a, PrincipalPrivilegeSet &b);
 
 typedef struct _Role__isset {
-  _Role__isset() : roleName(false), createTime(false), ownerName(false), principalName(false), principalType(false), grantOption(false), grantTime(false), grantor(false) {}
+  _Role__isset() : roleName(false), createTime(false), ownerName(false) {}
   bool roleName;
   bool createTime;
   bool ownerName;
-  bool principalName;
-  bool principalType;
-  bool grantOption;
-  bool grantTime;
-  bool grantor;
 } _Role__isset;
 
 class Role {
  public:
 
-  static const char* ascii_fingerprint; // = "8DEBC3096AEF414FFF38C357ECEEA8BC";
-  static const uint8_t binary_fingerprint[16]; // = {0x8D,0xEB,0xC3,0x09,0x6A,0xEF,0x41,0x4F,0xFF,0x38,0xC3,0x57,0xEC,0xEE,0xA8,0xBC};
+  static const char* ascii_fingerprint; // = "70563A0628F75DF9555F4D24690B1E26";
+  static const uint8_t binary_fingerprint[16]; // = {0x70,0x56,0x3A,0x06,0x28,0xF7,0x5D,0xF9,0x55,0x5F,0x4D,0x24,0x69,0x0B,0x1E,0x26};
 
-  Role() : roleName(), createTime(0), ownerName(), principalName(), principalType(), grantOption(0), grantTime(0), grantor() {
+  Role() : roleName(), createTime(0), ownerName() {
   }
 
   virtual ~Role() throw() {}
@@ -646,11 +641,6 @@ class Role {
   std::string roleName;
   int32_t createTime;
   std::string ownerName;
-  std::string principalName;
-  std::string principalType;
-  bool grantOption;
-  int32_t grantTime;
-  std::string grantor;
 
   _Role__isset __isset;
 
@@ -666,31 +656,6 @@ class Role {
     ownerName = val;
   }
 
-  void __set_principalName(const std::string& val) {
-    principalName = val;
-    __isset.principalName = true;
-  }
-
-  void __set_principalType(const std::string& val) {
-    principalType = val;
-    __isset.principalType = true;
-  }
-
-  void __set_grantOption(const bool val) {
-    grantOption = val;
-    __isset.grantOption = true;
-  }
-
-  void __set_grantTime(const int32_t val) {
-    grantTime = val;
-    __isset.grantTime = true;
-  }
-
-  void __set_grantor(const std::string& val) {
-    grantor = val;
-    __isset.grantor = true;
-  }
-
   bool operator == (const Role & rhs) const
   {
     if (!(roleName == rhs.roleName))
@@ -698,26 +663,6 @@ class Role {
     if (!(createTime == rhs.createTime))
       return false;
     if (!(ownerName == rhs.ownerName))
-      return false;
-    if (__isset.principalName != rhs.__isset.principalName)
-      return false;
-    else if (__isset.principalName && !(principalName == rhs.principalName))
-      return false;
-    if (__isset.principalType != rhs.__isset.principalType)
-      return false;
-    else if (__isset.principalType && !(principalType == rhs.principalType))
-      return false;
-    if (__isset.grantOption != rhs.__isset.grantOption)
-      return false;
-    else if (__isset.grantOption && !(grantOption == rhs.grantOption))
-      return false;
-    if (__isset.grantTime != rhs.__isset.grantTime)
-      return false;
-    else if (__isset.grantTime && !(grantTime == rhs.grantTime))
-      return false;
-    if (__isset.grantor != rhs.__isset.grantor)
-      return false;
-    else if (__isset.grantor && !(grantor == rhs.grantor))
       return false;
     return true;
   }
@@ -825,10 +770,87 @@ class RolePrincipalGrant {
 
 void swap(RolePrincipalGrant &a, RolePrincipalGrant &b);
 
-typedef struct _GetPrincipalsInRoleRequest__isset {
-  _GetPrincipalsInRoleRequest__isset() : roleName(false) {}
-  bool roleName;
-} _GetPrincipalsInRoleRequest__isset;
+
+class GetRoleGrantsForPrincipalRequest {
+ public:
+
+  static const char* ascii_fingerprint; // = "D6FD826D949221396F4FFC3ECCD3D192";
+  static const uint8_t binary_fingerprint[16]; // = {0xD6,0xFD,0x82,0x6D,0x94,0x92,0x21,0x39,0x6F,0x4F,0xFC,0x3E,0xCC,0xD3,0xD1,0x92};
+
+  GetRoleGrantsForPrincipalRequest() : principal_name(), principal_type((PrincipalType::type)0) {
+  }
+
+  virtual ~GetRoleGrantsForPrincipalRequest() throw() {}
+
+  std::string principal_name;
+  PrincipalType::type principal_type;
+
+  void __set_principal_name(const std::string& val) {
+    principal_name = val;
+  }
+
+  void __set_principal_type(const PrincipalType::type val) {
+    principal_type = val;
+  }
+
+  bool operator == (const GetRoleGrantsForPrincipalRequest & rhs) const
+  {
+    if (!(principal_name == rhs.principal_name))
+      return false;
+    if (!(principal_type == rhs.principal_type))
+      return false;
+    return true;
+  }
+  bool operator != (const GetRoleGrantsForPrincipalRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const GetRoleGrantsForPrincipalRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(GetRoleGrantsForPrincipalRequest &a, GetRoleGrantsForPrincipalRequest &b);
+
+
+class GetRoleGrantsForPrincipalResponse {
+ public:
+
+  static const char* ascii_fingerprint; // = "5926B4B3541A62E17663820C7E3BE690";
+  static const uint8_t binary_fingerprint[16]; // = {0x59,0x26,0xB4,0xB3,0x54,0x1A,0x62,0xE1,0x76,0x63,0x82,0x0C,0x7E,0x3B,0xE6,0x90};
+
+  GetRoleGrantsForPrincipalResponse() {
+  }
+
+  virtual ~GetRoleGrantsForPrincipalResponse() throw() {}
+
+  std::vector<RolePrincipalGrant>  principalGrants;
+
+  void __set_principalGrants(const std::vector<RolePrincipalGrant> & val) {
+    principalGrants = val;
+  }
+
+  bool operator == (const GetRoleGrantsForPrincipalResponse & rhs) const
+  {
+    if (!(principalGrants == rhs.principalGrants))
+      return false;
+    return true;
+  }
+  bool operator != (const GetRoleGrantsForPrincipalResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const GetRoleGrantsForPrincipalResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(GetRoleGrantsForPrincipalResponse &a, GetRoleGrantsForPrincipalResponse &b);
+
 
 class GetPrincipalsInRoleRequest {
  public:
@@ -842,8 +864,6 @@ class GetPrincipalsInRoleRequest {
   virtual ~GetPrincipalsInRoleRequest() throw() {}
 
   std::string roleName;
-
-  _GetPrincipalsInRoleRequest__isset __isset;
 
   void __set_roleName(const std::string& val) {
     roleName = val;
@@ -868,10 +888,6 @@ class GetPrincipalsInRoleRequest {
 
 void swap(GetPrincipalsInRoleRequest &a, GetPrincipalsInRoleRequest &b);
 
-typedef struct _GetPrincipalsInRoleResponse__isset {
-  _GetPrincipalsInRoleResponse__isset() : principalGrants(false) {}
-  bool principalGrants;
-} _GetPrincipalsInRoleResponse__isset;
 
 class GetPrincipalsInRoleResponse {
  public:
@@ -885,8 +901,6 @@ class GetPrincipalsInRoleResponse {
   virtual ~GetPrincipalsInRoleResponse() throw() {}
 
   std::vector<RolePrincipalGrant>  principalGrants;
-
-  _GetPrincipalsInRoleResponse__isset __isset;
 
   void __set_principalGrants(const std::vector<RolePrincipalGrant> & val) {
     principalGrants = val;
@@ -1952,20 +1966,123 @@ class BinaryColumnStatsData {
 
 void swap(BinaryColumnStatsData &a, BinaryColumnStatsData &b);
 
+
+class Decimal {
+ public:
+
+  static const char* ascii_fingerprint; // = "C4DDF6759F9B17C5C380806CE743DE8E";
+  static const uint8_t binary_fingerprint[16]; // = {0xC4,0xDD,0xF6,0x75,0x9F,0x9B,0x17,0xC5,0xC3,0x80,0x80,0x6C,0xE7,0x43,0xDE,0x8E};
+
+  Decimal() : unscaled(), scale(0) {
+  }
+
+  virtual ~Decimal() throw() {}
+
+  std::string unscaled;
+  int16_t scale;
+
+  void __set_unscaled(const std::string& val) {
+    unscaled = val;
+  }
+
+  void __set_scale(const int16_t val) {
+    scale = val;
+  }
+
+  bool operator == (const Decimal & rhs) const
+  {
+    if (!(unscaled == rhs.unscaled))
+      return false;
+    if (!(scale == rhs.scale))
+      return false;
+    return true;
+  }
+  bool operator != (const Decimal &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Decimal & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(Decimal &a, Decimal &b);
+
+
+class DecimalColumnStatsData {
+ public:
+
+  static const char* ascii_fingerprint; // = "3AE5C36598A014EE815B87600C3087B5";
+  static const uint8_t binary_fingerprint[16]; // = {0x3A,0xE5,0xC3,0x65,0x98,0xA0,0x14,0xEE,0x81,0x5B,0x87,0x60,0x0C,0x30,0x87,0xB5};
+
+  DecimalColumnStatsData() : numNulls(0), numDVs(0) {
+  }
+
+  virtual ~DecimalColumnStatsData() throw() {}
+
+  Decimal lowValue;
+  Decimal highValue;
+  int64_t numNulls;
+  int64_t numDVs;
+
+  void __set_lowValue(const Decimal& val) {
+    lowValue = val;
+  }
+
+  void __set_highValue(const Decimal& val) {
+    highValue = val;
+  }
+
+  void __set_numNulls(const int64_t val) {
+    numNulls = val;
+  }
+
+  void __set_numDVs(const int64_t val) {
+    numDVs = val;
+  }
+
+  bool operator == (const DecimalColumnStatsData & rhs) const
+  {
+    if (!(lowValue == rhs.lowValue))
+      return false;
+    if (!(highValue == rhs.highValue))
+      return false;
+    if (!(numNulls == rhs.numNulls))
+      return false;
+    if (!(numDVs == rhs.numDVs))
+      return false;
+    return true;
+  }
+  bool operator != (const DecimalColumnStatsData &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DecimalColumnStatsData & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(DecimalColumnStatsData &a, DecimalColumnStatsData &b);
+
 typedef struct _ColumnStatisticsData__isset {
-  _ColumnStatisticsData__isset() : booleanStats(false), longStats(false), doubleStats(false), stringStats(false), binaryStats(false) {}
+  _ColumnStatisticsData__isset() : booleanStats(false), longStats(false), doubleStats(false), stringStats(false), binaryStats(false), decimalStats(false) {}
   bool booleanStats;
   bool longStats;
   bool doubleStats;
   bool stringStats;
   bool binaryStats;
+  bool decimalStats;
 } _ColumnStatisticsData__isset;
 
 class ColumnStatisticsData {
  public:
 
-  static const char* ascii_fingerprint; // = "3D106F26C0761EF37E58CAFAA3F1651C";
-  static const uint8_t binary_fingerprint[16]; // = {0x3D,0x10,0x6F,0x26,0xC0,0x76,0x1E,0xF3,0x7E,0x58,0xCA,0xFA,0xA3,0xF1,0x65,0x1C};
+  static const char* ascii_fingerprint; // = "343F5865568AF7DA61829A616EB8C57C";
+  static const uint8_t binary_fingerprint[16]; // = {0x34,0x3F,0x58,0x65,0x56,0x8A,0xF7,0xDA,0x61,0x82,0x9A,0x61,0x6E,0xB8,0xC5,0x7C};
 
   ColumnStatisticsData() {
   }
@@ -1977,6 +2094,7 @@ class ColumnStatisticsData {
   DoubleColumnStatsData doubleStats;
   StringColumnStatsData stringStats;
   BinaryColumnStatsData binaryStats;
+  DecimalColumnStatsData decimalStats;
 
   _ColumnStatisticsData__isset __isset;
 
@@ -2000,6 +2118,10 @@ class ColumnStatisticsData {
     binaryStats = val;
   }
 
+  void __set_decimalStats(const DecimalColumnStatsData& val) {
+    decimalStats = val;
+  }
+
   bool operator == (const ColumnStatisticsData & rhs) const
   {
     if (!(booleanStats == rhs.booleanStats))
@@ -2011,6 +2133,8 @@ class ColumnStatisticsData {
     if (!(stringStats == rhs.stringStats))
       return false;
     if (!(binaryStats == rhs.binaryStats))
+      return false;
+    if (!(decimalStats == rhs.decimalStats))
       return false;
     return true;
   }
@@ -2031,8 +2155,8 @@ void swap(ColumnStatisticsData &a, ColumnStatisticsData &b);
 class ColumnStatisticsObj {
  public:
 
-  static const char* ascii_fingerprint; // = "DEE09584C51BCAF60824FE4509B59567";
-  static const uint8_t binary_fingerprint[16]; // = {0xDE,0xE0,0x95,0x84,0xC5,0x1B,0xCA,0xF6,0x08,0x24,0xFE,0x45,0x09,0xB5,0x95,0x67};
+  static const char* ascii_fingerprint; // = "CFDBB9DFF4F1670367EA5356861EC180";
+  static const uint8_t binary_fingerprint[16]; // = {0xCF,0xDB,0xB9,0xDF,0xF4,0xF1,0x67,0x03,0x67,0xEA,0x53,0x56,0x86,0x1E,0xC1,0x80};
 
   ColumnStatisticsObj() : colName(), colType() {
   }
@@ -2160,8 +2284,8 @@ void swap(ColumnStatisticsDesc &a, ColumnStatisticsDesc &b);
 class ColumnStatistics {
  public:
 
-  static const char* ascii_fingerprint; // = "681BDBD0CBB53373AC1C9C0C2E26BEAB";
-  static const uint8_t binary_fingerprint[16]; // = {0x68,0x1B,0xDB,0xD0,0xCB,0xB5,0x33,0x73,0xAC,0x1C,0x9C,0x0C,0x2E,0x26,0xBE,0xAB};
+  static const char* ascii_fingerprint; // = "37AA2F226C29DF25254CCCE6A7DDBAF3";
+  static const uint8_t binary_fingerprint[16]; // = {0x37,0xAA,0x2F,0x22,0x6C,0x29,0xDF,0x25,0x25,0x4C,0xCC,0xE6,0xA7,0xDD,0xBA,0xF3};
 
   ColumnStatistics() {
   }
@@ -2420,8 +2544,8 @@ void swap(PartitionsByExprRequest &a, PartitionsByExprRequest &b);
 class TableStatsResult {
  public:
 
-  static const char* ascii_fingerprint; // = "3A0CB62070A0D93EE2CE174AF08C0E92";
-  static const uint8_t binary_fingerprint[16]; // = {0x3A,0x0C,0xB6,0x20,0x70,0xA0,0xD9,0x3E,0xE2,0xCE,0x17,0x4A,0xF0,0x8C,0x0E,0x92};
+  static const char* ascii_fingerprint; // = "178DBEC75B48CDDEDB3B8338EF6FBF2F";
+  static const uint8_t binary_fingerprint[16]; // = {0x17,0x8D,0xBE,0xC7,0x5B,0x48,0xCD,0xDE,0xDB,0x3B,0x83,0x38,0xEF,0x6F,0xBF,0x2F};
 
   TableStatsResult() {
   }
@@ -2457,8 +2581,8 @@ void swap(TableStatsResult &a, TableStatsResult &b);
 class PartitionsStatsResult {
  public:
 
-  static const char* ascii_fingerprint; // = "9790481369E1B27F6E70DED62CFCA4E3";
-  static const uint8_t binary_fingerprint[16]; // = {0x97,0x90,0x48,0x13,0x69,0xE1,0xB2,0x7F,0x6E,0x70,0xDE,0xD6,0x2C,0xFC,0xA4,0xE3};
+  static const char* ascii_fingerprint; // = "0E3D549A0384CD453E2CB90C734A6245";
+  static const uint8_t binary_fingerprint[16]; // = {0x0E,0x3D,0x54,0x9A,0x03,0x84,0xCD,0x45,0x3E,0x2C,0xB9,0x0C,0x73,0x4A,0x62,0x45};
 
   PartitionsStatsResult() {
   }
@@ -3958,6 +4082,94 @@ class HeartbeatRequest {
 };
 
 void swap(HeartbeatRequest &a, HeartbeatRequest &b);
+
+
+class HeartbeatTxnRangeRequest {
+ public:
+
+  static const char* ascii_fingerprint; // = "F33135321253DAEB67B0E79E416CA831";
+  static const uint8_t binary_fingerprint[16]; // = {0xF3,0x31,0x35,0x32,0x12,0x53,0xDA,0xEB,0x67,0xB0,0xE7,0x9E,0x41,0x6C,0xA8,0x31};
+
+  HeartbeatTxnRangeRequest() : min(0), max(0) {
+  }
+
+  virtual ~HeartbeatTxnRangeRequest() throw() {}
+
+  int64_t min;
+  int64_t max;
+
+  void __set_min(const int64_t val) {
+    min = val;
+  }
+
+  void __set_max(const int64_t val) {
+    max = val;
+  }
+
+  bool operator == (const HeartbeatTxnRangeRequest & rhs) const
+  {
+    if (!(min == rhs.min))
+      return false;
+    if (!(max == rhs.max))
+      return false;
+    return true;
+  }
+  bool operator != (const HeartbeatTxnRangeRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const HeartbeatTxnRangeRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(HeartbeatTxnRangeRequest &a, HeartbeatTxnRangeRequest &b);
+
+
+class HeartbeatTxnRangeResponse {
+ public:
+
+  static const char* ascii_fingerprint; // = "33E49A70BD5C04262A0F407E3656E3CF";
+  static const uint8_t binary_fingerprint[16]; // = {0x33,0xE4,0x9A,0x70,0xBD,0x5C,0x04,0x26,0x2A,0x0F,0x40,0x7E,0x36,0x56,0xE3,0xCF};
+
+  HeartbeatTxnRangeResponse() {
+  }
+
+  virtual ~HeartbeatTxnRangeResponse() throw() {}
+
+  std::set<int64_t>  aborted;
+  std::set<int64_t>  nosuch;
+
+  void __set_aborted(const std::set<int64_t> & val) {
+    aborted = val;
+  }
+
+  void __set_nosuch(const std::set<int64_t> & val) {
+    nosuch = val;
+  }
+
+  bool operator == (const HeartbeatTxnRangeResponse & rhs) const
+  {
+    if (!(aborted == rhs.aborted))
+      return false;
+    if (!(nosuch == rhs.nosuch))
+      return false;
+    return true;
+  }
+  bool operator != (const HeartbeatTxnRangeResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const HeartbeatTxnRangeResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+void swap(HeartbeatTxnRangeResponse &a, HeartbeatTxnRangeResponse &b);
 
 typedef struct _CompactionRequest__isset {
   _CompactionRequest__isset() : partitionname(false), runas(false) {}

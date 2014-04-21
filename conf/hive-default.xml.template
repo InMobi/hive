@@ -881,7 +881,7 @@
 
 <property>
   <name>hive.auto.convert.join.use.nonstaged</name>
-  <value>true</value>
+  <value>false</value>
   <description>For conditional joins, if input stream from a small alias can be directly applied to join operator without
     filtering or projection, the alias need not to be pre-staged in distributed cache via mapred local task.
     Currently, this is not working with vectorization or tez execution engine.
@@ -2186,6 +2186,7 @@
        KERBEROS: Kerberos/GSSAPI authentication
        CUSTOM: Custom authentication provider
                (Use with property hive.server2.custom.authentication.class)
+       PAM: Pluggable authentication module.
   </description>
 </property>
 
@@ -2218,7 +2219,36 @@
     Kerberos keytab file for server principal
   </description>
 </property>
- 
+
+<property>
+  <name>hive.server2.authentication.spnego.principal</name>
+  <value></value>
+  <description>
+    SPNego service principal, optional,
+    typical value would look like HTTP/_HOST@EXAMPLE.COM
+    SPNego service principal would be used by hiveserver2 when kerberos security is enabled
+    and HTTP transport mode is used.
+    This needs to be set only if SPNEGO is to be used in authentication.
+  </description>
+</property>
+
+<property>
+  <name>hive.server2.authentication.spnego.keytab</name>
+  <value></value>
+  <description>
+    keytab file for SPNego principal, optional,
+    typical value would look like /etc/security/keytabs/spnego.service.keytab,
+    This keytab would be used by hiveserver2 when kerberos security is enabled
+    and HTTP transport mode is used.
+    This needs to be set only if SPNEGO is to be used in authentication.
+    SPNego authentication would be honored only if valid
+    hive.server2.authentication.spnego.principal
+    and
+    hive.server2.authentication.spnego.keytab
+    are specified
+  </description>
+</property>
+
 <property>
   <name>hive.server2.authentication.ldap.url</name>
   <value></value>
@@ -2418,7 +2448,7 @@
   <value>hdfs:///user/</value>
   <description>
     If hive (in tez mode only) cannot find a usable hive jar in "hive.jar.directory", 
-    it will upload the hive jar to &lthive.user.install.directory&gt/&ltuser name&gt 
+    it will upload the hive jar to &lt;hive.user.install.directory&gt;/&lt;user name&gt;
     and use it to run queries.
   </description>
 </property>
@@ -2433,6 +2463,15 @@
   <name>hive.tez.java.opts</name>
   <value></value>
   <description>By default tez will use the java opts from map tasks. This can be used to overwrite.</description>
+</property>
+
+<property>
+  <name>hive.tez.log.level</name>
+  <value>INFO</value>
+  <description>
+    The log level to use for tasks executing as part of the DAG.
+    Used only if hive.tez.java.opts is used to configure java opts.
+  </description>
 </property>
 
 <property>
@@ -2489,6 +2528,198 @@
   <description>
     Enable (configurable) deprecated behaviors by setting desired level of backward compatbility
   </description>
+</property>
+
+<property>
+  <name>hive.metastore.try.direct.sql</name>
+  <value>true</value>
+  <description>
+  Whether Hive metastore should try to use direct SQL queries instead of DataNucleus for certain
+  read paths. Can improve metastore performance when fetching many partitions or column stats by
+  orders of magnitude; however, is not guaranteed to work on all RDBMS-es and all versions. In case
+  of SQL failures, metastore will fall back to DataNucleus, so it's safe even if SQL doesn't work
+  for all queries on your datastore. If all SQL queries fail (e.g. your metastore is backed by
+  MongoDB), you might want to disable this to save the try-and-fall-back cost.
+  </description>
+</property>
+
+<property>
+  <name>hive.metastore.try.direct.sql.ddl</name>
+  <value>true</value>
+  <description>
+  Same as hive.metastore.try.direct.sql, for read statements within a transaction that modifies
+  metastore data. Due to non-standard behavior in Postgres, if direct SQL select query has
+  incorrect syntax or something inside a transaction, entire transaction will fail and fall-back to
+  DataNucleus will not be possible. You should disable the usage of direct SQL inside transactions
+  if that happens in your case.
+  </description>
+</property>
+
+<property>
+  <name>hive.metastore.integral.jdo.pushdown</name>
+  <value>false</value>
+  <description>
+  Whether to enable JDO pushdown for integral types. Off by default. Irrelevant if
+  hive.metastore.try.direct.sql is enabled. Otherwise, filter pushdown in metastore can improve
+  performance, but for partition columns storing integers in non-canonical form, (e.g. '012'),
+  it can produce incorrect results.
+  </description>
+</property>
+
+
+<property>
+  <name>hive.mapjoin.optimized.keys</name>
+  <value>true</value>
+  <description>
+  Whether MapJoin hashtable should use optimized (size-wise), keys, allowing the table to take less
+  memory. Depending on key, the memory savings for entire table can be 5-15% or so.
+  </description>
+</property>
+
+<property>
+  <name>hive.mapjoin.lazy.hashtable</name>
+  <value>true</value>
+  <description>
+  Whether MapJoin hashtable should deserialize values on demand. Depending on how many values in
+  the table the join will actually touch, it can save a lot of memory by not creating objects for
+  rows that are not needed. If all rows are needed obviously there's no gain.
+  </description>
+</property>
+
+<property>
+  <name>hive.exec.check.crossproducts</name>
+  <value>true</value>
+  <description>
+    Check if a plan contains a Cross Product. If there is one, output a warning to the Session's console.
+  </description>
+</property>
+
+<property>
+  <name>hive.localize.resource.wait.interval</name>
+  <value>5000</value>
+  <description>
+    Time in milliseconds to wait for another thread to localize the same resource for hive-tez.
+  </description>
+</property>
+
+<property>
+  <name>hive.localize.resource.num.wait.attempts</name>
+  <value>5</value>
+  <description>
+    The number of attempts waiting for localizing a resource in hive-tez.
+  </description>
+</property>
+
+<property>
+  <name>hive.server2.use.SSL</name>
+  <value>false</value>
+  <description>Set this to true for using SSL encryption in HiveServer2</description>
+</property>
+
+<property>
+  <name>hive.server2.keystore.path</name>
+  <value></value>
+  <description>SSL certificate keystore location</description>
+</property>
+
+<property>
+  <name>hive.server2.keystore.password</name>
+  <value></value>
+  <description>SSL certificate keystore password.</description>
+</property>
+
+<property>
+  <name>hive.server2.authentication.pam.services</name>
+  <value></value>
+  <description>List of the underlying pam services that should be used when auth type is PAM.
+  A file with the same name must exist in /etc/pam.d</description>
+</property>
+
+<property>
+ <name>hive.convert.join.bucket.mapjoin.tez</name>
+ <value>false</value>
+ <description>Whether joins can be automatically converted to bucket map 
+ joins in hive when tez is used as the execution engine.
+ </description>
+</property>
+
+<property>
+  <name>hive.serdes.using.metastore.for.schema</name>
+  <value>org.apache.hadoop.hive.ql.io.orc.OrcSerde,org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe,org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe,org.apache.hadoop.hive.serde2.dynamic_type.DynamicSerDe,org.apache.hadoop.hive.serde2.MetadataTypedColumnsetSerDe,org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe,org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe,org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe</value>
+  <description>This an internal parameter. Check with the hive dev. team</description>
+</property>
+
+<property>
+  <name>hive.limit.query.max.table.partition</name>
+  <value>-1</value>
+  <description>This controls how many partitions can be scanned for each partitioned table. The default value "-1" means no limit.</description>
+</property>
+
+<property>
+  <name>hive.txn.manager</name>
+  <value>org.apache.hadoop.hive.ql.lockmgr.DummyTxnManager</value>
+  <description></description>
+</property>
+
+<property>
+  <name>hive.txn.timeout</name>
+  <value>300</value>
+  <description>time after which transactions are declared aborted if the client has
+  not sent a heartbeat, in seconds.</description>
+</property>
+
+<property>
+  <name>hive.txn.max.open.batch</name>
+  <value>1000</value>
+  <description>Maximum number of transactions that can be fetched in one call to open_txns().
+  Increasing this will decrease the number of delta files created when
+  streaming data into Hive.  But it will also increase the number of
+  open transactions at any given time, possibly impacting read 
+  performance.
+  </description>
+</property>
+
+<property>
+  <name>hive.compactor.initiator.on</name>
+  <value>false</value>
+  <description>Whether to run the compactor's initiator thread in this metastore instance or not.</description>
+</property>
+
+<property>
+  <name>hive.compactor.worker.threads</name>
+  <value>0</value>
+  <description>Number of compactor worker threads to run on this metastore instance.</description>
+</property>
+
+<property>
+  <name>hive.compactor.worker.timeout</name>
+  <value>86400</value>
+  <description>Time, in seconds, before a given compaction in working state is declared a failure and returned to the initiated state.</description>
+</property>
+
+<property>
+  <name>hive.compactor.check.interval</name>
+  <value>300</value>
+  <description>Time in seconds between checks to see if any partitions need compacted.
+  This should be kept high because each check for compaction requires many calls against the NameNode.</description>
+</property>
+
+<property>
+  <name>hive.compactor.delta.num.threshold</name>
+  <value>10</value>
+  <description>Number of delta files that must exist in a directory before the compactor will attempt a minor compaction.</description>
+</property>
+
+<property>
+  <name>hive.compactor.delta.pct.threshold</name>
+  <value>0.1</value>
+  <description>Percentage (by size) of base that deltas can be before major compaction is initiated.</description>
+</property>
+
+<property>
+  <name>hive.compactor.abortedtxn.threshold</name>
+  <value>1000</value>
+  <description>Number of aborted transactions involving a particular table or partition before major compaction is initiated.</description>
 </property>
 
 </configuration>

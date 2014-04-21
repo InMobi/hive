@@ -48,6 +48,7 @@ import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.lib.CompositeProcessor;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
+import org.apache.hadoop.hive.ql.lib.ForwardWalker;
 import org.apache.hadoop.hive.ql.lib.GraphWalker;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.NodeProcessor;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.optimizer.ConvertJoinMapJoin;
 import org.apache.hadoop.hive.ql.optimizer.ReduceSinkMapJoinProc;
 import org.apache.hadoop.hive.ql.optimizer.SetReducerParallelism;
+import org.apache.hadoop.hive.ql.optimizer.physical.CrossProductCheck;
 import org.apache.hadoop.hive.ql.optimizer.physical.PhysicalContext;
 import org.apache.hadoop.hive.ql.optimizer.physical.Vectorizer;
 import org.apache.hadoop.hive.ql.optimizer.physical.StageIDsRearranger;
@@ -117,7 +119,7 @@ public class TezCompiler extends TaskCompiler {
     Dispatcher disp = new DefaultRuleDispatcher(null, opRules, procCtx);
     List<Node> topNodes = new ArrayList<Node>();
     topNodes.addAll(pCtx.getTopOps().values());
-    GraphWalker ogw = new TezWalker(disp);
+    GraphWalker ogw = new ForwardWalker(disp);
     ogw.startWalking(topNodes, null);
   }
 
@@ -143,7 +145,6 @@ public class TezCompiler extends TaskCompiler {
         genTezWork);
 
     opRules.put(new RuleRegExp("No more walking on ReduceSink-MapJoin",
-        ReduceSinkOperator.getOperatorName() + "%" +
         MapJoinOperator.getOperatorName() + "%"), new ReduceSinkMapJoinProc());
 
     opRules.put(new RuleRegExp("Split Work + Move/Merge - FileSink",
@@ -154,7 +155,7 @@ public class TezCompiler extends TaskCompiler {
         TableScanOperator.getOperatorName() + "%"),
         new ProcessAnalyzeTable(GenTezUtils.getUtils()));
 
-    opRules.put(new RuleRegExp("Handle union",
+    opRules.put(new RuleRegExp("Remember union",
         UnionOperator.getOperatorName() + "%"), new NodeProcessor()
     {
       @Override
@@ -245,6 +246,11 @@ public class TezCompiler extends TaskCompiler {
       Context ctx) throws SemanticException {
     PhysicalContext physicalCtx = new PhysicalContext(conf, pCtx, pCtx.getContext(), rootTasks,
        pCtx.getFetchTask());
+
+    if (conf.getBoolVar(HiveConf.ConfVars.HIVE_CHECK_CROSS_PRODUCT)) {
+      physicalCtx = new CrossProductCheck().resolve(physicalCtx);
+    }
+
     if (conf.getBoolVar(HiveConf.ConfVars.HIVE_VECTORIZATION_ENABLED)) {
       (new Vectorizer()).resolve(physicalCtx);
     }

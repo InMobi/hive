@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -42,9 +43,10 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
+import org.apache.hadoop.hive.ql.plan.TezEdgeProperty;
+import org.apache.hadoop.hive.ql.plan.TezEdgeProperty.EdgeType;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.UnionWork;
-import org.apache.hadoop.hive.ql.plan.TezWork.EdgeType;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.mapred.JobConf;
@@ -102,45 +104,55 @@ public class TezTask extends Task<TezWork> {
     TezSessionState session = null;
 
     try {
-      // Get or create Context object. If we create it we have to clean
-      // it later as well.
+      // Get or create Context object. If we create it we have to clean it later as well.
       ctx = driverContext.getCtx();
       if (ctx == null) {
         ctx = new Context(conf);
         cleanContext = true;
       }
 
-      // Need to remove this static hack. But this is the way currently to
-      // get a session.
+      // Need to remove this static hack. But this is the way currently to get a session.
       SessionState ss = SessionState.get();
       session = ss.getTezSession();
-      session = TezSessionPoolManager.getInstance().getSession(session, conf);
+      session = TezSessionPoolManager.getInstance().getSession(session, conf, false);
       ss.setTezSession(session);
 
-      // if it's not running start it.
+      // jobConf will hold all the configuration for hadoop, tez, and hive
+      JobConf jobConf = utils.createConfiguration(conf);
+
+      // Get all user jars from work (e.g. input format stuff).
+      String[] inputOutputJars = work.configureJobConfAndExtractJars(jobConf);
+
+      // we will localize all the files (jars, plans, hashtables) to the
+      // scratch dir. let's create this and tmp first.
+      Path scratchDir = ctx.getMRScratchDir();
+
+      // create the tez tmp dir
+      scratchDir = utils.createTezDir(scratchDir, conf);
+
+      // If we have any jars from input format, we need to restart the session because
+      // AM will need them; so, AM has to be restarted. What a mess...
+      if (!session.hasResources(inputOutputJars) && session.isOpen()) {
+        LOG.info("Tez session being reopened to pass custom jars to AM");
+        session.close(false);
+        session = TezSessionPoolManager.getInstance().getSession(null, conf, false);
+        ss.setTezSession(session);
+      }
+
       if (!session.isOpen()) {
         // can happen if the user sets the tez flag after the session was
         // established
         LOG.info("Tez session hasn't been created yet. Opening session");
-        session.open(session.getSessionId(), conf);
+        session.open(conf, inputOutputJars);
       }
-
-      // we will localize all the files (jars, plans, hashtables) to the
-      // scratch dir. let's create this first.
-      Path scratchDir = ctx.getMRScratchDir();
-
-      // create the tez tmp dir
-      utils.createTezDir(scratchDir, conf);
-
-      // jobConf will hold all the configuration for hadoop, tez, and hive
-      JobConf jobConf = utils.createConfiguration(conf);
+      List<LocalResource> additionalLr = session.getLocalizedResources();
 
       // unless already installed on all the cluster nodes, we'll have to
       // localize hive-exec.jar as well.
       LocalResource appJarLr = session.getAppJarLr();
 
       // next we translate the TezWork to a Tez DAG
-      DAG dag = build(jobConf, work, scratchDir, appJarLr, ctx);
+      DAG dag = build(jobConf, work, scratchDir, appJarLr, additionalLr, ctx);
 
       // submit will send the job to the cluster and start executing
       client = submit(jobConf, dag, scratchDir, appJarLr, session);
@@ -185,23 +197,19 @@ public class TezTask extends Task<TezWork> {
   }
 
   DAG build(JobConf conf, TezWork work, Path scratchDir,
-      LocalResource appJarLr, Context ctx)
+      LocalResource appJarLr, List<LocalResource> additionalLr, Context ctx)
       throws Exception {
 
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_BUILD_DAG);
     Map<BaseWork, Vertex> workToVertex = new HashMap<BaseWork, Vertex>();
     Map<BaseWork, JobConf> workToConf = new HashMap<BaseWork, JobConf>();
 
-    // we need to get the user specified local resources for this dag
-    List<LocalResource> additionalLr = utils.localizeTempFiles(conf);
-
     // getAllWork returns a topologically sorted list, which we use to make
     // sure that vertices are created before they are used in edges.
     List<BaseWork> ws = work.getAllWork();
     Collections.reverse(ws);
 
-    Path tezDir = utils.getTezDir(scratchDir);
-    FileSystem fs = tezDir.getFileSystem(conf);
+    FileSystem fs = scratchDir.getFileSystem(conf);
 
     // the name of the dag is what is displayed in the AM/Job UI
     DAG dag = new DAG(work.getName());
@@ -222,7 +230,7 @@ public class TezTask extends Task<TezWork> {
         // split the children into vertices that make up the union and vertices that are
         // proper children of the union
         for (BaseWork v: work.getChildren(w)) {
-          EdgeType type = work.getEdgeProperty(w, v);
+          EdgeType type = work.getEdgeProperty(w, v).getEdgeType();
           if (type == EdgeType.CONTAINS) {
             unionWorkItems.add(v);
           } else {
@@ -256,8 +264,8 @@ public class TezTask extends Task<TezWork> {
       } else {
         // Regular vertices
         JobConf wxConf = utils.initializeVertexConf(conf, w);
-        Vertex wx = utils.createVertex(wxConf, w, tezDir, appJarLr, 
-          additionalLr, fs, ctx, !isFinal);
+        Vertex wx = utils.createVertex(wxConf, w, scratchDir, appJarLr, 
+          additionalLr, fs, ctx, !isFinal, work);
         dag.addVertex(wx);
         utils.addCredentials(w, dag);
         perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.TEZ_CREATE_VERTEX + w.getName());
@@ -269,9 +277,9 @@ public class TezTask extends Task<TezWork> {
           assert workToVertex.containsKey(v);
           Edge e = null;
 
-          EdgeType edgeType = work.getEdgeProperty(w, v);
-          
-          e = utils.createEdge(wxConf, wx, workToConf.get(v), workToVertex.get(v), edgeType);
+          TezEdgeProperty edgeProp = work.getEdgeProperty(w, v);
+
+          e = utils.createEdge(wxConf, wx, workToConf.get(v), workToVertex.get(v), edgeProp);
           dag.addEdge(e);
         }
       }
@@ -298,7 +306,7 @@ public class TezTask extends Task<TezWork> {
       sessionState.close(true);
 
       // (re)open the session
-      sessionState.open(sessionState.getSessionId(), this.conf);
+      sessionState.open(this.conf);
 
       console.printInfo("Session re-established.");
 

@@ -1479,6 +1479,22 @@ module ThriftHiveMetastore
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'get_principals_in_role failed: unknown result')
     end
 
+    def get_role_grants_for_principal(request)
+      send_get_role_grants_for_principal(request)
+      return recv_get_role_grants_for_principal()
+    end
+
+    def send_get_role_grants_for_principal(request)
+      send_message('get_role_grants_for_principal', Get_role_grants_for_principal_args, :request => request)
+    end
+
+    def recv_get_role_grants_for_principal()
+      result = receive_message(Get_role_grants_for_principal_result)
+      return result.success unless result.success.nil?
+      raise result.o1 unless result.o1.nil?
+      raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'get_role_grants_for_principal failed: unknown result')
+    end
+
     def get_privilege_set(hiveObject, user_name, group_names)
       send_get_privilege_set(hiveObject, user_name, group_names)
       return recv_get_privilege_set()
@@ -1763,6 +1779,21 @@ module ThriftHiveMetastore
       raise result.o2 unless result.o2.nil?
       raise result.o3 unless result.o3.nil?
       return
+    end
+
+    def heartbeat_txn_range(txns)
+      send_heartbeat_txn_range(txns)
+      return recv_heartbeat_txn_range()
+    end
+
+    def send_heartbeat_txn_range(txns)
+      send_message('heartbeat_txn_range', Heartbeat_txn_range_args, :txns => txns)
+    end
+
+    def recv_heartbeat_txn_range()
+      result = receive_message(Heartbeat_txn_range_result)
+      return result.success unless result.success.nil?
+      raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'heartbeat_txn_range failed: unknown result')
     end
 
     def compact(rqst)
@@ -2961,6 +2992,17 @@ module ThriftHiveMetastore
       write_result(result, oprot, 'get_principals_in_role', seqid)
     end
 
+    def process_get_role_grants_for_principal(seqid, iprot, oprot)
+      args = read_args(iprot, Get_role_grants_for_principal_args)
+      result = Get_role_grants_for_principal_result.new()
+      begin
+        result.success = @handler.get_role_grants_for_principal(args.request)
+      rescue ::MetaException => o1
+        result.o1 = o1
+      end
+      write_result(result, oprot, 'get_role_grants_for_principal', seqid)
+    end
+
     def process_get_privilege_set(seqid, iprot, oprot)
       args = read_args(iprot, Get_privilege_set_args)
       result = Get_privilege_set_result.new()
@@ -3155,6 +3197,13 @@ module ThriftHiveMetastore
         result.o3 = o3
       end
       write_result(result, oprot, 'heartbeat', seqid)
+    end
+
+    def process_heartbeat_txn_range(seqid, iprot, oprot)
+      args = read_args(iprot, Heartbeat_txn_range_args)
+      result = Heartbeat_txn_range_result.new()
+      result.success = @handler.heartbeat_txn_range(args.txns)
+      write_result(result, oprot, 'heartbeat_txn_range', seqid)
     end
 
     def process_compact(seqid, iprot, oprot)
@@ -6573,6 +6622,40 @@ module ThriftHiveMetastore
     ::Thrift::Struct.generate_accessors self
   end
 
+  class Get_role_grants_for_principal_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQUEST = 1
+
+    FIELDS = {
+      REQUEST => {:type => ::Thrift::Types::STRUCT, :name => 'request', :class => ::GetRoleGrantsForPrincipalRequest}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Get_role_grants_for_principal_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    SUCCESS = 0
+    O1 = 1
+
+    FIELDS = {
+      SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::GetRoleGrantsForPrincipalResponse},
+      O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::MetaException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
   class Get_privilege_set_args
     include ::Thrift::Struct, ::Thrift::Struct_Union
     HIVEOBJECT = 1
@@ -7184,6 +7267,38 @@ module ThriftHiveMetastore
       O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::NoSuchLockException},
       O2 => {:type => ::Thrift::Types::STRUCT, :name => 'o2', :class => ::NoSuchTxnException},
       O3 => {:type => ::Thrift::Types::STRUCT, :name => 'o3', :class => ::TxnAbortedException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Heartbeat_txn_range_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    TXNS = 1
+
+    FIELDS = {
+      TXNS => {:type => ::Thrift::Types::STRUCT, :name => 'txns', :class => ::HeartbeatTxnRangeRequest}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Heartbeat_txn_range_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    SUCCESS = 0
+
+    FIELDS = {
+      SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::HeartbeatTxnRangeResponse}
     }
 
     def struct_fields; FIELDS; end

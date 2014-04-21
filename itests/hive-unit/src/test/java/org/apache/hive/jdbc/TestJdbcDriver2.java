@@ -46,6 +46,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -70,6 +72,7 @@ import org.junit.Test;
  *
  */
 public class TestJdbcDriver2 {
+  private static final Log LOG = LogFactory.getLog(TestJdbcDriver2.class);
   private static final String driverName = "org.apache.hive.jdbc.HiveDriver";
   private static final String tableName = "testHiveJdbcDriver_Table";
   private static final String tableComment = "Simple table";
@@ -82,6 +85,7 @@ public class TestJdbcDriver2 {
   private static final String dataTypeTableName = "testdatatypetable";
   private static final String dataTypeTableComment = "Table with many column data types";
   private final HiveConf conf;
+  public static String dataFileDir;
   private final Path dataFilePath;
   private final Path dataTypeDataFilePath;
   private Connection con;
@@ -90,7 +94,7 @@ public class TestJdbcDriver2 {
 
   public TestJdbcDriver2() {
     conf = new HiveConf(TestJdbcDriver2.class);
-    String dataFileDir = conf.get("test.data.files").replace('\\', '/')
+    dataFileDir = conf.get("test.data.files").replace('\\', '/')
         .replace("c:", "");
     dataFilePath = new Path(dataFileDir, "kv1.txt");
     dataTypeDataFilePath = new Path(dataFileDir, "datatypes.txt");
@@ -1996,13 +2000,21 @@ public class TestJdbcDriver2 {
   @Test
   public void testShowRoleGrant() throws SQLException {
     Statement stmt = con.createStatement();
+
+    // drop role. ignore error.
+    try {
+      stmt.execute("drop role role1");
+    } catch (Exception ex) {
+      LOG.warn("Ignoring error during drop role: " + ex);
+    }
+
     stmt.execute("create role role1");
     stmt.execute("grant role role1 to user hive_test_user");
     stmt.execute("show role grant user hive_test_user");
 
     ResultSet res = stmt.getResultSet();
     assertTrue(res.next());
-    assertEquals("PUBLIC", res.getString(1));
+    assertEquals("public", res.getString(1));
     assertTrue(res.next());
     assertEquals("role1", res.getString(1));
     res.close();
@@ -2070,5 +2082,41 @@ public class TestJdbcDriver2 {
       }
       return value;
     }
+  }
+
+  /**
+   * Loads data from a table containing non-ascii value column
+   * Runs a query and compares the return value
+   * @throws Exception
+   */
+  @Test
+  public void testNonAsciiReturnValues() throws Exception {
+    String nonAsciiTableName = "nonAsciiTable";
+    String nonAsciiString = "Garçu Kôkaku kidôtai";
+    Path nonAsciiFilePath = new Path(dataFileDir, "non_ascii_tbl.txt");
+    Statement stmt = con.createStatement();
+    stmt.execute("set hive.support.concurrency = false");
+
+    // Create table
+    stmt.execute("create table " + nonAsciiTableName + " (key int, value string) " +
+        "row format delimited fields terminated by '|'");
+
+    // Load data
+    stmt.execute("load data local inpath '"
+        + nonAsciiFilePath.toString() + "' into table " + nonAsciiTableName);
+
+    ResultSet rs = stmt.executeQuery("select value from " + nonAsciiTableName +  " limit 1");
+    while(rs.next()) {
+      String resultValue = rs.getString(1);
+      assertTrue(resultValue.equalsIgnoreCase(nonAsciiString));
+    }
+
+    // Drop table, ignore error.
+    try {
+      stmt.execute("drop table " + nonAsciiTableName);
+    } catch (Exception ex) {
+      // no-op
+    }
+    stmt.close();
   }
 }

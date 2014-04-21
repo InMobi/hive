@@ -614,7 +614,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
 
   private void addAlterDbDesc(AlterDatabaseDesc alterDesc) throws SemanticException {
     Database database = getDatabase(alterDesc.getDatabaseName());
-    outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL_METADATA_ONLY));
+    outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL_NO_LOCK));
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), alterDesc), conf));
   }
 
@@ -637,25 +637,27 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   private void analyzeExchangePartition(ASTNode ast) throws SemanticException {
-    Table sourceTable =  getTable(getUnescapedName((ASTNode)ast.getChild(0)));
-    Table destTable = getTable(getUnescapedName((ASTNode)ast.getChild(2)));
+    Table destTable =  getTable(getUnescapedName((ASTNode)ast.getChild(0)));
+    Table sourceTable = getTable(getUnescapedName((ASTNode)ast.getChild(2)));
 
     // Get the partition specs
     Map<String, String> partSpecs = getPartSpec((ASTNode) ast.getChild(1));
     validatePartitionValues(partSpecs);
     boolean sameColumns = MetaStoreUtils.compareFieldColumns(
-        sourceTable.getAllCols(), destTable.getAllCols());
+        destTable.getAllCols(), sourceTable.getAllCols());
     boolean samePartitions = MetaStoreUtils.compareFieldColumns(
-        sourceTable.getPartitionKeys(), destTable.getPartitionKeys());
+        destTable.getPartitionKeys(), sourceTable.getPartitionKeys());
     if (!sameColumns || !samePartitions) {
       throw new SemanticException(ErrorMsg.TABLES_INCOMPATIBLE_SCHEMAS.getMsg());
     }
-    List<Partition> partitions = getPartitions(sourceTable, partSpecs, true);
+    // check if source partition exists
+    getPartitions(sourceTable, partSpecs, true);
 
     // Verify that the partitions specified are continuous
     // If a subpartition value is specified without specifying a partition's value
     // then we throw an exception
-    if (!isPartitionValueContinuous(sourceTable.getPartitionKeys(), partSpecs)) {
+    int counter = isPartitionValueContinuous(sourceTable.getPartitionKeys(), partSpecs);
+    if (counter < 0) {
       throw new SemanticException(
           ErrorMsg.PARTITION_VALUE_NOT_CONTINUOUS.getMsg(partSpecs.toString()));
     }
@@ -679,24 +681,20 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
   /**
    * @param partitionKeys the list of partition keys of the table
    * @param partSpecs the partition specs given by the user
-   * @return true if no subpartition value is specified without a partition's
-   *         value being specified else it returns false
+   * @return >=0 if no subpartition value is specified without a partition's
+   *         value being specified else it returns -1
    */
-  private boolean isPartitionValueContinuous(List<FieldSchema> partitionKeys,
+  private int isPartitionValueContinuous(List<FieldSchema> partitionKeys,
       Map<String, String> partSpecs) {
-    boolean partitionMissing = false;
-    for (FieldSchema partitionKey: partitionKeys) {
-      if (!partSpecs.containsKey(partitionKey.getName())) {
-        partitionMissing = true;
-      } else {
-        if (partitionMissing) {
-          // A subpartition value exists after a missing partition
-          // The partition value specified are not continuous, return false
-          return false;
-        }
+    int counter = 0;
+    for (FieldSchema partitionKey : partitionKeys) {
+      if (partSpecs.containsKey(partitionKey.getName())) {
+        counter++;
+        continue;
       }
+      return partSpecs.size() == counter ? counter : -1;
     }
-    return true;
+    return counter;
   }
 
   private void analyzeCreateDatabase(ASTNode ast) throws SemanticException {
@@ -769,12 +767,14 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
       if (tableNames != null) {
         for (String tableName : tableNames) {
           Table table = getTable(dbName, tableName, true);
-          outputs.add(new WriteEntity(table, WriteEntity.WriteType.DDL));
+          // We want no lock here, as the database lock will cover the tables,
+          // and putting a lock will actually cause us to deadlock on ourselves.
+          outputs.add(new WriteEntity(table, WriteEntity.WriteType.DDL_NO_LOCK));
         }
       }
     }
     inputs.add(new ReadEntity(database));
-    outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL));
+    outputs.add(new WriteEntity(database, WriteEntity.WriteType.DDL_EXCLUSIVE));
 
     DropDatabaseDesc dropDatabaseDesc = new DropDatabaseDesc(dbName, ifExists, ifCascade);
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(), dropDatabaseDesc), conf));
@@ -800,7 +800,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     Table tab = getTable(tableName, throwException);
     if (tab != null) {
       inputs.add(new ReadEntity(tab));
-      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL));
+      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_EXCLUSIVE));
     }
 
     DropTableDesc dropTblDesc = new DropTableDesc(tableName, expectView, ifExists);
@@ -825,19 +825,19 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     Map<String, String> partSpec = getPartSpec((ASTNode) root.getChild(1));
     if (partSpec == null) {
       if (!table.isPartitioned()) {
-        outputs.add(new WriteEntity(table, WriteEntity.WriteType.DDL));
+        outputs.add(new WriteEntity(table, WriteEntity.WriteType.DDL_EXCLUSIVE));
       } else {
         for (Partition partition : getPartitions(table, null, false)) {
-          outputs.add(new WriteEntity(partition, WriteEntity.WriteType.DDL));
+          outputs.add(new WriteEntity(partition, WriteEntity.WriteType.DDL_EXCLUSIVE));
         }
       }
     } else {
       if (isFullSpec(table, partSpec)) {
         Partition partition = getPartition(table, partSpec, true);
-        outputs.add(new WriteEntity(partition, WriteEntity.WriteType.DDL));
+        outputs.add(new WriteEntity(partition, WriteEntity.WriteType.DDL_EXCLUSIVE));
       } else {
         for (Partition partition : getPartitions(table, partSpec, false)) {
-          outputs.add(new WriteEntity(partition, WriteEntity.WriteType.DDL));
+          outputs.add(new WriteEntity(partition, WriteEntity.WriteType.DDL_EXCLUSIVE));
         }
       }
     }
@@ -1374,19 +1374,22 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
   private void addInputsOutputsAlterTable(String tableName, Map<String, String> partSpec,
       AlterTableDesc desc) throws SemanticException {
     Table tab = getTable(tableName, true);
+    // Determine the lock type to acquire
+    WriteEntity.WriteType writeType = desc == null ? WriteEntity.WriteType.DDL_EXCLUSIVE :
+        WriteEntity.determineAlterTableWriteType(desc.getOp());
     if (partSpec == null || partSpec.isEmpty()) {
       inputs.add(new ReadEntity(tab));
-      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL));
+      outputs.add(new WriteEntity(tab, writeType));
     }
     else {
       inputs.add(new ReadEntity(tab));
       if (desc == null || desc.getOp() != AlterTableDesc.AlterTableTypes.ALTERPROTECTMODE) {
         Partition part = getPartition(tab, partSpec, true);
-        outputs.add(new WriteEntity(part, WriteEntity.WriteType.DDL));
+        outputs.add(new WriteEntity(part, writeType));
       }
       else {
         for (Partition part : getPartitions(tab, partSpec, true)) {
-          outputs.add(new WriteEntity(part, WriteEntity.WriteType.DDL));
+          outputs.add(new WriteEntity(part, writeType));
         }
       }
     }
@@ -1969,6 +1972,8 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
       descTblDesc.setExt(descOptions == HiveParser.KW_EXTENDED);
       descTblDesc.setPretty(descOptions == HiveParser.KW_PRETTY);
     }
+
+    inputs.add(new ReadEntity(getTable(tableName)));
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
         descTblDesc), conf));
     setFetchTask(createFetchTask(DescTableDesc.getSchema()));
@@ -2034,6 +2039,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     validateTable(tableName, null);
 
     showPartsDesc = new ShowPartitionsDesc(tableName, ctx.getResFile(), partSpec);
+    inputs.add(new ReadEntity(getTable(tableName)));
     rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
         showPartsDesc), conf));
     setFetchTask(createFetchTask(showPartsDesc.getSchema()));
@@ -2649,7 +2655,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     Table tab = getTable(tblName, true);
     boolean isView = tab.isView();
     validateAlterTableType(tab, AlterTableTypes.ADDPARTITION, expectView);
-    outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL));
+    outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_SHARED));
 
     int numCh = ast.getChildCount();
     int start = ifNotExists ? 2 : 1;
@@ -2783,7 +2789,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
       AlterTableSimpleDesc touchDesc = new AlterTableSimpleDesc(
           SessionState.get().getCurrentDatabase(), tblName, null,
           AlterTableDesc.AlterTableTypes.TOUCH);
-      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_METADATA_ONLY));
+      outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_NO_LOCK));
       rootTasks.add(TaskFactory.get(new DDLWork(getInputs(), getOutputs(),
           touchDesc), conf));
     } else {
@@ -3048,7 +3054,8 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
         }
       }
       for (Partition p : parts) {
-        outputs.add(new WriteEntity(p, WriteEntity.WriteType.DDL));
+        // Don't request any locks here, as the table has already been locked.
+        outputs.add(new WriteEntity(p, WriteEntity.WriteType.DDL_NO_LOCK));
       }
     }
   }
@@ -3116,7 +3123,7 @@ public class DDLSemanticAnalyzer extends BaseSemanticAnalyzer {
     Table tab = getTable(tableName, true);
 
     inputs.add(new ReadEntity(tab));
-    outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL));
+    outputs.add(new WriteEntity(tab, WriteEntity.WriteType.DDL_EXCLUSIVE));
 
     validateAlterTableType(tab, AlterTableTypes.ADDSKEWEDBY);
 

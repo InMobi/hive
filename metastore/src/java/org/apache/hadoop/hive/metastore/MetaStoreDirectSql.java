@@ -40,6 +40,7 @@ import javax.jdo.Query;
 import javax.jdo.Transaction;
 import javax.jdo.datastore.JDOConnection;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -291,7 +292,7 @@ class MetaStoreDirectSql {
       + "  inner join \"DBS\" on \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
       + "     and \"DBS\".\"NAME\" = ? "
       + join(joinsForFilter, ' ')
-      + (sqlFilter == null ? "" : (" where " + sqlFilter)) + orderForFilter;
+      + (StringUtils.isBlank(sqlFilter) ? "" : (" where " + sqlFilter)) + orderForFilter;
     Object[] params = new Object[paramsForFilter.size() + 2];
     params[0] = tblName;
     params[1] = dbName;
@@ -990,8 +991,9 @@ class MetaStoreDirectSql {
   /** The common query part for table and partition stats */
   private static final String STATS_COLLIST =
       "\"COLUMN_NAME\", \"COLUMN_TYPE\", \"LONG_LOW_VALUE\", \"LONG_HIGH_VALUE\", "
-    + "\"DOUBLE_LOW_VALUE\", \"DOUBLE_HIGH_VALUE\", \"NUM_NULLS\", \"NUM_DISTINCTS\", "
-    + "\"AVG_COL_LEN\", \"MAX_COL_LEN\", \"NUM_TRUES\", \"NUM_FALSES\", \"LAST_ANALYZED\"";
+    + "\"DOUBLE_LOW_VALUE\", \"DOUBLE_HIGH_VALUE\", \"BIG_DECIMAL_LOW_VALUE\", "
+    + "\"BIG_DECIMAL_HIGH_VALUE\", \"NUM_NULLS\", \"NUM_DISTINCTS\", \"AVG_COL_LEN\", "
+    + "\"MAX_COL_LEN\", \"NUM_TRUES\", \"NUM_FALSES\", \"LAST_ANALYZED\" ";
 
   private ColumnStatistics makeColumnStats(
       List<Object[]> list, ColumnStatisticsDesc csd, int offset) {
@@ -1001,7 +1003,7 @@ class MetaStoreDirectSql {
     for (Object[] row : list) {
       // LastAnalyzed is stored per column but thrift has it per several;
       // get the lowest for now as nobody actually uses this field.
-      Object laObj = row[offset + 12];
+      Object laObj = row[offset + 14];
       if (laObj != null && (!csd.isSetLastAnalyzed() || csd.getLastAnalyzed() > (Long)laObj)) {
         csd.setLastAnalyzed((Long)laObj);
       }
@@ -1010,10 +1012,10 @@ class MetaStoreDirectSql {
       int i = offset;
       ColumnStatisticsObj cso = new ColumnStatisticsObj((String)row[i++], (String)row[i++], data);
       Object llow = row[i++], lhigh = row[i++], dlow = row[i++], dhigh = row[i++],
-        nulls = row[i++], dist = row[i++], avglen = row[i++], maxlen = row[i++],
-        trues = row[i++], falses = row[i++];
+          declow = row[i++], dechigh = row[i++], nulls = row[i++], dist = row[i++],
+          avglen = row[i++], maxlen = row[i++], trues = row[i++], falses = row[i++];
       StatObjectConverter.fillColumnStatisticsData(cso.getColType(), data,
-          llow, lhigh, dlow, dhigh, nulls, dist, avglen, maxlen, trues, falses);
+          llow, lhigh, dlow, dhigh, declow, dechigh, nulls, dist, avglen, maxlen, trues, falses);
       csos.add(cso);
     }
     result.setStatsObj(csos);

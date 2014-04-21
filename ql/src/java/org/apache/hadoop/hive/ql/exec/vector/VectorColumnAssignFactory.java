@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.common.type.Decimal128;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
@@ -87,7 +88,7 @@ public class VectorColumnAssignFactory {
     }
 
     protected void assignNull(int index) {
-      VectorizedBatchUtil.SetNullColIsNullValue(outCol, index);
+      VectorizedBatchUtil.setNullColIsNullValue(outCol, index);
     }
 
     @Override
@@ -298,6 +299,20 @@ public class VectorColumnAssignFactory {
               TimestampWritable bw = (TimestampWritable) val;
               Timestamp t = bw.getTimestamp();
               assignLong(TimestampUtils.getTimeNanoSec(t), destIndex);
+            }
+          }
+        }.init(outputBatch, (LongColumnVector) destCol);
+        break;
+      case DATE:
+        outVCA = new VectorLongColumnAssign() {
+          @Override
+          public void assignObjectValue(Object val, int destIndex) throws HiveException {
+            if (val == null) {
+              assignNull(destIndex);
+            }
+            else {
+              DateWritable bw = (DateWritable) val;
+              assignLong(bw.getDays(), destIndex);
             }
           }
         }.init(outputBatch, (LongColumnVector) destCol);

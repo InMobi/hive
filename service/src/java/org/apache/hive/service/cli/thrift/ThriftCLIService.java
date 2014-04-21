@@ -201,16 +201,31 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   }
 
   private String getIpAddress() {
-    if (hiveAuthFactory != null) {
-      return hiveAuthFactory.getIpAddress();
+    String clientIpAddress;
+    // Http transport mode.
+    // We set the thread local ip address, in ThriftHttpServlet.
+    if (cliService.getHiveConf().getVar(
+        ConfVars.HIVE_SERVER2_TRANSPORT_MODE).equalsIgnoreCase("http")) {
+      clientIpAddress = SessionManager.getIpAddress();
     }
-    return TSetIpAddressProcessor.getUserIpAddress();
+    else {
+      // Kerberos
+      if (isKerberosAuthMode()) {
+        clientIpAddress = hiveAuthFactory.getIpAddress();
+      }
+      // Except kerberos, NOSASL
+      else {
+        clientIpAddress = TSetIpAddressProcessor.getUserIpAddress();
+      }
+    }
+    LOG.debug("Client's IP Address: " + clientIpAddress);
+    return clientIpAddress;
   }
 
   private String getUserName(TOpenSessionReq req) throws HiveSQLException {
     String userName = null;
     // Kerberos
-    if (hiveAuthFactory != null) {
+    if (isKerberosAuthMode()) {
       userName = hiveAuthFactory.getRemoteUser();
     }
     // Except kerberos, NOSASL
@@ -560,12 +575,26 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
    */
   private String getProxyUser(String realUser, Map<String, String> sessionConf,
       String ipAddress) throws HiveSQLException {
-    if (sessionConf == null || !sessionConf.containsKey(HiveAuthFactory.HS2_PROXY_USER)) {
+    String proxyUser = null;
+    // Http transport mode.
+    // We set the thread local proxy username, in ThriftHttpServlet.
+    if (cliService.getHiveConf().getVar(
+        ConfVars.HIVE_SERVER2_TRANSPORT_MODE).equalsIgnoreCase("http")) {
+      proxyUser = SessionManager.getProxyUserName();
+      LOG.debug("Proxy user from query string: " + proxyUser);
+    }
+
+    if (proxyUser == null && sessionConf != null && sessionConf.containsKey(HiveAuthFactory.HS2_PROXY_USER)) {
+      String proxyUserFromThriftBody = sessionConf.get(HiveAuthFactory.HS2_PROXY_USER);
+      LOG.debug("Proxy user from thrift body: " + proxyUserFromThriftBody);
+      proxyUser = proxyUserFromThriftBody;
+    }
+
+    if (proxyUser == null) {
       return realUser;
     }
 
-    // Extract the proxy user name and check if we are allowed to do the substitution
-    String proxyUser = sessionConf.get(HiveAuthFactory.HS2_PROXY_USER);
+    // check whether substitution is allowed
     if (!hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ALLOW_USER_SUBSTITUTION)) {
       throw new HiveSQLException("Proxy user substitution is not allowed");
     }
@@ -578,7 +607,14 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
 
     // Verify proxy user privilege of the realUser for the proxyUser
     HiveAuthFactory.verifyProxyAccess(realUser, proxyUser, ipAddress, hiveConf);
+    LOG.debug("Verified proxy user: " + proxyUser);
     return proxyUser;
   }
+
+  private boolean isKerberosAuthMode() {
+    return cliService.getHiveConf().getVar(ConfVars.HIVE_SERVER2_AUTHENTICATION)
+        .equals(HiveAuthFactory.AuthTypes.KERBEROS.toString());
+  }
+
 }
 

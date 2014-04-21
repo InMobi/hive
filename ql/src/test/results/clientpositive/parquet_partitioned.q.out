@@ -40,8 +40,10 @@ POSTHOOK: Output: database:default
 POSTHOOK: Output: default@parquet_partitioned
 PREHOOK: query: DESCRIBE FORMATTED parquet_partitioned
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@parquet_partitioned
 POSTHOOK: query: DESCRIBE FORMATTED parquet_partitioned
 POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@parquet_partitioned
 # col_name            	data_type           	comment             
 	 	 
 id                  	int                 	                    
@@ -104,13 +106,13 @@ POSTHOOK: Lineage: parquet_partitioned PARTITION(part=part1).id SIMPLE [(parquet
 POSTHOOK: Lineage: parquet_partitioned PARTITION(part=part1).str SIMPLE [(parquet_partitioned_staging)parquet_partitioned_staging.FieldSchema(name:str, type:string, comment:null), ]
 POSTHOOK: Lineage: parquet_partitioned PARTITION(part=part2).id SIMPLE [(parquet_partitioned_staging)parquet_partitioned_staging.FieldSchema(name:id, type:int, comment:null), ]
 POSTHOOK: Lineage: parquet_partitioned PARTITION(part=part2).str SIMPLE [(parquet_partitioned_staging)parquet_partitioned_staging.FieldSchema(name:str, type:string, comment:null), ]
-PREHOOK: query: SELECT * FROM parquet_partitioned
+PREHOOK: query: SELECT * FROM parquet_partitioned ORDER BY id, str
 PREHOOK: type: QUERY
 PREHOOK: Input: default@parquet_partitioned
 PREHOOK: Input: default@parquet_partitioned@part=part1
 PREHOOK: Input: default@parquet_partitioned@part=part2
 #### A masked pattern was here ####
-POSTHOOK: query: SELECT * FROM parquet_partitioned
+POSTHOOK: query: SELECT * FROM parquet_partitioned ORDER BY id, str
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@parquet_partitioned
 POSTHOOK: Input: default@parquet_partitioned@part=part1
@@ -141,13 +143,13 @@ POSTHOOK: Lineage: parquet_partitioned PARTITION(part=part2).id SIMPLE [(parquet
 POSTHOOK: Lineage: parquet_partitioned PARTITION(part=part2).str SIMPLE [(parquet_partitioned_staging)parquet_partitioned_staging.FieldSchema(name:str, type:string, comment:null), ]
 part1	1
 part2	2
-PREHOOK: query: SELECT * FROM parquet_partitioned
+PREHOOK: query: SELECT * FROM parquet_partitioned ORDER BY id, str
 PREHOOK: type: QUERY
 PREHOOK: Input: default@parquet_partitioned
 PREHOOK: Input: default@parquet_partitioned@part=part1
 PREHOOK: Input: default@parquet_partitioned@part=part2
 #### A masked pattern was here ####
-POSTHOOK: query: SELECT * FROM parquet_partitioned
+POSTHOOK: query: SELECT * FROM parquet_partitioned ORDER BY id, str
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@parquet_partitioned
 POSTHOOK: Input: default@parquet_partitioned@part=part1

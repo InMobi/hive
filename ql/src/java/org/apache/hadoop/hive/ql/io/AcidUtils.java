@@ -51,11 +51,14 @@ public class AcidUtils {
   public static final String DELTA_PREFIX = "delta_";
   public static final String BUCKET_PREFIX = "bucket_";
 
-  private static final String BUCKET_DIGITS = "%05d";
-  private static final String DELTA_DIGITS = "%07d";
+  public static final String BUCKET_DIGITS = "%05d";
+  public static final String DELTA_DIGITS = "%07d";
 
   private static final Pattern ORIGINAL_PATTERN =
       Pattern.compile("[0-9]+_[0-9]+");
+
+  public static final Pattern BUCKET_DIGIT_PATTERN = Pattern.compile("[0-9]{5}$");
+  public static final Pattern LEGACY_BUCKET_DIGIT_PATTERN = Pattern.compile("^[0-9]{5}");
 
   public static final PathFilter hiddenFileFilter = new PathFilter(){
     public boolean accept(Path p){
@@ -63,6 +66,14 @@ public class AcidUtils {
       return !name.startsWith("_") && !name.startsWith(".");
     }
   };
+
+  public static final PathFilter bucketFileFilter = new PathFilter() {
+    @Override
+    public boolean accept(Path path) {
+      return path.getName().startsWith(BUCKET_PREFIX);
+    }
+  };
+
   private static final HadoopShims SHIMS = ShimLoader.getHadoopShims();
 
   /**
@@ -306,7 +317,6 @@ public class AcidUtils {
     List<ParsedDelta> working = new ArrayList<ParsedDelta>();
     final List<FileStatus> original = new ArrayList<FileStatus>();
     final List<FileStatus> obsolete = new ArrayList<FileStatus>();
-    Path ignoredBase = null;
     List<FileStatus> children = SHIMS.listLocatedStatus(fs, directory,
         hiddenFileFilter);
     for(FileStatus child: children) {
@@ -314,20 +324,15 @@ public class AcidUtils {
       String fn = p.getName();
       if (fn.startsWith(BASE_PREFIX) && child.isDir()) {
         long txn = parseBase(p);
-        if (txnList.isTxnRangeCommitted(0, txn) !=
-            ValidTxnList.RangeResponse.ALL) {
-          ignoredBase = p;
+        if (bestBase == null) {
+          bestBase = child;
+          bestBaseTxn = txn;
+        } else if (bestBaseTxn < txn) {
+          obsolete.add(bestBase);
+          bestBase = child;
+          bestBaseTxn = txn;
         } else {
-          if (bestBase == null) {
-            bestBase = child;
-            bestBaseTxn = txn;
-          } else if (bestBaseTxn < txn) {
-            obsolete.add(bestBase);
-            bestBase = child;
-            bestBaseTxn = txn;
-          } else {
-            obsolete.add(child);
-          }
+          obsolete.add(child);
         }
       } else if (fn.startsWith(DELTA_PREFIX) && child.isDir()) {
         ParsedDelta delta = parseDelta(child);
@@ -339,13 +344,6 @@ public class AcidUtils {
       } else {
         findOriginals(fs, child, original);
       }
-    }
-
-    // Complain if all of the bases were too recent for the minimum excluded
-    // transaction.
-    if (bestBase == null && ignoredBase != null) {
-      throw new IllegalArgumentException("All base directories were ignored," +
-          " such as " + ignoredBase + " by " + txnList);
     }
 
     // if we have a base, the original files are obsolete.

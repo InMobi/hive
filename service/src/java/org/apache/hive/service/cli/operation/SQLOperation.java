@@ -21,6 +21,8 @@ package org.apache.hive.service.cli.operation;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.security.PrivilegedExceptionAction;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +39,8 @@ import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.TaskStatus;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.metadata.Hive;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.VariableSubstitution;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -50,7 +54,9 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils.ObjectInspectorCopyOption;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.HiveSQLException;
 import org.apache.hive.service.cli.OperationState;
@@ -178,20 +184,47 @@ public class SQLOperation extends ExecuteStatementOperation {
   public void run() throws HiveSQLException {
     setState(OperationState.PENDING);
     markOperationStartTime();
-    prepare(getConfigForOperation());
+    final HiveConf opConfig = getConfigForOperation();
+    prepare(opConfig);
     if (!shouldRunAsync()) {
-      runInternal(getConfigForOperation());
+      runInternal(opConfig);
     } else {
+      final SessionState parentSessionState = SessionState.get();
+      // current Hive object needs to be set in aysnc thread in case of remote metastore.
+      // The metastore client in Hive is associated with right user
+      final Hive sessionHive = getCurrentHive();
+      // current UGI will get used by metastore when metsatore is in embedded mode
+      // so this needs to get passed to the new async thread
+      final UserGroupInformation currentUGI = getCurrentUGI(opConfig);
+
+      // Runnable impl to call runInternal asynchronously,
+      // from a different thread
       Runnable backgroundOperation = new Runnable() {
-        SessionState ss = SessionState.get();
+
         @Override
         public void run() {
-          SessionState.setCurrentSessionState(ss);
+          PrivilegedExceptionAction<Object> doAsAction = new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws HiveSQLException {
+
+              // Storing the current Hive object necessary when doAs is enabled
+              // User information is part of the metastore client member in Hive
+              Hive.set(sessionHive);
+              SessionState.setCurrentSessionState(parentSessionState);
+              try {
+                runInternal(opConfig);
+              } catch (HiveSQLException e) {
+                setOperationException(e);
+                LOG.error("Error running hive query: ", e);
+              }
+              return null;
+            }
+          };
           try {
-            runInternal(getConfigForOperation());
-          } catch (HiveSQLException e) {
-            setOperationException(e);
-            LOG.error("Error: ", e);
+            ShimLoader.getHadoopShims().doAs(currentUGI, doAsAction);
+          } catch (Exception e) {
+            setOperationException(new HiveSQLException(e));
+            LOG.error("Error running hive query as user : " + currentUGI.getShortUserName(), e);
           }
         }
       };
@@ -202,9 +235,25 @@ public class SQLOperation extends ExecuteStatementOperation {
         setBackgroundHandle(backgroundHandle);
       } catch (RejectedExecutionException rejected) {
         setState(OperationState.ERROR);
-        throw new HiveSQLException("All the asynchronous threads are currently busy, " +
-            "please retry the operation", rejected);
+        throw new HiveSQLException("The background threadpool cannot accept" +
+            " new task for execution, please retry the operation", rejected);
       }
+    }
+  }
+
+  private UserGroupInformation getCurrentUGI(HiveConf opConfig) throws HiveSQLException {
+    try {
+      return ShimLoader.getHadoopShims().getUGIForConf(opConfig);
+    } catch (Exception e) {
+      throw new HiveSQLException("Unable to get current user", e);
+    }
+  }
+
+  private Hive getCurrentHive() throws HiveSQLException {
+    try {
+      return Hive.get();
+    } catch (HiveException e) {
+      throw new HiveSQLException("Failed to get current Hive object", e);
     }
   }
 
@@ -310,7 +359,11 @@ public class SQLOperation extends ExecuteStatementOperation {
 
     int protocol = getProtocolVersion().getValue();
     for (Object rowString : rows) {
-      rowObj = serde.deserialize(new BytesWritable(((String)rowString).getBytes()));
+      try {
+        rowObj = serde.deserialize(new BytesWritable(((String)rowString).getBytes("UTF-8")));
+      } catch (UnsupportedEncodingException e) {
+        throw new SerDeException(e);
+      }
       for (int i = 0; i < fieldRefs.size(); i++) {
         StructField fieldRef = fieldRefs.get(i);
         fieldOI = fieldRef.getFieldObjectInspector();

@@ -266,21 +266,11 @@ class Role
   ROLENAME = 1
   CREATETIME = 2
   OWNERNAME = 3
-  PRINCIPALNAME = 4
-  PRINCIPALTYPE = 5
-  GRANTOPTION = 6
-  GRANTTIME = 7
-  GRANTOR = 8
 
   FIELDS = {
     ROLENAME => {:type => ::Thrift::Types::STRING, :name => 'roleName'},
     CREATETIME => {:type => ::Thrift::Types::I32, :name => 'createTime'},
-    OWNERNAME => {:type => ::Thrift::Types::STRING, :name => 'ownerName'},
-    PRINCIPALNAME => {:type => ::Thrift::Types::STRING, :name => 'principalName', :optional => true},
-    PRINCIPALTYPE => {:type => ::Thrift::Types::STRING, :name => 'principalType', :optional => true},
-    GRANTOPTION => {:type => ::Thrift::Types::BOOL, :name => 'grantOption', :optional => true},
-    GRANTTIME => {:type => ::Thrift::Types::I32, :name => 'grantTime', :optional => true},
-    GRANTOR => {:type => ::Thrift::Types::STRING, :name => 'grantor', :optional => true}
+    OWNERNAME => {:type => ::Thrift::Types::STRING, :name => 'ownerName'}
   }
 
   def struct_fields; FIELDS; end
@@ -325,6 +315,46 @@ class RolePrincipalGrant
   ::Thrift::Struct.generate_accessors self
 end
 
+class GetRoleGrantsForPrincipalRequest
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  PRINCIPAL_NAME = 1
+  PRINCIPAL_TYPE = 2
+
+  FIELDS = {
+    PRINCIPAL_NAME => {:type => ::Thrift::Types::STRING, :name => 'principal_name'},
+    PRINCIPAL_TYPE => {:type => ::Thrift::Types::I32, :name => 'principal_type', :enum_class => ::PrincipalType}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field principal_name is unset!') unless @principal_name
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field principal_type is unset!') unless @principal_type
+    unless @principal_type.nil? || ::PrincipalType::VALID_VALUES.include?(@principal_type)
+      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field principal_type!')
+    end
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class GetRoleGrantsForPrincipalResponse
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  PRINCIPALGRANTS = 1
+
+  FIELDS = {
+    PRINCIPALGRANTS => {:type => ::Thrift::Types::LIST, :name => 'principalGrants', :element => {:type => ::Thrift::Types::STRUCT, :class => ::RolePrincipalGrant}}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field principalGrants is unset!') unless @principalGrants
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
 class GetPrincipalsInRoleRequest
   include ::Thrift::Struct, ::Thrift::Struct_Union
   ROLENAME = 1
@@ -336,6 +366,7 @@ class GetPrincipalsInRoleRequest
   def struct_fields; FIELDS; end
 
   def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field roleName is unset!') unless @roleName
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -352,6 +383,7 @@ class GetPrincipalsInRoleResponse
   def struct_fields; FIELDS; end
 
   def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field principalGrants is unset!') unless @principalGrants
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -712,6 +744,52 @@ class BinaryColumnStatsData
   ::Thrift::Struct.generate_accessors self
 end
 
+class Decimal
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  UNSCALED = 1
+  SCALE = 3
+
+  FIELDS = {
+    UNSCALED => {:type => ::Thrift::Types::STRING, :name => 'unscaled', :binary => true},
+    SCALE => {:type => ::Thrift::Types::I16, :name => 'scale'}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field unscaled is unset!') unless @unscaled
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field scale is unset!') unless @scale
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class DecimalColumnStatsData
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  LOWVALUE = 1
+  HIGHVALUE = 2
+  NUMNULLS = 3
+  NUMDVS = 4
+
+  FIELDS = {
+    LOWVALUE => {:type => ::Thrift::Types::STRUCT, :name => 'lowValue', :class => ::Decimal},
+    HIGHVALUE => {:type => ::Thrift::Types::STRUCT, :name => 'highValue', :class => ::Decimal},
+    NUMNULLS => {:type => ::Thrift::Types::I64, :name => 'numNulls'},
+    NUMDVS => {:type => ::Thrift::Types::I64, :name => 'numDVs'}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field lowValue is unset!') unless @lowValue
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field highValue is unset!') unless @highValue
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field numNulls is unset!') unless @numNulls
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field numDVs is unset!') unless @numDVs
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
 class ColumnStatisticsData < ::Thrift::Union
   include ::Thrift::Struct_Union
   class << self
@@ -734,6 +812,10 @@ class ColumnStatisticsData < ::Thrift::Union
     def binaryStats(val)
       ColumnStatisticsData.new(:binaryStats, val)
     end
+
+    def decimalStats(val)
+      ColumnStatisticsData.new(:decimalStats, val)
+    end
   end
 
   BOOLEANSTATS = 1
@@ -741,13 +823,15 @@ class ColumnStatisticsData < ::Thrift::Union
   DOUBLESTATS = 3
   STRINGSTATS = 4
   BINARYSTATS = 5
+  DECIMALSTATS = 6
 
   FIELDS = {
     BOOLEANSTATS => {:type => ::Thrift::Types::STRUCT, :name => 'booleanStats', :class => ::BooleanColumnStatsData},
     LONGSTATS => {:type => ::Thrift::Types::STRUCT, :name => 'longStats', :class => ::LongColumnStatsData},
     DOUBLESTATS => {:type => ::Thrift::Types::STRUCT, :name => 'doubleStats', :class => ::DoubleColumnStatsData},
     STRINGSTATS => {:type => ::Thrift::Types::STRUCT, :name => 'stringStats', :class => ::StringColumnStatsData},
-    BINARYSTATS => {:type => ::Thrift::Types::STRUCT, :name => 'binaryStats', :class => ::BinaryColumnStatsData}
+    BINARYSTATS => {:type => ::Thrift::Types::STRUCT, :name => 'binaryStats', :class => ::BinaryColumnStatsData},
+    DECIMALSTATS => {:type => ::Thrift::Types::STRUCT, :name => 'decimalStats', :class => ::DecimalColumnStatsData}
   }
 
   def struct_fields; FIELDS; end
@@ -1542,6 +1626,46 @@ class HeartbeatRequest
   def struct_fields; FIELDS; end
 
   def validate
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class HeartbeatTxnRangeRequest
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  MIN = 1
+  MAX = 2
+
+  FIELDS = {
+    MIN => {:type => ::Thrift::Types::I64, :name => 'min'},
+    MAX => {:type => ::Thrift::Types::I64, :name => 'max'}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field min is unset!') unless @min
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field max is unset!') unless @max
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class HeartbeatTxnRangeResponse
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  ABORTED = 1
+  NOSUCH = 2
+
+  FIELDS = {
+    ABORTED => {:type => ::Thrift::Types::SET, :name => 'aborted', :element => {:type => ::Thrift::Types::I64}},
+    NOSUCH => {:type => ::Thrift::Types::SET, :name => 'nosuch', :element => {:type => ::Thrift::Types::I64}}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field aborted is unset!') unless @aborted
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field nosuch is unset!') unless @nosuch
   end
 
   ::Thrift::Struct.generate_accessors self

@@ -106,6 +106,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
       SHIMS.getHadoopConfNames().get("MAPREDMINSPLITSIZE");
   static final String MAX_SPLIT_SIZE =
       SHIMS.getHadoopConfNames().get("MAPREDMAXSPLITSIZE");
+  static final String SARG_PUSHDOWN = "sarg.pushdown";
 
   private static final long DEFAULT_MIN_SPLIT_SIZE = 16 * 1024 * 1024;
   private static final long DEFAULT_MAX_SPLIT_SIZE = 256 * 1024 * 1024;
@@ -268,21 +269,28 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
                                 boolean isOriginal) {
     int rootColumn = getRootColumn(isOriginal);
     String serializedPushdown = conf.get(TableScanDesc.FILTER_EXPR_CONF_STR);
+    String sargPushdown = conf.get(SARG_PUSHDOWN);
     String columnNamesString =
         conf.get(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR);
-    if (serializedPushdown == null || columnNamesString == null) {
+    if ((sargPushdown == null && serializedPushdown == null)
+        || columnNamesString == null) {
       LOG.debug("No ORC pushdown predicate");
       options.searchArgument(null, null);
     } else {
-      SearchArgument sarg = SearchArgument.FACTORY.create
-          (Utilities.deserializeExpression(serializedPushdown));
+      SearchArgument sarg;
+      if (serializedPushdown != null) {
+        sarg = SearchArgument.FACTORY.create
+            (Utilities.deserializeExpression(serializedPushdown));
+      } else {
+        sarg = SearchArgument.FACTORY.create(sargPushdown);
+      }
       LOG.info("ORC pushdown predicate: " + sarg);
       String[] neededColumnNames = columnNamesString.split(",");
       String[] columnNames = new String[types.size() - rootColumn];
       boolean[] includedColumns = options.getInclude();
       int i = 0;
       for(int columnId: types.get(rootColumn).getSubtypesList()) {
-        if (includedColumns == null || includedColumns[columnId]) {
+        if (includedColumns == null || includedColumns[columnId - rootColumn]) {
           // this is guaranteed to be positive because types only have children
           // ids greater than their own id.
           columnNames[columnId - rootColumn] = neededColumnNames[i++];
@@ -536,10 +544,12 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
         // Generate a split for any buckets that weren't covered.
         // This happens in the case where a bucket just has deltas and no
         // base.
-        for(int b=0; b < context.numBuckets; ++b) {
-          if (!covered[b]) {
-            context.splits.add(new OrcSplit(dir, b, 0, new String[0], null,
-                               false, false, deltas));
+        if (!deltas.isEmpty()) {
+          for (int b = 0; b < context.numBuckets; ++b) {
+            if (!covered[b]) {
+              context.splits.add(new OrcSplit(dir, b, 0, new String[0], null,
+                  false, false, deltas));
+            }
           }
         }
       } catch (Throwable th) {
@@ -754,7 +764,7 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
               // eliminate stripes that doesn't satisfy the predicate condition
               includeStripe = new boolean[stripes.size()];
               for(int i=0; i < stripes.size(); ++i) {
-                includeStripe[i] = (i > stripeStats.size()) ||
+                includeStripe[i] = (i >= stripeStats.size()) ||
                     isStripeSatisfyPredicate(stripeStats.get(i), sarg,
                                              filterColumns);
                 if (LOG.isDebugEnabled() && !includeStripe[i]) {
@@ -990,24 +1000,24 @@ public class OrcInputFormat  implements InputFormat<NullWritable, OrcStruct>,
     }
 
     OrcSplit split = (OrcSplit) inputSplit;
-    // TODO vectorized reader doesn't work with the new format yet
-    if (vectorMode) {
-      if (!split.getDeltas().isEmpty() || !split.isOriginal()) {
-        throw new IOException("Vectorization and ACID tables are incompatible."
-                              );
-      }
-      return createVectorizedReader(inputSplit, conf, reporter);
-    }
     reporter.setStatus(inputSplit.toString());
 
     // if we are strictly old-school, just use the old code
     if (split.isOriginal() && split.getDeltas().isEmpty()) {
-      return new OrcRecordReader(OrcFile.createReader(split.getPath(),
-          OrcFile.readerOptions(conf)), conf, split);
+      if (vectorMode) {
+        return createVectorizedReader(inputSplit, conf, reporter);
+      } else {
+        return new OrcRecordReader(OrcFile.createReader(split.getPath(),
+            OrcFile.readerOptions(conf)), conf, split);
+      }
     }
 
     Options options = new Options(conf).reporter(reporter);
     final RowReader<OrcStruct> inner = getReader(inputSplit, options);
+    if (vectorMode) {
+      return (org.apache.hadoop.mapred.RecordReader)
+          new VectorizedOrcAcidRowReader(inner, conf, (FileSplit) inputSplit);
+    }
     final RecordIdentifier id = inner.createKey();
 
     // Return a RecordReader that is compatible with the Hive 0.12 reader

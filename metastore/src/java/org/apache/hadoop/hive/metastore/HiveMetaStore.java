@@ -42,6 +42,10 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Timer;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
 import org.apache.commons.cli.OptionBuilder;
@@ -80,7 +84,11 @@ import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleRequest;
 import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleResponse;
+import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalRequest;
+import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalResponse;
 import org.apache.hadoop.hive.metastore.api.HeartbeatRequest;
+import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeRequest;
+import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeResponse;
 import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
 import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
 import org.apache.hadoop.hive.metastore.api.HiveObjectType;
@@ -198,8 +206,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
    * default port on which to start the Hive server
    */
   private static final int DEFAULT_HIVE_METASTORE_PORT = 9083;
-  public static final String ADMIN = "ADMIN";
-  public static final String PUBLIC = "PUBLIC";
+  public static final String ADMIN = "admin";
+  public static final String PUBLIC = "public";
 
   private static HadoopThriftAuthBridge.Server saslServer;
   private static boolean useSasl;
@@ -524,33 +532,11 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       }
     }
 
-    private boolean areWeAllowedToCreate() {
-
-      Class<?> authCls;
-      Class<?> authIface;
-      try {
-        authCls = hiveConf.getClassByName(hiveConf.getVar(ConfVars.HIVE_AUTHORIZATION_MANAGER));
-        authIface = Class.forName("org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizerFactory");
-      } catch (ClassNotFoundException e) {
-        LOG.debug("No auth manager specified", e);
-        return false;
-      }
-      if(!authIface.isAssignableFrom(authCls)){
-        LOG.warn("Configured auth manager "+authCls.getName()+" doesn't implement "+ ConfVars.HIVE_AUTHENTICATOR_MANAGER);
-        return false;
-      }
-
-      return true;
-    }
 
     private void createDefaultRoles() throws MetaException {
 
       if(defaultRolesCreated) {
         LOG.debug("Admin role already created previously.");
-        return;
-      }
-
-      if(!areWeAllowedToCreate()) {
         return;
       }
 
@@ -595,9 +581,6 @@ public class HiveMetaStore extends ThriftHiveMetastore {
 
       if(adminUsersAdded) {
         LOG.debug("Admin users already added.");
-        return;
-      }
-      if(!areWeAllowedToCreate()) {
         return;
       }
       // now add pre-configured users to admin role
@@ -4035,11 +4018,6 @@ public class HiveMetaStore extends ThriftHiveMetastore {
           for (MRoleMap roleMap : roleMaps) {
             MRole mrole = roleMap.getRole();
             Role role = new Role(mrole.getRoleName(), mrole.getCreateTime(), mrole.getOwnerName());
-            role.setPrincipalName(roleMap.getPrincipalName());
-            role.setPrincipalType(roleMap.getPrincipalType());
-            role.setGrantOption(roleMap.getGrantOption());
-            role.setGrantTime(roleMap.getAddTime());
-            role.setGrantor(roleMap.getGrantor());
             result.add(role);
           }
         }
@@ -4887,6 +4865,16 @@ public class HiveMetaStore extends ThriftHiveMetastore {
     }
 
     @Override
+    public HeartbeatTxnRangeResponse heartbeat_txn_range(HeartbeatTxnRangeRequest rqst)
+      throws TException {
+      try {
+        return getTxnHandler().heartbeatTxnRange(rqst);
+      } catch (MetaException e) {
+        throw new TException(e);
+      }
+    }
+
+    @Override
     public void compact(CompactionRequest rqst) throws TException {
       try {
         getTxnHandler().compact(rqst);
@@ -4909,33 +4897,10 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         throws MetaException, TException {
 
       incrementCounter("get_principals_in_role");
-      String role_name = request.getRoleName();
-      List<RolePrincipalGrant> rolePrinGrantList = new ArrayList<RolePrincipalGrant>();
       Exception ex = null;
+      List<MRoleMap> roleMaps = null;
       try {
-        List<MRoleMap> roleMaps = getMS().listRoleMembers(role_name);
-        if (roleMaps != null) {
-          //convert each MRoleMap object into a thrift RolePrincipalGrant object
-          for (MRoleMap roleMap : roleMaps) {
-            String mapRoleName = roleMap.getRole().getRoleName();
-            if (!role_name.equals(mapRoleName)) {
-              // should not happen
-              throw new AssertionError("Role name " + mapRoleName + " does not match role name arg "
-                  + role_name);
-            }
-            RolePrincipalGrant rolePrinGrant = new RolePrincipalGrant(
-                role_name,
-                roleMap.getPrincipalName(),
-                PrincipalType.valueOf(roleMap.getPrincipalType()),
-                roleMap.getGrantOption(),
-                roleMap.getAddTime(),
-                roleMap.getGrantor(),
-                PrincipalType.valueOf(roleMap.getGrantorType())
-                );
-            rolePrinGrantList.add(rolePrinGrant);
-          }
-        }
-
+        roleMaps = getMS().listRoleMembers(request.getRoleName());
       } catch (MetaException e) {
         throw e;
       } catch (Exception e) {
@@ -4944,10 +4909,59 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       } finally {
         endFunction("get_principals_in_role", ex == null, ex);
       }
-      return new GetPrincipalsInRoleResponse(rolePrinGrantList);
+      return new GetPrincipalsInRoleResponse(getRolePrincipalGrants(roleMaps));
     }
-  }
 
+    @Override
+    public GetRoleGrantsForPrincipalResponse get_role_grants_for_principal(
+        GetRoleGrantsForPrincipalRequest request) throws MetaException, TException {
+
+      incrementCounter("get_role_grants_for_principal");
+      Exception ex = null;
+      List<MRoleMap> roleMaps = null;
+      try {
+        roleMaps = getMS().listRoles(request.getPrincipal_name(), request.getPrincipal_type());
+      } catch (MetaException e) {
+        throw e;
+      } catch (Exception e) {
+        ex = e;
+        rethrowException(e);
+      } finally {
+        endFunction("get_role_grants_for_principal", ex == null, ex);
+      }
+
+      List<RolePrincipalGrant> roleGrantsList = getRolePrincipalGrants(roleMaps);
+      // all users by default belongs to public role
+      roleGrantsList.add(new RolePrincipalGrant(PUBLIC, request.getPrincipal_name(), request
+          .getPrincipal_type(), false, 0, null, null));
+      return new GetRoleGrantsForPrincipalResponse(roleGrantsList);
+    }
+
+    /**
+     * Convert each MRoleMap object into a thrift RolePrincipalGrant object
+     * @param roleMaps
+     * @return
+     */
+    private List<RolePrincipalGrant> getRolePrincipalGrants(List<MRoleMap> roleMaps) {
+      List<RolePrincipalGrant> rolePrinGrantList = new ArrayList<RolePrincipalGrant>();
+      if (roleMaps != null) {
+        for (MRoleMap roleMap : roleMaps) {
+          RolePrincipalGrant rolePrinGrant = new RolePrincipalGrant(
+              roleMap.getRole().getRoleName(),
+              roleMap.getPrincipalName(),
+              PrincipalType.valueOf(roleMap.getPrincipalType()),
+              roleMap.getGrantOption(),
+              roleMap.getAddTime(),
+              roleMap.getGrantor(),
+              PrincipalType.valueOf(roleMap.getGrantorType())
+              );
+          rolePrinGrantList.add(rolePrinGrant);
+        }
+      }
+      return rolePrinGrantList;
+    }
+
+  }
 
   public static IHMSHandler newHMSHandler(String name, HiveConf hiveConf) throws MetaException {
     return RetryingHMSHandler.getProxy(hiveConf, name);
@@ -5086,7 +5100,12 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         }
       });
 
-      startMetaStore(cli.port, ShimLoader.getHadoopThriftAuthBridge(), conf);
+      Lock startLock = new ReentrantLock();
+      Condition startCondition = startLock.newCondition();
+      MetaStoreThread.BooleanPointer startedServing = new MetaStoreThread.BooleanPointer();
+      startMetaStoreThreads(conf, startLock, startCondition, startedServing);
+      startMetaStore(cli.port, ShimLoader.getHadoopThriftAuthBridge(), conf, startLock,
+          startCondition, startedServing);
     } catch (Throwable t) {
       // Catch the exception, log it and rethrow it.
       HMSHandler.LOG
@@ -5104,7 +5123,19 @@ public class HiveMetaStore extends ThriftHiveMetastore {
    */
   public static void startMetaStore(int port, HadoopThriftAuthBridge bridge)
       throws Throwable {
-    startMetaStore(port, bridge, new HiveConf(HMSHandler.class));
+    startMetaStore(port, bridge, new HiveConf(HMSHandler.class), null, null, null);
+  }
+
+  /**
+   * Start the metastore store.
+   * @param port
+   * @param bridge
+   * @param conf
+   * @throws Throwable
+   */
+  public static void startMetaStore(int port, HadoopThriftAuthBridge bridge,
+                                    HiveConf conf) throws Throwable {
+    startMetaStore(port, bridge, conf, null, null, null);
   }
 
   /**
@@ -5117,7 +5148,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
    * @throws Throwable
    */
   public static void startMetaStore(int port, HadoopThriftAuthBridge bridge,
-      HiveConf conf) throws Throwable {
+      HiveConf conf, Lock startLock, Condition startCondition,
+      MetaStoreThread.BooleanPointer startedServing) throws Throwable {
     try {
 
       // Server will create new threads up to max as necessary. After an idle
@@ -5185,11 +5217,130 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       HMSHandler.LOG.info("Options.maxWorkerThreads = "
           + maxWorkerThreads);
       HMSHandler.LOG.info("TCP keepalive = " + tcpKeepAlive);
+
+      if (startLock != null) {
+        signalOtherThreadsToStart(tServer, startLock, startCondition, startedServing);
+      }
       tServer.serve();
     } catch (Throwable x) {
       x.printStackTrace();
       HMSHandler.LOG.error(StringUtils.stringifyException(x));
       throw x;
     }
+  }
+
+  private static void signalOtherThreadsToStart(final TServer server, final Lock startLock,
+                                                final Condition startCondition,
+                                                final MetaStoreThread.BooleanPointer startedServing) {
+    // A simple thread to wait until the server has started and then signal the other threads to
+    // begin
+    Thread t = new Thread() {
+      @Override
+      public void run() {
+        do {
+          try {
+            Thread.sleep(1000);
+          } catch (InterruptedException e) {
+            LOG.warn("Signalling thread was interuppted: " + e.getMessage());
+          }
+        } while (!server.isServing());
+        startLock.lock();
+        try {
+          startedServing.boolVal = true;
+          startCondition.signalAll();
+        } finally {
+          startLock.unlock();
+        }
+      }
+    };
+    t.start();
+  }
+
+  /**
+   * Start threads outside of the thrift service, such as the compactor threads.
+   * @param conf Hive configuration object
+   */
+  private static void startMetaStoreThreads(final HiveConf conf, final Lock startLock,
+                                            final Condition startCondition, final
+                                            MetaStoreThread.BooleanPointer startedServing) {
+    // A thread is spun up to start these other threads.  That's because we can't start them
+    // until after the TServer has started, but once TServer.serve is called we aren't given back
+    // control.
+    Thread t = new Thread() {
+      @Override
+      public void run() {
+        // This is a massive hack.  The compactor threads have to access packages in ql (such as
+        // AcidInputFormat).  ql depends on metastore so we can't directly access those.  To deal
+        // with this the compactor thread classes have been put in ql and they are instantiated here
+        // dyanmically.  This is not ideal but it avoids a massive refactoring of Hive packages.
+        //
+        // Wrap the start of the threads in a catch Throwable loop so that any failures
+        // don't doom the rest of the metastore.
+        startLock.lock();
+        try {
+          // Per the javadocs on Condition, do not depend on the condition alone as a start gate
+          // since spurious wake ups are possible.
+          while (!startedServing.boolVal) startCondition.await();
+          startCompactorInitiator(conf);
+          startCompactorWorkers(conf);
+          startCompactorCleaner(conf);
+        } catch (Throwable e) {
+          LOG.error("Failure when starting the compactor, compactions may not happen, " +
+              StringUtils.stringifyException(e));
+        } finally {
+          startLock.unlock();
+        }
+      }
+    };
+
+    t.start();
+  }
+
+  private static void startCompactorInitiator(HiveConf conf) throws Exception {
+    if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_INITIATOR_ON)) {
+      MetaStoreThread initiator =
+          instantiateThread("org.apache.hadoop.hive.ql.txn.compactor.Initiator");
+      initializeAndStartThread(initiator, conf);
+    }
+  }
+
+  private static void startCompactorWorkers(HiveConf conf) throws Exception {
+    int numWorkers = HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_WORKER_THREADS);
+    for (int i = 0; i < numWorkers; i++) {
+      MetaStoreThread worker =
+          instantiateThread("org.apache.hadoop.hive.ql.txn.compactor.Worker");
+      initializeAndStartThread(worker, conf);
+    }
+  }
+
+  private static void startCompactorCleaner(HiveConf conf) throws Exception {
+    if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_COMPACTOR_INITIATOR_ON)) {
+      MetaStoreThread cleaner =
+          instantiateThread("org.apache.hadoop.hive.ql.txn.compactor.Cleaner");
+      initializeAndStartThread(cleaner, conf);
+    }
+  }
+
+  private static MetaStoreThread instantiateThread(String classname) throws Exception {
+    Class c = Class.forName(classname);
+    Object o = c.newInstance();
+    if (MetaStoreThread.class.isAssignableFrom(o.getClass())) {
+      return (MetaStoreThread)o;
+    } else {
+      String s = classname + " is not an instance of MetaStoreThread.";
+      LOG.error(s);
+      throw new IOException(s);
+    }
+  }
+
+  private static int nextThreadId = 1000000;
+
+  private static void initializeAndStartThread(MetaStoreThread thread, HiveConf conf) throws
+      MetaException {
+    LOG.info("Starting metastore thread of type " + thread.getClass().getName());
+    thread.setHiveConf(conf);
+    thread.setThreadId(nextThreadId++);
+    thread.init(new MetaStoreThread.BooleanPointer());
+    thread.start();
   }
 }

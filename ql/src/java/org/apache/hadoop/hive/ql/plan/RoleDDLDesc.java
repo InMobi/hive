@@ -48,8 +48,8 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
    * thrift ddl for the result of show role grant principalName
    */
   private static final String roleShowGrantSchema =
-      "role,create_time,principal_name,principal_type,grant_option,grant_time,grantor#" +
-      "string:bigint:string:string:boolean:bigint:string";
+      "role,grant_option,grant_time,grantor#" +
+      "string:boolean:bigint:string";
 
   /**
    * thrift ddl for the result of describe role roleName
@@ -102,7 +102,8 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
 
   public RoleDDLDesc(String principalName, PrincipalType principalType,
       RoleOperation operation, String roleOwnerName) {
-    this.name = principalName;
+    this.name = (principalName != null  && principalType == PrincipalType.ROLE) ?
+      principalName.toLowerCase() : principalName;
     this.principalType = principalType;
     this.operation = operation;
     this.roleOwnerName = roleOwnerName;
@@ -111,10 +112,6 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
   @Explain(displayName = "name")
   public String getName() {
     return name;
-  }
-
-  public void setName(String roleName) {
-    this.name = roleName;
   }
 
   @Explain(displayName = "role operation")
