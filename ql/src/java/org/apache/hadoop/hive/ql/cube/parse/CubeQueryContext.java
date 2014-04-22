@@ -984,9 +984,11 @@ public class CubeQueryContext {
     return null;
   }
 
+
   private void appendWhereClause(StringBuilder whereWithoutTimerange,
       String whereClause, boolean hasMore) {
-    if (hasMore) {
+    // Make sure we add AND only when there are already some conditions in where clause
+    if (hasMore && !whereWithoutTimerange.toString().isEmpty()) {
       whereWithoutTimerange.append(" AND ");
     }
     appendWhereClause(whereWithoutTimerange, whereClause);
