@@ -1134,7 +1134,10 @@ public class CubeQueryContext {
   }
 
   public boolean hasPartitions() {
-    return !dimStorageTableToWhereClause.isEmpty();
+    // Check if the resolved storage table in where clause has partition
+    AbstractCubeTable cube = storageTableToQuery.keySet().iterator().next();
+    return dimStorageTableToWhereClause.get(
+        storageTableToQuery.get(cube).iterator().next()) != null;
   }
 
   public Map<String, List<String>> getTblToColumns() {
