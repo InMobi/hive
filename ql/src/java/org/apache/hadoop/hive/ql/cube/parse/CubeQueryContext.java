@@ -47,6 +47,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeColumn;
@@ -219,8 +220,7 @@ public class CubeQueryContext {
         if (client.isCube(tblName)) {
           if (cube != null) {
             if (cube.getName() != tblName) {
-              throw new SemanticException("More than one cube accessed in" +
-                  " query");
+              throw new SemanticException(ErrorMsg.MORE_THAN_ONE_CUBE);
             }
           }
           cube = client.getCube(tblName);
@@ -243,7 +243,7 @@ public class CubeQueryContext {
         }
       }
       if (cube == null && dimensions.size() == 0) {
-        throw new SemanticException("Neither cube nor dimensions accessed");
+        throw new SemanticException(ErrorMsg.NEITHER_CUBE_NOR_DIMENSION);
       }
       if (cube != null) {
         for (CubeFactTable fact : client.getAllFactTables(cube)) {
@@ -277,7 +277,7 @@ public class CubeQueryContext {
     // AND condition TOK_WHERE.KW_AND.TOK_FUNCTION.Identifier
     ASTNode whereTree = qb.getParseInfo().getWhrForClause(getClause());
     if (whereTree == null || whereTree.getChildCount() < 1) {
-      throw new SemanticException("No filter specified");
+      throw new SemanticException(ErrorMsg.NO_TIMERANGE_FILTER);
     }
     searchTimeRanges(whereTree);
   }
@@ -306,7 +306,7 @@ public class CubeQueryContext {
     if (cube.getTimedDimensions().contains(timeDimName)) {
       builder.partitionColumn(timeDimName);
     } else {
-      throw new SemanticException(timeDimName + " is not a time dimension");
+      throw new SemanticException(ErrorMsg.NOT_A_TIMED_DIMENSION, timeDimName);
     }
 
     String fromDateRaw = PlanUtils.stripQuotes(timenode.getChild(2).getText());
@@ -319,15 +319,11 @@ public class CubeQueryContext {
     }
 
     Date now = new Date();
-    try {
-      builder.fromDate(DateUtil.resolveDate(fromDateRaw, now));
-      if (StringUtils.isNotBlank(toDateRaw)) {
-        builder.toDate(DateUtil.resolveDate(toDateRaw, now));
-      } else {
-        builder.toDate(now);
-      }
-    } catch (HiveException e) {
-      throw new SemanticException(e);
+    builder.fromDate(DateUtil.resolveDate(fromDateRaw, now));
+    if (StringUtils.isNotBlank(toDateRaw)) {
+      builder.toDate(DateUtil.resolveDate(toDateRaw, now));
+    } else {
+      builder.toDate(now);
     }
 
     TimeRange range = builder.build();
@@ -350,8 +346,7 @@ public class CubeQueryContext {
       if (star != null) {
         int starType = star.getToken().getType();
         if (TOK_FUNCTIONSTAR == starType || TOK_ALLCOLREF == starType) {
-          throw new SemanticException("Selecting allColumns is not yet " +
-              "supported");
+          throw new SemanticException(ErrorMsg.ALL_COLUMNS_NOT_SUPPORTED);
         }
       }
     }
@@ -510,23 +505,20 @@ public class CubeQueryContext {
           if (!inCube) {
             String prevDim = columnToTabAlias.get(col.toLowerCase());
             if (prevDim != null && !prevDim.equals(dim.getName())) {
-              throw new SemanticException("Ambiguous column:" + col
-                  + " in dimensions '" + prevDim + "' and '"
-                  + dim.getName() + "'");
+              throw new SemanticException(ErrorMsg.AMBIGOUS_DIM_COLUMN, col, 
+                  prevDim, dim.getName());
             }
             columnToTabAlias.put(col.toLowerCase(), getAliasForTabName(
                 dim.getName()));
           } else {
             // throw error because column is in both cube and dimension table
-            throw new SemanticException("Ambiguous column:" + col
-                + " in cube: " + cube.getName() + " and dimension: "
-                + dim.getName());
+            throw new SemanticException(ErrorMsg.AMBIGOUS_CUBE_COLUMN, col, 
+                cube.getName(), dim.getName());
           }
         }
       }
       if (columnToTabAlias.get(col.toLowerCase()) == null) {
-        throw new SemanticException("Could not find the table containing" +
-            " column:" + col);
+        throw new SemanticException(ErrorMsg.COLUMN_NOT_FOUND, col);
       }
     }
   }
@@ -537,7 +529,7 @@ public class CubeQueryContext {
       for (TimeRange range : timeRanges) {
         if (column == null) {
           if (!cube.getTimedDimensions().contains(col)) {
-            throw new SemanticException("Not a cube column:" + col);
+            throw new SemanticException(ErrorMsg.NOT_A_CUBE_COLUMN);
           }
           continue;
         }
@@ -545,11 +537,10 @@ public class CubeQueryContext {
             column.getStartTime().after(range.getFromDate())) ||
             (column.getEndTime() != null &&
             column.getEndTime().before(range.getToDate()))) {
-          throw new SemanticException("Column " + col + " is not available" +
-            " in the specified range:" + range + ", available" +
-            (column.getStartTime() == null ? "" :
-              " from:" + column.getStartTime())
-            + (column.getEndTime() == null ? "" :
+          throw new SemanticException(ErrorMsg.NOT_AVAILABLE_IN_RANGE, col, 
+            range.toString(),  (column.getStartTime() == null ? "" :
+              " from:" + column.getStartTime()),
+             (column.getEndTime() == null ? "" :
               " upto:" + column.getEndTime()));
         }
       }
@@ -600,8 +591,7 @@ public class CubeQueryContext {
         }
       }
       if (candidateFacts.size() == 0) {
-        throw new SemanticException("No candidate fact table available to" +
-            " answer the query");
+        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE);
       }
     }
   }
@@ -937,7 +927,7 @@ public class CubeQueryContext {
         tablesAlreadyAdded.add(joiningTable);
       }
     } else {
-      throw new SemanticException("No join condition available");
+      throw new SemanticException(ErrorMsg.NO_JOIN_CONDITION_AVAIABLE);
     }
   }
 
@@ -1084,21 +1074,19 @@ public class CubeQueryContext {
         LOG.info("Available candidate facts:" + candidateFacts +
             ", picking up " + fact.fact + " for querying");
       } else {
-        throw new SemanticException("No candidate facts available");
+        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE);
       }
     }
 
     if (fact != null) {
       if (fact.storageTables.isEmpty()) {
-        throw new SemanticException("No storage table available for candidate"
-            + " fact:" + fact);
+        throw new SemanticException(ErrorMsg.NO_STORAGE_TABLE_AVAIABLE, fact.toString());
       }
       // choosing the first storage table one in the list
       storageTableToQuery.put(getCube(), fact.storageTables);
       if (fact.storageTables != null && fact.storageTables.size() > 1
           && !fact.enabledMultiTableSelect) {
-        throw new SemanticException("Querying multiple storage tables within" +
-            " the same query is not supported");
+        throw new SemanticException(ErrorMsg.MULTIPLE_STORAGE_TABLES);
       }
       return toHQL(fact);
     } else {

@@ -31,6 +31,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
@@ -193,8 +194,7 @@ public class AggregateResolver implements ContextRewriter {
       String aggregateFn = measure.getAggregate();
 
       if (StringUtils.isBlank(aggregateFn)) {
-        throw new SemanticException("Default aggregate is not set for measure: "
-            + colname);
+        throw new SemanticException(ErrorMsg.NO_DEFAULT_AGGREGATE, colname);
       }
       ASTNode fnroot = new ASTNode(new CommonToken(HiveParser.TOK_FUNCTION));
       fnroot.setParent(node.getParent());

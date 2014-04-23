@@ -47,6 +47,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
@@ -289,8 +290,7 @@ public class JoinResolver implements ContextRewriter {
         if (LOG.isDebugEnabled()) {
           graph.print();
         }
-        throw new SemanticException("No join path from " + joinee.getName()
-            + " to " + target.getName());
+        throw new SemanticException(ErrorMsg.NO_JOIN_PATH, joinee.getName(), target.getName());
       }
     }
 
@@ -319,7 +319,7 @@ public class JoinResolver implements ContextRewriter {
     } else if (getMetastoreClient().isCube(targetTableName)) {
       target = getMetastoreClient().getCube(targetTableName);
     } else {
-      throw new SemanticException("Target table is neither dimension nor cube: " + targetTableName);
+      throw new SemanticException(ErrorMsg.JOIN_TARGET_NOT_CUBE_TABLE, targetTableName);
     }
   }
 
@@ -459,7 +459,7 @@ public class JoinResolver implements ContextRewriter {
       cubeql.setJoinCond(joinTree, HQLParser.getString(joinCond));
     } else {
       // No join condition specified. this should be an error
-      new SemanticException("Join condition not specified");
+      new SemanticException(ErrorMsg.NO_JOIN_CONDITION_AVAIABLE);
     }
     return joinTree;
   }

@@ -30,8 +30,10 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateUtils;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.log4j.Logger;
 
 public class DateUtil {
@@ -104,7 +106,7 @@ public class DateUtil {
     throw new IllegalArgumentException("Unsupported formatting for date" + str);
   }
 
-  public static Date resolveDate(String str, Date now) throws HiveException {
+  public static Date resolveDate(String str, Date now) throws SemanticException {
     if (RELDATE_VALIDATOR.matcher(str).matches()) {
       return resolveRelativeDate(str, now);
     } else {
@@ -113,18 +115,16 @@ public class DateUtil {
       } catch (ParseException e) {
         LOG.error("Invalid date format. expected only " + ABSDATE_FMT
             + " date provided:" + str, e);
-        throw new HiveException("Date parsing error. expected format "
-            + ABSDATE_FMT
-            + ", date provided: " + str
-            + ", failed because: " + e.getMessage());
+        throw new SemanticException(e, ErrorMsg.WRONG_TIME_RANGE_FORMAT, 
+            ABSDATE_FMT, str);
       }
     }
   }
 
   private static Date resolveRelativeDate(String str, Date now)
-      throws HiveException {
+      throws SemanticException {
     if (StringUtils.isBlank(str)) {
-      throw new HiveException("date value cannot be null or empty:" + str);
+      throw new SemanticException(ErrorMsg.NULL_DATE_VALUE);
     }
     // Get rid of whitespace
     String raw = str.replaceAll(WSPACE, "").replaceAll(RELATIVE, "");
@@ -168,7 +168,7 @@ public class DateUtil {
       } else if ("second".equals(unit)) {
         calendar.add(Calendar.SECOND, qty);
       } else {
-        throw new HiveException("invalid time unit: " + unit);
+        throw new SemanticException(ErrorMsg.INVALID_TIME_UNIT);
       }
     }
 

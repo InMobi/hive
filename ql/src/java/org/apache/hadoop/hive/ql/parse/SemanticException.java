@@ -48,4 +48,9 @@ public class SemanticException extends HiveException {
   public SemanticException(ErrorMsg errorMsg, String... msgArgs) {
     super(errorMsg, msgArgs);
   }
+
+  public SemanticException(Throwable cause, ErrorMsg errorMsg, String... msgArgs) {
+    super(cause, errorMsg, msgArgs);
+  }
+
 }
