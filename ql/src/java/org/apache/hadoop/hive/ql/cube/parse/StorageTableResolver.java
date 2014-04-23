@@ -137,6 +137,11 @@ public class StorageTableResolver implements ContextRewriter {
         if (isStorageSupported(storage)) {
           String tableName = MetastoreUtil.getDimStorageTableName(
               dim.getName(), storage).toLowerCase();
+          if (!client.tableExists(tableName) {
+            LOG.info("Not considering the dim storage table:" + tableName
+                + ", as it does not exist");
+            continue;
+          }
           if (validDimTables != null && !validDimTables.contains(tableName)) {
             LOG.info("Not considering the dim storage table:" + tableName
                 + " as it is not a valid dim storage");
@@ -147,6 +152,7 @@ public class StorageTableResolver implements ContextRewriter {
             storageTables = new ArrayList<String>();
             dimStorageMap.put(dim, storageTables);
           }
+          
           storageTables.add(tableName);
           if (dim.hasStorageSnapshots(storage)) {
             dimStorageTableToWhereClause.put(tableName,
