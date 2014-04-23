@@ -24,6 +24,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.util.Date;
 
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
@@ -87,12 +88,11 @@ public class TimeRange {
 
   public void validate() throws SemanticException {
     if (partitionColumn == null || fromDate == null || toDate == null)   {
-      throw new SemanticException("Invalid time range");
+      throw new SemanticException(ErrorMsg.INVALID_TIME_RANGE);
     }
 
     if (fromDate.after(toDate)) {
-      throw new SemanticException("From date: " + fromDate
-        + " is after to date:" + toDate);
+      throw new SemanticException(ErrorMsg.FROM_AFTER_TO, fromDate.toString(), toDate.toString());
     }
   }
 

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.QB;
@@ -56,7 +57,7 @@ public class CubeSemanticAnalyzer extends SemanticAnalyzer {
     // TODO Move this to a validation rule
     if (ast.getToken().getType() == HiveParser.TOK_CREATETABLE ||
         ast.getToken().getType() == HiveParser.TOK_CREATEVIEW) {
-      throw new SemanticException("Create table/view is not allowed");
+      throw new SemanticException(ErrorMsg.CREATE_NOT_ALLOWED);
     }
 
     if (ast.getToken().getType() == HiveParser.TOK_QUERY) {
