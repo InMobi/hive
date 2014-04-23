@@ -47,6 +47,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
@@ -128,7 +129,8 @@ public class StorageTableResolver implements ContextRewriter {
     cubeql.setNonexistingParts(nonExistingParts);
   }
 
-  private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql) {
+  private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)
+      throws SemanticException {
     Set<CubeDimensionTable> dimsToResolve = new HashSet<CubeDimensionTable>(cubeql.getDimensionTables());
     dimsToResolve.addAll(cubeql.getAutoJoinDimensions());
     dimsToResolve.addAll(cubeql.getDimensionTables());
@@ -137,10 +139,14 @@ public class StorageTableResolver implements ContextRewriter {
         if (isStorageSupported(storage)) {
           String tableName = MetastoreUtil.getDimStorageTableName(
               dim.getName(), storage).toLowerCase();
-          if (!client.tableExists(tableName) {
-            LOG.info("Not considering the dim storage table:" + tableName
-                + ", as it does not exist");
-            continue;
+          try {
+            if (!client.tableExists(tableName)) {
+              LOG.info("Not considering the dim storage table:" + tableName
+                  + ", as it does not exist");
+              continue;
+            }
+          } catch (HiveException e) {
+            throw new SemanticException(e);
           }
           if (validDimTables != null && !validDimTables.contains(tableName)) {
             LOG.info("Not considering the dim storage table:" + tableName
