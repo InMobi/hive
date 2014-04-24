@@ -151,6 +151,7 @@ public class CubeQueryContext {
   private CubeMetastoreClient client;
   private final boolean qlEnabledMultiTableSelect;
   private JoinResolver.AutoJoinContext autoJoinCtx;
+  private AbstractCubeTable autoJoinTarget;
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -866,11 +867,17 @@ public class CubeQueryContext {
       if (cube != null) {
         fromString = getStorageString(cube) ;
       } else {
-        CubeDimensionTable dim = dimensions.iterator().next();
-        fromString = getStorageString(dim);
+        String targetDimAlias = getQB().getTabAliases().iterator().next();
+        String targetDimTable = getQB().getTabNameForAlias(targetDimAlias);
+        try {
+          fromString = getStorageString(getMetastoreClient().getDimensionTable(targetDimTable));
+        } catch (HiveException e) {
+          throw new SemanticException(e);
+        }
       }
 
       if (joinsResolvedAutomatically()) {
+        fromString = getStorageString(getAutoJoinTarget());
         fromString += " " + getAutoResolvedJoinChain();
       }
 
@@ -1285,6 +1292,14 @@ public class CubeQueryContext {
 
   public JoinResolver.AutoJoinContext getAutoJoinCtx() {
     return autoJoinCtx;
+  }
+
+  public void setAutoJoinTarget(AbstractCubeTable autoJoinTarget) {
+    this.autoJoinTarget = autoJoinTarget;
+  }
+
+  public AbstractCubeTable getAutoJoinTarget() {
+    return autoJoinTarget;
   }
 
   static class CandidateFact {
