@@ -253,6 +253,8 @@ public class JoinResolver implements ContextRewriter {
       LOG.warn("Can't resolve joins for null target");
       return;
     }
+
+    cubeql.setAutoJoinTarget(target);
     boolean hasDimensions = (autoJoinDims != null && !autoJoinDims.isEmpty()) || !partialJoinConditions.isEmpty();
     // Query has a cube and at least one dimension
     boolean cubeAndDimQuery = cubeql.hasCubeInQuery() && hasDimensions;

@@ -320,5 +320,11 @@ public class TestJoinResolver {
     System.out.println("testDimOnlyQuery@@@Resolved join clause: " + ctx.getAutoResolvedJoinChain());
     assertEquals("left outer join c1_statetable statetable on citytable.stateid = statetable.id and (statetable.dt = 'latest')",
         ctx.getAutoResolvedJoinChain().trim());
+
+    String queryWithJoin = "select citytable.name, statetable.name from citytable join statetable";
+    ctx = rewriter.rewrite(queryWithJoin);
+    hql = ctx.toHQL();
+    System.out.println("testDimOnlyQuery@@@HQL2:" + hql);
+    HQLParser.parseHQL(hql);
   }
 }
