@@ -78,6 +78,7 @@
                       <mapper>
                         <type>perm</type>
                         <prefix>/usr/local/inmobi-hive</prefix>
+                        <filemode>755</filemode>                    
                       </mapper>
                     </data>
                   </dataSet>
