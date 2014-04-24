@@ -389,6 +389,7 @@ public class HQLParser {
       buf.append(")");
 
     } else if (TOK_TABSORTCOLNAMEDESC == rootType || TOK_TABSORTCOLNAMEASC == rootType) {
+      buf.append("(");
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
       }
@@ -397,6 +398,7 @@ public class HQLParser {
       } else if (TOK_TABSORTCOLNAMEASC == rootType) {
         buf.append(" asc ");
       }
+      buf.append(")");
     } else if (TOK_SELECT == rootType || TOK_ORDERBY == rootType || TOK_GROUPBY == rootType) {
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
