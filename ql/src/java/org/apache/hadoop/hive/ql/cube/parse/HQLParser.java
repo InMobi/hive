@@ -389,16 +389,23 @@ public class HQLParser {
       buf.append(")");
 
     } else if (TOK_TABSORTCOLNAMEDESC == rootType || TOK_TABSORTCOLNAMEASC == rootType) {
-      buf.append("(");
+      //buf.append("(");
       for (int i = 0; i < root.getChildCount(); i++) {
-        toInfixString((ASTNode) root.getChild(i), buf);
+        StringBuilder orderByCol = new StringBuilder();
+        toInfixString((ASTNode) root.getChild(i), orderByCol);
+        String colStr = orderByCol.toString().trim();
+        if (colStr.startsWith("(") && colStr.endsWith(")")) {
+          colStr = colStr.substring(1, colStr.length() - 1);
+        }
+        buf.append(colStr);
+        buf.append(" ");
       }
       if (TOK_TABSORTCOLNAMEDESC == rootType) {
         buf.append(" desc ");
       } else if (TOK_TABSORTCOLNAMEASC == rootType) {
         buf.append(" asc ");
       }
-      buf.append(")");
+      //buf.append(")");
     } else if (TOK_SELECT == rootType || TOK_ORDERBY == rootType || TOK_GROUPBY == rootType) {
       for (int i = 0; i < root.getChildCount(); i++) {
         toInfixString((ASTNode) root.getChild(i), buf);
