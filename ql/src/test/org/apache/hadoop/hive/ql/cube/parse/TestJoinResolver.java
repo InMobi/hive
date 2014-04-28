@@ -309,13 +309,22 @@ public class TestJoinResolver {
 
   @Test
   public void testDimOnlyQuery() throws Exception {
-    String query = "select citytable.name, statetable.name from citytable";
-    CubeQueryRewriter rewriter = new CubeQueryRewriter(hconf);
+    String query = "select citytable.name, statetable.name from citytable limit 10";
+    HiveConf dimOnlyConf = new HiveConf(hconf);
+    //dimOnlyConf.set(CubeQueryConfUtil.DISABLE_AUTO_JOINS, "true");
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(dimOnlyConf);
     CubeQueryContext ctx = rewriter.rewrite(query);
     String hql = ctx.toHQL();
+    assertTrue(hql.contains("WHERE (citytable.dt = 'latest') LIMIT 10"));
     System.out.println("testDimOnlyQuery@@@HQL:" + hql);
     System.out.println("testDimOnlyQuery@@@Resolved join clause: " + ctx.getAutoResolvedJoinChain());
     assertEquals("left outer join c1_statetable statetable on citytable.stateid = statetable.id and (statetable.dt = 'latest')",
         ctx.getAutoResolvedJoinChain().trim());
+
+    String queryWithJoin = "select citytable.name, statetable.name from citytable join statetable";
+    ctx = rewriter.rewrite(queryWithJoin);
+    hql = ctx.toHQL();
+    System.out.println("testDimOnlyQuery@@@HQL2:" + hql);
+    HQLParser.parseHQL(hql);
   }
 }

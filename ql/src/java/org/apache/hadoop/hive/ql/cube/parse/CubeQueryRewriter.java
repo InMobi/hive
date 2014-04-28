@@ -38,15 +38,15 @@ public class CubeQueryRewriter {
   private final Configuration conf;
   private final List<ContextRewriter> rewriters = new ArrayList<ContextRewriter>();
   private final HiveConf hconf;
-  private final Context ctx;
+  private Context ctx = null;
 
-  public CubeQueryRewriter(Configuration conf) throws SemanticException {
+  public CubeQueryRewriter(Configuration conf) {
     this.conf = conf;
     hconf = new HiveConf(conf, HiveConf.class);
     try {
       ctx = new Context(hconf);
     } catch (IOException e) {
-      throw new SemanticException("Error creating ql context", e);
+      // IOException is ignorable
     }
     setupRewriters();
   }
@@ -75,7 +75,7 @@ public class CubeQueryRewriter {
   }
 
   public CubeQueryContext rewrite(String command)
-      throws ParseException,SemanticException {
+      throws ParseException, SemanticException {
     if (command != null) {
       command = command.replace("\n", "");
     }
