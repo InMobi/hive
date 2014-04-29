@@ -959,7 +959,7 @@ public class CubeQueryContext {
   private String toHQL(CandidateFact fact) throws SemanticException {
     findDimStorageTables();
     String qfmt = getQueryFormat();
-    LOG.info("qfmt:" + qfmt);
+    LOG.debug("qfmt:" + qfmt + " Query strings: " + Arrays.toString(getQueryTreeStrings(fact)));
     String baseQuery = String.format(qfmt, getQueryTreeStrings(fact));
     String insertString = "";
     ASTNode destTree = qb.getParseInfo().getDestForClause(clauseName);
@@ -1043,11 +1043,13 @@ public class CubeQueryContext {
     }
 
     if (joinsResolvedAutomatically()) {
-      tablesAlreadyAdded.addAll(getAutoJoinCtx().getWhereClauseAddedTables());
+      tablesAlreadyAdded.addAll(getAutoJoinCtx().getPushedPartitionTables());
     }
 
     // add where clause for all dimensions
-    Iterator<CubeDimensionTable> it = dimensions.iterator();
+    HashSet<CubeDimensionTable> dimensionTables = new HashSet<CubeDimensionTable>(dimensions);
+    dimensionTables.addAll(getAutoJoinDimensions());
+    Iterator<CubeDimensionTable> it = dimensionTables.iterator();
     if (it.hasNext()) {
       CubeDimensionTable dim = it.next();
       appendWhereClause(dim, whereBuf, originalWhere != null || fact != null);
@@ -1130,9 +1132,24 @@ public class CubeQueryContext {
 
   public boolean hasPartitions() {
     // Check if the resolved storage table in where clause has partition
-    AbstractCubeTable cube = storageTableToQuery.keySet().iterator().next();
-    return dimStorageTableToWhereClause.get(
-        storageTableToQuery.get(cube).iterator().next()) != null;
+    if (hasCubeInQuery() ) {
+      return dimStorageTableToWhereClause.get(storageTableToQuery.get(cube).iterator().next()) != null;
+    } else {
+      // This is a dimension only query. In this case partitions have to be added only if partition condition hasn't
+      // been already pushed in the join clause
+      getAutoJoinCtx().getMergedJoinClause(conf, dimStorageTableToWhereClause, storageTableToQuery, this);
+      Set<String> pushedPartitionTables = getAutoJoinCtx().getPushedPartitionTables();
+      Set<String> dimensionTables = new HashSet<String>();
+      for (CubeDimensionTable dim : dimensions) {
+        dimensionTables.add(dim.getName());
+      }
+      for (CubeDimensionTable dim : autoJoinDims) {
+        dimensionTables.add(dim.getName());
+      }
+
+      dimensionTables.removeAll(pushedPartitionTables);
+      return !dimensionTables.isEmpty();
+    }
   }
 
   public Map<String, List<String>> getTblToColumns() {
