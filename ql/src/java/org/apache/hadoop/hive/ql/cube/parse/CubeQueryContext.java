@@ -959,8 +959,11 @@ public class CubeQueryContext {
   private String toHQL(CandidateFact fact) throws SemanticException {
     findDimStorageTables();
     String qfmt = getQueryFormat();
-    LOG.info("qfmt:" + qfmt);
-    String baseQuery = String.format(qfmt, getQueryTreeStrings(fact));
+    Object[] queryTreeStrings = getQueryTreeStrings(fact);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("qfmt:" + qfmt + " Query strings: " + Arrays.toString(queryTreeStrings));
+    }
+    String baseQuery = String.format(qfmt, queryTreeStrings);
     String insertString = "";
     ASTNode destTree = qb.getParseInfo().getDestForClause(clauseName);
     if (destTree != null && ((ASTNode)(destTree.getChild(0)))
@@ -1043,11 +1046,13 @@ public class CubeQueryContext {
     }
 
     if (joinsResolvedAutomatically()) {
-      tablesAlreadyAdded.addAll(getAutoJoinCtx().getWhereClauseAddedTables());
+      tablesAlreadyAdded.addAll(getAutoJoinCtx().getPushedPartitionTables());
     }
 
     // add where clause for all dimensions
-    Iterator<CubeDimensionTable> it = dimensions.iterator();
+    HashSet<CubeDimensionTable> dimensionTables = new HashSet<CubeDimensionTable>(dimensions);
+    dimensionTables.addAll(getAutoJoinDimensions());
+    Iterator<CubeDimensionTable> it = dimensionTables.iterator();
     if (it.hasNext()) {
       CubeDimensionTable dim = it.next();
       appendWhereClause(dim, whereBuf, originalWhere != null || fact != null);
@@ -1128,11 +1133,35 @@ public class CubeQueryContext {
     dimStorageTableToWhereClause.putAll(whereClauseMap);
   }
 
+  /**
+   * Check if partition conditions should be appended to the where clause
+   * @return
+   */
   public boolean hasPartitions() {
     // Check if the resolved storage table in where clause has partition
-    AbstractCubeTable cube = storageTableToQuery.keySet().iterator().next();
-    return dimStorageTableToWhereClause.get(
-        storageTableToQuery.get(cube).iterator().next()) != null;
+    if (hasCubeInQuery()) {
+      return dimStorageTableToWhereClause.get(storageTableToQuery.get(cube).iterator().next()) != null;
+    } else {
+      // This is a dimension only query. In this case partitions have to be added only if partition condition hasn't
+      // been already pushed in the join clause
+      if (joinsResolvedAutomatically) {
+        getAutoJoinCtx().getMergedJoinClause(conf, dimStorageTableToWhereClause, storageTableToQuery, this);
+        Set<String> pushedPartitionTables = getAutoJoinCtx().getPushedPartitionTables();
+        Set<String> dimensionTables = new HashSet<String>();
+        for (CubeDimensionTable dim : dimensions) {
+          dimensionTables.add(dim.getName());
+        }
+        for (CubeDimensionTable dim : autoJoinDims) {
+          dimensionTables.add(dim.getName());
+        }
+
+        dimensionTables.removeAll(pushedPartitionTables);
+        return !dimensionTables.isEmpty();
+      } else {
+        AbstractCubeTable table = storageTableToQuery.keySet().iterator().next();
+        return dimStorageTableToWhereClause.get(storageTableToQuery.get(table).iterator().next()) != null;
+      }
+    }
   }
 
   public Map<String, List<String>> getTblToColumns() {

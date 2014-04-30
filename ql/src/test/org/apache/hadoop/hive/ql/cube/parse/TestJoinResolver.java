@@ -327,4 +327,40 @@ public class TestJoinResolver {
     System.out.println("testDimOnlyQuery@@@HQL2:" + hql);
     HQLParser.parseHQL(hql);
   }
+
+  @Test
+  public void testStorageFilterPushdown() throws Exception {
+    String q = "SELECT citytable.name, statetable.name FROM citytable";
+    HiveConf conf = new HiveConf(hconf);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
+    conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "LEFTOUTER");
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(conf);
+    CubeQueryContext context = rewriter.rewrite(q);
+    String hql = context.toHQL();
+    System.out.println("##1 hql " + hql);
+    System.out.println("##1 " + context.getAutoResolvedJoinChain());
+    assertEquals("left outer join c1_statetable statetable on citytable.stateid = statetable.id" +
+      " and (statetable.dt = 'latest')", context.getAutoResolvedJoinChain().trim());
+    assertTrue(hql.contains("WHERE (citytable.dt = 'latest')"));
+
+    conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "RIGHTOUTER");
+    rewriter = new CubeQueryRewriter(conf);
+    context = rewriter.rewrite(q);
+    hql = context.toHQL();
+    System.out.println("##2 hql " + hql);
+    System.out.println("##2 " + context.getAutoResolvedJoinChain());
+    assertEquals("right outer join c1_statetable statetable on citytable.stateid = statetable.id " +
+      "and (citytable.dt = 'latest')", context.getAutoResolvedJoinChain().trim());
+    assertTrue(hql.contains("WHERE (statetable.dt = 'latest')"));
+
+    conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "FULLOUTER");
+    rewriter = new CubeQueryRewriter(conf);
+    context = rewriter.rewrite(q);
+    hql = context.toHQL();
+    System.out.println("##3 hql " + hql);
+    System.out.println("##3 " + context.getAutoResolvedJoinChain());
+    assertEquals("full outer join c1_statetable statetable on citytable.stateid = statetable.id " +
+      "and (citytable.dt = 'latest' and statetable.dt = 'latest')", context.getAutoResolvedJoinChain().trim());
+    assertTrue(!hql.contains("WHERE"));
+  }
 }

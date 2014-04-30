@@ -72,13 +72,13 @@ public class JoinResolver implements ContextRewriter {
   public static class AutoJoinContext {
     private final Map<CubeDimensionTable, List<TableRelationship>> joinChain;
     private final Map<AbstractCubeTable, String> partialJoinConditions;
-    private final Set<String> whereClauseAddedTables;
+    private final Set<String> partitionPushedTables;
 
     public AutoJoinContext(Map<CubeDimensionTable, List<TableRelationship>> joinChain,
         Map<AbstractCubeTable, String> partialJoinConditions) {
       this.joinChain = joinChain;
       this.partialJoinConditions = partialJoinConditions;
-      whereClauseAddedTables = new HashSet<String>();
+      partitionPushedTables = new HashSet<String>();
     }
 
     public Map<CubeDimensionTable, List<TableRelationship>> getJoinChain() {
@@ -101,35 +101,36 @@ public class JoinResolver implements ContextRewriter {
       Set<String> clauses = new LinkedHashSet<String>();
 
       String joinTypeCfg = conf.get(CubeQueryConfUtil.JOIN_TYPE_KEY);
-      String joinType = "";
+      String joinTypeStr = "";
+      JoinType joinType = JoinType.INNER;
 
       if (StringUtils.isNotBlank(joinTypeCfg)) {
-        JoinType type = JoinType.valueOf(joinTypeCfg.toUpperCase());
-        switch (type) {
+        joinType = JoinType.valueOf(joinTypeCfg.toUpperCase());
+        switch (joinType) {
         case FULLOUTER:
-          joinType = "full outer";
+          joinTypeStr = "full outer";
           break;
         case INNER:
-          joinType = "inner";
+          joinTypeStr = "inner";
           break;
         case LEFTOUTER:
-          joinType = "left outer";
+          joinTypeStr = "left outer";
           break;
         case LEFTSEMI:
-          joinType = "left semi";
+          joinTypeStr = "left semi";
           break;
         case UNIQUE:
-          joinType = "unique";
+          joinTypeStr = "unique";
           break;
         case RIGHTOUTER:
-          joinType = "right outer";
+          joinTypeStr = "right outer";
           break;
         }
       }
 
       for (List<TableRelationship> chain : joinChain.values()) {
         for (TableRelationship rel : chain) {
-          StringBuilder clause = new StringBuilder(joinType)
+          StringBuilder clause = new StringBuilder(joinTypeStr)
           .append(" join ");
           // Add storage table name followed by alias
           clause.append(cubeql.getStorageString(rel.getToTable()));
@@ -138,27 +139,58 @@ public class JoinResolver implements ContextRewriter {
           .append(cubeql.getAliasForTabName(rel.getFromTable().getName())).append(".").append(rel.getFromColumn())
           .append(" = ")
           .append(cubeql.getAliasForTabName(rel.getToTable().getName())).append(".").append(rel.getToColumn());
-          // Check if user specified a join clause, if yes, add it
-          String filter = partialJoinConditions.get(rel.getToTable());
 
-          if (StringUtils.isNotBlank(filter)) {
-            clause.append(" and (").append(filter).append(")");
-          }
+          // We have to push user specified filters for the joined tables
+          String userFilter = null;
+          // Partition condition on the tables also needs to be pushed depending on the join
+          String storageFilter = null;
 
-          String whereClause = null;
-          if (dimStorageTableToWhereClause != null && storageTableToQuery != null) {
-            Set<String> queries = storageTableToQuery.get(rel.getToTable());
-            if (queries != null) {
-              String storageTableKey = queries.iterator().next();
-              if (StringUtils.isNotBlank(storageTableKey)) {
-                whereClause = dimStorageTableToWhereClause.get(storageTableKey);
-              }
+          if (JoinType.INNER == joinType || JoinType.LEFTOUTER == joinType || JoinType.LEFTSEMI == joinType) {
+            // For inner and left joins push filter of right table
+            userFilter = partialJoinConditions.get(rel.getToTable());
+            storageFilter = getStorageFilter(dimStorageTableToWhereClause, storageTableToQuery, rel.getToTable());
+            partitionPushedTables.add(rel.getToTable().getName());
+          } else if (JoinType.RIGHTOUTER == joinType) {
+            // For right outer joins, push filters of left table
+            userFilter = partialJoinConditions.get(rel.getFromTable());
+            storageFilter = getStorageFilter(dimStorageTableToWhereClause, storageTableToQuery, rel.getFromTable());
+            partitionPushedTables.add(rel.getFromTable().getName());
+          } else if (JoinType.FULLOUTER == joinType) {
+            // For full outer we need to push filters of both left and right tables in the join clause
+            String leftFilter = null, rightFilter = null;
+            String leftStorageFilter = null, rightStorgeFilter = null;
+
+            if (StringUtils.isNotBlank(partialJoinConditions.get(rel.getFromTable()))) {
+              leftFilter = partialJoinConditions.get(rel.getFromTable()) + " and ";
             }
+
+            leftStorageFilter =
+              getStorageFilter(dimStorageTableToWhereClause, storageTableToQuery, rel.getFromTable());
+            if (StringUtils.isNotBlank((leftStorageFilter))) {
+              leftStorageFilter += " and ";
+              partitionPushedTables.add(rel.getFromTable().getName());
+            }
+
+            if (StringUtils.isNotBlank(partialJoinConditions.get(rel.getToTable()))) {
+              rightFilter = partialJoinConditions.get(rel.getToTable());
+            }
+
+            rightStorgeFilter =
+              getStorageFilter(dimStorageTableToWhereClause, storageTableToQuery, rel.getToTable());
+            if (StringUtils.isNotBlank(rightStorgeFilter)) {
+              partitionPushedTables.add(rel.getToTable().getName());
+            }
+
+            userFilter = (leftFilter == null ? "" : leftFilter) + (rightFilter == null ? "" : rightFilter);
+            storageFilter = (leftStorageFilter == null ? "" : leftStorageFilter) +
+              (rightStorgeFilter == null ? "" : rightStorgeFilter);
           }
 
-          if (StringUtils.isNotBlank(whereClause)) {
-            clause.append (" and (").append(whereClause).append(")");
-            whereClauseAddedTables.add(rel.getToTable().getName());
+          if (StringUtils.isNotBlank(userFilter)) {
+            clause.append(" and (").append(userFilter).append(")");
+          }
+          if (StringUtils.isNotBlank(storageFilter)) {
+            clause.append (" and (").append(storageFilter).append(")");
           }
           clauses.add(clause.toString());
         }
@@ -167,8 +199,28 @@ public class JoinResolver implements ContextRewriter {
       return StringUtils.join(clauses, " ");
     }
 
-    public Set<String> getWhereClauseAddedTables() {
-      return whereClauseAddedTables;
+    private String getStorageFilter(Map<String, String> dimStorageTableToWhereClause,
+                                    Map<AbstractCubeTable, Set<String>> storageTableToQuery,
+                                    AbstractCubeTable table) {
+      String whereClause = "";
+      if (dimStorageTableToWhereClause != null && storageTableToQuery != null) {
+        Set<String> queries = storageTableToQuery.get(table);
+        if (queries != null) {
+          String storageTableKey = queries.iterator().next();
+          if (StringUtils.isNotBlank(storageTableKey)) {
+            whereClause = dimStorageTableToWhereClause.get(storageTableKey);
+          }
+        }
+      }
+      return whereClause;
+    }
+
+    /**
+     * Partition condition for these tables has been moved to the join clause
+     * @return
+     */
+    public Set<String> getPushedPartitionTables() {
+      return partitionPushedTables;
     }
 
   }
