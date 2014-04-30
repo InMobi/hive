@@ -413,9 +413,9 @@ public class TestCubeRewriter {
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "citytable", StorageConstants.getPartitionsForLatest()));
-    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "ziptable", StorageConstants.getPartitionsForLatest()));
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+      "citytable", StorageConstants.getPartitionsForLatest()));
     expected = getExpectedQuery(cubeName, "select statetable.name," +
       " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
       " testCube.cityid = citytable.id LEFT OUTER JOIN c1_statetable statetable"
@@ -435,9 +435,9 @@ public class TestCubeRewriter {
       + " where " + twoDaysRange);
     joinWhereConds = new ArrayList<String>();
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
-      "ct", StorageConstants.getPartitionsForLatest()));
-    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "zt", StorageConstants.getPartitionsForLatest()));
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+      "ct", StorageConstants.getPartitionsForLatest()));
     expected = getExpectedQuery("tc", "select st.name," +
       " sum(tc.msr2) FROM ", " INNER JOIN c1_citytable ct ON" +
       " tc.cityid = ct.id LEFT OUTER JOIN c1_statetable st"
@@ -476,7 +476,7 @@ public class TestCubeRewriter {
     try {
       hqlQuery = rewrite(driver, "select name, SUM(msr2) from testCube"
         + " join citytable" + " where " + twoDaysRange + " group by name");
-      Assert.assertTrue(false);
+      Assert.fail("Expected to throw exception");
     } catch (SemanticException e) {
       e.printStackTrace();
     }
