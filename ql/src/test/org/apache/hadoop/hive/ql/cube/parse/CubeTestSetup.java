@@ -203,7 +203,7 @@ public class CubeTestSetup {
       String rangeWhere, String storageTable) {
     StringBuilder expected = new StringBuilder();
     expected.append(selExpr);
-    expected.append(storageTable);
+    expected.append(getDbName() + storageTable);
     expected.append(" ");
     expected.append(cubeName);
     expected.append(" WHERE ");
@@ -261,6 +261,14 @@ public class CubeTestSetup {
     return getWhereForDailyAndHourly2daysWithTimeDim(cubeName, "dt", storageTables);
   }
 
+  public static String getDbName() {
+    String database = SessionState.get().getCurrentDatabase();
+    if (!"default".equalsIgnoreCase(database) && StringUtils.isNotBlank(database)) {
+      return database + ".";
+    }
+    return "";
+  }
+
   public static Map<String, String> getWhereForDailyAndHourly2daysWithTimeDim(
       String cubeName, String timedDimension, String... storageTables) {
     return getWhereForDailyAndHourly2daysWithTimeDim(cubeName, timedDimension,
@@ -274,7 +282,7 @@ public class CubeTestSetup {
     String whereClause = getWhereForDailyAndHourly2daysWithTimeDim(cubeName,
         timedDimension, from,
         to);
-    storageTableToWhereClause.put(StringUtils.join(storageTables, ","),
+    storageTableToWhereClause.put(getDbName() + StringUtils.join(storageTables, ","),
         whereClause);
     return storageTableToWhereClause;
   }
@@ -355,7 +363,7 @@ public class CubeTestSetup {
       tables.append(storageTables[0]);
     }
     Collections.sort(parts);
-    storageTableToWhereClause.put(tables.toString(),
+    storageTableToWhereClause.put(getDbName() + tables.toString(),
         StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
@@ -367,7 +375,7 @@ public class CubeTestSetup {
     addParts(parts, UpdatePeriod.MONTHLY,
         twoMonthsBack,
         DateUtil.getFloorDate(now, UpdatePeriod.MONTHLY));
-    storageTableToWhereClause.put(monthlyTable,
+    storageTableToWhereClause.put(getDbName() + monthlyTable,
         StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
@@ -378,7 +386,7 @@ public class CubeTestSetup {
     List<String> parts = new ArrayList<String>();
     addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
         DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
-    storageTableToWhereClause.put(hourlyTable,
+    storageTableToWhereClause.put(getDbName() + hourlyTable,
         StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
@@ -417,7 +425,7 @@ public class CubeTestSetup {
           dimName, StorageConstants.getPartitionsForLatest());
     }
     expected.append(selExpr);
-    expected.append(storageTable);
+    expected.append(getDbName() + storageTable);
     expected.append(" ");
     expected.append(dimName);
     if (whereExpr != null || hasPart) {
