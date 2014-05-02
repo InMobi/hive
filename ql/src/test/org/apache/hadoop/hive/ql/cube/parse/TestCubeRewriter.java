@@ -20,7 +20,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
  *
 */
 
-
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getDbName;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getExpectedQuery;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2days;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2daysWithTimeDim;
@@ -57,11 +57,13 @@ public class TestCubeRewriter {
 
   static CubeTestSetup setup;
   static HiveConf hconf = new HiveConf(TestCubeRewriter.class);
+  static String dbName;
   @BeforeClass
   public static void setup() throws Exception {
     SessionState.start(hconf);
     setup = new CubeTestSetup();
-    setup.createSources(hconf, TestCubeRewriter.class.getSimpleName());
+    String dbName = TestCubeRewriter.class.getSimpleName();
+    setup.createSources(hconf, dbName);
   }
 
   @AfterClass
@@ -389,7 +391,7 @@ public class TestCubeRewriter {
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "citytable", StorageConstants.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select sum(testcube.msr2)" +
-      " FROM ", " INNER JOIN c1_citytable citytable ON" +
+      " FROM ", " INNER JOIN " + getDbName() + "c1_citytable citytable ON" +
       " testCube.cityid = citytable.id", null, null, joinWhereConds,
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
@@ -417,10 +419,10 @@ public class TestCubeRewriter {
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "citytable", StorageConstants.getPartitionsForLatest()));
     expected = getExpectedQuery(cubeName, "select statetable.name," +
-      " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
-      " testCube.cityid = citytable.id LEFT OUTER JOIN c1_statetable statetable"
+      " sum(testcube.msr2) FROM ", "INNER JOIN " + getDbName() + "c1_citytable citytable ON" +
+      " testCube.cityid = citytable.id LEFT OUTER JOIN " + getDbName() + "c1_statetable statetable"
       + " ON statetable.id = citytable.stateid AND " +
-      "(statetable.dt = 'latest') RIGHT OUTER JOIN c1_ziptable" +
+      "(statetable.dt = 'latest') RIGHT OUTER JOIN " + getDbName() + "c1_ziptable" +
       " ziptable ON citytable.zipcode = ziptable.code", null, " group by" +
       " statetable.name ", joinWhereConds,
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
@@ -439,10 +441,10 @@ public class TestCubeRewriter {
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "ct", StorageConstants.getPartitionsForLatest()));
     expected = getExpectedQuery("tc", "select st.name," +
-      " sum(tc.msr2) FROM ", " INNER JOIN c1_citytable ct ON" +
-      " tc.cityid = ct.id LEFT OUTER JOIN c1_statetable st"
+      " sum(tc.msr2) FROM ", " INNER JOIN " + getDbName() + "c1_citytable ct ON" +
+      " tc.cityid = ct.id LEFT OUTER JOIN " + getDbName() + "c1_statetable st"
       + " ON st.id = ct.stateid and (st.dt = 'latest') " +
-      "RIGHT OUTER JOIN c1_ziptable" +
+      "RIGHT OUTER JOIN " + getDbName() + "c1_ziptable" +
       " zt ON ct.zipcode = zt.code", null, " group by" +
       " st.name ", joinWhereConds,
       getWhereForDailyAndHourly2days("tc", "C2_testfact"));
@@ -455,9 +457,9 @@ public class TestCubeRewriter {
       + " left outer join ziptable on citytable.zipcode = ziptable.code"
       + " where " + twoDaysRange);
     expected = getExpectedQuery(cubeName, "select citytable.name," +
-      " sum(testcube.msr2) FROM ", " LEFT OUTER JOIN c1_citytable citytable ON" +
+      " sum(testcube.msr2) FROM ", " LEFT OUTER JOIN " + getDbName() + "c1_citytable citytable ON" +
       " testCube.cityid = citytable.id and (citytable.dt = 'latest') " +
-      " LEFT OUTER JOIN c1_ziptable" +
+      " LEFT OUTER JOIN " + getDbName() + "c1_ziptable" +
       " ziptable ON citytable.zipcode = ziptable.code AND " +
       "(ziptable.dt = 'latest')", null, " group by" +
       " citytable.name ", null,
@@ -468,7 +470,7 @@ public class TestCubeRewriter {
       + " join countrytable on testCube.countryid = countrytable.id"
       + " where " + twoMonthsRangeUptoMonth);
     expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
-      " INNER JOIN c1_countrytable countrytable ON testCube.countryid = " +
+      " INNER JOIN " + getDbName() + "c1_countrytable countrytable ON testCube.countryid = " +
         " countrytable.id", null, null, null,
       getWhereForMonthly2months("c2_testfactmonthly"));
     compareQueries(expected, hqlQuery);
@@ -492,7 +494,7 @@ public class TestCubeRewriter {
     joinWhereConds.add(StorageUtil.getWherePartClause("dt",
       "citytable", StorageConstants.getPartitionsForLatest()));
     String expected = getExpectedQuery(cubeName, "select citytable.name," +
-      " sum(testcube.msr2) FROM ", "INNER JOIN c1_citytable citytable ON" +
+      " sum(testcube.msr2) FROM ", "INNER JOIN " + getDbName() + "c1_citytable citytable ON" +
       " testCube.cityid = citytable.id", null, " group by citytable.name ",
       joinWhereConds, getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
@@ -616,9 +618,9 @@ public class TestCubeRewriter {
         + " ON statetable.id = citytable.stateid " +
         "INNER JOIN c1_ziptable" +
         " ziptable ON citytable.zipcode = ziptable.code";
-    String actualExpr = "join c1_statetable statetable on testcube.stateid = statetable.id and (statetable.dt = 'latest')" +
-      "  join c1_ziptable ziptable on testcube.zipcode = ziptable.zipcode and (ziptable.dt = 'latest')  " +
-      "join c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')";
+    String actualExpr = "join " + getDbName() + "c1_statetable statetable on testcube.stateid = statetable.id and (statetable.dt = 'latest')" +
+      "  join " + getDbName() + "c1_ziptable ziptable on testcube.zipcode = ziptable.zipcode and (ziptable.dt = 'latest')  " +
+      "join " + getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')";
     expected = getExpectedQuery(cubeName, "SELECT ( citytable  .  name ) g1 ," +
     		"  case  when (( citytable  .  name ) ==  'NULL' ) then  'NULL'  when (( citytable  .  name ) ==  'X' )" +
     		" then  'X-NAME'  when (( citytable  .  name ) ==  'Y' ) then  'Y-NAME'" +
@@ -1061,7 +1063,7 @@ public class TestCubeRewriter {
       " statetable.countryid = countrytable.id";
     try {
       String hql = rewrite(driver, q2);
-      Assert.assertTrue("Should not reach here: " + hql, false);
+      Assert.fail("Should not reach here: " + hql);
     } catch (SemanticException exc) {
       Assert.assertNotNull(exc);
       exc.printStackTrace();

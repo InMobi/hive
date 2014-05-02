@@ -69,6 +69,7 @@ import org.apache.hadoop.hive.ql.parse.QBJoinTree;
 import org.apache.hadoop.hive.ql.parse.QBParseInfo;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
+import org.apache.hadoop.hive.ql.session.SessionState;
 
 public class CubeQueryContext {
   public static final String TIME_RANGE_FUNC = "time_range_in";
@@ -857,8 +858,15 @@ public class CubeQueryContext {
   }
 
   public String getStorageString(AbstractCubeTable tbl) {
-    return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
+    String database = SessionState.get().getCurrentDatabase();
+    // Add database name suffix for default database
+    if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
+      return database + "." + StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
         getAliasForTabName(tbl.getName());
+    } else {
+      return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
+        getAliasForTabName(tbl.getName());
+    }
   }
 
   private String getFromString() throws SemanticException {
