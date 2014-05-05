@@ -2062,19 +2062,20 @@ fromStatement[boolean topLevel]
 singleFromStatement
     :
     fromClause
-    ( b+=body )+ -> ^(TOK_QUERY fromClause body+)
+    cubeClause?
+    ( b+=body )+ -> ^(TOK_QUERY cubeClause? fromClause body+)
     ;
 
 regularBody[boolean topLevel]
    :
    i=insertClause
    s=selectStatement[topLevel]
-     {$s.tree.getChild(1).replaceChildren(0, 0, $i.tree);} -> {$s.tree}
+     {$s.tree.getFirstChildWithType(TOK_INSERT).replaceChildren(0, 0, $i.tree);} -> {$s.tree}
    |
    selectStatement[topLevel]
    ;
 
- selectStatement[boolean topLevel]
+selectStatement[boolean topLevel]
  : (singleSelectStatement -> singleSelectStatement)
    (u=setOperator b=singleSelectStatement
        -> ^($u {$selectStatement.tree} $b)
@@ -2181,8 +2182,8 @@ limitClause
    ;
 
 cubeClause
-@init { msgs.push("cube clause"); }
-@after { msgs.pop(); }
+@init { pushMsg("cube clause", state); }
+@after { popMsg(state); }
    :
    KW_CUBE -> ^(KW_CUBE)
    ;
