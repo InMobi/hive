@@ -20,7 +20,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
  *
 */
 
-
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getDbName;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getDateUptoHours;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.now;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.rewrite;
@@ -177,10 +177,10 @@ public class TestJoinResolver {
     System.out.println("testAutoJoinResolverauto join HQL:" + hql);
     System.out.println("testAutoJoinResolver@@Resolved join chain:[" + rewrittenQuery.getAutoResolvedJoinChain()+ "]");
     Set<String> expectedClauses = new HashSet<String>();
-    expectedClauses.add("c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')");
-    expectedClauses.add("c1_testdim2 testdim2 on testcube.dim2 = testdim2.id and (testdim2.dt = 'latest')");
-    expectedClauses.add("c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
-    expectedClauses.add("c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and (testdim4.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim2 testdim2 on testcube.dim2 = testdim2.id and (testdim2.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and (testdim4.dt = 'latest')");
 
     Set<String> actualClauses = new HashSet<String>();
     for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
@@ -201,8 +201,8 @@ public class TestJoinResolver {
     hql = rewrittenQuery.toHQL();
     System.out.println("testAutoJoinResolverauto join HQL:" + hql);
     System.out.println("testAutoJoinResolver@@Resolved join chain:[" + rewrittenQuery.getAutoResolvedJoinChain()+ "]");
-    expectedClauses.add("c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
-    expectedClauses.add("c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and (testdim4.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and (testdim4.dt = 'latest')");
     for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
       if (StringUtils.isNotBlank(clause))  {
         actualClauses.add(clause.trim());
@@ -233,10 +233,10 @@ public class TestJoinResolver {
     String resolvedClause = rewrittenQuery.getAutoResolvedJoinChain();
     System.out.println("@@resolved join chain " + resolvedClause);
     Set<String> expectedClauses = new HashSet<String>();
-    expectedClauses.add("c1_citytable citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')");
-    expectedClauses.add("c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim4.dt = 'latest')");
-    expectedClauses.add("c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
-    expectedClauses.add("c1_testdim2 testdim2 on testcube.dim2 = testdim2.id and (testdim2.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim4.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
+    expectedClauses.add(getDbName() + "c1_testdim2 testdim2 on testcube.dim2 = testdim2.id and (testdim2.dt = 'latest')");
 
     Set<String> actualClauses = new HashSet<String>();
     for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
@@ -266,7 +266,7 @@ public class TestJoinResolver {
     String hql = ctx.toHQL();
     String joinClause = ctx.getAutoResolvedJoinChain();
     System.out.println("@Resolved join clause " + joinClause);
-    assertEquals("join c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')", joinClause.trim());
+    assertEquals("join " +  getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')", joinClause.trim());
   }
 
   @Test
@@ -278,7 +278,7 @@ public class TestJoinResolver {
     CubeQueryContext ctx = driver.rewrite(query);
     String hql = ctx.toHQL();
     System.out.println("testJoinTypeConf@@Resolved join clause1 - " + ctx.getAutoResolvedJoinChain());
-    assertEquals("left outer join c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')",
+    assertEquals("left outer join " + getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')",
       ctx.getAutoResolvedJoinChain().trim());
 
     hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "FULLOUTER");
@@ -287,7 +287,7 @@ public class TestJoinResolver {
     ctx = driver.rewrite(query);
     hql = ctx.toHQL();
     System.out.println("testJoinTypeConf@@Resolved join clause2 - "+ ctx.getAutoResolvedJoinChain());
-    assertEquals("full outer join c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')",
+    assertEquals("full outer join " + getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')",
       ctx.getAutoResolvedJoinChain().trim());
   }
 
@@ -301,7 +301,7 @@ public class TestJoinResolver {
     System.out.println("testPreserveTableAlias@@HQL:" + hql);
     System.out.println("testPreserveTableAlias@@Resolved join clause - " + ctx.getAutoResolvedJoinChain());
     // Check that aliases are preserved in the join clause
-    assertEquals("left outer join c1_citytable c on t.cityid = c.id and (c.dt = 'latest')", ctx.getAutoResolvedJoinChain().trim());
+    assertEquals("left outer join "+ getDbName() + "c1_citytable c on t.cityid = c.id and (c.dt = 'latest')", ctx.getAutoResolvedJoinChain().trim());
     String whereClause = hql.substring(hql.indexOf("WHERE"));
     // Check that the partition condition is not added again in where clause
     assertFalse(whereClause.contains("c.dt = 'latest'"));
@@ -318,7 +318,7 @@ public class TestJoinResolver {
     assertTrue(hql.contains("WHERE (citytable.dt = 'latest') LIMIT 10"));
     System.out.println("testDimOnlyQuery@@@HQL:" + hql);
     System.out.println("testDimOnlyQuery@@@Resolved join clause: " + ctx.getAutoResolvedJoinChain());
-    assertEquals("left outer join c1_statetable statetable on citytable.stateid = statetable.id and (statetable.dt = 'latest')",
+    assertEquals("left outer join "+ getDbName() + "c1_statetable statetable on citytable.stateid = statetable.id and (statetable.dt = 'latest')",
         ctx.getAutoResolvedJoinChain().trim());
 
     String queryWithJoin = "select citytable.name, statetable.name from citytable join statetable";
@@ -326,5 +326,41 @@ public class TestJoinResolver {
     hql = ctx.toHQL();
     System.out.println("testDimOnlyQuery@@@HQL2:" + hql);
     HQLParser.parseHQL(hql);
+  }
+
+  @Test
+  public void testStorageFilterPushdown() throws Exception {
+    String q = "SELECT citytable.name, statetable.name FROM citytable";
+    HiveConf conf = new HiveConf(hconf);
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
+    conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "LEFTOUTER");
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(conf);
+    CubeQueryContext context = rewriter.rewrite(q);
+    String hql = context.toHQL();
+    System.out.println("##1 hql " + hql);
+    System.out.println("##1 " + context.getAutoResolvedJoinChain());
+    assertEquals("left outer join " + getDbName() + "c1_statetable statetable on citytable.stateid = statetable.id" +
+      " and (statetable.dt = 'latest')", context.getAutoResolvedJoinChain().trim());
+    assertTrue(hql.contains("WHERE (citytable.dt = 'latest')"));
+
+    conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "RIGHTOUTER");
+    rewriter = new CubeQueryRewriter(conf);
+    context = rewriter.rewrite(q);
+    hql = context.toHQL();
+    System.out.println("##2 hql " + hql);
+    System.out.println("##2 " + context.getAutoResolvedJoinChain());
+    assertEquals("right outer join " + getDbName() + "c1_statetable statetable on citytable.stateid = statetable.id " +
+      "and (citytable.dt = 'latest')", context.getAutoResolvedJoinChain().trim());
+    assertTrue(hql.contains("WHERE (statetable.dt = 'latest')"));
+
+    conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "FULLOUTER");
+    rewriter = new CubeQueryRewriter(conf);
+    context = rewriter.rewrite(q);
+    hql = context.toHQL();
+    System.out.println("##3 hql " + hql);
+    System.out.println("##3 " + context.getAutoResolvedJoinChain());
+    assertEquals("full outer join " + getDbName() + "c1_statetable statetable on citytable.stateid = statetable.id " +
+      "and (citytable.dt = 'latest' and statetable.dt = 'latest')", context.getAutoResolvedJoinChain().trim());
+    assertTrue(!hql.contains("WHERE"));
   }
 }
