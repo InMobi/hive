@@ -225,28 +225,24 @@ public class TestJoinResolver {
   @Test
   public void testPartialJoinResolver() throws Exception {
     String query = "SELECT citytable.name, testDim4.name, msr2 " +
-      "FROM testCube join citytable ON citytable.name = 'FOOBAR'" +
-      " join testDim4 on testDim4.name='TESTDIM4NAME'" +
+      "FROM testCube left outer join citytable ON citytable.name = 'FOOBAR'" +
+      " right outer join testDim4 on testDim4.name='TESTDIM4NAME'" +
       " WHERE " + twoDaysRange;
     CubeQueryContext rewrittenQuery = driver.rewrite(query);
     String hql = rewrittenQuery.toHQL();
+    System.out.println("testPartialJoinResolver Partial join hql: " + hql);
     String resolvedClause = rewrittenQuery.getAutoResolvedJoinChain();
     System.out.println("@@resolved join chain " + resolvedClause);
-    Set<String> expectedClauses = new HashSet<String>();
-    expectedClauses.add(getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')");
-    expectedClauses.add(getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim4.dt = 'latest')");
-    expectedClauses.add(getDbName() + "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
-    expectedClauses.add(getDbName() + "c1_testdim2 testdim2 on testcube.dim2 = testdim2.id and (testdim2.dt = 'latest')");
+    assertTrue(hql.contains(getDbName()+ "c1_testfact2_raw testcube" +
+      " left outer join " + getDbName() + "c1_citytable citytable " +
+      "on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')"));
 
-    Set<String> actualClauses = new HashSet<String>();
-    for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
-      if (StringUtils.isNotBlank(clause))  {
-        actualClauses.add(clause.trim());
-      }
-    }
-    System.out.println("testPartialJoinResolverExpected" + expectedClauses);
-    System.out.println("testPartialJoinResolverActual" + actualClauses);
-    assertEquals(actualClauses, expectedClauses);
+    assertTrue(hql.contains("right outer join " + getDbName() + "c1_testdim2 testdim2 " +
+      "on testcube.dim2 = testdim2.id " +
+      "right outer join " + getDbName() + "c1_testdim3 testdim3 " +
+      "on testdim2.testdim3id = testdim3.id and (testdim2.dt = 'latest') " +
+      "right outer join " + getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id " +
+      "and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')"));
   }
 
   @Test
@@ -301,7 +297,9 @@ public class TestJoinResolver {
     System.out.println("testPreserveTableAlias@@HQL:" + hql);
     System.out.println("testPreserveTableAlias@@Resolved join clause - " + ctx.getAutoResolvedJoinChain());
     // Check that aliases are preserved in the join clause
-    assertEquals("left outer join "+ getDbName() + "c1_citytable c on t.cityid = c.id and (c.dt = 'latest')", ctx.getAutoResolvedJoinChain().trim());
+    // Conf will be ignored in this case since user has specified partial join
+    assertEquals("inner join "+ getDbName() + "c1_citytable c on t.cityid = c.id and (c.dt = 'latest')",
+      ctx.getAutoResolvedJoinChain().trim());
     String whereClause = hql.substring(hql.indexOf("WHERE"));
     // Check that the partition condition is not added again in where clause
     assertFalse(whereClause.contains("c.dt = 'latest'"));
