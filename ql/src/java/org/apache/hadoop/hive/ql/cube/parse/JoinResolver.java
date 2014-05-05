@@ -150,11 +150,25 @@ public class JoinResolver implements ContextRewriter {
           if (JoinType.INNER == joinType || JoinType.LEFTOUTER == joinType || JoinType.LEFTSEMI == joinType) {
             // For inner and left joins push filter of right table
             userFilter = partialJoinConditions.get(rel.getToTable());
+            if (partialJoinConditions.containsKey(rel.getFromTable())) {
+              if (StringUtils.isNotBlank(userFilter)) {
+                userFilter += (" AND " + partialJoinConditions.get(rel.getFromTable()));
+              } else {
+                userFilter = partialJoinConditions.get(rel.getFromTable());
+              }
+            }
             storageFilter = getStorageFilter(dimStorageTableToWhereClause, storageTableToQuery, rel.getToTable());
             partitionPushedTables.add(rel.getToTable().getName());
           } else if (JoinType.RIGHTOUTER == joinType) {
             // For right outer joins, push filters of left table
             userFilter = partialJoinConditions.get(rel.getFromTable());
+            if (partialJoinConditions.containsKey(rel.getToTable())) {
+              if (StringUtils.isNotBlank(userFilter)) {
+                userFilter += (" AND " + partialJoinConditions.get(rel.getToTable()));
+              } else {
+                userFilter = partialJoinConditions.get(rel.getToTable());
+              }
+            }
             storageFilter = getStorageFilter(dimStorageTableToWhereClause, storageTableToQuery, rel.getFromTable());
             partitionPushedTables.add(rel.getFromTable().getName());
           } else if (JoinType.FULLOUTER == joinType) {

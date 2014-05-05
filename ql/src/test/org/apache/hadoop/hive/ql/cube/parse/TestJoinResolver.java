@@ -241,9 +241,8 @@ public class TestJoinResolver {
       "on testcube.dim2 = testdim2.id " +
       "right outer join " + getDbName() + "c1_testdim3 testdim3 " +
       "on testdim2.testdim3id = testdim3.id and (testdim2.dt = 'latest') " +
-      "right outer join " + getDbName() + "c1_testdim4 testdim4 " +
-      "on testdim3.testdim4id = testdim4.id and (testdim3.dt = 'latest')"));
-    assertTrue(hql.contains("(testdim4.dt = 'latest' AND (( testdim4  .  name ) =  'TESTDIM4NAME' ))"));
+      "right outer join " + getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id " +
+      "and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')"));
   }
 
   @Test

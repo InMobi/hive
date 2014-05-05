@@ -1011,13 +1011,6 @@ public class CubeQueryContext {
     }
     String storageCondition = dimStorageTableToWhereClause.get(
         storageTableToQuery.get(dim).iterator().next());
-    // Any user specified condition specified in the join clause has to be moved to where clause
-    if (joinsResolvedAutomatically) {
-      String userCondition = getAutoJoinCtx().getPartialJoinConditions().get(dim);
-      if (StringUtils.isNotBlank(userCondition)) {
-        storageCondition += " AND " + userCondition;
-      }
-    }
 
     if (storageCondition != null) {
       appendWhereClause(whereString, storageCondition, hasMore);
