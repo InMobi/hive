@@ -69,16 +69,26 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
+
+  /**
+   * Store join chain information resolved by join resolver
+   */
   public static class AutoJoinContext {
     private final Map<CubeDimensionTable, List<TableRelationship>> joinChain;
     private final Map<AbstractCubeTable, String> partialJoinConditions;
     private final Set<String> partitionPushedTables;
+    private final boolean partialJoinChains;
+    private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
 
     public AutoJoinContext(Map<CubeDimensionTable, List<TableRelationship>> joinChain,
-        Map<AbstractCubeTable, String> partialJoinConditions) {
+        Map<AbstractCubeTable, String> partialJoinConditions,
+        boolean partialJoinChains,
+        Map<AbstractCubeTable, JoinType> tableJoinTypeMap) {
       this.joinChain = joinChain;
       this.partialJoinConditions = partialJoinConditions;
       partitionPushedTables = new HashSet<String>();
+      this.partialJoinChains = partialJoinChains;
+      this.tableJoinTypeMap = tableJoinTypeMap;
     }
 
     public Map<CubeDimensionTable, List<TableRelationship>> getJoinChain() {
@@ -99,36 +109,28 @@ public class JoinResolver implements ContextRewriter {
       }
 
       Set<String> clauses = new LinkedHashSet<String>();
-
       String joinTypeCfg = conf.get(CubeQueryConfUtil.JOIN_TYPE_KEY);
       String joinTypeStr = "";
       JoinType joinType = JoinType.INNER;
 
-      if (StringUtils.isNotBlank(joinTypeCfg)) {
-        joinType = JoinType.valueOf(joinTypeCfg.toUpperCase());
-        switch (joinType) {
-        case FULLOUTER:
-          joinTypeStr = "full outer";
-          break;
-        case INNER:
-          joinTypeStr = "inner";
-          break;
-        case LEFTOUTER:
-          joinTypeStr = "left outer";
-          break;
-        case LEFTSEMI:
-          joinTypeStr = "left semi";
-          break;
-        case UNIQUE:
-          joinTypeStr = "unique";
-          break;
-        case RIGHTOUTER:
-          joinTypeStr = "right outer";
-          break;
+      // this flag is set to true if user has specified a partial join chain
+      if (!partialJoinChains) {
+        // User has not specified any join conditions. In this case, we rely on configuration for the join type
+        if (StringUtils.isNotBlank(joinTypeCfg)) {
+          joinType = JoinType.valueOf(joinTypeCfg.toUpperCase());
+          joinTypeStr = getJoinTypeStr(joinType);
         }
       }
 
-      for (List<TableRelationship> chain : joinChain.values()) {
+      for (Map.Entry<CubeDimensionTable, List<TableRelationship>> entry : joinChain.entrySet()) {
+        List<TableRelationship> chain = entry.getValue();
+        CubeDimensionTable table = entry.getKey();
+
+        if (partialJoinChains) {
+          joinType = tableJoinTypeMap.get(table);
+          joinTypeStr = getJoinTypeStr(joinType);
+        }
+
         for (TableRelationship rel : chain) {
           StringBuilder clause = new StringBuilder(joinTypeStr)
           .append(" join ");
@@ -199,6 +201,21 @@ public class JoinResolver implements ContextRewriter {
       return StringUtils.join(clauses, " ");
     }
 
+    private String getJoinTypeStr(JoinType joinType) {
+      if (joinType == null) {
+        return "";
+      }
+      switch (joinType) {
+        case FULLOUTER: return "full outer";
+        case INNER: return "inner";
+        case LEFTOUTER: return "left outer";
+        case LEFTSEMI: return "left semi";
+        case UNIQUE: return "unique";
+        case RIGHTOUTER: return "right outer";
+        default: return "";
+      }
+    }
+
     private String getStorageFilter(Map<String, String> dimStorageTableToWhereClause,
                                     Map<AbstractCubeTable, Set<String>> storageTableToQuery,
                                     AbstractCubeTable table) {
@@ -227,11 +244,14 @@ public class JoinResolver implements ContextRewriter {
 
   private CubeMetastoreClient metastore;
   private final Map<AbstractCubeTable, String> partialJoinConditions;
+  private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
+  private boolean partialJoinChain;
   private AbstractCubeTable target;
   private HiveConf conf;
 
   public JoinResolver(Configuration conf) {
     partialJoinConditions = new HashMap<AbstractCubeTable, String>();
+    tableJoinTypeMap = new HashMap<AbstractCubeTable, JoinType>();
   }
 
   private CubeMetastoreClient getMetastoreClient() throws HiveException {
@@ -359,7 +379,7 @@ public class JoinResolver implements ContextRewriter {
           }
         }
       }
-      AutoJoinContext joinCtx = new AutoJoinContext(joinChain, partialJoinConditions);
+      AutoJoinContext joinCtx = new AutoJoinContext(joinChain, partialJoinConditions, partialJoinChain, tableJoinTypeMap);
       cubeql.setAutoJoinCtx(joinCtx);
       cubeql.setJoinsResolvedAutomatically(joinsResolved);
     }
@@ -381,7 +401,8 @@ public class JoinResolver implements ContextRewriter {
     if (node == null) {
       return;
     }
-
+    // User has specified join conditions partially. We need to store join conditions as well as join types
+    partialJoinChain = true;
     if (isJoinToken(node)) {
       ASTNode left = (ASTNode) node.getChild(0);
       ASTNode right = (ASTNode) node.getChild(1);
@@ -397,7 +418,7 @@ public class JoinResolver implements ContextRewriter {
         joinCond = HQLParser.getString((ASTNode) node.getChild(2));
       }
       partialJoinConditions.put(dimensionTable, joinCond);
-
+      tableJoinTypeMap.put(dimensionTable, getJoinType(node));
       if (isJoinToken(left)) {
         searchDimensionTables(left);
       } else {
@@ -409,6 +430,25 @@ public class JoinResolver implements ContextRewriter {
       setTarget(node);
     }
 
+  }
+
+  private JoinType getJoinType(ASTNode node) {
+    switch(node.getToken().getType()) {
+      case TOK_LEFTOUTERJOIN:
+        return JoinType.LEFTOUTER;
+      case TOK_LEFTSEMIJOIN:
+        return JoinType.LEFTSEMI;
+      case TOK_RIGHTOUTERJOIN:
+        return JoinType.RIGHTOUTER;
+      case TOK_FULLOUTERJOIN:
+        return JoinType.FULLOUTER;
+      case TOK_JOIN:
+        return JoinType.INNER;
+      case TOK_UNIQUEJOIN:
+        return JoinType.UNIQUE;
+      default:
+        return JoinType.INNER;
+    }
   }
 
   // Recursively find out join conditions
