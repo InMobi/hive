@@ -154,11 +154,19 @@ public class TestCubeRewriter {
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
 
+    hqlQuery = rewrite(driver, "insert overwrite directory" +
+        " '/tmp/test' cube select SUM(msr2) from testCube where " + twoDaysRange);
+    compareQueries(expected, hqlQuery);
+
     hqlQuery = rewrite(driver, "insert overwrite local directory" +
       " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);
     expected = "insert overwrite local directory '/tmp/test' " +
       getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "insert overwrite local directory" +
+        " '/tmp/test' cube select SUM(msr2) from testCube where " + twoDaysRange);
     compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "insert overwrite table temp" +
@@ -167,6 +175,11 @@ public class TestCubeRewriter {
       getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ", null, null,
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "insert overwrite table temp" +
+        " cube select SUM(msr2) from testCube where " + twoDaysRange);
+    compareQueries(expected, hqlQuery);
+
   }
 
   private void compareQueries(String expected, String actual) {
