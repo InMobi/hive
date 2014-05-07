@@ -79,6 +79,7 @@ public class JoinResolver implements ContextRewriter {
     private final Set<String> partitionPushedTables;
     private final boolean partialJoinChains;
     private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
+    private String mergedJoinClause;
 
     public AutoJoinContext(Map<CubeDimensionTable, List<TableRelationship>> joinChain,
         Map<AbstractCubeTable, String> partialJoinConditions,
@@ -103,6 +104,10 @@ public class JoinResolver implements ContextRewriter {
         Map<String, String> dimStorageTableToWhereClause,
         Map<AbstractCubeTable, Set<String>> storageTableToQuery,
         CubeQueryContext cubeql) {
+      if (mergedJoinClause != null) {
+        return mergedJoinClause;
+      }
+
       for (List<TableRelationship> chain : joinChain.values()) {
         // Need to reverse the chain so that left most table in join comes first
         Collections.reverse(chain);
@@ -211,8 +216,8 @@ public class JoinResolver implements ContextRewriter {
           clauses.add(clause.toString());
         }
       }
-
-      return StringUtils.join(clauses, " ");
+      mergedJoinClause = StringUtils.join(clauses, " ");
+      return mergedJoinClause;
     }
 
     private String getJoinTypeStr(JoinType joinType) {
@@ -389,7 +394,7 @@ public class JoinResolver implements ContextRewriter {
             autoJoinDims.add((CubeDimensionTable) rel.getToTable());
           }
           if (rel.getFromTable() instanceof  CubeDimensionTable) {
-            autoJoinDims.add((CubeDimensionTable) rel.getToTable());
+            autoJoinDims.add((CubeDimensionTable) rel.getFromTable());
           }
         }
       }
