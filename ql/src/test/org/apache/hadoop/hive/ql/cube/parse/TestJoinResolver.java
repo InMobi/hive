@@ -33,7 +33,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -176,13 +175,13 @@ public class TestJoinResolver {
     String hql = rewrittenQuery.toHQL();
     System.out.println("testAutoJoinResolverauto join HQL:" + hql);
     System.out.println("testAutoJoinResolver@@Resolved join chain:[" + rewrittenQuery.getAutoResolvedJoinChain()+ "]");
-    Set<String> expectedClauses = new HashSet<String>();
+    List<String> expectedClauses = new ArrayList<String>();
     expectedClauses.add(getDbName() + "c1_citytable citytable on testcube.cityid = citytable.id and (citytable.dt = 'latest')");
     expectedClauses.add(getDbName() + "c1_testdim2 testdim2 on testcube.dim2 = testdim2.id and (testdim2.dt = 'latest')");
     expectedClauses.add(getDbName() + "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and (testdim3.dt = 'latest')");
     expectedClauses.add(getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and (testdim4.dt = 'latest')");
 
-    Set<String> actualClauses = new HashSet<String>();
+    List<String> actualClauses = new ArrayList<String>();
     for (String clause : StringUtils.splitByWholeSeparator(rewrittenQuery.getAutoResolvedJoinChain(), "join")) {
       if (StringUtils.isNotBlank(clause))  {
         actualClauses.add(clause.trim());
@@ -231,8 +230,6 @@ public class TestJoinResolver {
     CubeQueryContext rewrittenQuery = driver.rewrite(query);
     String hql = rewrittenQuery.toHQL();
     System.out.println("testPartialJoinResolver Partial join hql: " + hql);
-    String resolvedClause = rewrittenQuery.getAutoResolvedJoinChain();
-    System.out.println("@@resolved join chain " + resolvedClause);
     assertTrue(hql.contains(getDbName()+ "c1_testfact2_raw testcube" +
       " left outer join " + getDbName() + "c1_citytable citytable " +
       "on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')"));
