@@ -34,6 +34,15 @@
       <id>dist</id>
       <build>
         <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>2.7</version>
+        <configuration>
+          <skip>true</skip>    
+        </configuration>
+      </plugin>
+
     <!-- plugins are always listed in sorted order by groupId, artifectId -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
