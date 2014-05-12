@@ -35,7 +35,6 @@
     <connection>scm:git:git://github.com/InMobi/hive</connection>
     <url>https://github.com/InMobi/hive</url>
     <developerConnection>scm:git:git@github.com:InMobi/hive.git</developerConnection>
-    <tag>hive-0.13.0</tag>
   </scm>
 
 
