@@ -194,6 +194,10 @@ public class MetastoreUtil implements MetastoreConstants {
     return getCubePrefix(cubeName) + TIMED_DIMENSIONS_LIST_SFX;
   }
 
+  public static final String getParentCubeNameKey(String cubeName) {
+    return getCubePrefix(cubeName) + PARENT_CUBE_SFX;
+  }
+
   public static final String getCubeTableKeyPrefix(String tableName) {
     return CUBE_TABLE_PFX + tableName.toLowerCase();
   }

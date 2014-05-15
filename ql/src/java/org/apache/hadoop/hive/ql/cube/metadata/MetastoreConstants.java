@@ -31,6 +31,7 @@ public interface MetastoreConstants {
   public static final String MEASURES_LIST_SFX = ".measures.list";
   public static final String DIMENSIONS_LIST_SFX = ".dimensions.list";
   public static final String TIMED_DIMENSIONS_LIST_SFX = ".timed.dimensions.list";
+  public static final String PARENT_CUBE_SFX = ".parent.cube";
 
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
