@@ -525,6 +525,8 @@
                   <shadedPattern>org.apache.hive.com.esotericsoftware</shadedPattern>
                 </relocation>
               </relocations>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>withdep</shadedClassifierName>
             </configuration>
           </execution>
         </executions>
