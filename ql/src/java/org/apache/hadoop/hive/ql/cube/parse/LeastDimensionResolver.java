@@ -42,29 +42,7 @@ public class LeastDimensionResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
-    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
-        .isEmpty()) {
-      Map<CandidateFact, Integer> dimWeightMap =
-          new HashMap<CandidateFact, Integer>();
-
-      for (CandidateFact fact : cubeql.getCandidateFactTables()) {
-        dimWeightMap.put(fact, getDimensionWeight(cubeql, fact));
-      }
-
-      int minWeight = Collections.min(dimWeightMap.values());
-
-      for (Iterator<CandidateFact> i =
-          cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CandidateFact fact = i.next();
-        if (dimWeightMap.get(fact) > minWeight) {
-          LOG.info("Removing fact:" + fact +
-              " from candidate fact tables as it has more dimension weight:"
-              + dimWeightMap.get(fact) + " minimum:"
-              + minWeight);
-          i.remove();
-        }
-      }
-    }
+    // Nothing
   }
 
   private Integer getDimensionWeight(CubeQueryContext cubeql,
