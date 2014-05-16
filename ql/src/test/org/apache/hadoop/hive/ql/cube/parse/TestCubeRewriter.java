@@ -148,6 +148,38 @@ public class TestCubeRewriter {
   }
 
   @Test
+  public void testLightestFactFirst() throws Exception {
+    // testFact is lighter than testFact2.
+    String hqlQuery = rewrite(driver, "cube select" +
+        " SUM(msr2) from testCube where " + twoDaysRange);
+    String expected = getExpectedQuery(cubeName,
+        "select sum(testcube.msr2) FROM ", null, null,
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, true);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
+        " where " + twoDaysRange);
+    expected = getExpectedQuery(cubeName, "select sum(testcube.msr2) FROM ",
+        null, null, getWhereForHourly2days("c1_testfact2"));
+    compareQueries(expected, hqlQuery);
+
+    conf.setBoolean(CubeQueryConfUtil.LIGHTEST_FACT_FIRST, true);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    Throwable th = null;
+    try {
+      hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
+          " where " + twoDaysRange);
+    } catch (Exception e) {
+      th = e;
+      e.printStackTrace();
+    }
+    Assert.assertNotNull(th);
+    Assert.assertTrue(th instanceof SemanticException);
+  }
+
+  @Test
   public void testCubeInsert() throws Exception {
     String hqlQuery = rewrite(driver, "insert overwrite directory" +
       " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);
