@@ -103,4 +103,7 @@ public class CubeQueryConfUtil {
   public static final String JOIN_TYPE_KEY = "hive.cube.join.type";
   public static final String DISABLE_AGGREGATE_RESOLVER = "hive.cube.disable.aggregate.resolver";
   public static final boolean DEFAULT_DISABLE_AGGREGATE_RESOLVER = true;
+  public static final String LIGHTEST_FACT_FIRST = "cube.query.pick.lightest.fact.first";
+  public static final boolean DEFAULT_LIGHTEST_FACT_FIRST = false;
+  
 }
