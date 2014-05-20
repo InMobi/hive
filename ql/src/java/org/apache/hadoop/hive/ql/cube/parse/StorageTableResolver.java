@@ -302,6 +302,7 @@ public class StorageTableResolver implements ContextRewriter {
         String pruneCause = "";
         if (!skipStorageCauses.isEmpty()) {
           pruneCause += StringUtils.join(skipStorageCauses, ",");
+          pruneCause += ";";
         }
         if (!nonExistingParts.isEmpty()) {
           pruneCause += "Non existing partitions for fact:" + cfact.fact
@@ -349,6 +350,8 @@ public class StorageTableResolver implements ContextRewriter {
         partitions, updatePeriods, addNonExistingParts, skipStorageCauses, nonExistingParts)) {
       return partitions;
     } else {
+      skipStorageCauses.add(fact + " has no storage tables that contain " +
+          " given range:" + range);
       return null;
     }
   }

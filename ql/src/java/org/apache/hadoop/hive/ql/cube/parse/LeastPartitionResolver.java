@@ -52,6 +52,8 @@ public class LeastPartitionResolver implements ContextRewriter {
               " from candidate fact tables as it requires more partitions to" +
               " be queried:" + fact.numQueriedParts + " minimum:"
               + minPartitions);
+          cubeql.addFactPruningMsgs(fact.fact, fact + " is not considered" +
+            " as it requires more partitions to be queried");
           i.remove();
         }
       }
