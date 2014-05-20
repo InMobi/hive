@@ -45,6 +45,8 @@ public class CubeQueryConfUtil {
       "cube.query.fail.if.data.partial";
   public static final String NON_EXISTING_PARTITIONS =
       "cube.query.nonexisting.partitions";
+  public static final String ADD_NON_EXISTING_PARTITIONS =
+      "cube.query.add.nonexisting.partitions";
   public static final String ENABLE_MULTI_TABLE_SELECT =
       "cube.query.enable.multi.table.select";
   public static final String QUERY_MAX_INTERVAL = "cube.query.max.interval";
@@ -61,6 +63,7 @@ public class CubeQueryConfUtil {
   public static final int DEFAULT_LOOK_AHEAD_PT_PARTS = 1;
   public static final boolean DEFAULT_ENABLE_GROUP_BY_TO_SELECT = false;
   public static final boolean DEFAULT_ENABLE_SELECT_TO_GROUPBY = false;
+  public static final boolean DEFAULT_ADD_NON_EXISTING_PARTITIONS = false;
 
   public static String getLookAheadPTPartsKey(UpdatePeriod interval) {
     return LOOK_AHEAD_PT_PARTS_PFX + interval.name().toLowerCase();

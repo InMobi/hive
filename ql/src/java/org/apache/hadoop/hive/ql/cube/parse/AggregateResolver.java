@@ -59,6 +59,8 @@ public class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
   private final Configuration conf;
+  static String NO_AGGREGATE_IN_QUERY ="No default aggregate around measure in query";
+
 
   public AggregateResolver(Configuration conf) {
     this.conf = conf;
@@ -84,6 +86,7 @@ public class AggregateResolver implements ContextRewriter {
         while (factItr.hasNext()) {
           CubeQueryContext.CandidateFact candidate = factItr.next();
           if (candidate.fact.isAggregated()) {
+            cubeql.addFactPruningMsgs(candidate.fact, NO_AGGREGATE_IN_QUERY);
             factItr.remove();
           }
         }

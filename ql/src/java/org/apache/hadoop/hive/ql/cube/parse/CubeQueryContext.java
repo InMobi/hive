@@ -153,6 +153,7 @@ public class CubeQueryContext {
   private final boolean qlEnabledMultiTableSelect;
   private JoinResolver.AutoJoinContext autoJoinCtx;
   private AbstractCubeTable autoJoinTarget;
+  private Map<CubeFactTable, List<String>> factPruningMsgs = new HashMap<CubeFactTable, List<String>>();
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -564,6 +565,7 @@ public class CubeQueryContext {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
             LOG.info("Not considering the fact table:" + fact + " as it is" +
                 " not a valid fact");
+            addFactPruningMsgs(fact, fact + " is not valid");;
             i.remove();
             continue;
           }
@@ -577,6 +579,7 @@ public class CubeQueryContext {
             if(!factCols.contains(col.toLowerCase())) {
               LOG.info("Not considering the fact table:" + fact +
                   " as column " + col + " is not available");
+              addFactPruningMsgs(fact, "Column is not in fact" + fact);
               i.remove();
               break;
             } else {
@@ -584,6 +587,7 @@ public class CubeQueryContext {
                 if (!validFactCols.contains(col.toLowerCase())) {
                   LOG.info("Not considering the fact table:" + fact +
                       " as column " + col + " is not valid");
+                  addFactPruningMsgs(fact, "Column is not valid in fact" + fact);
                   i.remove();
                   break;
                 }
@@ -593,7 +597,7 @@ public class CubeQueryContext {
         }
       }
       if (candidateFacts.size() == 0) {
-        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE);
+        throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN);
       }
     }
   }
@@ -609,6 +613,19 @@ public class CubeQueryContext {
 
   public Set<CandidateFact> getCandidateFactTables() {
     return candidateFacts;
+  }
+
+  public Map<CubeFactTable, List<String>> getFactPruningMsgs() {
+    return factPruningMsgs;
+  }
+
+  public void addFactPruningMsgs(CubeFactTable fact, String factPruningMsg) {
+    List<String> pruneMsgs = factPruningMsgs.get(fact);
+    if (pruneMsgs == null) {
+      pruneMsgs = new ArrayList<String>();
+      factPruningMsgs.put(fact, pruneMsgs);
+    }
+    pruneMsgs.add(factPruningMsg);
   }
 
   public Set<CubeDimensionTable> getDimensionTables() {
@@ -1095,7 +1112,13 @@ public class CubeQueryContext {
         LOG.info("Available candidate facts:" + candidateFacts +
             ", picking up " + fact.fact + " for querying");
       } else {
-        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE);
+        StringBuilder reason = new StringBuilder();
+        for (List<String> causes: factPruningMsgs.values()) {
+          reason.append("{");
+          reason.append(StringUtils.join(causes, ";"));
+          reason.append("}");
+        }
+        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE, reason.toString());
       }
     }
 

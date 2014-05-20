@@ -60,6 +60,7 @@ public class LightestFactResolver implements ContextRewriter {
               " from candidate fact tables as it has more fact weight:"
               + factWeightMap.get(fact) + " minimum:"
               + minWeight);
+          cubeql.addFactPruningMsgs(fact.fact, "The fact " + fact + " has more weight.");
           i.remove();
         }
       }

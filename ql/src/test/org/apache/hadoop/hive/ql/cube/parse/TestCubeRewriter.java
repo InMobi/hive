@@ -38,6 +38,7 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.parse.ParseException;
@@ -84,7 +85,7 @@ public class TestCubeRewriter {
 
   @Test
   public void testQueryWithNow() throws Exception {
-    Throwable th = null;
+    SemanticException th = null;
     try {
       rewrite(driver, "select SUM(msr2) from testCube where" +
         " time_range_in('dt', 'NOW - 2DAYS', 'NOW')");
@@ -93,11 +94,13 @@ public class TestCubeRewriter {
       e.printStackTrace();
     }
     Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE.getErrorCode());
   }
 
   @Test
   public void testCandidateTables() throws Exception {
-    Throwable th = null;
+    SemanticException th = null;
     try {
       rewrite(driver, "select dim12, SUM(msr2) from testCube" +
         " where " + twoDaysRange);
@@ -106,6 +109,9 @@ public class TestCubeRewriter {
       e.printStackTrace();
     }
     Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.COLUMN_NOT_FOUND.getErrorCode());
+
     try {
       // this query should through exception because invalidMsr is invalid
       rewrite(driver, "SELECT cityid, invalidMsr from testCube " +
@@ -114,8 +120,11 @@ public class TestCubeRewriter {
     } catch (SemanticException exc) {
       exc.printStackTrace();
       Assert.assertNotNull(exc);
+      th = exc;
     }
-
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.COLUMN_NOT_FOUND.getErrorCode());
   }
 
   private CubeQueryContext rewrittenQuery;
@@ -135,16 +144,17 @@ public class TestCubeRewriter {
     compareQueries(expected, hqlQuery);
 
     // Query with column life not in the range
-    Throwable th = null;
+    SemanticException th = null;
     try {
       hqlQuery = rewrite(driver, "cube select SUM(newmeasure) from testCube" +
         " where " + twoDaysRange);
-    } catch (Exception e) {
+    } catch (SemanticException e) {
       th = e;
       e.printStackTrace();
     }
     Assert.assertNotNull(th);
-    Assert.assertTrue(th instanceof SemanticException);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NOT_AVAILABLE_IN_RANGE.getErrorCode());
   }
 
   @Test
@@ -166,17 +176,21 @@ public class TestCubeRewriter {
     compareQueries(expected, hqlQuery);
 
     conf.setBoolean(CubeQueryConfUtil.LIGHTEST_FACT_FIRST, true);
+    conf.setBoolean(CubeQueryConfUtil.ADD_NON_EXISTING_PARTITIONS, true);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
-    Throwable th = null;
+    SemanticException th = null;
     try {
       hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
           " where " + twoDaysRange);
-    } catch (Exception e) {
+    } catch (SemanticException e) {
       th = e;
       e.printStackTrace();
     }
     Assert.assertNotNull(th);
-    Assert.assertTrue(th instanceof SemanticException);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE.getErrorCode());
+    Assert.assertTrue(th.getMessage()
+        .contains("Non existing partitions for fact"));
   }
 
   @Test
@@ -520,14 +534,19 @@ public class TestCubeRewriter {
       getWhereForMonthly2months("c2_testfactmonthly"));
     compareQueries(expected, hqlQuery);
 
+    SemanticException th = null;
     try {
       hqlQuery = rewrite(driver, "select name, SUM(msr2) from testCube"
         + " join citytable" + " where " + twoDaysRange + " group by name");
       Assert.fail("Expected to throw exception");
     } catch (SemanticException e) {
       e.printStackTrace();
+      th = e;
     }
 
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NO_JOIN_CONDITION_AVAIABLE.getErrorCode());
   }
 
   @Test
@@ -789,13 +808,18 @@ public class TestCubeRewriter {
 
     conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, true);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    SemanticException th = null;
     try {
       hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
         " where " + twoMonthsRangeUptoHours);
       Assert.assertTrue(false);
     } catch (SemanticException e) {
       e.printStackTrace();
+      th = e;
     }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE.getErrorCode());
     conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, false);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
 
@@ -907,8 +931,6 @@ public class TestCubeRewriter {
       " count(1) from ", "groupby citytable.name order by citytable.name asc ",
       "c2_citytable", false);
     compareQueries(expected, hqlQuery);
-    
-
   }
 
   @Test
@@ -1015,44 +1037,35 @@ public class TestCubeRewriter {
       expectedq5, expectedq6, expectedq7, expectedq8, expectedq9};
 
     for (int i = 0; i < tests.length; i++) {
-      String hql = null;
-      Throwable th = null;
-      try {
-        hql = rewrite(driver, tests[i]);
-      } catch (SemanticException e) {
-        th = e;
-        e.printStackTrace();
-      }
-      if (expected[i] != null) {
-        compareQueries(expected[i], hql);
-      } else {
-        Assert.assertNotNull(th);
-      }
+      String hql  = rewrite(driver, tests[i]);
+      compareQueries(expected[i], hql);
     }
     String failq = "SELECT cityid, testCube.noAggrMsr FROM testCube where "
       + twoDaysRange;
+    SemanticException th = null;
     try {
       // Should throw exception in aggregate resolver because noAggrMsr does
       //not have a default aggregate defined.
       String hql = rewrite(driver, failq);
       Assert.assertTrue("Should not reach here: " + hql, false);
     } catch (SemanticException exc) {
-      Assert.assertNotNull(exc);
       exc.printStackTrace();
+      th = exc;
+    }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NO_DEFAULT_AGGREGATE.getErrorCode());
+    String queryWithFunction = "SELECT cityid, exp(testCube.msr2) FROM testCube where " + twoDaysRange;
+    String hql = rewrite(driver, queryWithFunction);
+    System.out.println("#### AGG resolver HQL with function " + hql);
 
-      String queryWithFunction = "SELECT cityid, exp(testCube.msr2) FROM testCube where " + twoDaysRange;
-      String hql = rewrite(driver, queryWithFunction);
-      System.out.println("#### AGG resolver HQL with function " + hql);
-
-      String expectedHqlWithFunction = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
+    String expectedHqlWithFunction = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
         " exp(sum(testCube.msr2)) from ", null,
         "group by testcube.cityid",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
-      compareQueries(expectedHqlWithFunction, hql);
+    compareQueries(expectedHqlWithFunction, hql);
 
-    } finally {
-      conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, true);
-    }
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, true);
 
     // Test if raw fact is selected for query with no aggregate function on a measure, with aggregate resolver disabled
     String query = "SELECT cityid, testCube.msr2 FROM testCube WHERE " + twoDaysRange;
@@ -1095,14 +1108,19 @@ public class TestCubeRewriter {
     String query = "SELECT ambigdim1, sum(testCube.msr1) FROM testCube join" +
       " citytable on testcube.cityid = citytable.id where " + twoDaysRange;
 
+    SemanticException th = null;
     try {
       String hql = rewrite(driver, query);
       Assert.assertTrue("Should not reach here:" + hql, false);
     } catch (SemanticException exc) {
-      Assert.assertNotNull(exc);
       exc.printStackTrace();
+      th = exc;
     }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.AMBIGOUS_CUBE_COLUMN.getErrorCode());
 
+    th = null;
     String q2 = "SELECT ambigdim2 from citytable join" +
       " statetable on citytable.stateid = statetable.id join countrytable on" +
       " statetable.countryid = countrytable.id";
@@ -1110,9 +1128,12 @@ public class TestCubeRewriter {
       String hql = rewrite(driver, q2);
       Assert.fail("Should not reach here: " + hql);
     } catch (SemanticException exc) {
-      Assert.assertNotNull(exc);
       exc.printStackTrace();
+      th = exc;
     }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.AMBIGOUS_DIM_COLUMN.getErrorCode());
   }
 
   @Test

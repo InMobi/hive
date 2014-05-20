@@ -415,12 +415,12 @@ public enum ErrorMsg {
   NULL_DATE_VALUE(15006, "Date value cannot be null or empty"),
   INVALID_TIME_UNIT(15007, "Invalid time unit {0}", true),
   ALL_COLUMNS_NOT_SUPPORTED(15008, "Selecting all columns is not supported"),
-  AMBIGOUS_DIM_COLUMN(15009, "Ambiguous column {0}, in dimensions '{1}' and '{2}'", true),
-  AMBIGOUS_CUBE_COLUMN(15010, "Ambiguous column {0}, in cube '{1}' and in dimension '{2}'", true),
+  AMBIGOUS_DIM_COLUMN(15009, "Ambiguous column {0}, in dimensions {1} and {2}", true),
+  AMBIGOUS_CUBE_COLUMN(15010, "Ambiguous column {0}, in cube {1} and in dimension {2}", true),
   COLUMN_NOT_FOUND(15011, "Could not find the table containing column: {0}", true),
   NOT_A_CUBE_COLUMN(15012, "Not a cube column {0}", true),
   NOT_AVAILABLE_IN_RANGE(15013, "Column {0} is not available in the specified range: {1}, available {2} {3}", true),
-  NO_CANDIDATE_FACT_AVAILABLE(15014, "No candidate fact table available to answer the query"),
+  NO_CANDIDATE_FACT_AVAILABLE(15014, "No candidate fact table available to answer the query, because {0}", true),
   NO_JOIN_CONDITION_AVAIABLE(15015, "No join condition available"),
   NO_STORAGE_TABLE_AVAIABLE(15016, "No storage table available for candidate fact: {0}", true),
   MULTIPLE_STORAGE_TABLES(15017, "Querying multiple storage tables within the same query is not supported"),
@@ -429,7 +429,7 @@ public enum ErrorMsg {
   FROM_AFTER_TO(15020, "From date: {0} is after to date: {1}", true),
   NO_JOIN_PATH(15021, "No join path from {0} to {1}", true),
   JOIN_TARGET_NOT_CUBE_TABLE(15022, "Join target table {0} is neither dimension nor cube", true),
-  
+  NO_FACT_HAS_COLUMN(15023, "No fact table has the queried column"),
   
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),
