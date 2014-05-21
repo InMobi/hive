@@ -29,6 +29,7 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
@@ -60,7 +61,8 @@ public class LightestFactResolver implements ContextRewriter {
               " from candidate fact tables as it has more fact weight:"
               + factWeightMap.get(fact) + " minimum:"
               + minWeight);
-          cubeql.addFactPruningMsgs(fact.fact, "The fact " + fact + " has more weight.");
+          cubeql.addFactPruningMsgs(fact.fact, new CandidateTablePruneCause(
+              fact.fact.getName(), CubeTableCause.MORE_WEIGHT));
           i.remove();
         }
       }

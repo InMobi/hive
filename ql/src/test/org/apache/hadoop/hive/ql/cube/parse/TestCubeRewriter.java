@@ -142,6 +142,8 @@ public class TestCubeRewriter {
       "select sum(testcube.msr2) FROM ", null, null,
       getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expected, hqlQuery);
+    System.out.println("Non existing parts:" + rewrittenQuery.getNonExistingParts());
+    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
 
     // Query with column life not in the range
     SemanticException th = null;
@@ -190,7 +192,7 @@ public class TestCubeRewriter {
     Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
         ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE.getErrorCode());
     Assert.assertTrue(th.getMessage()
-        .contains("Non existing partitions for fact"));
+        .contains("missingPartitions"));
   }
 
   @Test
@@ -839,6 +841,38 @@ public class TestCubeRewriter {
     String expected = getExpectedQuery("citytable", "select citytable.name," +
       " citytable.stateid from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
+
+    // should pick up c2 storage when 'fail on partial data' enabled
+    conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, true);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "select name, stateid from" +
+        " citytable");
+    expected = getExpectedQuery("citytable", "select citytable.name," +
+        " citytable.stateid from ", null, "c2_citytable", false);
+      compareQueries(expected, hqlQuery);
+
+    // state table is present on c1 with partition dumps and partitions added
+    SemanticException th = null;
+    try {
+      hqlQuery = rewrite(driver, "select name, capital from statetable ");
+    } catch (SemanticException e) {
+      th = e;
+      e.printStackTrace();
+    }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.NO_CANDIDATE_DIM_STORAGE_TABLES.getErrorCode());
+    Assert.assertTrue(th.getMessage().contains("statetable"));
+
+    conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, false);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+
+    // non existing parts should be populated
+    hqlQuery = rewrite(driver, "select name, capital from statetable ");
+    expected = getExpectedQuery("statetable", "select statetable.name," +
+        " statetable.capital from ", null, "c1_statetable", true);
+    compareQueries(expected, hqlQuery);
+    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
 
     // run a query with time range function
     hqlQuery = rewrite(driver, "select name, stateid from citytable where " + twoDaysRange);

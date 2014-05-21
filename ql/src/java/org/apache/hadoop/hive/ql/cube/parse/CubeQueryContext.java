@@ -30,6 +30,8 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TMP_FILE;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,6 +57,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
+import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.ASTNodeVisitor;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.TreeNode;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -70,6 +73,10 @@ import org.apache.hadoop.hive.ql.parse.QBParseInfo;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.session.SessionState;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.annotate.JsonWriteNullProperties;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
 
 public class CubeQueryContext {
   public static final String TIME_RANGE_FUNC = "time_range_in";
@@ -153,7 +160,7 @@ public class CubeQueryContext {
   private final boolean qlEnabledMultiTableSelect;
   private JoinResolver.AutoJoinContext autoJoinCtx;
   private AbstractCubeTable autoJoinTarget;
-  private Map<CubeFactTable, List<String>> factPruningMsgs = new HashMap<CubeFactTable, List<String>>();
+  private Map<CubeFactTable, List<CandidateTablePruneCause>> factPruningMsgs = new HashMap<CubeFactTable, List<CandidateTablePruneCause>>();
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -565,7 +572,7 @@ public class CubeQueryContext {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
             LOG.info("Not considering the fact table:" + fact + " as it is" +
                 " not a valid fact");
-            addFactPruningMsgs(fact, fact + " is not valid");;
+            addFactPruningMsgs(fact, new CandidateTablePruneCause(fact.getName(), CubeTableCause.INVALID));;
             i.remove();
             continue;
           }
@@ -579,7 +586,7 @@ public class CubeQueryContext {
             if(!factCols.contains(col.toLowerCase())) {
               LOG.info("Not considering the fact table:" + fact +
                   " as column " + col + " is not available");
-              addFactPruningMsgs(fact, "Column is not in fact" + fact);
+              addFactPruningMsgs(fact, new CandidateTablePruneCause(fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));;
               i.remove();
               break;
             } else {
@@ -587,7 +594,7 @@ public class CubeQueryContext {
                 if (!validFactCols.contains(col.toLowerCase())) {
                   LOG.info("Not considering the fact table:" + fact +
                       " as column " + col + " is not valid");
-                  addFactPruningMsgs(fact, "Column is not valid in fact" + fact);
+                  addFactPruningMsgs(fact, new CandidateTablePruneCause(fact.getName(), CubeTableCause.COLUMN_NOT_VALID));;
                   i.remove();
                   break;
                 }
@@ -615,14 +622,14 @@ public class CubeQueryContext {
     return candidateFacts;
   }
 
-  public Map<CubeFactTable, List<String>> getFactPruningMsgs() {
+  public Map<CubeFactTable, List<CandidateTablePruneCause>> getFactPruningMsgs() {
     return factPruningMsgs;
   }
 
-  public void addFactPruningMsgs(CubeFactTable fact, String factPruningMsg) {
-    List<String> pruneMsgs = factPruningMsgs.get(fact);
+  public void addFactPruningMsgs(CubeFactTable fact, CandidateTablePruneCause factPruningMsg) {
+    List<CandidateTablePruneCause> pruneMsgs = factPruningMsgs.get(fact);
     if (pruneMsgs == null) {
-      pruneMsgs = new ArrayList<String>();
+      pruneMsgs = new ArrayList<CandidateTablePruneCause>();
       factPruningMsgs.put(fact, pruneMsgs);
     }
     pruneMsgs.add(factPruningMsg);
@@ -999,16 +1006,40 @@ public class CubeQueryContext {
     return insertString + baseQuery;
   }
 
-  void setNonexistingParts(List<String> nonExistingParts) {
-    conf.set(CubeQueryConfUtil.NON_EXISTING_PARTITIONS,
-        StringUtils.join(nonExistingParts, ','));
+  void setNonexistingParts(Map<String, List<String>> nonExistingParts) throws SemanticException {
+    if (!nonExistingParts.isEmpty()) {
+      ByteArrayOutputStream out = null;
+      String partsStr;
+      try {
+        ObjectMapper mapper = new ObjectMapper();
+        out = new ByteArrayOutputStream();
+        mapper.writeValue(out, nonExistingParts);
+        partsStr = out.toString("UTF-8");
+      } catch (Exception e) {
+        throw new SemanticException("Error writing non existing parts", e);
+      } finally {
+        if (out != null) {
+          try {
+            out.close();
+          } catch (IOException e) {
+            throw new SemanticException(e);
+          }
+        }
+      }
+      conf.set(CubeQueryConfUtil.NON_EXISTING_PARTITIONS, partsStr);
+    } else {
+      conf.unset(CubeQueryConfUtil.NON_EXISTING_PARTITIONS);
+    }
+  }
+
+  public String getNonExistingParts() {
+    return conf.get(CubeQueryConfUtil.NON_EXISTING_PARTITIONS);
   }
 
   private String unionQuery() {
     // TODO Auto-generated method stub
     return null;
   }
-
 
   private void appendWhereClause(StringBuilder whereWithoutTimerange,
       String whereClause, boolean hasMore) {
@@ -1112,13 +1143,27 @@ public class CubeQueryContext {
         LOG.info("Available candidate facts:" + candidateFacts +
             ", picking up " + fact.fact + " for querying");
       } else {
-        StringBuilder reason = new StringBuilder();
-        for (List<String> causes: factPruningMsgs.values()) {
-          reason.append("{");
-          reason.append(StringUtils.join(causes, ";"));
-          reason.append("}");
+        String reason = "";
+        if (!factPruningMsgs.isEmpty()) {
+          ByteArrayOutputStream out = null;
+          try {
+            ObjectMapper mapper = new ObjectMapper();
+            out = new ByteArrayOutputStream();
+            mapper.writeValue(out, factPruningMsgs.values());
+            reason = out.toString("UTF-8");
+          } catch (Exception e) {
+            throw new SemanticException("Error writing non existing parts", e);
+          } finally {
+            if (out != null) {
+              try {
+                out.close();
+              } catch (IOException e) {
+                throw new SemanticException(e);
+              }
+            }
+          }
         }
-        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE, reason.toString());
+        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE, reason);
       }
     }
 
