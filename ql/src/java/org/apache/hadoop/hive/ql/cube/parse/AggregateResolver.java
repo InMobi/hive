@@ -60,8 +60,6 @@ public class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
   private final Configuration conf;
-  static String NO_AGGREGATE_IN_QUERY ="No default aggregate around measure in query";
-
 
   public AggregateResolver(Configuration conf) {
     this.conf = conf;
