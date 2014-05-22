@@ -71,7 +71,6 @@ public class CubeQueryRewriter {
     if (!lightFactFirst) {
       rewriters.add(new LightestFactResolver(conf));
     }
-    rewriters.add(new LeastDimensionResolver(conf));
   }
 
   public CubeQueryContext rewrite(ASTNode astnode) throws SemanticException {
