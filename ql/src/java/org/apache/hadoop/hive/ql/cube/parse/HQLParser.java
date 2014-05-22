@@ -357,7 +357,11 @@ public class HQLParser {
       // Left operand
       toInfixString((ASTNode) root.getChild(0), buf);
       // Operand name
-      buf.append(rootText.toLowerCase());
+      if (root.getToken().getType() != DOT) {
+        buf.append(' ').append(rootText.toLowerCase()).append(' ');
+      } else {
+        buf.append(rootText.toLowerCase());
+      }
       // Right operand
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append(")");
