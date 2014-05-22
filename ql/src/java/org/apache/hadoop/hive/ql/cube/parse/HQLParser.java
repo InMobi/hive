@@ -334,7 +334,7 @@ public class HQLParser {
       } else if (KW_FALSE == rootType) {
         buf.append(" false ");
       } else {
-        buf.append(' ').append(rootText == null ? "" : rootText.toLowerCase()).append(' ');
+        buf.append(rootText == null ? "" : rootText.toLowerCase());
       }
 
     } else if (UNARY_OPERATORS.contains(Integer.valueOf(rootType))) {
@@ -357,7 +357,11 @@ public class HQLParser {
       // Left operand
       toInfixString((ASTNode) root.getChild(0), buf);
       // Operand name
-      buf.append(' ').append(rootText.toLowerCase()).append(' ');
+      if (root.getToken().getType() != DOT) {
+        buf.append(' ').append(rootText.toLowerCase()).append(' ');
+      } else {
+        buf.append(rootText.toLowerCase());
+      }
       // Right operand
       toInfixString((ASTNode) root.getChild(1), buf);
       buf.append(")");
