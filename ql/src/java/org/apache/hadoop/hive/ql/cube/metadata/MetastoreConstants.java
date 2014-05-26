@@ -32,6 +32,10 @@ public interface MetastoreConstants {
   public static final String DIMENSIONS_LIST_SFX = ".dimensions.list";
   public static final String TIMED_DIMENSIONS_LIST_SFX = ".timed.dimensions.list";
 
+  // Uber dimension constants
+  public static final String UBER_DIMENSION_KEY_PFX = "uber.dimension.";
+  public static final String ATTRIBUTES_LIST_SFX = ".attributes.list";
+
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
   public static final String UPDATE_PERIOD_SFX = ".updateperiods";
@@ -65,6 +69,7 @@ public interface MetastoreConstants {
   public static final String STORAGE_LIST_SFX = ".storages";
   public static final String METASTORE_ENABLE_CACHING = "cube.metastore.enable.cache";
   public static final String TIMED_DIMENSION = "cube.dimensiontable.timed.dimension";
+  public static final String UBER_DIM_NAME_SFX = ".uberdim.name";
 
   // storage constants
   public static final String STORAGE_ENTITY_PFX = "storage.";

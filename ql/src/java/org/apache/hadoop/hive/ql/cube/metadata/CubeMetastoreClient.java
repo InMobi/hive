@@ -67,6 +67,8 @@ public class CubeMetastoreClient {
   private final Map<String, Table> allHiveTables = new HashMap<String, Table>();
   // map from cube name to Cube
   private final Map<String, Cube> allCubes = new HashMap<String, Cube>();
+  // map from uberdim name to UberDimension
+  private final Map<String, UberDimension> allUberDims = new HashMap<String, UberDimension>();
   // map from dim name to CubeDimensionTable
   private final Map<String, CubeDimensionTable> allDims = new HashMap<String, CubeDimensionTable>();
   // map from fact name to fact table
@@ -182,6 +184,33 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Create uber dimension defined by attributes and properties
+   *
+   * @param name Name of the uber dimension
+   * @param attributes Attributes of the uber dimension
+   * @param properties Properties of the uber dimension
+   * @param weight Weight of the uber dimension
+   * 
+   * @throws HiveException
+   */
+  public void createUberDimension(String name, 
+      Set<CubeDimension> attributes, Map<String, String> properties, double weight)
+          throws HiveException {
+    UberDimension uberDim = new UberDimension(name, attributes, properties, weight);
+    createUberDimension(uberDim);
+  }
+
+  /**
+   * Create uber dimension in metastore defined by {@link UberDimension} object
+   *
+   * @param uberDim the {@link UberDimension} object.
+   * @throws HiveException
+   */
+  public void createUberDimension(UberDimension uberDim) throws HiveException {
+    createCubeHiveTable(uberDim);
+  }
+
+  /**
    * Create a cube fact table
    *
    * @param cubeNames The cube names to which fact belongs to.
@@ -217,14 +246,13 @@ public class CubeMetastoreClient {
    *
    * @throws HiveException
    */
-  public void createCubeDimensionTable(String dimName,
+  public void createCubeDimensionTable(String uberDim, String dimName,
       List<FieldSchema> columns, double weight,
-      Map<String, List<TableReference>> dimensionReferences,
       Set<String> storageNames, Map<String, String> properties,
       Map<String, StorageTableDesc> storageTableDescs)
           throws HiveException {
-    CubeDimensionTable dimTable = new CubeDimensionTable(dimName, columns,
-        weight, storageNames, dimensionReferences, properties);
+    CubeDimensionTable dimTable = new CubeDimensionTable(uberDim, dimName, columns,
+        weight, storageNames, properties);
     createCubeTable(dimTable, storageTableDescs);
   }
 
@@ -241,15 +269,14 @@ public class CubeMetastoreClient {
    * @param storageTableDescs Map of storage to its storage table description
    * @throws HiveException
    */
-  public void createCubeDimensionTable(String dimName,
+  public void createCubeDimensionTable(String uberDim, String dimName,
       List<FieldSchema> columns, double weight,
-      Map<String, List<TableReference>> dimensionReferences,
       Map<String, UpdatePeriod> dumpPeriods,
       Map<String, String> properties,
       Map<String, StorageTableDesc> storageTableDescs)
           throws HiveException {
-    CubeDimensionTable dimTable = new CubeDimensionTable(dimName, columns,
-        weight, dumpPeriods, dimensionReferences, properties);
+    CubeDimensionTable dimTable = new CubeDimensionTable(uberDim, dimName, columns,
+        weight, dumpPeriods, properties);
     createCubeTable(dimTable, storageTableDescs);
   }
 
@@ -733,6 +760,19 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Is the table name passed a uber dimension?
+   *
+   * @param tableName table name
+   * @return true if it is uber dimension, false otherwise
+   * 
+   * @throws HiveException
+   */
+  public boolean isUberDimension(String tableName) throws HiveException {
+    Table tbl = getTable(tableName);
+    return isUberDimension(tbl);
+  }
+
+  /**
    * Is the hive table a cube table?
    *
    * @param tbl
@@ -743,6 +783,19 @@ public class CubeMetastoreClient {
     String tableType = tbl.getParameters().get(
         MetastoreConstants.TABLE_TYPE_KEY);
     return CubeTableType.CUBE.name().equals(tableType);
+  }
+
+  /**
+   * Is the hive table a uber dimension?
+   *
+   * @param tbl
+   * @return
+   * @throws HiveException
+   */
+  boolean isUberDimension(Table tbl) throws HiveException {
+    String tableType = tbl.getParameters().get(
+        MetastoreConstants.TABLE_TYPE_KEY);
+    return CubeTableType.UBER_DIMENSION.name().equals(tableType);
   }
 
   /**
@@ -873,6 +926,27 @@ public class CubeMetastoreClient {
    * @return Returns cube is table name passed is a cube, null otherwise
    * @throws HiveException
    */
+  public UberDimension getUberDimension(String tableName) throws HiveException {
+    UberDimension uberdim = allUberDims.get(tableName.toLowerCase());
+    if (uberdim == null) {
+      Table tbl = getTable(tableName);
+      if (isCube(tbl)) {
+        uberdim = getUberDimension(tbl);
+        if (enableCaching) {
+          allUberDims.put(tableName.toLowerCase(), uberdim);
+        }
+      }
+    }
+    return uberdim;
+  }
+
+  /**
+   * Get {@link Cube} object corresponding to the name
+   *
+   * @param tableName The cube name
+   * @return Returns cube is table name passed is a cube, null otherwise
+   * @throws HiveException
+   */
   public CubeFactTable getCubeFact(String tableName) throws HiveException {
     CubeFactTable fact = allFactTables.get(tableName.toLowerCase());
     if (fact == null) {
@@ -887,6 +961,10 @@ public class CubeMetastoreClient {
 
   private Cube getCube(Table tbl) {
     return new Cube(tbl);
+  }
+
+  private UberDimension getUberDimension(Table tbl) {
+    return new UberDimension(tbl);
   }
 
   /**
@@ -958,6 +1036,28 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Get all cubes in metastore
+   *
+   * @return List of Cube objects
+   * @throws HiveException
+   */
+  public List<UberDimension> getAllUberDimensions()
+      throws HiveException {
+    List<UberDimension> uberdims = new ArrayList<UberDimension>();
+    try {
+      for (String table : getAllHiveTableNames()) {
+        UberDimension uberdim = getUberDimension(table);
+        if (uberdim != null) {
+          uberdims.add(uberdim);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return uberdims;
+  }
+
+  /**
    * Get all facts in metastore
    *
    * @return List of Cube Fact Table objects
@@ -1004,6 +1104,28 @@ public class CubeMetastoreClient {
       throw new HiveException("Could not get all tables", e);
     }
     return cubeFacts;
+  }
+
+  /**
+   * Get all dimension tables of the uber dimension.
+   *
+   * @param uberdim UberDimension object
+   *
+   * @return List of fact tables
+   * @throws HiveException
+   */
+  public List<CubeDimensionTable> getAllDimensionTables(UberDimension uberdim) throws HiveException {
+    List<CubeDimensionTable> dimTables = new ArrayList<CubeDimensionTable>();
+    try {
+      for (CubeDimensionTable dim : getAllDimensionTables()) {
+        if (dim.getUberDim().equalsIgnoreCase(uberdim.getName().toLowerCase())) {
+          dimTables.add(dim);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return dimTables;
   }
 
   public List<String> getPartColNames(String tableName)

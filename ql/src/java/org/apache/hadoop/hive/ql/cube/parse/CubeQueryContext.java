@@ -57,6 +57,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
+import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.ASTNodeVisitor;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.TreeNode;
@@ -74,7 +75,6 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.annotate.JsonWriteNullProperties;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 
@@ -98,12 +98,12 @@ public class CubeQueryContext {
   private List<String> cubeDimNames;
   // Dimensions used to decide partitions
   private Set<String> timedDimensions;
-  // Dimension tables accessed in the query
-  protected Set<CubeDimensionTable> dimensions =
-      new HashSet<CubeDimensionTable>();
+  // Dimensions accessed in the query
+  protected Set<UberDimension> dimensions =
+      new HashSet<UberDimension>();
 
   // Dimension table accessed but not in from
-  protected Set<CubeDimensionTable> autoJoinDims = new HashSet<CubeDimensionTable>();
+  protected Set<UberDimension> autoJoinDims = new HashSet<UberDimension>();
 
   // Name to table object mapping of tables accessed in this query
   private final Map<String, AbstractCubeTable> cubeTbls =
@@ -137,11 +137,8 @@ public class CubeQueryContext {
   // storage specific
   protected final Set<CandidateFact> candidateFacts =
       new HashSet<CandidateFact>();
-  // Map from fact to number of partitions
-  private final Map<CubeDimensionTable, List<String>> dimStorageMap =
-      new HashMap<CubeDimensionTable, List<String>>();
-  private final Map<String, String> dimStorageTableToWhereClause =
-      new HashMap<String, String>();
+  protected final Map<UberDimension, Set<CandidateDim>> candidateDims =
+      new HashMap<UberDimension, Set<CandidateDim>>();
   private final Map<AbstractCubeTable, Set<String>> storageTableToQuery =
       new HashMap<AbstractCubeTable, Set<String>>();
 
@@ -160,7 +157,10 @@ public class CubeQueryContext {
   private final boolean qlEnabledMultiTableSelect;
   private JoinResolver.AutoJoinContext autoJoinCtx;
   private AbstractCubeTable autoJoinTarget;
-  private Map<CubeFactTable, List<CandidateTablePruneCause>> factPruningMsgs = new HashMap<CubeFactTable, List<CandidateTablePruneCause>>();
+  private Map<CubeFactTable, List<CandidateTablePruneCause>> factPruningMsgs = 
+      new HashMap<CubeFactTable, List<CandidateTablePruneCause>>();
+  private Map<CubeDimensionTable, List<CandidateTablePruneCause>> dimPruningMsgs = 
+      new HashMap<CubeDimensionTable, List<CandidateTablePruneCause>>();
 
   public CubeQueryContext(ASTNode ast, QB qb, HiveConf conf)
       throws SemanticException {
@@ -212,6 +212,7 @@ public class CubeQueryContext {
     extractTabAliasForCol();
     doColLifeValidation();
     findCandidateFactTables();
+    findCandidateDimTables();
   }
 
   public boolean hasCubeInQuery() {
@@ -245,10 +246,12 @@ public class CubeQueryContext {
           }
           cubeTabToCols.put(cube, cubeCols);
           cubeTbls.put(tblName.toLowerCase(), cube);
-        } else if (client.isDimensionTable(tblName)) {
-          CubeDimensionTable dim = client.getDimensionTable(tblName);
+        } else if (client.isUberDimension(tblName)) {
+          UberDimension dim = client.getUberDimension(tblName);
           dimensions.add(dim);
-          cubeTabToCols.put(dim, MetastoreUtil.getColumnNames(dim));
+          List<String> cubeCols = new ArrayList<String>();
+          cubeCols.addAll(MetastoreUtil.getAttributeNames(dim));
+          cubeTabToCols.put(dim, cubeCols);
           cubeTbls.put(tblName.toLowerCase(), dim);
         }
       }
@@ -261,6 +264,19 @@ public class CubeQueryContext {
           cfact.enabledMultiTableSelect = qlEnabledMultiTableSelect;
           candidateFacts.add(cfact);
           cubeTabToCols.put(fact, MetastoreUtil.getColumnNames(fact));
+        }
+      }
+      
+      if (dimensions.size() != 0) {
+        for (UberDimension dim : dimensions) {
+          Set<CandidateDim> candidates = new HashSet<CandidateDim>();
+          candidateDims.put(dim, candidates);
+          for (CubeDimensionTable dimtable : client.getAllDimensionTables(dim)) {
+            CandidateDim cfact = new CandidateDim(dimtable);
+            candidates.add(cfact);
+            cubeTabToCols.put(dimtable, MetastoreUtil.getColumnNames(dimtable));
+          }
+          
         }
       }
     } catch (HiveException e) {
@@ -388,8 +404,8 @@ public class CubeQueryContext {
           if (qb.getTabNameForAlias(table) != null) {
             table = qb.getTabNameForAlias(table);
           }
-          if (client.isDimensionTable(table)) {
-            CubeDimensionTable dimTable = client.getDimensionTable(table);
+          if (client.isUberDimension(table)) {
+            UberDimension dimTable = client.getUberDimension(table);
             autoJoinDims.add(dimTable);
           }
         }
@@ -510,7 +526,7 @@ public class CubeQueryContext {
           inCube = true;
         }
       }
-      for (CubeDimensionTable dim : dimensions) {
+      for (UberDimension dim : dimensions) {
         if (cubeTabToCols.get(dim).contains(col.toLowerCase())) {
           if (!inCube) {
             String prevDim = columnToTabAlias.get(col.toLowerCase());
@@ -520,6 +536,14 @@ public class CubeQueryContext {
             }
             columnToTabAlias.put(col.toLowerCase(), getAliasForTabName(
                 dim.getName()));
+            List<String> dimCols = tblAliasToColumns.get(getAliasForTabName(
+                dim.getName()));
+            if (dimCols == null) {
+              dimCols = new ArrayList<String>();
+              tblAliasToColumns.put(getAliasForTabName(
+                dim.getName()), dimCols);
+            }
+            dimCols.add(col.toLowerCase());
           } else {
             // throw error because column is in both cube and dimension table
             throw new SemanticException(ErrorMsg.AMBIGOUS_CUBE_COLUMN, col, 
@@ -609,6 +633,33 @@ public class CubeQueryContext {
     }
   }
 
+  private void findCandidateDimTables() throws SemanticException {
+    if (dimensions.size() != 0) {
+      for (UberDimension dim : dimensions) {
+        // go over the columns accessed in the query and find out which tables
+        // can answer the query
+        for (Iterator<CandidateDim> i = candidateDims.get(dim).iterator();
+            i.hasNext();) {
+          CubeDimensionTable dimtable = i.next().dimtable;
+          List<String> dimCols = cubeTabToCols.get(dimtable);
+
+          for (String col : tblAliasToColumns.get(getAliasForTabName(dim.getName()))) {
+            if(!dimCols.contains(col.toLowerCase())) {
+              LOG.info("Not considering the dimension table:" + dimtable +
+                  " as column " + col + " is not available");
+              addDimPruningMsgs(dimtable, new CandidateTablePruneCause(
+                  dimtable.getName(), CubeTableCause.COLUMN_NOT_FOUND));;
+              i.remove();
+              break;
+            }
+          }
+        }
+        if (candidateDims.get(dim).size() == 0) {
+          throw new SemanticException(ErrorMsg.NO_DIM_HAS_COLUMN);
+        }
+      }
+    }
+  }
 
   public Cube getCube() {
     return cube;
@@ -620,6 +671,10 @@ public class CubeQueryContext {
 
   public Set<CandidateFact> getCandidateFactTables() {
     return candidateFacts;
+  }
+
+  public Map<UberDimension, Set<CandidateDim>> getCandidateDimTables() {
+    return candidateDims;
   }
 
   public Map<CubeFactTable, List<CandidateTablePruneCause>> getFactPruningMsgs() {
@@ -635,11 +690,20 @@ public class CubeQueryContext {
     pruneMsgs.add(factPruningMsg);
   }
 
-  public Set<CubeDimensionTable> getDimensionTables() {
+  public void addDimPruningMsgs(CubeDimensionTable dimtable, CandidateTablePruneCause msg) {
+    List<CandidateTablePruneCause> pruneMsgs = dimPruningMsgs.get(dimtable);
+    if (pruneMsgs == null) {
+      pruneMsgs = new ArrayList<CandidateTablePruneCause>();
+      dimPruningMsgs.put(dimtable, pruneMsgs);
+    }
+    pruneMsgs.add(msg);
+  }
+
+  public Set<UberDimension> getDimensions() {
     return dimensions;
   }
 
-  public Set<CubeDimensionTable> getAutoJoinDimensions() {
+  public Set<UberDimension> getAutoJoinDimensions() {
     return autoJoinDims;
   }
 
@@ -961,7 +1025,7 @@ public class CubeQueryContext {
       builder.append(joinCond);
       if (joiningTable != null) {
         // assuming the joining table to be dimension table
-        appendWhereClause((CubeDimensionTable)cubeTbls.get(joiningTable),
+        appendWhereClause((UberDimension)cubeTbls.get(joiningTable),
             builder, true);
         tablesAlreadyAdded.add(joiningTable);
       }
@@ -1050,7 +1114,7 @@ public class CubeQueryContext {
     appendWhereClause(whereWithoutTimerange, whereClause);
   }
 
-  private void appendWhereClause(CubeDimensionTable dim,
+  private void appendWhereClause(UberDimension dim,
       StringBuilder whereString,
       boolean hasMore) {
     if (tablesAlreadyAdded.contains(dim.getName())) {
@@ -1107,11 +1171,11 @@ public class CubeQueryContext {
     }
 
     // add where clause for all dimensions
-    HashSet<CubeDimensionTable> dimensionTables = new HashSet<CubeDimensionTable>(dimensions);
-    dimensionTables.addAll(getAutoJoinDimensions());
-    Iterator<CubeDimensionTable> it = dimensionTables.iterator();
+    HashSet<UberDimension> dims = new HashSet<UberDimension>(dimensions);
+    dims.addAll(getAutoJoinDimensions());
+    Iterator<UberDimension> it = dims.iterator();
     if (it.hasNext()) {
-      CubeDimensionTable dim = it.next();
+      UberDimension dim = it.next();
       appendWhereClause(dim, whereBuf, originalWhere != null || fact != null);
       while (it.hasNext()) {
         dim = it.next();
@@ -1421,6 +1485,20 @@ public class CubeQueryContext {
     @Override
     public String toString() {
       return fact.toString();
+    }
+  }
+
+  static class CandidateDim {
+    final CubeDimensionTable dimtable;
+    Set<String> storageTables = new HashSet<String>();
+    String whereClause;
+    CandidateDim(CubeDimensionTable dim) {
+      this.dimtable = dim;
+    }
+
+    @Override
+    public String toString() {
+      return dimtable.toString();
     }
   }
 

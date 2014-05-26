@@ -73,6 +73,7 @@ public class TestCubeMetastoreClient {
   private static String c1 = "C1";
   private static String c2 = "C2";
   private static String c3 = "C3";
+  private static UberDimension zipDim, cityDim, stateDim, countryDim;
 
   /**
    * Get the date partition as fieldschema
@@ -156,13 +157,13 @@ public class TestCubeMetastoreClient {
     cubeDimensions = new HashSet<CubeDimension>();
     List<CubeDimension> locationHierarchy = new ArrayList<CubeDimension>();
     locationHierarchy.add(new ReferencedDimension(new FieldSchema("zipcode",
-        "int", "zip"), new TableReference("ziptable", "zipcode")));
+        "int", "zip"), new TableReference("zipdim", "zipcode")));
     locationHierarchy.add(new ReferencedDimension(new FieldSchema("cityid",
-        "int", "city"), new TableReference("citytable", "id")));
+        "int", "city"), new TableReference("citydim", "id")));
     locationHierarchy.add(new ReferencedDimension(new FieldSchema("stateid",
-        "int", "state"), new TableReference("statetable", "id")));
+        "int", "state"), new TableReference("statedim", "id")));
     locationHierarchy.add(new ReferencedDimension(new FieldSchema("countryid",
-        "int", "country"), new TableReference("countrytable", "id")));
+        "int", "country"), new TableReference("countrydim", "id")));
     List<String> regions = Arrays.asList("APAC", "EMEA", "USA");
     locationHierarchy.add(new InlineDimension(new FieldSchema("regionname",
         "string", "region"), regions));
@@ -176,16 +177,16 @@ public class TestCubeMetastoreClient {
     List<CubeDimension> locationHierarchyWithStartTime = new ArrayList<CubeDimension>();
     locationHierarchyWithStartTime.add(new ReferencedDimension(
         new FieldSchema("zipcode2","int", "zip"),
-        new TableReference("ziptable", "zipcode"), now, now, 100.0));
+        new TableReference("zipdim", "zipcode"), now, now, 100.0));
     locationHierarchyWithStartTime.add(new ReferencedDimension(
         new FieldSchema("cityid2", "int", "city"),
-        new TableReference("citytable", "id"), now, null, null));
+        new TableReference("citydim", "id"), now, null, null));
     locationHierarchyWithStartTime.add(new ReferencedDimension(
         new FieldSchema("stateid2", "int", "state"),
-        new TableReference("statetable", "id"), now, null, 100.0));
+        new TableReference("statedim", "id"), now, null, 100.0));
     locationHierarchyWithStartTime.add(
         new ReferencedDimension(new FieldSchema("countryid2", "int", "country"),
-        new TableReference("countrytable", "id"),
+        new TableReference("countrydim", "id"),
         null, null, null));
     locationHierarchyWithStartTime.add(new InlineDimension(
         new FieldSchema("regionname2","string", "region"), regions));
@@ -217,6 +218,73 @@ public class TestCubeMetastoreClient {
         new FieldSchema("regionstart", "string", "region dim"), now,
         null, 100.0, regions));
     cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
+
+    cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
+        cubeNameWithProps), "dt,mydate");
+    cubeWithProps = new Cube(cubeNameWithProps, cubeMeasures, cubeDimensions,
+        cubeProperties);
+  }
+
+  private static void defineUberDims() {
+    // Define zip dimension
+    Set<CubeDimension> zipAttrs = new HashSet<CubeDimension>();
+    zipAttrs.add(new BaseDimension(new FieldSchema("zipcode", "int",
+        "code")));
+    zipAttrs.add(new BaseDimension(new FieldSchema("f1", "string",
+        "field1")));
+    zipAttrs.add(new BaseDimension(new FieldSchema("f2", "string",
+        "field1")));
+    List<TableReference> stateRefs = new ArrayList<TableReference>();
+    stateRefs.add(new TableReference("statedim", "id"));
+    stateRefs.add(new TableReference("stateWeatherDim", "id"));
+    zipAttrs.add(new ReferencedDimension(
+        new FieldSchema("stateid", "int", "state id"), stateRefs));
+    zipAttrs.add(new ReferencedDimension(
+        new FieldSchema("cityid", "int", "city id"),
+        new TableReference("citydim", "id")));
+    zipAttrs.add(new ReferencedDimension(
+        new FieldSchema("countryid", "int", "country id"),
+        new TableReference("countrydim", "id")));
+    zipDim = new UberDimension("zipdim", zipAttrs);
+    
+    // Define city table
+    Set<CubeDimension> cityAttrs = new HashSet<CubeDimension>();
+    cityAttrs.add(new BaseDimension(new FieldSchema("id", "int",
+        "code")));
+    cityAttrs.add(new BaseDimension(new FieldSchema("name", "string",
+        "city name")));
+    cityAttrs.add(new ReferencedDimension(
+        new FieldSchema("stateid", "int", "state id"),
+        new TableReference("statedim", "id")));
+    cityDim = new UberDimension("citydim", cityAttrs);
+
+    // Define state table
+    Set<CubeDimension> stateAttrs = new HashSet<CubeDimension>();
+    stateAttrs.add(new BaseDimension(new FieldSchema("id", "int",
+        "state id")));
+    stateAttrs.add(new BaseDimension(new FieldSchema("name", "string",
+        "state name")));
+    stateAttrs.add(new BaseDimension(new FieldSchema("capital", "string",
+        "state capital")));
+    stateAttrs.add(new ReferencedDimension(
+        new FieldSchema("countryid", "int", "country id"),
+        new TableReference("countrydim", "id")));
+    stateDim = new UberDimension("statedim", stateAttrs);
+
+    Set<CubeDimension> countryAttrs = new HashSet<CubeDimension>();
+    countryAttrs.add(new BaseDimension(new FieldSchema("id", "int",
+        "country id")));
+    countryAttrs.add(new BaseDimension(new FieldSchema("name", "string",
+        "country name")));
+    countryAttrs.add(new BaseDimension(new FieldSchema("capital", "string",
+        "country capital")));
+    countryAttrs.add(new BaseDimension(new FieldSchema("region", "string",
+        "region name")));
+    countryAttrs.add(new ReferencedDimension(
+        new FieldSchema("countryid", "int", "country id"),
+        new TableReference("countrydim", "id")));
+    countryDim = new UberDimension("countrydim", stateAttrs);
+    
 
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
         cubeNameWithProps), "dt,mydate");
@@ -1494,10 +1562,6 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("capital", "string", "field2"));
     dimColumns.add(new FieldSchema("countryid", "int", "country id"));
 
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    dimensionReferences.put("countryid", Arrays.asList(new TableReference("countrytable", "id")));
-
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
@@ -1513,10 +1577,10 @@ public class TestCubeMetastoreClient {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
-        dimColumns, 100L, dumpPeriods, dimensionReferences);
-    client.createCubeDimensionTable(dimName, dimColumns, 100L,
-        dimensionReferences, dumpPeriods, null, storageTables);
+    CubeDimensionTable cubeDim = new CubeDimensionTable(stateDim.getName(), dimName,
+        dimColumns, 100L, dumpPeriods);
+    client.createCubeDimensionTable(stateDim.getName(), dimName, dimColumns,
+        100L, dumpPeriods, null, storageTables);
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
@@ -1571,17 +1635,6 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("stateid", "int", "state id"));
     dimColumns.add(new FieldSchema("statei2", "int", "state id"));
 
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-
-
-    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
-
-    final TableReference stateRef = new TableReference("statetable", "id");
-    final TableReference cityRef =  new TableReference("citytable", "id");
-    dimensionReferences.put("stateid2",
-        Arrays.asList(stateRef, cityRef));
-
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
@@ -1597,10 +1650,10 @@ public class TestCubeMetastoreClient {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
-        dimColumns, 0L, dumpPeriods, dimensionReferences);
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, null, storageTables);
+    CubeDimensionTable cubeDim = new CubeDimensionTable(zipDim.getName(), dimName,
+        dimColumns, 0L, dumpPeriods);
+    client.createCubeDimensionTable(zipDim.getName(), dimName, dimColumns, 0L,
+        dumpPeriods, null, storageTables);
 
     Assert.assertTrue(client.tableExists(dimName));
 
@@ -1609,15 +1662,6 @@ public class TestCubeMetastoreClient {
 
     CubeDimensionTable cubeDim2 = new CubeDimensionTable(cubeTbl);
     Assert.assertTrue(cubeDim.equals(cubeDim2));
-
-    Map<String, List<TableReference>> actualRefs = cubeDim2.getDimensionReferences();
-    Assert.assertNotNull(actualRefs);
-    List<TableReference> multirefs = actualRefs.get("stateid2");
-    Assert.assertNotNull(multirefs);
-    Assert.assertEquals("Expecting two refs", 2, multirefs.size());
-    Assert.assertEquals(stateRef, multirefs.get(0));
-    Assert.assertEquals(cityRef, multirefs.get(1));
-
 
     // Assert for storage tables
     for (String storage : storageTables.keySet()) {
@@ -1710,9 +1754,6 @@ public class TestCubeMetastoreClient {
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("zipcode", "int", "code"));
 
-    Map<String, List<TableReference>> dimensionReferences =
-      new HashMap<String, List<TableReference>>();
-
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
@@ -1728,8 +1769,8 @@ public class TestCubeMetastoreClient {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 100L,
-        dimensionReferences, dumpPeriods, null, storageTables);
+    client.createCubeDimensionTable(zipDim.getName(), dimName, dimColumns, 100L,
+        dumpPeriods, null, storageTables);
 
     CubeDimensionTable dimTable = client.getDimensionTable(dimName);
     dimTable.alterColumn(new FieldSchema("testAddDim", "string", "test add column"));
@@ -1794,9 +1835,6 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("capital", "string", "field2"));
     dimColumns.add(new FieldSchema("region", "string", "region name"));
 
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
     Set<String> storageNames = new HashSet<String>();
 
     StorageTableDesc s1 = new StorageTableDesc();
@@ -1807,11 +1845,11 @@ public class TestCubeMetastoreClient {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
-        dimColumns, 0L, storageNames, dimensionReferences);
+    CubeDimensionTable cubeDim = new CubeDimensionTable(countryDim.getName(), dimName,
+        dimColumns, 0L, storageNames);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, storageNames, null, storageTables);
+    client.createCubeDimensionTable(countryDim.getName(), dimName, dimColumns,
+        0L, storageNames, null, storageTables);
 
 
     Assert.assertTrue(client.tableExists(dimName));
@@ -1838,10 +1876,6 @@ public class TestCubeMetastoreClient {
     dimColumns.add(new FieldSchema("name", "string", "field1"));
     dimColumns.add(new FieldSchema("stateid", "int", "state id"));
 
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
-
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
@@ -1863,10 +1897,10 @@ public class TestCubeMetastoreClient {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    CubeDimensionTable cubeDim = new CubeDimensionTable(dimName,
-        dimColumns, 0L, dumpPeriods, dimensionReferences);
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, null, storageTables);
+    CubeDimensionTable cubeDim = new CubeDimensionTable(cityDim.getName(), dimName,
+        dimColumns, 0L, dumpPeriods);
+    client.createCubeDimensionTable(cityDim.getName(), dimName, dimColumns, 0L,
+        dumpPeriods, null, storageTables);
 
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);

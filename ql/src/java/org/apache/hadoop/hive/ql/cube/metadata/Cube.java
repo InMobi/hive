@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  *
 */
 
-
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;

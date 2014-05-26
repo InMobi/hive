@@ -74,6 +74,10 @@ public class MetastoreUtil implements MetastoreConstants {
         dimName).length()));
   }
 
+  public static String getUberDimNameKey(String dimName) {
+    return getDimensionKeyPrefix(dimName)+ UBER_DIM_NAME_SFX;
+  }
+
   public static final String getDimensionSrcReferenceKey(String dimName) {
     return getDimensionKeyPrefix(dimName) + DIM_REFERS_SFX;
   }
@@ -199,6 +203,17 @@ public class MetastoreUtil implements MetastoreConstants {
   }
 
   // //////////////////////////
+  // Uber dimension properties ///
+  // /////////////////////////
+  public static final String getUberDimPrefix(String dimName) {
+    return UBER_DIMENSION_KEY_PFX + dimName.toLowerCase();
+  }
+
+  public static final String getUberDimAttributeListKey(String dimName) {
+    return getUberDimPrefix(dimName) + ATTRIBUTES_LIST_SFX;
+  }
+
+  // //////////////////////////
   // Fact propertes ///
   // /////////////////////////
   public static String getFactStorageListKey(String name) {
@@ -296,6 +311,14 @@ public class MetastoreUtil implements MetastoreConstants {
   public static List<String> getCubeDimensionNames(Cube table) {
     List<String> columns = new ArrayList<String>();
     for (CubeDimension f : table.getDimensions()) {
+      addColumnNames(f, columns);
+    }
+    return columns;
+  }
+
+  public static List<String> getAttributeNames(UberDimension table) {
+    List<String> columns = new ArrayList<String>();
+    for (CubeDimension f : table.getAttributes()) {
       addColumnNames(f, columns);
     }
     return columns;
