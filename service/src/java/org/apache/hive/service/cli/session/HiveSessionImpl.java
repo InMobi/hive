@@ -460,10 +460,16 @@ public class HiveSessionImpl implements HiveSession {
       if (metastoreClient != null) {
         metastoreClient.close();
       }
+      
+      /**
+       * Since async operations can be accessed across sessions, session close
+       * should not close the operations.
+       */
+      /*
       // Iterate through the opHandles and close their operations
       for (OperationHandle opHandle : opHandleSet) {
         operationManager.closeOperation(opHandle);
-      }
+      } */
       opHandleSet.clear();
       HiveHistory hiveHist = sessionState.getHiveHistory();
       if (null != hiveHist) {

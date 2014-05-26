@@ -39,6 +39,7 @@ public class CubeQueryRewriter {
   private final List<ContextRewriter> rewriters = new ArrayList<ContextRewriter>();
   private final HiveConf hconf;
   private Context ctx = null;
+  private boolean lightFactFirst;
 
   public CubeQueryRewriter(Configuration conf) {
     this.conf = conf;
@@ -48,6 +49,8 @@ public class CubeQueryRewriter {
     } catch (IOException e) {
       // IOException is ignorable
     }
+    lightFactFirst = conf.getBoolean(CubeQueryConfUtil.LIGHTEST_FACT_FIRST,
+        CubeQueryConfUtil.DEFAULT_LIGHTEST_FACT_FIRST);
     setupRewriters();
   }
 
@@ -59,11 +62,15 @@ public class CubeQueryRewriter {
     rewriters.add(new GroupbyResolver(conf));
     // Resolve joins and generate base join tree
     rewriters.add(new JoinResolver(conf));
+    if (lightFactFirst) {
+      rewriters.add(new LightestFactResolver(conf));
+    }
     // Resolve storage partitions and table names
     rewriters.add(new StorageTableResolver(conf));
     rewriters.add(new LeastPartitionResolver(conf));
-    rewriters.add(new LightestFactResolver(conf));
-    rewriters.add(new LeastDimensionResolver(conf));
+    if (!lightFactFirst) {
+      rewriters.add(new LightestFactResolver(conf));
+    }
   }
 
   public CubeQueryContext rewrite(ASTNode astnode) throws SemanticException {

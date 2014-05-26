@@ -33,6 +33,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
+import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
@@ -84,6 +85,9 @@ public class AggregateResolver implements ContextRewriter {
         while (factItr.hasNext()) {
           CubeQueryContext.CandidateFact candidate = factItr.next();
           if (candidate.fact.isAggregated()) {
+            cubeql.addFactPruningMsgs(candidate.fact,
+                new CandidateTablePruneCause(candidate.fact.getName(),
+                    CubeTableCause.MISSING_DEFAULT_AGGREGATE));
             factItr.remove();
           }
         }
