@@ -385,4 +385,13 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
     }
     return dimNames;
   }
+
+  @Override
+  public boolean canBeQueried() {
+    String canbeQueried = getProperties().get(MetastoreConstants.CUBE_CAN_BE_QUERIED);
+    if (canbeQueried != null) {
+      return Boolean.parseBoolean(canbeQueried);
+    }
+    return true;
+  }
 }

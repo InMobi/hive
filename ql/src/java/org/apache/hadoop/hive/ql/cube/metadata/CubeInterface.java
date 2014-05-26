@@ -41,4 +41,6 @@ public interface CubeInterface extends Named {
   public Set<String> getMeasureNames();
 
   public Set<String> getDimensionNames();
+
+  public boolean canBeQueried();
 }

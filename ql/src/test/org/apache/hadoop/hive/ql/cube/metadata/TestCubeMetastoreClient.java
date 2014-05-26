@@ -234,6 +234,7 @@ public class TestCubeMetastoreClient {
 
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
         cubeNameWithProps), "dt,mydate");
+    cubeProperties.put(MetastoreConstants.CUBE_CAN_BE_QUERIED, "false");
     cubeProperties.put("cube.custom.prop", "myval");
     cubeWithProps = new Cube(cubeNameWithProps, cubeMeasures, cubeDimensions,
         cubeProperties);
@@ -279,6 +280,7 @@ public class TestCubeMetastoreClient {
     Assert.assertEquals(cubeDimensions.size(), cube2.getDimensions().size());
     Assert.assertNotNull(cube2.getMeasureByName("msr4"));
     Assert.assertNotNull(cube2.getDimensionByName("location"));
+    Assert.assertTrue(cube2.canBeQueried());
 
     client.createDerivedCube(cubeName, derivedCubeName, measures, dimensions, new HashMap<String, String>(), 0L);
     Assert.assertTrue(client.tableExists(derivedCubeName));
@@ -296,6 +298,7 @@ public class TestCubeMetastoreClient {
     Assert.assertNull(dcube2.getMeasureByName("msr4"));
     Assert.assertNull(dcube2.getDimensionByName("location"));
     Assert.assertNotNull(dcube2.getDimensionByName("dim1"));
+    Assert.assertTrue(dcube2.canBeQueried());
 
     client.createCube(cubeNameWithProps, cubeMeasures, cubeDimensions,
         cubeProperties);
@@ -314,6 +317,7 @@ public class TestCubeMetastoreClient {
     Assert.assertEquals(cubeDimensions.size(), cube2.getDimensions().size());
     Assert.assertNotNull(cube2.getMeasureByName("msr4"));
     Assert.assertNotNull(cube2.getDimensionByName("location"));
+    Assert.assertFalse(cube2.canBeQueried());
 
     client.createDerivedCube(cubeNameWithProps, derivedCubeNameWithProps, measures, dimensions,
         cubeProperties, 0L);
@@ -329,6 +333,7 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(dcube2.getMeasureByName("msr3"));
     Assert.assertNull(dcube2.getDimensionByName("location"));
     Assert.assertNotNull(dcube2.getDimensionByName("dim1"));
+    Assert.assertTrue(dcube2.canBeQueried());
   }
 
   @Test

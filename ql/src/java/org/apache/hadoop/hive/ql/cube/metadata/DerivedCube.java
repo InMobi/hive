@@ -237,4 +237,9 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   public Set<String> getDimensionNames() {
     return dimensions;
   }
+
+  @Override
+  public boolean canBeQueried() {
+    return true;
+  }
 }
