@@ -384,6 +384,44 @@ public class TestCubeMetastoreClient {
   }
 
   @Test
+  public void testAlterDerivedCube() throws Exception {
+    String name = "alter_derived_cube";
+    client.createDerivedCube(cubeName, name, measures, dimensions,
+        new HashMap<String, String>(), 0L);
+    // Test alter cube
+    Table cubeTbl = client.getHiveTable(name);
+    DerivedCube toAlter = new DerivedCube(cubeTbl, (Cube)client.getCube(cubeName));
+    toAlter.addMeasure("msr4");
+    toAlter.removeMeasure("msr3");
+    toAlter.addDimension("dim1StartTime");
+    toAlter.removeDimension("dim1");
+
+    Assert.assertNotNull(toAlter.getMeasureByName("msr4"));
+    Assert.assertNotNull(toAlter.getMeasureByName("msr2"));
+    Assert.assertNull(toAlter.getMeasureByName("msr3"));
+    Assert.assertNotNull(toAlter.getDimensionByName("dim1StartTime"));
+    Assert.assertNotNull(toAlter.getDimensionByName("dim2"));
+    Assert.assertNull(toAlter.getDimensionByName("dim1"));
+
+    client.alterCube(name, toAlter);
+
+    DerivedCube altered = (DerivedCube)client.getCube(name);
+
+    Assert.assertEquals(toAlter, altered);
+    Assert.assertNotNull(altered.getMeasureByName("msr4"));
+    CubeMeasure addedMsr = altered.getMeasureByName("msr4");
+    Assert.assertEquals(addedMsr.getType(), "bigint");
+    Assert.assertNotNull(altered.getDimensionByName("dim1StartTime"));
+    BaseDimension addedDim = (BaseDimension) altered.getDimensionByName("dim1StartTime");
+    Assert.assertEquals(addedDim.getType(), "string");
+    Assert.assertNotNull(addedDim.getStartTime());
+    
+    client.dropCube(name);
+    Assert.assertFalse(client.tableExists(name));
+  }
+
+
+  @Test
   public void testCubeFact() throws Exception {
     String factName = "testMetastoreFact";
     List<FieldSchema> factColumns = new ArrayList<FieldSchema>(
