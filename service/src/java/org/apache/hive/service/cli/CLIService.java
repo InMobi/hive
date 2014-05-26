@@ -46,6 +46,7 @@ import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.cli.session.HiveSession;
 import org.apache.hive.service.cli.operation.Operation;
+import org.apache.hive.service.cli.session.HiveSessionImpl;
 import org.apache.hive.service.cli.session.SessionManager;
 import org.apache.hive.service.cli.thrift.TProtocolVersion;
 
@@ -178,6 +179,18 @@ public class CLIService extends CompositeService implements ICLIService {
     SessionHandle sessionHandle = sessionManager.openSession(SERVER_VERSION, username, password, configuration, false, null);
     LOG.debug(sessionHandle + ": openSession()");
     return sessionHandle;
+  }
+
+  /**
+   * Used to restore session in Grill
+   */
+  public SessionHandle restoreSession(SessionHandle sessionHandle, String username, String password,
+                                      Map<String, String> configuration)
+    throws HiveSQLException {
+    SessionHandle result = sessionManager.restoreSession(sessionHandle, SERVER_VERSION, username, password,
+      configuration, false, null);
+    LOG.debug(sessionHandle + ": restoreSession()");
+    return result;
   }
 
   /* (non-Javadoc)
