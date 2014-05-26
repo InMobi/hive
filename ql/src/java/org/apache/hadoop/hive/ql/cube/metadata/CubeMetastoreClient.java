@@ -66,7 +66,7 @@ public class CubeMetastoreClient {
   // map from table name to Table
   private final Map<String, Table> allHiveTables = new HashMap<String, Table>();
   // map from cube name to Cube
-  private final Map<String, Cube> allCubes = new HashMap<String, Cube>();
+  private final Map<String, CubeInterface> allCubes = new HashMap<String, CubeInterface>();
   // map from dim name to CubeDimensionTable
   private final Map<String, CubeDimensionTable> allDims = new HashMap<String, CubeDimensionTable>();
   // map from fact name to fact table
@@ -151,6 +151,16 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Create cube in metastore defined by {@link DerivedCube} object
+   *
+   * @param cube the {@link DerivedCube} object.
+   * @throws HiveException
+   */
+  public void createCube(DerivedCube cube) throws HiveException {
+    createCubeHiveTable(cube);
+  }
+
+  /**
    * Create cube defined by measures and dimensions
    *
    * @param name Name of the cube
@@ -182,9 +192,28 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Create derived cube defined by measures, dimensions and properties
+   *
+   * @param parent Name of the parent cube
+   * @param name Name of the derived cube
+   * @param measures Measures of the derived cube
+   * @param dimensions Dimensions of the derived cube
+   * @param properties Properties of the derived cube
+   * @param weight Weight of the derived cube
+   * @throws HiveException
+   */
+  public void createDerivedCube(String parent, String name, Set<String> measures,
+      Set<String> dimensions, Map<String, String> properties, double weight)
+          throws HiveException {
+    DerivedCube cube = new DerivedCube(name, measures, dimensions, properties,
+        weight, (Cube)getCube(parent));
+    createCube(cube);
+  }
+
+  /**
    * Create a cube fact table
    *
-   * @param cubeNames The cube names to which fact belongs to.
+   * @param cubeName The cube name to which fact belongs to.
    * @param factName The fact name
    * @param columns The columns of fact table
    * @param storageAggregatePeriods Aggregate periods for the storages
@@ -194,12 +223,12 @@ public class CubeMetastoreClient {
    *
    * @throws HiveException
    */
-  public void createCubeFactTable(List<String> cubeNames, String factName,
+  public void createCubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageAggregatePeriods, double weight,
       Map<String, String> properties, Map<String, StorageTableDesc> storageTableDescs)
           throws HiveException {
-    CubeFactTable factTable = new CubeFactTable(cubeNames, factName, columns,
+    CubeFactTable factTable = new CubeFactTable(cubeName, factName, columns,
         storageAggregatePeriods, weight, properties);
     createCubeTable(factTable, storageTableDescs);
   }
@@ -696,8 +725,8 @@ public class CubeMetastoreClient {
 
   boolean isFactTableForCube(Table tbl, String cube) {
     if (isFactTable(tbl)) {
-      return CubeFactTable.getCubeNames(tbl.getTableName(),
-          tbl.getParameters()).contains(cube.toLowerCase());
+      return CubeFactTable.getCubeName(tbl.getTableName(),
+          tbl.getParameters()).equalsIgnoreCase(cube.toLowerCase());
     }
     return false;
   }
@@ -852,8 +881,8 @@ public class CubeMetastoreClient {
    * @return Returns cube is table name passed is a cube, null otherwise
    * @throws HiveException
    */
-  public Cube getCube(String tableName) throws HiveException {
-    Cube cube = allCubes.get(tableName.toLowerCase());
+  public CubeInterface getCube(String tableName) throws HiveException {
+    CubeInterface cube = allCubes.get(tableName.toLowerCase());
     if (cube == null) {
       Table tbl = getTable(tableName);
       if (isCube(tbl)) {
@@ -885,8 +914,13 @@ public class CubeMetastoreClient {
     return fact;
   }
 
-  private Cube getCube(Table tbl) {
-    return new Cube(tbl);
+  private CubeInterface getCube(Table tbl) throws HiveException {
+    String parentCube = tbl.getParameters().get(MetastoreUtil.getParentCubeNameKey(tbl.getTableName()));
+    if (parentCube != null) {
+      return new DerivedCube(tbl, (Cube)getCube(parentCube));
+    } else {
+      return new Cube(tbl);
+    }
   }
 
   /**
@@ -941,12 +975,12 @@ public class CubeMetastoreClient {
    * @return List of Cube objects
    * @throws HiveException
    */
-  public List<Cube> getAllCubes()
+  public List<CubeInterface> getAllCubes()
       throws HiveException {
-    List<Cube> cubes = new ArrayList<Cube>();
+    List<CubeInterface> cubes = new ArrayList<CubeInterface>();
     try {
       for (String table : getAllHiveTableNames()) {
-        Cube cube = getCube(table);
+        CubeInterface cube = getCube(table);
         if (cube != null) {
           cubes.add(cube);
         }
@@ -992,11 +1026,12 @@ public class CubeMetastoreClient {
    * @return List of fact tables
    * @throws HiveException
    */
-  public List<CubeFactTable> getAllFactTables(Cube cube) throws HiveException {
+  public List<CubeFactTable> getAllFactTables(CubeInterface cube) throws HiveException {
+    if (cube instanceof Cube) {
     List<CubeFactTable> cubeFacts = new ArrayList<CubeFactTable>();
     try {
       for (CubeFactTable fact : getAllFacts()) {
-        if (fact.getCubeNames().contains(cube.getName().toLowerCase())) {
+        if (fact.getCubeName().equalsIgnoreCase(((Cube)cube).getName().toLowerCase())) {
           cubeFacts.add(fact);
         }
       }
@@ -1004,6 +1039,9 @@ public class CubeMetastoreClient {
       throw new HiveException("Could not get all tables", e);
     }
     return cubeFacts;
+    } else {
+      return getAllFactTables(((DerivedCube)cube).getParent());
+    }
   }
 
   public List<String> getPartColNames(String tableName)
@@ -1078,15 +1116,15 @@ public class CubeMetastoreClient {
    * Alter cube specified by the name to new definition
    *
    * @param cubeName The cube name to be altered
-   * @param cube The new cube definition
+   * @param cube The new cube definition {@link Cube} or {@link DerivedCube}
    * @throws HiveException
    * @throws InvalidOperationException
    */
-  public void alterCube(String cubeName, Cube cube)
+  public void alterCube(String cubeName, CubeInterface cube)
       throws HiveException {
     Table cubeTbl = getTable(cubeName);
     if (isCube(cubeTbl)) {
-      alterCubeTable(cubeName, cubeTbl, cube);
+      alterCubeTable(cubeName, cubeTbl, (AbstractCubeTable)cube);
       if (enableCaching) {
         allCubes.put(cubeName, getCube(refreshTable(cubeName)));
       }

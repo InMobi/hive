@@ -196,6 +196,45 @@ public class TestCubeRewriter {
   }
 
   @Test
+  public void testDerivedCube() throws SemanticException, ParseException {
+    String hqlQuery = rewrite(driver, "cube select" +
+        " SUM(msr2) from derivedCube where " + twoDaysRange);
+    String expected = getExpectedQuery(CubeTestSetup.DERIVED_CUBE_NAME,
+        "select sum(derivedCube.msr2) FROM ", null, null,
+        getWhereForDailyAndHourly2days(CubeTestSetup.DERIVED_CUBE_NAME, "C2_testfact"));
+    compareQueries(expected, hqlQuery);
+    System.out.println("Non existing parts:" + rewrittenQuery.getNonExistingParts());
+    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
+
+    SemanticException th = null;
+    try {
+      hqlQuery = rewrite(driver, "select SUM(msr4) from derivedCube" +
+          " where " + twoDaysRange);
+    } catch (SemanticException e) {
+      th = e;
+      e.printStackTrace();
+    }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.COLUMN_NOT_FOUND.getErrorCode());
+
+    // test join
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "cube select" +
+        " testdim2.name, SUM(msr2) from derivedCube where " + twoDaysRange);
+    expected = getExpectedQuery(CubeTestSetup.DERIVED_CUBE_NAME,
+        "select testdim2.name, sum(derivedCube.msr2) FROM ",
+        " JOIN " + getDbName() + "c1_testdim2 testdim2 ON derivedCube.dim2 = " +
+          " testdim2.id and (testdim2.dt = 'latest') ", null, "group by (testdim2.name)", null,
+          getWhereForDailyAndHourly2days(CubeTestSetup.DERIVED_CUBE_NAME, "C2_testfact"));
+    compareQueries(expected, hqlQuery);
+
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+  }
+
+  @Test
   public void testCubeInsert() throws Exception {
     String hqlQuery = rewrite(driver, "insert overwrite directory" +
       " '/tmp/test' select SUM(msr2) from testCube where " + twoDaysRange);

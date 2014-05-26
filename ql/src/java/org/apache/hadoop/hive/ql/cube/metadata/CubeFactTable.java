@@ -41,36 +41,36 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeFactTable extends AbstractCubeTable {
-  private final List<String> cubeNames;
+  private String cubeName;
   private final Map<String, Set<UpdatePeriod>> storageUpdatePeriods;
 
   public CubeFactTable(Table hiveTable) {
     super(hiveTable);
     this.storageUpdatePeriods = getUpdatePeriods(getName(), getProperties());
-    this.cubeNames = getCubeNames(getName(), getProperties());
+    this.cubeName = getCubeName(getName(), getProperties());
   }
 
-  public CubeFactTable(List<String> cubeNames, String factName,
+  public CubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageUpdatePeriods) {
-    this(cubeNames, factName, columns, storageUpdatePeriods, 0L,
+    this(cubeName, factName, columns, storageUpdatePeriods, 0L,
         new HashMap<String, String>());
   }
 
-  public CubeFactTable(List<String> cubeNames, String factName,
+  public CubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageUpdatePeriods, double weight) {
-    this(cubeNames, factName, columns, storageUpdatePeriods, weight,
+    this(cubeName, factName, columns, storageUpdatePeriods, weight,
         new HashMap<String, String>());
   }
 
-  public CubeFactTable(List<String> cubeNames, String factName,
+  public CubeFactTable(String cubeName, String factName,
       List<FieldSchema> columns,
       Map<String, Set<UpdatePeriod>> storageUpdatePeriods,
       double weight,
       Map<String, String> properties) {
     super(factName, columns, properties, weight);
-    this.cubeNames = cubeNames;
+    this.cubeName = cubeName;
     this.storageUpdatePeriods = storageUpdatePeriods;
     addProperties();
   }
@@ -78,7 +78,7 @@ public final class CubeFactTable extends AbstractCubeTable {
   @Override
   protected void addProperties() {
     super.addProperties();
-    addCubeNames(getName(), getProperties(), cubeNames);
+    addCubeNames(getName(), getProperties(), cubeName);
     addUpdatePeriodProperies(getName(), getProperties(), storageUpdatePeriods);
   }
 
@@ -96,9 +96,8 @@ public final class CubeFactTable extends AbstractCubeTable {
   }
 
   private static void addCubeNames(String factName, Map<String, String> props,
-      List<String> cubeNames) {
-    props.put(MetastoreUtil.getFactCubeNamesKey(factName),
-        StringUtils.join(cubeNames, ",").toLowerCase());
+      String cubeName) {
+    props.put(MetastoreUtil.getFactCubeNameKey(factName), cubeName);
   }
 
   private static Map<String, Set<UpdatePeriod>> getUpdatePeriods(String name,
@@ -122,11 +121,8 @@ public final class CubeFactTable extends AbstractCubeTable {
     return storageUpdatePeriods;
   }
 
-  static List<String> getCubeNames(String factName, Map<String, String> props) {
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.addAll(Arrays.asList(StringUtils.split(
-        props.get(MetastoreUtil.getFactCubeNamesKey(factName)), ',')));
-    return cubeNames;
+  static String getCubeName(String factName, Map<String, String> props) {
+    return props.get(MetastoreUtil.getFactCubeNameKey(factName));
   }
 
   public Map<String, Set<UpdatePeriod>> getUpdatePeriods() {
@@ -140,6 +136,9 @@ public final class CubeFactTable extends AbstractCubeTable {
     }
 
     CubeFactTable other = (CubeFactTable) obj;
+    if (!this.getCubeName().equals(other.getCubeName())) {
+      return false;
+    }
     if (this.getUpdatePeriods() == null) {
       if (other.getUpdatePeriods() != null) {
         return false;
@@ -245,8 +244,8 @@ public final class CubeFactTable extends AbstractCubeTable {
     return storageUpdatePeriods.keySet();
   }
 
-  public List<String> getCubeNames() {
-    return cubeNames;
+  public String getCubeName() {
+    return cubeName;
   }
 
   /**
@@ -342,23 +341,13 @@ public final class CubeFactTable extends AbstractCubeTable {
   }
 
   /**
-   * Add a cubeName to which this fact belongs
+   * Alter the cubeName to which this fact belongs
    *
    * @param cubeName
    */
-  public void addCubeName(String cubeName) {
-    cubeNames.add(cubeName.toLowerCase());
-    addCubeNames(getName(), getProperties(), cubeNames);
-  }
-
-  /**
-   * Remove a cubeName to which this fact no more belongs
-   *
-   * @param cubeName
-   */
-  public void removeCubeName(String cubeName) {
-    cubeNames.remove(cubeName.toLowerCase());
-    addCubeNames(getName(), getProperties(), cubeNames);
+  public void alterCubeName(String cubeName) {
+    this.cubeName = cubeName;
+    addCubeNames(getName(), getProperties(), cubeName);
   }
 
   public boolean isAggregated() {

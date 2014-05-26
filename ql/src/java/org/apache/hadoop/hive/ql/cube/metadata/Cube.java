@@ -367,4 +367,22 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   public boolean isDerivedCube() {
     return false;
   }
+
+  @Override
+  public Set<String> getMeasureNames() {
+    Set<String> measureNames = new HashSet<String>();
+    for (CubeMeasure f : getMeasures()) {
+      measureNames.add(f.getName().toLowerCase());
+    }
+    return measureNames;
+  }
+
+  @Override
+  public Set<String> getDimensionNames() {
+    Set<String> dimNames = new HashSet<String>();
+    for (CubeDimension f : getDimensions()) {
+      MetastoreUtil.addColumnNames(f, dimNames);
+    }
+    return dimNames;
+  }
 }

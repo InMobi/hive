@@ -2,7 +2,7 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.util.Set;
 
-public interface CubeInterface {
+public interface CubeInterface extends Named {
 
   public Set<CubeMeasure> getMeasures();
 

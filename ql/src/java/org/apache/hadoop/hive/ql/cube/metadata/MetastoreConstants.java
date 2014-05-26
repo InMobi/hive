@@ -36,7 +36,7 @@ public interface MetastoreConstants {
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
   public static final String UPDATE_PERIOD_SFX = ".updateperiods";
-  public static final String CUBE_NAMES_SFX = ".cubenames";
+  public static final String CUBE_NAME_SFX = ".cubename";
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
   public static final String FACT_AGGREGATED_PROPERTY = "cube.fact.is.aggregated";
 
