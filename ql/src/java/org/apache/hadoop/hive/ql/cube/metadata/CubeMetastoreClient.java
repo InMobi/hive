@@ -141,24 +141,15 @@ public class CubeMetastoreClient {
   }
 
   /**
-   * Create cube in metastore defined by {@link Cube} object
+   * Create cube in metastore defined by {@link Cube} or {@link DerivedCube} object
    *
    * @param cube the {@link Cube} object.
    * @throws HiveException
    */
-  public void createCube(Cube cube) throws HiveException {
-    createCubeHiveTable(cube);
+  public void createCube(CubeInterface cube) throws HiveException {
+    createCubeHiveTable((AbstractCubeTable)cube);
   }
 
-  /**
-   * Create cube in metastore defined by {@link DerivedCube} object
-   *
-   * @param cube the {@link DerivedCube} object.
-   * @throws HiveException
-   */
-  public void createCube(DerivedCube cube) throws HiveException {
-    createCubeHiveTable(cube);
-  }
 
   /**
    * Create cube defined by measures and dimensions
