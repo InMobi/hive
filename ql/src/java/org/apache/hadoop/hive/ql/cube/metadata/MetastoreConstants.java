@@ -31,11 +31,13 @@ public interface MetastoreConstants {
   public static final String MEASURES_LIST_SFX = ".measures.list";
   public static final String DIMENSIONS_LIST_SFX = ".dimensions.list";
   public static final String TIMED_DIMENSIONS_LIST_SFX = ".timed.dimensions.list";
+  public static final String PARENT_CUBE_SFX = ".parent.cube";
+  public static final String CUBE_CAN_BE_QUERIED = "cube.can.be.queried";
 
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
   public static final String UPDATE_PERIOD_SFX = ".updateperiods";
-  public static final String CUBE_NAMES_SFX = ".cubenames";
+  public static final String CUBE_NAME_SFX = ".cubename";
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
   public static final String FACT_AGGREGATED_PROPERTY = "cube.fact.is.aggregated";
 

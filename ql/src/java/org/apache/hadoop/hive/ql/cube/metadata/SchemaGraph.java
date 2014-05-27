@@ -90,7 +90,7 @@ public class SchemaGraph {
  */
   private final CubeMetastoreClient metastore;
   // Graph for each cube
-  private Map<Cube, Map<AbstractCubeTable, Set<TableRelationship>>> cubeToGraph;
+  private Map<CubeInterface, Map<AbstractCubeTable, Set<TableRelationship>>> cubeToGraph;
 
   // sub graph that contains only dimensions, mainly used while checking connectivity
   // between a set of dimensions
@@ -100,7 +100,7 @@ public class SchemaGraph {
     this.metastore = metastore;
   }
 
-  public Map<AbstractCubeTable, Set<TableRelationship>> getCubeGraph(Cube cube) {
+  public Map<AbstractCubeTable, Set<TableRelationship>> getCubeGraph(CubeInterface cube) {
     return cubeToGraph.get(cube);
   }
 
@@ -114,8 +114,8 @@ public class SchemaGraph {
    * @throws org.apache.hadoop.hive.ql.metadata.HiveException
    */
   public void buildSchemaGraph() throws HiveException {
-    cubeToGraph = new HashMap<Cube, Map<AbstractCubeTable, Set<TableRelationship>>>();
-    for (Cube cube : metastore.getAllCubes()) {
+    cubeToGraph = new HashMap<CubeInterface, Map<AbstractCubeTable, Set<TableRelationship>>>();
+    for (CubeInterface cube : metastore.getAllCubes()) {
       Map<AbstractCubeTable, Set<TableRelationship>> graph =
         new HashMap<AbstractCubeTable, Set<TableRelationship>>();
       buildCubeGraph(cube, graph);
@@ -134,7 +134,7 @@ public class SchemaGraph {
   }
 
   // Build schema graph for a cube
-  private void buildCubeGraph(Cube cube, Map<AbstractCubeTable, Set<TableRelationship>> graph)
+  private void buildCubeGraph(CubeInterface cube, Map<AbstractCubeTable, Set<TableRelationship>> graph)
     throws HiveException {
     List<CubeDimension> refDimensions = new ArrayList<CubeDimension>();
     // find out all dimensions which link to other dimension tables
@@ -164,7 +164,7 @@ public class SchemaGraph {
           if (metastore.isDimensionTable(destTableName)) {
             // Cube -> Dimension reference
             CubeDimensionTable relatedDim = metastore.getDimensionTable(destTableName);
-            addLinks(refDim.getName(), cube, destColumnName, relatedDim, graph);
+            addLinks(refDim.getName(), (AbstractCubeTable)cube, destColumnName, relatedDim, graph);
           } else if (metastore.isFactTable(destTableName)) {
             throw new HiveException("Dim -> Fact references are not supported: "
               + dim.getName() + "." + refDim.getName() + "->" + destTableName + "." + destColumnName);
@@ -274,20 +274,20 @@ public class SchemaGraph {
    * @return
    */
   public boolean findJoinChain(CubeDimensionTable joinee, AbstractCubeTable target,
-                               List<TableRelationship> chain) {
-    if (target instanceof Cube) {
+      List<TableRelationship> chain) {
+    if (target instanceof CubeInterface) {
       return findJoinChain(joinee, target, cubeToGraph.get(target), chain,
-        new HashSet<AbstractCubeTable>());
+          new HashSet<AbstractCubeTable>());
     } else if (target instanceof CubeDimensionTable) {
       return findJoinChain(joinee, target, dimOnlySubGraph, chain,
-        new HashSet<AbstractCubeTable>());
+          new HashSet<AbstractCubeTable>());
     } else {
       return false;
     }
   }
 
   public void print() {
-    for (Cube cube : cubeToGraph.keySet()) {
+    for (CubeInterface cube : cubeToGraph.keySet()) {
       Map<AbstractCubeTable, Set<TableRelationship>> graph = cubeToGraph.get(cube);
       System.out.println("**Cube " + cube.getName());
       System.out.println("--Graph-Nodes=" + graph.size());

@@ -36,7 +36,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
-public final class Cube extends AbstractCubeTable {
+public class Cube extends AbstractCubeTable implements CubeInterface {
   private final Set<CubeMeasure> measures;
   private final Set<CubeDimension> dimensions;
   private static final List<FieldSchema> columns = new ArrayList<FieldSchema>();
@@ -361,5 +361,37 @@ public final class Cube extends AbstractCubeTable {
       getProperties().put(MetastoreUtil.getCubeTimedDimensionListKey(getName()),
           StringUtils.join(timeDims, ","));
     }
+  }
+
+  @Override
+  public boolean isDerivedCube() {
+    return false;
+  }
+
+  @Override
+  public Set<String> getMeasureNames() {
+    Set<String> measureNames = new HashSet<String>();
+    for (CubeMeasure f : getMeasures()) {
+      measureNames.add(f.getName().toLowerCase());
+    }
+    return measureNames;
+  }
+
+  @Override
+  public Set<String> getDimensionNames() {
+    Set<String> dimNames = new HashSet<String>();
+    for (CubeDimension f : getDimensions()) {
+      MetastoreUtil.addColumnNames(f, dimNames);
+    }
+    return dimNames;
+  }
+
+  @Override
+  public boolean canBeQueried() {
+    String canbeQueried = getProperties().get(MetastoreConstants.CUBE_CAN_BE_QUERIED);
+    if (canbeQueried != null) {
+      return Boolean.parseBoolean(canbeQueried);
+    }
+    return true;
   }
 }
