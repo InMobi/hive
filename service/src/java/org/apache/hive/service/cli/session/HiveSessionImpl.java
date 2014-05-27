@@ -87,11 +87,11 @@ public class HiveSessionImpl implements HiveSession {
   private PrintStream sessionErr;
   private File sessionLogDir;
 
-  public HiveSessionImpl(TProtocolVersion protocol, String username, String password,
-      HiveConf serverhiveConf, Map<String, String> sessionConfMap, String ipAddress) {
+  protected HiveSessionImpl(SessionHandle sessionHandle, TProtocolVersion protocol, String username, String password,
+                         HiveConf serverhiveConf, Map<String, String> sessionConfMap, String ipAddress) {
     this.username = username;
     this.password = password;
-    this.sessionHandle = new SessionHandle(protocol);
+    this.sessionHandle = sessionHandle;
     this.hiveConf = new HiveConf(serverhiveConf);
     this.ipAddress = ipAddress;
 
@@ -103,14 +103,19 @@ public class HiveSessionImpl implements HiveSession {
     }
     // set an explicit session name to control the download directory name
     hiveConf.set(ConfVars.HIVESESSIONID.varname,
-        sessionHandle.getHandleIdentifier().toString());
+      sessionHandle.getHandleIdentifier().toString());
     // use thrift transportable formatter
     hiveConf.set(ListSinkOperator.OUTPUT_FORMATTER,
-        FetchFormatter.ThriftFormatter.class.getName());
+      FetchFormatter.ThriftFormatter.class.getName());
     hiveConf.setInt(ListSinkOperator.OUTPUT_PROTOCOL, protocol.getValue());
     sessionState = new SessionState(hiveConf, username);
     sessionState.setIsHiveServerQuery(true);
     SessionState.start(sessionState);
+  }
+
+  public HiveSessionImpl(TProtocolVersion protocol, String username, String password,
+      HiveConf serverhiveConf, Map<String, String> sessionConfMap, String ipAddress) {
+    this(new SessionHandle(protocol), protocol, username, password, serverhiveConf, sessionConfMap, ipAddress);
   }
 
   @Override
