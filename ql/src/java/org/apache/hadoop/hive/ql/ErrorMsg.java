@@ -431,6 +431,7 @@ public enum ErrorMsg {
   JOIN_TARGET_NOT_CUBE_TABLE(15022, "Join target table {0} is neither dimension nor cube", true),
   NO_FACT_HAS_COLUMN(15023, "No fact table has the queried column"),
   NO_CANDIDATE_DIM_STORAGE_TABLES(15024, "No candidate dimension storage tables for dimension because {0}", true),
+  CUBE_NOT_QUERYABLE(15025, "Cube {0} cannot be queried", true),
   
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),

@@ -234,6 +234,9 @@ public class CubeQueryContext {
             }
           }
           cube = client.getCube(tblName);
+          if (!cube.canBeQueried()) {
+            throw new SemanticException(ErrorMsg.CUBE_NOT_QUERYABLE, tblName);
+          }
           cubeMeasureNames = cube.getMeasureNames();
           cubeDimNames = cube.getDimensionNames();
           timedDimensions = cube.getTimedDimensions();
