@@ -218,7 +218,7 @@ public class StorageTableResolver implements ContextRewriter {
           skipStorageCauses.put(storage, SkipStorageCause.UNSUPPORTED);
         }
       }
-      if (dimStorageMap.get(dim).isEmpty()) {
+      if (dimStorageMap.get(dim) == null || dimStorageMap.get(dim).isEmpty()) {
         String reason = "";
         CandidateTablePruneCause cause = new CandidateTablePruneCause(
             dim.getName(), skipStorageCauses);
