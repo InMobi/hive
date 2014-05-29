@@ -179,11 +179,6 @@
       <version>${guava.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-      <version>${protobuf.version}</version>
-    </dependency>
-    <dependency>
       <groupId>com.googlecode.javaewah</groupId>
       <artifactId>JavaEWAH</artifactId>
       <version>${javaewah.version}</version>
@@ -331,6 +326,12 @@
           <version>${hadoop-20S.version}</version>
          <optional>true</optional>
         </dependency>
+        <dependency>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+          <version>${hadoop-2.0.protobuf.version}</version>
+          <optional>true</optional>
+        </dependency>
       </dependencies>
     </profile>
     <profile>
@@ -387,6 +388,12 @@
          <optional>true</optional>
          <scope>test</scope>
        </dependency>
+       <dependency>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
+          <version>${protobuf.version}</version>
+          <optional>true</optional>
+        </dependency>
       </dependencies>
     </profile>
     <profile>
