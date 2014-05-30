@@ -242,19 +242,18 @@ public class TestJoinResolver {
     String hql = rewrittenQuery.toHQL();
     System.out.println("testPartialJoinResolver Partial join hql: " + hql);
     System.out.println("testPartialJoinResolver Partial dbname :" + getDbName());
-    System.out.println(hql.contains(getDbName()+ "c1_testfact2_raw testcube" +
-        " left outer join " + getDbName() + "c1_citytable citytable " +
-        "on testcube.cityid = citytable.id and ((( citytable.name ) =  'FOOBAR' )) and (citytable.dt = 'latest')"));
-    assertTrue(hql.contains(getDbName()+ "c1_testfact2_raw testcube" +
-      " left outer join " + getDbName() + "c1_citytable citytable " +
-      "on testcube.cityid = citytable.id and (((citytable.name) =  'FOOBAR' )) and (citytable.dt = 'latest')"));
+    String partSQL = getDbName() + "c1_citytable citytable on testcube.cityid " +
+        "= citytable.id and ((( citytable . name ) =  'FOOBAR' )) " +
+        "and (citytable.dt = 'latest')";
+    assertTrue(hql.contains(partSQL));
+    partSQL = "right outer join "+ getDbName() +"c1_testdim2 testdim2 on " +
+        "testcube.dim2 = testdim2.id right outer join "+ getDbName()+
+        "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and " +
+        "(testdim2.dt = 'latest') right outer join "+ getDbName() +
+        "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and " +
+        "((( testdim4 . name ) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')";
 
-    assertTrue(hql.contains("right outer join " + getDbName() + "c1_testdim2 testdim2 " +
-      "on testcube.dim2 = testdim2.id " +
-      "right outer join " + getDbName() + "c1_testdim3 testdim3 " +
-      "on testdim2.testdim3id = testdim3.id and (testdim2.dt = 'latest') " +
-      "right outer join " + getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id " +
-      "and (((testdim4.name) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')"));
+    assertTrue(hql.contains(partSQL));
   }
 
   @Test

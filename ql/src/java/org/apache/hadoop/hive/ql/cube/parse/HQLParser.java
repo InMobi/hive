@@ -334,7 +334,7 @@ public class HQLParser {
       } else if (KW_FALSE == rootType) {
         buf.append(" false ");
       } else {
-        buf.append(rootText == null ? "" : rootText.toLowerCase());
+        buf.append(" ").append(rootText == null ? "" : rootText.toLowerCase()).append(" ");
       }
 
     } else if (UNARY_OPERATORS.contains(Integer.valueOf(rootType))) {
