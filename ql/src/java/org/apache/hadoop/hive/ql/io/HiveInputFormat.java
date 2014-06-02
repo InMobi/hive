@@ -36,6 +36,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
@@ -320,6 +321,12 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     TableDesc currentTable = null;
     TableScanOperator currentTableScan = null;
 
+    boolean pushDownProjection = false;
+    //Buffers to hold filter pushdown information
+    StringBuilder readColumnsBuffer = new StringBuilder(newjob.
+      get(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, ""));;
+    StringBuilder readColumnNamesBuffer = new StringBuilder(newjob.
+      get(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, ""));
     // for each dir, get the InputFormat, and do getSplits.
     for (Path dir : dirs) {
       PartitionDesc part = getPartitionDescFromPath(pathToPartitionInfo, dir);
@@ -335,9 +342,13 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
         Operator op = mrwork.getAliasToWork().get(aliases.get(0));
         if ((op != null) && (op instanceof TableScanOperator)) {
           tableScan = (TableScanOperator) op;
+          //Reset buffers to store filter push down columns
+          readColumnsBuffer.setLength(0);
+          readColumnNamesBuffer.setLength(0);
           // push down projections.
-          ColumnProjectionUtils.appendReadColumns(
-              newjob, tableScan.getNeededColumnIDs(), tableScan.getNeededColumns());
+          ColumnProjectionUtils.appendReadColumns(readColumnsBuffer, readColumnNamesBuffer,
+            tableScan.getNeededColumnIDs(), tableScan.getNeededColumns());
+          pushDownProjection = true;
           // push down filters
           pushFilters(newjob, tableScan);
         }
@@ -364,6 +375,13 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       currentTableScan = tableScan;
       currentTable = table;
       currentInputFormatClass = inputFormatClass;
+    }
+    if (pushDownProjection) {
+      newjob.setBoolean(ColumnProjectionUtils.READ_ALL_COLUMNS, false);
+      newjob.set(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, readColumnsBuffer.toString());
+      newjob.set(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, readColumnNamesBuffer.toString());
+      LOG.info(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR + "=" + readColumnsBuffer.toString());
+      LOG.info(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR + "=" + readColumnNamesBuffer.toString());
     }
 
     if (dirs.length != 0) {
