@@ -886,13 +886,23 @@ public class CubeQueryContext {
 
   public String getStorageString(AbstractCubeTable tbl) {
     String database = SessionState.get().getCurrentDatabase();
-    // Add database name suffix for default database
+    // Add database name prefix for non default database
     if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
       return database + "." + StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
         getAliasForTabName(tbl.getName());
     } else {
       return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
         getAliasForTabName(tbl.getName());
+    }
+  }
+
+  private String getStorageStringWithAlias(AbstractCubeTable tbl, String alias) {
+    String database = SessionState.get().getCurrentDatabase();
+    // Add database name prefix for non default database
+    if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
+      return database + "." + StringUtils.join(storageTableToQuery.get(tbl), ",") + " " + alias;
+    } else {
+      return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " + alias;
     }
   }
 
@@ -937,7 +947,7 @@ public class CubeQueryContext {
       }
     } else { // (joinTree.getBaseSrc()[0] != null){
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[0]).toLowerCase();
-      builder.append(getStorageString(cubeTbls.get(tblName)));
+      builder.append(getStorageStringWithAlias(cubeTbls.get(tblName), joinTree.getBaseSrc()[0]));
       if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.RIGHTOUTER)) {
         joiningTable = tblName;
       }
@@ -952,7 +962,7 @@ public class CubeQueryContext {
       }
     } else { // (joinTree.getBaseSrc()[1] != null){
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[1]).toLowerCase();
-      builder.append(getStorageString(cubeTbls.get(tblName)));
+      builder.append(getStorageStringWithAlias(cubeTbls.get(tblName), joinTree.getBaseSrc()[1]));
       if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.LEFTOUTER)) {
         joiningTable = tblName;
       }

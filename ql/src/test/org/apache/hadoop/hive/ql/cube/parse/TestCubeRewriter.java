@@ -1469,4 +1469,24 @@ public class TestCubeRewriter {
       " citytable.id) from ", null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
   }
+
+  @Test
+  public void testJoinWithMultipleAliases() throws Exception {
+    HiveConf conf = new HiveConf();
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
+    String cubeQl = "SELECT SUM(msr2) from testCube left outer join citytable c1 on testCube.cityid = c1.id" +
+      " left outer join statetable s1 on c1.stateid = s1.id" +
+      " left outer join citytable c2 on s1.countryid = c2.id where " + twoDaysRange;
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(conf);
+    CubeQueryContext context  = rewriter.rewrite(cubeQl);
+    String hql = context.toHQL();
+    String db = getDbName();
+    String expectedJoin = "FROM " + db + ".c3_testfact testcube " +
+      "LEFT OUTER JOIN " + db + ".c1_citytable c1 ON (( testcube . cityid ) = ( c1 . id )) AND (c1.dt = 'latest') " +
+      "LEFT OUTER JOIN " + db + ".c1_statetable s1 ON (( c1 . stateid ) = ( s1 . id )) AND (s1.dt = 'latest') " +
+      "LEFT OUTER JOIN " + db + ".c1_citytable c2 ON (( s1 . countryid ) = ( c2 . id ))";
+
+    Assert.assertTrue(hql.replaceAll("\\W+", "").contains(expectedJoin.replaceAll("\\W+", "")));
+    System.out.println("%%% " + hql);
+   }
 }
