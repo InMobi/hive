@@ -124,6 +124,7 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-exec</artifactId>
+      <classifier>withdep</classifier>
       <version>${project.version}</version>
     </dependency>
     <dependency>
