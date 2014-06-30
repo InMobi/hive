@@ -98,6 +98,7 @@ public class CubeTestSetup {
   private Set<CubeMeasure> cubeMeasures;
   private Set<CubeDimension> cubeDimensions;
   public static final String TEST_CUBE_NAME= "testCube";
+  public static final String DERIVED_CUBE_NAME= "derivedCube";
   public static Date now;
   public static Date twodaysBack;
   public static String twoDaysRange;
@@ -502,6 +503,16 @@ public class CubeTestSetup {
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
         TEST_CUBE_NAME), "dt,pt,it,et");
     client.createCube(TEST_CUBE_NAME, cubeMeasures, cubeDimensions, cubeProperties);
+    
+    Set<String> measures = new HashSet<String>();
+    measures.add("msr1");
+    measures.add("msr2");
+    measures.add("msr3");
+    Set<String> dimensions = new HashSet<String>();
+    dimensions.add("dim1");
+    dimensions.add("dim2");
+    client.createDerivedCube(TEST_CUBE_NAME, DERIVED_CUBE_NAME, measures,
+        dimensions, new HashMap<String, String>(), 0L);
   }
 
   private void createCubeFact(CubeMetastoreClient client) throws HiveException {
@@ -546,9 +557,7 @@ public class CubeTestSetup {
     storageTables.put(c2, s1);
     storageTables.put(c3, s1);
     // create cube fact
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.add(TEST_CUBE_NAME);
-    client.createCubeFactTable(cubeNames, factName, factColumns,
+    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 0L, null, storageTables);
   }
 
@@ -582,9 +591,7 @@ public class CubeTestSetup {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
     // create cube fact
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.add(TEST_CUBE_NAME);
-    client.createCubeFactTable(cubeNames, factName, factColumns,
+    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 0L, null, storageTables);
   }
 
@@ -621,9 +628,7 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
 
     // create cube fact
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.add(TEST_CUBE_NAME);
-    client.createCubeFactTable(cubeNames, factName, factColumns,
+    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 10L, null, storageTables);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
@@ -673,12 +678,10 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
 
     // create cube fact
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.add(TEST_CUBE_NAME);
     Map<String, String> properties = new HashMap<String, String>();
     properties.put(MetastoreConstants.FACT_AGGREGATED_PROPERTY, "false");
 
-    client.createCubeFactTable(cubeNames, factName, factColumns,
+    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 100L, properties, storageTables);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
@@ -728,9 +731,7 @@ public class CubeTestSetup {
     storageTables.put(c2, s1);
 
     // create cube fact
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.add(TEST_CUBE_NAME);
-    client.createCubeFactTable(cubeNames, factName, factColumns,
+    client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 0L, null, storageTables);
   }
 
@@ -1155,9 +1156,7 @@ public class CubeTestSetup {
     String validColumns = commonCols.toString() + ",dim1";
     properties.put(MetastoreUtil.getValidColumnsKey(factName),
         validColumns);
-    List<String> cubeNames = new ArrayList<String>();
-    cubeNames.add(TEST_CUBE_NAME);
-    CubeFactTable fact1 = new CubeFactTable(cubeNames, factName, factColumns,
+    CubeFactTable fact1 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageUpdatePeriods, 10L, properties);
     client.createCubeTable(fact1, storageTables);
     createPIEParts(client, fact1, c2);
@@ -1168,7 +1167,7 @@ public class CubeTestSetup {
     validColumns = commonCols.toString() + ",dim1,dim2";
     properties.put(MetastoreUtil.getValidColumnsKey(factName),
         validColumns);
-    CubeFactTable fact2 = new CubeFactTable(cubeNames, factName, factColumns,
+    CubeFactTable fact2 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageUpdatePeriods, 20L, properties);
     client.createCubeTable(fact2, storageTables);
     createPIEParts(client, fact2, c2);
@@ -1178,7 +1177,7 @@ public class CubeTestSetup {
     validColumns = commonCols.toString() + ",dim1,dim2,cityid";
     properties.put(MetastoreUtil.getValidColumnsKey(factName),
         validColumns);
-    CubeFactTable fact3 = new CubeFactTable(cubeNames, factName, factColumns,
+    CubeFactTable fact3 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageUpdatePeriods, 30L, properties);
     client.createCubeTable(fact3, storageTables);
     createPIEParts(client, fact3, c2);

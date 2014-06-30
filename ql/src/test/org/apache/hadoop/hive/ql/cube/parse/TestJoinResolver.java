@@ -40,8 +40,8 @@ import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
-import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
 import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph.TableRelationship;
@@ -93,7 +93,7 @@ public class TestJoinResolver {
   public void testBuildGraph() throws Exception {
     SchemaGraph schemaGraph = new SchemaGraph(metastore);
     schemaGraph.buildSchemaGraph();
-    Cube cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
+    CubeInterface cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
     Map<AbstractCubeTable, Set<TableRelationship>> graph = schemaGraph.getCubeGraph(cube);
     printGraph(graph);
     assertNotNull(graph);
@@ -115,19 +115,30 @@ public class TestJoinResolver {
   public void testFindChain() throws Exception {
     SchemaGraph schemaGraph = new SchemaGraph(metastore);
     schemaGraph.buildSchemaGraph();
-    Cube cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
+    CubeInterface cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
+    CubeInterface derivedCube = metastore.getCube(CubeTestSetup.DERIVED_CUBE_NAME);
     printGraph(schemaGraph.getCubeGraph(cube));
 
     CubeDimensionTable testDim4 = metastore.getDimensionTable("testdim4");
     List<TableRelationship> chain = new ArrayList<TableRelationship>();
-    assertTrue(schemaGraph.findJoinChain(testDim4, cube, chain));
+    assertTrue(schemaGraph.findJoinChain(testDim4, (AbstractCubeTable)cube, chain));
     System.out.println(chain);
 
     chain.clear();
+    CubeDimensionTable testDim2 = metastore.getDimensionTable("testdim2");
+    assertTrue(schemaGraph.findJoinChain(testDim2, (AbstractCubeTable)derivedCube, chain));
+    System.out.println(chain);
+    assertEquals(1, chain.size());
+
+    chain.clear();
     CubeDimensionTable cityTable = metastore.getDimensionTable("citytable");
-    assertTrue(schemaGraph.findJoinChain(cityTable, cube, chain));
+    assertTrue(schemaGraph.findJoinChain(cityTable, (AbstractCubeTable)cube, chain));
     System.out.println("City -> cube chain: " + chain);
     assertEquals(1, chain.size());
+
+    chain.clear();
+    cityTable = metastore.getDimensionTable("citytable");
+    assertFalse(schemaGraph.findJoinChain(cityTable, (AbstractCubeTable)derivedCube, chain));
 
     // find chains between dimensions
     chain.clear();
@@ -230,16 +241,19 @@ public class TestJoinResolver {
     CubeQueryContext rewrittenQuery = driver.rewrite(query);
     String hql = rewrittenQuery.toHQL();
     System.out.println("testPartialJoinResolver Partial join hql: " + hql);
-    assertTrue(hql.contains(getDbName()+ "c1_testfact2_raw testcube" +
-      " left outer join " + getDbName() + "c1_citytable citytable " +
-      "on testcube.cityid = citytable.id and ((( citytable  .  name ) =  'FOOBAR' )) and (citytable.dt = 'latest')"));
+    System.out.println("testPartialJoinResolver Partial dbname :" + getDbName());
+    String partSQL = getDbName() + "c1_citytable citytable on testcube.cityid " +
+        "= citytable.id and ((( citytable . name ) =  'FOOBAR' )) " +
+        "and (citytable.dt = 'latest')";
+    assertTrue(hql.contains(partSQL));
+    partSQL = "right outer join "+ getDbName() +"c1_testdim2 testdim2 on " +
+        "testcube.dim2 = testdim2.id right outer join "+ getDbName()+
+        "c1_testdim3 testdim3 on testdim2.testdim3id = testdim3.id and " +
+        "(testdim2.dt = 'latest') right outer join "+ getDbName() +
+        "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id and " +
+        "((( testdim4 . name ) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')";
 
-    assertTrue(hql.contains("right outer join " + getDbName() + "c1_testdim2 testdim2 " +
-      "on testcube.dim2 = testdim2.id " +
-      "right outer join " + getDbName() + "c1_testdim3 testdim3 " +
-      "on testdim2.testdim3id = testdim3.id and (testdim2.dt = 'latest') " +
-      "right outer join " + getDbName() + "c1_testdim4 testdim4 on testdim3.testdim4id = testdim4.id " +
-      "and ((( testdim4  .  name ) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')"));
+    assertTrue(hql.contains(partSQL));
   }
 
   @Test

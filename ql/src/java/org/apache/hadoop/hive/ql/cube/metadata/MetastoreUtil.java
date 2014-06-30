@@ -21,10 +21,11 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 */
 
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -198,6 +199,10 @@ public class MetastoreUtil implements MetastoreConstants {
     return getCubePrefix(cubeName) + TIMED_DIMENSIONS_LIST_SFX;
   }
 
+  public static final String getParentCubeNameKey(String cubeName) {
+    return getCubePrefix(cubeName) + PARENT_CUBE_SFX;
+  }
+
   public static final String getCubeTableKeyPrefix(String tableName) {
     return CUBE_TABLE_PFX + tableName.toLowerCase();
   }
@@ -229,8 +234,8 @@ public class MetastoreUtil implements MetastoreConstants {
         + UPDATE_PERIOD_SFX;
   }
 
-  public static String getFactCubeNamesKey(String name) {
-    return getFactKeyPrefix(name) + CUBE_NAMES_SFX;
+  public static String getFactCubeNameKey(String name) {
+    return getFactKeyPrefix(name) + CUBE_NAME_SFX;
   }
 
   public static String getValidColumnsKey(String name) {
@@ -291,40 +296,24 @@ public class MetastoreUtil implements MetastoreConstants {
     return valueStr.toString();
   }
 
-  public static List<String> getColumnNames(AbstractCubeTable table) {
+  public static Set<String> getColumnNames(AbstractCubeTable table) {
     List<FieldSchema> fields = table.getColumns();
-    List<String> columns = new ArrayList<String>(fields.size());
+    Set<String> columns = new HashSet<String>(fields.size());
     for (FieldSchema f : fields) {
       columns.add(f.getName().toLowerCase());
     }
     return columns;
   }
 
-  public static List<String> getCubeMeasureNames(Cube table) {
-    List<String> columns = new ArrayList<String>();
-    for (CubeMeasure f : table.getMeasures()) {
-      columns.add(f.getName().toLowerCase());
-    }
-    return columns;
-  }
-
-  public static List<String> getCubeDimensionNames(Cube table) {
-    List<String> columns = new ArrayList<String>();
-    for (CubeDimension f : table.getDimensions()) {
-      addColumnNames(f, columns);
-    }
-    return columns;
-  }
-
-  public static List<String> getAttributeNames(UberDimension table) {
-    List<String> columns = new ArrayList<String>();
+  public static Set<String> getAttributeNames(UberDimension table) {
+    Set<String> columns = new HashSet<String>();
     for (CubeDimension f : table.getAttributes()) {
       addColumnNames(f, columns);
     }
     return columns;
   }
 
-  private static void addColumnNames(CubeDimension dim, List<String> cols) {
+  public static void addColumnNames(CubeDimension dim, Set<String> cols) {
     if (dim instanceof HierarchicalDimension) {
       HierarchicalDimension h = (HierarchicalDimension) dim;
       for (CubeDimension d : h.getHierarchy()) {

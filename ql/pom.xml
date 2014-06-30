@@ -512,7 +512,6 @@
                   <include>org.apache.hive.shims:hive-shims-common-secure</include>
                   <include>com.googlecode.javaewah:JavaEWAH</include>
                   <include>javolution:javolution</include>
-                  <include>com.google.protobuf:protobuf-java</include>
                   <include>org.iq80.snappy:snappy</include>
                   <include>org.codehaus.jackson:jackson-core-asl</include>
                   <include>org.codehaus.jackson:jackson-mapper-asl</include>
@@ -525,8 +524,6 @@
                   <shadedPattern>org.apache.hive.com.esotericsoftware</shadedPattern>
                 </relocation>
               </relocations>
-              <shadedArtifactAttached>true</shadedArtifactAttached>
-              <shadedClassifierName>withdep</shadedClassifierName>
             </configuration>
           </execution>
         </executions>

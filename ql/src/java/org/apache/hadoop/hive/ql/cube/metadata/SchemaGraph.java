@@ -90,7 +90,7 @@ public class SchemaGraph {
  */
   private final CubeMetastoreClient metastore;
   // Graph for each cube
-  private Map<Cube, Map<AbstractCubeTable, Set<TableRelationship>>> cubeToGraph;
+  private Map<CubeInterface, Map<AbstractCubeTable, Set<TableRelationship>>> cubeToGraph;
 
   // sub graph that contains only dimensions, mainly used while checking connectivity
   // between a set of dimensions
@@ -100,7 +100,7 @@ public class SchemaGraph {
     this.metastore = metastore;
   }
 
-  public Map<AbstractCubeTable, Set<TableRelationship>> getCubeGraph(Cube cube) {
+  public Map<AbstractCubeTable, Set<TableRelationship>> getCubeGraph(CubeInterface cube) {
     return cubeToGraph.get(cube);
   }
 
@@ -114,11 +114,11 @@ public class SchemaGraph {
    * @throws org.apache.hadoop.hive.ql.metadata.HiveException
    */
   public void buildSchemaGraph() throws HiveException {
-    cubeToGraph = new HashMap<Cube, Map<AbstractCubeTable, Set<TableRelationship>>>();
-    for (Cube cube : metastore.getAllCubes()) {
+    cubeToGraph = new HashMap<CubeInterface, Map<AbstractCubeTable, Set<TableRelationship>>>();
+    for (CubeInterface cube : metastore.getAllCubes()) {
       Map<AbstractCubeTable, Set<TableRelationship>> graph =
         new HashMap<AbstractCubeTable, Set<TableRelationship>>();
-      buildGraph(cube, graph);
+      buildGraph((AbstractCubeTable)cube, graph);
 
       for (UberDimension dim : metastore.getAllUberDimensions()) {
         buildGraph(dim, graph);
@@ -136,8 +136,8 @@ public class SchemaGraph {
   private List<CubeDimension> getRefDimensions(AbstractCubeTable cube) throws HiveException {
     List<CubeDimension> refDimensions = new ArrayList<CubeDimension>();
     Set<CubeDimension> allAttrs = null;
-    if (cube instanceof Cube) {
-      allAttrs = ((Cube)cube).getDimensions();
+    if (cube instanceof CubeInterface) {
+      allAttrs = ((CubeInterface)cube).getDimensions();
     } else if (cube instanceof UberDimension) {
       allAttrs = ((UberDimension)cube).getAttributes();
     } else {
@@ -259,7 +259,7 @@ public class SchemaGraph {
    */
   public boolean findJoinChain(UberDimension joinee, AbstractCubeTable target,
                                List<TableRelationship> chain) {
-    if (target instanceof Cube) {
+    if (target instanceof CubeInterface) {
       return findJoinChain(joinee, target, cubeToGraph.get(target), chain,
         new HashSet<AbstractCubeTable>());
     } else if (target instanceof UberDimension) {
@@ -271,7 +271,7 @@ public class SchemaGraph {
   }
 
   public void print() {
-    for (Cube cube : cubeToGraph.keySet()) {
+    for (CubeInterface cube : cubeToGraph.keySet()) {
       Map<AbstractCubeTable, Set<TableRelationship>> graph = cubeToGraph.get(cube);
       System.out.println("**Cube " + cube.getName());
       System.out.println("--Graph-Nodes=" + graph.size());

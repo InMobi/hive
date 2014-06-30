@@ -55,6 +55,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeColumn;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
@@ -91,11 +92,11 @@ public class CubeQueryContext {
   private final List<TimeRange> timeRanges;
 
   // metadata
-  private Cube cube;
+  private CubeInterface cube;
   // All measures in this cube
-  private List<String> cubeMeasureNames;
+  private Set<String> cubeMeasureNames;
   // All dimensions in this cube
-  private List<String> cubeDimNames;
+  private Set<String> cubeDimNames;
   // Dimensions used to decide partitions
   private Set<String> timedDimensions;
   // Dimensions accessed in the query
@@ -109,8 +110,8 @@ public class CubeQueryContext {
   private final Map<String, AbstractCubeTable> cubeTbls =
       new HashMap<String, AbstractCubeTable>();
   // Mapping of table objects to all columns of that table accessed in the query
-  private final Map<AbstractCubeTable, List<String>> cubeTabToCols =
-      new HashMap<AbstractCubeTable, List<String>>();
+  private final Map<AbstractCubeTable, Set<String>> cubeTabToCols =
+      new HashMap<AbstractCubeTable, Set<String>>();
 
   // Alias name to fields queried
   private final Map<String, List<String>> tblAliasToColumns =
@@ -235,23 +236,24 @@ public class CubeQueryContext {
             }
           }
           cube = client.getCube(tblName);
-          cubeMeasureNames = MetastoreUtil.getCubeMeasureNames(cube);
-          cubeDimNames = MetastoreUtil.getCubeDimensionNames(cube);
+          if (!cube.canBeQueried()) {
+            throw new SemanticException(ErrorMsg.CUBE_NOT_QUERYABLE, tblName);
+          }
+          cubeMeasureNames = cube.getMeasureNames();
+          cubeDimNames = cube.getDimensionNames();
           timedDimensions = cube.getTimedDimensions();
-          List<String> cubeCols = new ArrayList<String>();
+          Set<String> cubeCols = new HashSet<String>();
           cubeCols.addAll(cubeMeasureNames);
           cubeCols.addAll(cubeDimNames);
           if (timedDimensions != null) {
             cubeCols.addAll(timedDimensions);
           }
-          cubeTabToCols.put(cube, cubeCols);
-          cubeTbls.put(tblName.toLowerCase(), cube);
+          cubeTabToCols.put((AbstractCubeTable)cube, cubeCols);
+          cubeTbls.put(tblName.toLowerCase(), (AbstractCubeTable)cube);
         } else if (client.isUberDimension(tblName)) {
           UberDimension dim = client.getUberDimension(tblName);
           dimensions.add(dim);
-          List<String> cubeCols = new ArrayList<String>();
-          cubeCols.addAll(MetastoreUtil.getAttributeNames(dim));
-          cubeTabToCols.put(dim, cubeCols);
+          cubeTabToCols.put(dim, MetastoreUtil.getAttributeNames(dim));
           cubeTbls.put(tblName.toLowerCase(), dim);
         }
       }
@@ -518,7 +520,7 @@ public class CubeQueryContext {
     for (String col : columns) {
       boolean inCube = false;
       if (cube != null) {
-        List<String> cols = cubeTabToCols.get(cube);
+        Set<String> cols = cubeTabToCols.get(cube);
         if (cols.contains(col.toLowerCase())) {
           columnToTabAlias.put(col.toLowerCase(), getAliasForTabName(
               cube.getName()));
@@ -602,7 +604,7 @@ public class CubeQueryContext {
           }
         }
 
-        List<String> factCols = cubeTabToCols.get(fact);
+        Set<String> factCols = cubeTabToCols.get(fact);
         List<String> validFactCols = fact.getValidColumns();
 
         for (String col : cubeColumnsQueried) {
@@ -641,7 +643,7 @@ public class CubeQueryContext {
         for (Iterator<CandidateDim> i = candidateDims.get(dim).iterator();
             i.hasNext();) {
           CubeDimensionTable dimtable = i.next().dimtable;
-          List<String> dimCols = cubeTabToCols.get(dimtable);
+          Set<String> dimCols = cubeTabToCols.get(dimtable);
 
           for (String col : tblAliasToColumns.get(getAliasForTabName(dim.getName()))) {
             if(!dimCols.contains(col.toLowerCase())) {
@@ -661,7 +663,7 @@ public class CubeQueryContext {
     }
   }
 
-  public Cube getCube() {
+  public CubeInterface getCube() {
     return cube;
   }
 
@@ -947,7 +949,7 @@ public class CubeQueryContext {
 
   public String getStorageString(AbstractCubeTable tbl) {
     String database = SessionState.get().getCurrentDatabase();
-    // Add database name suffix for default database
+    // Add database name prefix for non default database
     if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
       return database + "." + StringUtils.join(storageTableToQuery.get(tbl), ",") + " " +
         getAliasForTabName(tbl.getName());
@@ -957,11 +959,21 @@ public class CubeQueryContext {
     }
   }
 
+  private String getStorageStringWithAlias(AbstractCubeTable tbl, String alias) {
+    String database = SessionState.get().getCurrentDatabase();
+    // Add database name prefix for non default database
+    if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
+      return database + "." + StringUtils.join(storageTableToQuery.get(tbl), ",") + " " + alias;
+    } else {
+      return StringUtils.join(storageTableToQuery.get(tbl), ",") + " " + alias;
+    }
+  }
+
   private String getFromString() throws SemanticException {
     String fromString = null;
     if (getJoinTree() == null || !conf.getBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, CubeQueryConfUtil.DEFAULT_DISABLE_AUTO_JOINS)) {
       if (cube != null) {
-        fromString = getStorageString(cube) ;
+        fromString = getStorageString((AbstractCubeTable)cube) ;
       } else {
         String targetDimAlias = getQB().getTabAliases().iterator().next();
         String targetDimTable = getQB().getTabNameForAlias(targetDimAlias);
@@ -998,7 +1010,7 @@ public class CubeQueryContext {
       }
     } else { // (joinTree.getBaseSrc()[0] != null){
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[0]).toLowerCase();
-      builder.append(getStorageString(cubeTbls.get(tblName)));
+      builder.append(getStorageStringWithAlias(cubeTbls.get(tblName), joinTree.getBaseSrc()[0]));
       if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.RIGHTOUTER)) {
         joiningTable = tblName;
       }
@@ -1013,7 +1025,7 @@ public class CubeQueryContext {
       }
     } else { // (joinTree.getBaseSrc()[1] != null){
       String tblName = qb.getTabNameForAlias(joinTree.getBaseSrc()[1]).toLowerCase();
-      builder.append(getStorageString(cubeTbls.get(tblName)));
+      builder.append(getStorageStringWithAlias(cubeTbls.get(tblName), joinTree.getBaseSrc()[1]));
       if (joinTree.getJoinCond()[0].getJoinType().equals(JoinType.LEFTOUTER)) {
         joiningTable = tblName;
       }
@@ -1236,7 +1248,7 @@ public class CubeQueryContext {
         throw new SemanticException(ErrorMsg.NO_STORAGE_TABLE_AVAIABLE, fact.toString());
       }
       // choosing the first storage table one in the list
-      storageTableToQuery.put(getCube(), fact.storageTables);
+      storageTableToQuery.put((AbstractCubeTable)getCube(), fact.storageTables);
       if (fact.storageTables != null && fact.storageTables.size() > 1
           && !fact.enabledMultiTableSelect) {
         throw new SemanticException(ErrorMsg.MULTIPLE_STORAGE_TABLES);
@@ -1382,7 +1394,7 @@ public class CubeQueryContext {
     return cubeColumnsQueried;
   }
 
-  public Map<AbstractCubeTable, List<String>> getCubeTabToCols() {
+  public Map<AbstractCubeTable, Set<String>> getCubeTabToCols() {
     return cubeTabToCols;
   }
 

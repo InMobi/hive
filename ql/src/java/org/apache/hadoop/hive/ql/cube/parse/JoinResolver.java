@@ -329,7 +329,7 @@ public class JoinResolver implements ContextRewriter {
     if (joinClause == null) {
       // Only cube in the query
       if (cubeql.hasCubeInQuery()) {
-        target = cubeql.getCube();
+        target = (AbstractCubeTable)cubeql.getCube();
       } else {
         String targetDimAlias = cubeql.getQB().getTabAliases().iterator().next();
         String targetDimTable = cubeql.getQB().getTabNameForAlias(targetDimAlias);
@@ -410,7 +410,7 @@ public class JoinResolver implements ContextRewriter {
     if (getMetastoreClient().isDimensionTable(targetTableName)) {
       target = getMetastoreClient().getDimensionTable(targetTableName);
     } else if (getMetastoreClient().isCube(targetTableName)) {
-      target = getMetastoreClient().getCube(targetTableName);
+      target = (AbstractCubeTable)getMetastoreClient().getCube(targetTableName);
     } else {
       throw new SemanticException(ErrorMsg.JOIN_TARGET_NOT_CUBE_TABLE, targetTableName);
     }
