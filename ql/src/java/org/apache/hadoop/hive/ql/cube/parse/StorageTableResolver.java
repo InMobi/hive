@@ -44,7 +44,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
-import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipStorageCause;
@@ -137,7 +137,7 @@ public class StorageTableResolver implements ContextRewriter {
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)
       throws SemanticException {
-    for (UberDimension dim : cubeql.getDimensions()) {
+    for (Dimension dim : cubeql.getDimensions()) {
       Set<CandidateDim> dimTables = cubeql.getCandidateDimTables().get(dim);
       if (dimTables.isEmpty()) {
       }
@@ -182,7 +182,7 @@ public class StorageTableResolver implements ContextRewriter {
               try {
                 numParts = client.getNumPartitionsByFilter(
                     tableName, getDimFilter(
-                        dimtable.getTimedDimension(), StorageConstants.LATEST_PARTITION_VALUE));
+                        dim.getTimedDimension(), StorageConstants.LATEST_PARTITION_VALUE));
               } catch (Exception e) {
                 e.printStackTrace();
                 throw new SemanticException("Could not check if partition exists on " + dim, e);
@@ -196,7 +196,7 @@ public class StorageTableResolver implements ContextRewriter {
               }
               if (!failOnPartialData || (failOnPartialData && numParts > 0)) {
                 storageTables.add(tableName);
-                String whereClause = StorageUtil.getWherePartClause(dimtable.getTimedDimension(),
+                String whereClause = StorageUtil.getWherePartClause(dim.getTimedDimension(),
                     cubeql.getAliasForTabName(dim.getName()),
                     StorageConstants.getPartitionsForLatest());
                 whereClauses.put(tableName, whereClause);

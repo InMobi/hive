@@ -40,7 +40,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
-import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph.TableRelationship;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -83,7 +83,7 @@ public class TestJoinResolver {
   }
 
   // testBuildGraph - graph correctness
-  //@Test
+  @Test
   public void testBuildGraph() throws Exception {
     SchemaGraph schemaGraph = new SchemaGraph(metastore);
     schemaGraph.buildSchemaGraph();
@@ -93,19 +93,19 @@ public class TestJoinResolver {
     assertNotNull(graph);
 
     // Let's do some lookups
-    Set<TableRelationship> dim4Edges = graph.get(metastore.getUberDimension("testdim4"));
+    Set<TableRelationship> dim4Edges = graph.get(metastore.getDimension("testdim4"));
     assertNotNull(dim4Edges);
     assertEquals(1, dim4Edges.size());
 
     List<TableRelationship> edges = new ArrayList<TableRelationship>(dim4Edges);
     TableRelationship dim4edge = edges.get(0);
     assertEquals("id", dim4edge.getToColumn());
-    assertEquals(metastore.getUberDimension("testdim4"), dim4edge.getToTable());
+    assertEquals(metastore.getDimension("testdim4"), dim4edge.getToTable());
     assertEquals("testdim4id", dim4edge.getFromColumn());
-    assertEquals(metastore.getUberDimension("testdim3"), dim4edge.getFromTable());
+    assertEquals(metastore.getDimension("testdim3"), dim4edge.getFromTable());
   }
 
-  //@Test
+  @Test
   public void testFindChain() throws Exception {
     SchemaGraph schemaGraph = new SchemaGraph(metastore);
     schemaGraph.buildSchemaGraph();
@@ -113,30 +113,30 @@ public class TestJoinResolver {
     CubeInterface derivedCube = metastore.getCube(CubeTestSetup.DERIVED_CUBE_NAME);
     printGraph(schemaGraph.getCubeGraph(cube));
 
-    UberDimension testDim4 = metastore.getUberDimension("testdim4");
+    Dimension testDim4 = metastore.getDimension("testdim4");
     List<TableRelationship> chain = new ArrayList<TableRelationship>();
     assertTrue(schemaGraph.findJoinChain(testDim4, (AbstractCubeTable)cube, chain));
     System.out.println(chain);
 
     chain.clear();
-    UberDimension testDim2 = metastore.getUberDimension("testdim2");
+    Dimension testDim2 = metastore.getDimension("testdim2");
     assertTrue(schemaGraph.findJoinChain(testDim2, (AbstractCubeTable)derivedCube, chain));
     System.out.println(chain);
     assertEquals(1, chain.size());
 
     chain.clear();
-    UberDimension cityTable = metastore.getUberDimension("citydim");
+    Dimension cityTable = metastore.getDimension("citydim");
     assertTrue(schemaGraph.findJoinChain(cityTable, (AbstractCubeTable)cube, chain));
     System.out.println("City -> cube chain: " + chain);
     assertEquals(1, chain.size());
 
     chain.clear();
-    cityTable = metastore.getUberDimension("citydim");
+    cityTable = metastore.getDimension("citydim");
     assertFalse(schemaGraph.findJoinChain(cityTable, (AbstractCubeTable)derivedCube, chain));
 
     // find chains between dimensions
     chain.clear();
-    UberDimension stateTable = metastore.getUberDimension("statedim");
+    Dimension stateTable = metastore.getDimension("statedim");
     assertTrue(schemaGraph.findJoinChain(stateTable, cityTable, chain));
     System.out.println("Dim chain state -> city : " + chain);
     assertEquals(1, chain.size());
@@ -147,7 +147,7 @@ public class TestJoinResolver {
     assertEquals(1, chain.size());
 
     chain.clear();
-    UberDimension dim2 = metastore.getUberDimension("testdim2");
+    Dimension dim2 = metastore.getDimension("testdim2");
     assertTrue(schemaGraph.findJoinChain(testDim4, dim2, chain));
     System.out.println("Dim chain testdim4 -> testdim2 : " + chain);
     assertEquals(2, chain.size());
@@ -235,7 +235,7 @@ public class TestJoinResolver {
     }
   }
 
-  //@Test
+  @Test
   public void testPartialJoinResolver() throws Exception {
     String query = "SELECT citydim.name, testDim4.name, msr2 " +
       "FROM testCube left outer join citydim ON citydim.name = 'FOOBAR'" +
@@ -259,7 +259,7 @@ public class TestJoinResolver {
     assertTrue(hql.contains(partSQL));
   }
 
-  //@Test
+  @Test
   public void testJoinNotRequired() throws Exception {
     String query = "SELECT msr2 FROM testCube WHERE " + twoDaysRange;
     CubeQueryContext ctx = driver.rewrite(query);
@@ -270,7 +270,7 @@ public class TestJoinResolver {
     assertTrue(ctx.getAutoJoinCtx() == null);
   }
 
-  //@Test
+  @Test
   public void testJoinWithoutCondition() throws Exception {
     String query = "SELECT citydim.name, msr2 FROM testCube WHERE " + twoDaysRange;
     CubeQueryContext ctx = driver.rewrite(query);
@@ -280,7 +280,7 @@ public class TestJoinResolver {
     assertEquals(getDbName() + "c1_testfact2_raw testcube join " + getDbName() + "c1_citytable citydim on testcube.cityid = citydim.id and (citydim.dt = 'latest')", joinClause.trim());
   }
 
-  //@Test
+  @Test
   public void testJoinTypeConf() throws Exception {
     hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "LEFTOUTER");
     System.out.println("@@Set join type to " + hconf.get(CubeQueryConfUtil.JOIN_TYPE_KEY));
@@ -302,7 +302,7 @@ public class TestJoinResolver {
         getAutoResolvedFromString(ctx).trim());
   }
 
-  //@Test
+  @Test
   public void testPreserveTableAlias() throws Exception {
     hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "LEFTOUTER");
     String query = "select c.name, t.msr2 FROM testCube t join citydim c WHERE " + twoDaysRange;
@@ -320,7 +320,7 @@ public class TestJoinResolver {
     assertFalse(whereClause.contains("c.dt = 'latest'"));
   }
 
-  //@Test
+  @Test
   public void testDimOnlyQuery() throws Exception {
     hconf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "INNER");
     String query = "select citydim.name, statedim.name from citydim limit 10";
@@ -343,7 +343,7 @@ public class TestJoinResolver {
         getAutoResolvedFromString(ctx).trim());
   }
 
-  //@Test
+  @Test
   public void testStorageFilterPushdown() throws Exception {
     String q = "SELECT citydim.name, statedim.name FROM citydim";
     HiveConf conf = new HiveConf(hconf);

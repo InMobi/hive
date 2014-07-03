@@ -23,8 +23,8 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 
 public enum CubeTableType {
   CUBE,
-  UBER_DIMENSION,
-  FACT,
   DIMENSION,
+  FACT,
+  DIM_TABLE,
   STORAGE
 }

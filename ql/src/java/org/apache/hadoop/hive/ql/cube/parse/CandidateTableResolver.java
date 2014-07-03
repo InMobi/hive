@@ -38,7 +38,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
-import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
@@ -81,7 +81,7 @@ public class CandidateTableResolver implements ContextRewriter {
     }
     
     if (cubeql.getDimensions().size() != 0) {
-      for (UberDimension dim : cubeql.getDimensions()) {
+      for (Dimension dim : cubeql.getDimensions()) {
         Set<CandidateDim> candidates = new HashSet<CandidateDim>();
         cubeql.getCandidateDimTables().put(dim, candidates);
         for (CubeDimensionTable dimtable : cubeql.getMetastoreClient().getAllDimensionTables(dim)) {
@@ -110,7 +110,7 @@ public class CandidateTableResolver implements ContextRewriter {
             LOG.info("Not considering the fact table:" + fact + " as it is" +
                 " not a valid fact");
             cubeql.addFactPruningMsgs(fact,
-                new CandidateTablePruneCause(fact.getName(), CubeTableCause.INVALID));;
+                new CandidateTablePruneCause(fact.getName(), CubeTableCause.INVALID));
             i.remove();
             continue;
           }
@@ -154,7 +154,7 @@ public class CandidateTableResolver implements ContextRewriter {
 
   void resolveCandidateDimTables(CubeQueryContext cubeql) throws SemanticException {
     if (cubeql.getDimensions().size() != 0) {
-      for (UberDimension dim : cubeql.getDimensions()) {
+      for (Dimension dim : cubeql.getDimensions()) {
         // go over the columns accessed in the query and find out which tables
         // can answer the query
         for (Iterator<CandidateDim> i = cubeql.getCandidateDimTables().get(dim).iterator();

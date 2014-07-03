@@ -52,7 +52,7 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   }
 
   private Set<CubeMeasure> cachedMeasures;
-  private Set<CubeDimension> cachedDims;
+  private Set<CubeDimAttribute> cachedDims;
 
   public Set<CubeMeasure> getMeasures() {
     if (cachedMeasures == null) {
@@ -64,11 +64,11 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
     return cachedMeasures;
   }
 
-  public Set<CubeDimension> getDimensions() {
+  public Set<CubeDimAttribute> getDimKeys() {
     if (cachedDims == null) {
-      cachedDims = new HashSet<CubeDimension>();
+      cachedDims = new HashSet<CubeDimAttribute>();
       for (String dim : dimensions) {
-        cachedDims.add(parent.getDimensionByName(dim));
+        cachedDims.add(parent.getDimKeyByName(dim));
       }
     }
     return cachedDims;
@@ -145,19 +145,19 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
     } else if (!this.getMeasureNames().equals(other.getMeasureNames())) {
       return false;
     }
-    if (this.getDimensionNames() == null) {
-      if (other.getDimensionNames() != null) {
+    if (this.getDimKeyNames() == null) {
+      if (other.getDimKeyNames() != null) {
         return false;
       }
-    } else if (!this.getDimensionNames().equals(other.getDimensionNames())) {
+    } else if (!this.getDimKeyNames().equals(other.getDimKeyNames())) {
       return false;
     }
     return true;
   }
 
-  public CubeDimension getDimensionByName(String dimension) {
+  public CubeDimAttribute getDimKeyByName(String dimension) {
     if (dimensions.contains(dimension.toLowerCase())) {
-      return parent.getDimensionByName(dimension);
+      return parent.getDimKeyByName(dimension);
     }
     return null;
   }
@@ -172,7 +172,7 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   public CubeColumn getColumnByName(String column) {
     CubeColumn cubeCol = (CubeColumn)getMeasureByName(column);
     if (cubeCol == null) {
-      cubeCol = (CubeColumn)getDimensionByName(column);
+      cubeCol = (CubeColumn)getDimKeyByName(column);
     }
     return cubeCol;
   }
@@ -234,7 +234,7 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   }
 
   @Override
-  public Set<String> getDimensionNames() {
+  public Set<String> getDimKeyNames() {
     return dimensions;
   }
 

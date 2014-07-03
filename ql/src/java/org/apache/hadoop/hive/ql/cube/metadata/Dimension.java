@@ -32,61 +32,61 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
-public class UberDimension extends AbstractCubeTable {
+public class Dimension extends AbstractCubeTable {
 
-  private final Set<CubeDimension> attributes;
+  private final Set<CubeDimAttribute> attributes;
   private static final List<FieldSchema> columns = new ArrayList<FieldSchema>();
-  private final Map<String, CubeDimension> attributeMap;
+  private final Map<String, CubeDimAttribute> attributeMap;
 
   static {
     columns.add(new FieldSchema("dummy", "string", "dummy column"));
   }
 
-  public UberDimension(String name, 
-      Set<CubeDimension> attributes) {
+  public Dimension(String name,
+      Set<CubeDimAttribute> attributes) {
     this(name, attributes, new HashMap<String, String>(), 0L);
   }
 
-  public UberDimension(String name, 
-      Set<CubeDimension> attributes, Map<String, String> properties,
+  public Dimension(String name,
+      Set<CubeDimAttribute> attributes, Map<String, String> properties,
       double weight) {
     super(name, columns, properties, weight);
     this.attributes = attributes;
 
-    attributeMap = new HashMap<String, CubeDimension>();
-    for (CubeDimension dim : attributes) {
+    attributeMap = new HashMap<String, CubeDimAttribute>();
+    for (CubeDimAttribute dim : attributes) {
       attributeMap.put(dim.getName().toLowerCase(), dim);
     }
 
     addProperties();
   }
 
-  public UberDimension(Table tbl) {
+  public Dimension(Table tbl) {
     super(tbl);
     this.attributes = getAttributes(getName(), getProperties());
 
-    attributeMap = new HashMap<String, CubeDimension>();
-    for (CubeDimension attr : attributes) {
+    attributeMap = new HashMap<String, CubeDimAttribute>();
+    for (CubeDimAttribute attr : attributes) {
       addAllAttributesToMap(attr);
     }
   }
 
-  private void addAllAttributesToMap(CubeDimension attr) {
+  private void addAllAttributesToMap(CubeDimAttribute attr) {
     attributeMap.put(attr.getName().toLowerCase(), attr);
-    if (attr instanceof HierarchicalDimension) {
-      for (CubeDimension d : ((HierarchicalDimension)attr).getHierarchy()) {
+    if (attr instanceof HierarchicalDimAttribute) {
+      for (CubeDimAttribute d : ((HierarchicalDimAttribute)attr).getHierarchy()) {
         addAllAttributesToMap(d);
       }
     }
   }
 
-  public Set<CubeDimension> getAttributes() {
+  public Set<CubeDimAttribute> getAttributes() {
     return attributes;
   }
 
   @Override
   public CubeTableType getTableType() {
-    return CubeTableType.UBER_DIMENSION;
+    return CubeTableType.DIMENSION;
   }
 
   @Override
@@ -97,32 +97,32 @@ public class UberDimension extends AbstractCubeTable {
   @Override
   public void addProperties() {
     super.addProperties();
-    getProperties().put(MetastoreUtil.getUberDimAttributeListKey(getName()),
+    getProperties().put(MetastoreUtil.getDimAttributeListKey(getName()),
         MetastoreUtil.getNamedStr(attributes));
     setAttributedProperties(getProperties(), attributes);
   }
 
   private static void setAttributedProperties(Map<String, String> props,
-                                             Set<CubeDimension> attributes) {
-    for (CubeDimension attr : attributes) {
+                                             Set<CubeDimAttribute> attributes) {
+    for (CubeDimAttribute attr : attributes) {
       attr.addProperties(props);
     }
   }
 
-  public static Set<CubeDimension> getAttributes(String name,
+  public static Set<CubeDimAttribute> getAttributes(String name,
       Map<String, String> props) {
-    Set<CubeDimension> attributes = new HashSet<CubeDimension>();
-    String attrStr = props.get(MetastoreUtil.getUberDimAttributeListKey(name));
+    Set<CubeDimAttribute> attributes = new HashSet<CubeDimAttribute>();
+    String attrStr = props.get(MetastoreUtil.getDimAttributeListKey(name));
     String[] names = attrStr.split(",");
     for (String attrName : names) {
       String className = props.get(MetastoreUtil.getDimensionClassPropertyKey(
           attrName));
-      CubeDimension attr;
+      CubeDimAttribute attr;
       try {
         Class<?> clazz = Class.forName(className);
         Constructor<?> constructor;
         constructor = clazz.getConstructor(String.class, Map.class);
-        attr = (CubeDimension) constructor.newInstance(new Object[]
+        attr = (CubeDimAttribute) constructor.newInstance(new Object[]
             {attrName, props});
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid dimension", e);
@@ -137,7 +137,7 @@ public class UberDimension extends AbstractCubeTable {
     if (!super.equals(obj)) {
       return false;
     }
-    UberDimension other = (UberDimension) obj;
+    Dimension other = (Dimension) obj;
     if (this.getAttributes() == null) {
       if (other.getAttributes() != null) {
         return false;
@@ -148,7 +148,7 @@ public class UberDimension extends AbstractCubeTable {
     return true;
   }
 
-  public CubeDimension getAttributeByName(String attr) {
+  public CubeDimAttribute getAttributeByName(String attr) {
     return attributeMap.get(attr == null ? attr : attr.toLowerCase());
   }
 
@@ -162,7 +162,7 @@ public class UberDimension extends AbstractCubeTable {
    * @param dimension
    * @throws HiveException
    */
-  public void alterAttribute(CubeDimension attribute) throws HiveException {
+  public void alterAttribute(CubeDimAttribute attribute) throws HiveException {
     if (attribute == null) {
       throw new NullPointerException("Cannot add null attribute");
     }
@@ -176,7 +176,7 @@ public class UberDimension extends AbstractCubeTable {
 
     attributes.add(attribute);
     attributeMap.put(attribute.getName().toLowerCase(), attribute);
-    getProperties().put(MetastoreUtil.getCubeDimensionListKey(getName()),
+    getProperties().put(MetastoreUtil.getDimAttributeListKey(getName()),
         MetastoreUtil.getNamedStr(attributes));
     attribute.addProperties(getProperties());
   }
@@ -191,8 +191,16 @@ public class UberDimension extends AbstractCubeTable {
       LOG.info("Removing dimension " + getAttributeByName(attrName));
       attributes.remove(getAttributeByName(attrName));
       attributeMap.remove(attrName.toLowerCase());
-      getProperties().put(MetastoreUtil.getCubeDimensionListKey(getName()),
+      getProperties().put(MetastoreUtil.getDimAttributeListKey(getName()),
           MetastoreUtil.getNamedStr(attributes));
     }
   }
+
+  /**
+   * @return the timedDimension
+   */
+  public String getTimedDimension() {
+    return getProperties().get(MetastoreUtil.getDimTimedDimensionKey(getName()));
+  }
+
 }

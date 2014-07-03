@@ -20,49 +20,45 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  *
 */
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeDimensionTable extends AbstractCubeTable {
-  private String uberDim;
+  private String dimName; // dimension name the dimtabe belongs to
   private final Map<String, UpdatePeriod> snapshotDumpPeriods = new HashMap<String, UpdatePeriod>();
 
-  public CubeDimensionTable(String uberDim, String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight, Map<String, UpdatePeriod> snapshotDumpPeriods) {
-    this(uberDim, dimName, columns, weight, snapshotDumpPeriods,
+    this(dimName, dimTblName, columns, weight, snapshotDumpPeriods,
         new HashMap<String, String>());
   }
 
-  public CubeDimensionTable(String uberDim, String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight, Set<String> storages) {
-    this(uberDim, dimName, columns, weight, getSnapshotDumpPeriods(storages),
+    this(dimName, dimTblName, columns, weight, getSnapshotDumpPeriods(storages),
          new HashMap<String, String>());
   }
 
-  public CubeDimensionTable(String uberDim, String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight, Set<String> storages,
       Map<String, String> properties) {
-    this(uberDim, dimName, columns, weight, getSnapshotDumpPeriods(storages),
+    this(dimName, dimTblName, columns, weight, getSnapshotDumpPeriods(storages),
          properties);
   }
 
-  public CubeDimensionTable(String uberDim, String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight,
       Map<String, UpdatePeriod> snapshotDumpPeriods,
       Map<String, String> properties) {
-    super(dimName, columns, properties, weight);
-    this.uberDim = uberDim;
+    super(dimTblName, columns, properties, weight);
+    this.dimName = dimName;
     if (snapshotDumpPeriods != null) {
       this.snapshotDumpPeriods.putAll(snapshotDumpPeriods);
     }
@@ -81,7 +77,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   public CubeDimensionTable(Table tbl) {
     super(tbl);
-    this.uberDim = getUberDimName(getName(), getProperties());
+    this.dimName = getDimName(getName(), getProperties());
     Map<String, UpdatePeriod> dumpPeriods = getDumpPeriods(getName(), getProperties());
     if (dumpPeriods != null) {
       this.snapshotDumpPeriods.putAll(dumpPeriods);
@@ -90,13 +86,13 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   @Override
   public CubeTableType getTableType() {
-    return CubeTableType.DIMENSION;
+    return CubeTableType.DIM_TABLE;
   }
 
   @Override
   protected void addProperties() {
     super.addProperties();
-    setUberDimName(getProperties(), getName(), uberDim);
+    setDimName(getProperties(), getName(), dimName);
     setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
 
@@ -104,8 +100,8 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     return snapshotDumpPeriods;
   }
 
-  public String getUberDim() {
-    return uberDim;
+  public String getDimName() {
+    return dimName;
   }
 
   private static void setSnapshotPeriods(String name, Map<String, String> props,
@@ -123,12 +119,12 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
   }
 
-  private static void setUberDimName(Map<String, String> props, String dimName, String uberDimName) {
-    props.put(MetastoreUtil.getUberDimNameKey(dimName), uberDimName);
+  private static void setDimName(Map<String, String> props, String dimTblName, String dimName) {
+    props.put(MetastoreUtil.getDimNameKey(dimTblName), dimName);
   }
 
-  static String getUberDimName(String dimName, Map<String, String> props) {
-    return props.get(MetastoreUtil.getUberDimNameKey(dimName));
+  static String getDimName(String dimTblName, Map<String, String> props) {
+    return props.get(MetastoreUtil.getDimNameKey(dimTblName));
   }
 
   private static Map<String, UpdatePeriod> getDumpPeriods(String name,
@@ -159,13 +155,13 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
     CubeDimensionTable other = (CubeDimensionTable) obj;
 
-    if (this.getUberDim() == null) {
-      if (other.getUberDim() != null) {
+    if (this.getDimName() == null) {
+      if (other.getDimName() != null) {
         return false;
       }
     } else {
-      if (!this.getUberDim().equals(
-          other.getUberDim())) {
+      if (!this.getDimName().equals(
+          other.getDimName())) {
         return false;
       }
     }
@@ -192,13 +188,13 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   }
 
   /**
-   * Alter the uber dim name
+   * Alter the dimension name that the table belongs to
    * 
-   * @param newUberDimName
+   * @param newDimName
    */
-  public void alterUberDim(String newUberDimName) {
-    this.uberDim = newUberDimName;
-    setUberDimName(getProperties(), getName(), this.uberDim);
+  public void alterUberDim(String newDimName) {
+    this.dimName = newDimName;
+    setDimName(getProperties(), getName(), this.dimName);
   }
 
   /**
@@ -237,12 +233,4 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     snapshotDumpPeriods.remove(storage);
     setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
-
-  /**
-   * @return the timedDimension
-   */
-  public String getTimedDimension() {
-    return getProperties().get(MetastoreConstants.TIMED_DIMENSION);
-  }
-
 }

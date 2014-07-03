@@ -35,8 +35,9 @@ public interface MetastoreConstants {
   public static final String CUBE_CAN_BE_QUERIED = "cube.can.be.queried";
 
   // Uber dimension constants
-  public static final String UBER_DIMENSION_KEY_PFX = "uber.dimension.";
+  public static final String DIMENSION_PFX = "dimension.";
   public static final String ATTRIBUTES_LIST_SFX = ".attributes.list";
+  public static final String TIMED_DIMENSION_SFX = ".timed.dimension";
 
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
@@ -44,6 +45,12 @@ public interface MetastoreConstants {
   public static final String CUBE_NAME_SFX = ".cubename";
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
   public static final String FACT_AGGREGATED_PROPERTY = "cube.fact.is.aggregated";
+
+  // dim table constants
+  public static final String DIM_TBL_PFX = "dimtble.";
+  public static final String DUMP_PERIOD_SFX = ".dumpperiod";
+  public static final String STORAGE_LIST_SFX = ".storages";
+  public static final String DIM_NAME_SFX = ".dim.name";
 
   // column constants
   public static final String COL_PFX = "cube.col.";
@@ -67,11 +74,7 @@ public interface MetastoreConstants {
   public static final String INLINE_VALUES_SFX = ".inline.values";
   public static final String HIERARCHY_SFX = ".hierarchy.";
   public static final String CLASS_SFX = ".class";
-  public static final String DUMP_PERIOD_SFX = ".dumpperiod";
-  public static final String STORAGE_LIST_SFX = ".storages";
   public static final String METASTORE_ENABLE_CACHING = "cube.metastore.enable.cache";
-  public static final String TIMED_DIMENSION = "cube.dimensiontable.timed.dimension";
-  public static final String UBER_DIM_NAME_SFX = ".uberdim.name";
 
   // storage constants
   public static final String STORAGE_ENTITY_PFX = "storage.";

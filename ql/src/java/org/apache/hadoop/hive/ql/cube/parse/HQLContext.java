@@ -8,7 +8,7 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -17,11 +17,11 @@ public class HQLContext {
 
   public static Log LOG = LogFactory.getLog(HQLContext.class.getName());
 
-  private Map<UberDimension, CandidateDim> dimsToQuery;
+  private Map<Dimension, CandidateDim> dimsToQuery;
   private CandidateFact fact;
   private CubeQueryContext query;
 
-  HQLContext(CandidateFact fact, Map<UberDimension, CandidateDim> dimsToQuery, CubeQueryContext query) {
+  HQLContext(CandidateFact fact, Map<Dimension, CandidateDim> dimsToQuery, CubeQueryContext query) {
     this.query = query;
     this.fact = fact;
     this.dimsToQuery = dimsToQuery;
@@ -39,7 +39,7 @@ public class HQLContext {
     return query.getInsertClause() + baseQuery;
   }
 
-  public Map<UberDimension, CandidateDim> getDimsToQuery() {
+  public Map<Dimension, CandidateDim> getDimsToQuery() {
     return dimsToQuery;
   }
 
@@ -103,7 +103,7 @@ public class HQLContext {
     // add where clause for all dimensions
     if (dimsToQuery != null) {
       boolean added = (originalWhere != null || fact != null);
-      for (Map.Entry<UberDimension, CandidateDim> entry : dimsToQuery.entrySet()) {
+      for (Map.Entry<Dimension, CandidateDim> entry : dimsToQuery.entrySet()) {
         CandidateDim cdim = entry.getValue();
         if (!cdim.isWhereClauseAdded()) {
           appendWhereClause(whereBuf, cdim.whereClause, added);

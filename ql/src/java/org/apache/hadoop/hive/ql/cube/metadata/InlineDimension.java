@@ -28,7 +28,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-public class InlineDimension extends BaseDimension {
+public class InlineDimension extends BaseDimAttribute {
 
   private final List<String> values;
 

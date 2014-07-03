@@ -30,7 +30,7 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.cube.metadata.UberDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -45,7 +45,7 @@ public class LightestDimensionResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
     if (!cubeql.getCandidateDimTables().isEmpty()) {
-      for (Map.Entry<UberDimension, Set<CandidateDim>> entry : cubeql.getCandidateDimTables().entrySet()) {
+      for (Map.Entry<Dimension, Set<CandidateDim>> entry : cubeql.getCandidateDimTables().entrySet()) {
         if (entry.getValue().isEmpty()) {
           continue;
         }
