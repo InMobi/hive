@@ -51,7 +51,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.ExprMeasure;
 import org.apache.hadoop.hive.ql.cube.metadata.HDFSStorage;
 import org.apache.hadoop.hive.ql.cube.metadata.HierarchicalDimAttribute;
-import org.apache.hadoop.hive.ql.cube.metadata.InlineDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.InlineDimAttribute;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.ReferencedDimAtrribute;
@@ -498,7 +498,7 @@ public class CubeTestSetup {
     locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("countryid",
         "int", "country"), new TableReference("countrydim", "id")));
     List<String> regions = Arrays.asList("APAC", "EMEA", "USA");
-    locationHierarchy.add(new InlineDimension(new FieldSchema("regionname",
+    locationHierarchy.add(new InlineDimAttribute(new FieldSchema("regionname",
         "string", "region"), regions));
 
     cubeDimensions.add(new HierarchicalDimAttribute("location", locationHierarchy));
