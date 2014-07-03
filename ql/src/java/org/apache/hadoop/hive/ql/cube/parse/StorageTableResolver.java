@@ -137,20 +137,21 @@ public class StorageTableResolver implements ContextRewriter {
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)
       throws SemanticException {
-    Set<UberDimension> dimsToResolve = new HashSet<UberDimension>();
-    dimsToResolve.addAll(cubeql.getAutoJoinDimensions());
-    dimsToResolve.addAll(cubeql.getDimensions());
-    for (UberDimension dim : dimsToResolve) {
+    for (UberDimension dim : cubeql.getDimensions()) {
       Set<CandidateDim> dimTables = cubeql.getCandidateDimTables().get(dim);
+      if (dimTables.isEmpty()) {
+      }
       for (Iterator<CandidateDim> i = dimTables.iterator(); i.hasNext();) {
         CandidateDim candidate = i.next();
         CubeDimensionTable dimtable = candidate.dimtable;
         if (dimtable.getStorages().isEmpty()) {
-          cubeql.addDimPruningMsgs(dimtable, new CandidateTablePruneCause(
+          cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
               dimtable.getName(), CubeTableCause.MISSING_STORAGES));
           i.remove();
           continue;
         }
+        Set<String> storageTables = new HashSet<String>();
+        Map<String, String> whereClauses = new HashMap<String, String>();
         boolean foundPart = false;
         Map<String, SkipStorageCause> skipStorageCauses = 
             new HashMap<String, SkipStorageCause>();
@@ -194,17 +195,18 @@ public class StorageTableResolver implements ContextRewriter {
                     + " does not exist on " + tableName);
               }
               if (!failOnPartialData || (failOnPartialData && numParts > 0)) {
-                candidate.storageTables.add(tableName);
-                candidate.whereClause = StorageUtil.getWherePartClause(dimtable.getTimedDimension(),
+                storageTables.add(tableName);
+                String whereClause = StorageUtil.getWherePartClause(dimtable.getTimedDimension(),
                     cubeql.getAliasForTabName(dim.getName()),
                     StorageConstants.getPartitionsForLatest());
+                whereClauses.put(tableName, whereClause);
               } else {
                 LOG.info("Not considering the dim storage table:" + tableName
-                    + " as no dim partition exists");
+                    + " as no dim partitions exist");
                 skipStorageCauses.put(tableName, SkipStorageCause.NO_PARTITIONS);
               }
             } else {
-              candidate.storageTables.add(tableName);
+              storageTables.add(tableName);
               foundPart = true;
             }
           } else {
@@ -215,16 +217,19 @@ public class StorageTableResolver implements ContextRewriter {
         if (!foundPart) {
           addNonExistingParts(dim.getName(), StorageConstants.getPartitionsForLatest());
         }
-        if (candidate.storageTables.isEmpty()) {
+        if (storageTables.isEmpty()) {
           LOG.info("Not considering the dim table:" + dimtable
               + " as no candidate storage tables eixst");
           CandidateTablePruneCause cause =  new CandidateTablePruneCause(
               dimtable.getName(), CubeTableCause.NO_CANDIDATE_STORAGES);
           cause.setStorageCauses(skipStorageCauses);
-          cubeql.addDimPruningMsgs(dimtable, cause);
+          cubeql.addDimPruningMsgs(dim, dimtable, cause);
           i.remove();
           continue;
         }
+        // pick the first storage table
+        candidate.storageTable = storageTables.iterator().next();
+        candidate.whereClause = whereClauses.get(candidate.storageTable);
       }
     }
   }
@@ -395,6 +400,17 @@ public class StorageTableResolver implements ContextRewriter {
           new LinkedHashMap<String, Set<FactPartition>>();
       boolean enabledMultiTableSelect = StorageUtil.getMinimalAnsweringTables(
           answeringParts, minimalStorageTables);
+      if (minimalStorageTables.isEmpty()) {
+        LOG.info("Not considering the fact table:" + cfact + " as it does not" +
+            " have any storage tables");
+        CandidateTablePruneCause cause = new CandidateTablePruneCause(
+            cfact.fact.getName(),
+            CubeTableCause.NO_CANDIDATE_STORAGES);
+        cause.setStorageCauses(skipStorageCauses);
+        cubeql.addFactPruningMsgs(cfact.fact, cause);
+        i.remove();
+        continue;
+      }
       Set<String> storageTables = new LinkedHashSet<String>();
       storageTables.addAll(minimalStorageTables.keySet());
       cfact.storageTables = storageTables;

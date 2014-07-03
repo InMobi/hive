@@ -950,7 +950,7 @@ public class CubeMetastoreClient {
     UberDimension uberdim = allUberDims.get(tableName.toLowerCase());
     if (uberdim == null) {
       Table tbl = getTable(tableName);
-      if (isCube(tbl)) {
+      if (isUberDimension(tbl)) {
         uberdim = getUberDimension(tbl);
         if (enableCaching) {
           allUberDims.put(tableName.toLowerCase(), uberdim);

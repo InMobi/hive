@@ -57,11 +57,12 @@ public class CubeQueryRewriter {
   private void setupRewriters() {
     // Rewrite base trees (groupby, having, orderby, limit) using aliases
     rewriters.add(new AliasReplacer(conf));
+    // Resolve joins and generate base join tree
+    rewriters.add(new JoinResolver(conf));
+    rewriters.add(new CandidateTableResolver(conf));
     // Resolve aggregations and generate base select tree
     rewriters.add(new AggregateResolver(conf));
     rewriters.add(new GroupbyResolver(conf));
-    // Resolve joins and generate base join tree
-    rewriters.add(new JoinResolver(conf));
     if (lightFactFirst) {
       rewriters.add(new LightestFactResolver(conf));
     }
@@ -71,6 +72,7 @@ public class CubeQueryRewriter {
     if (!lightFactFirst) {
       rewriters.add(new LightestFactResolver(conf));
     }
+    rewriters.add(new LightestDimensionResolver(conf));
   }
 
   public CubeQueryContext rewrite(ASTNode astnode) throws SemanticException {

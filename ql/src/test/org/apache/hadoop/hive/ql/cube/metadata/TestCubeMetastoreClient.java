@@ -78,6 +78,10 @@ public class TestCubeMetastoreClient {
   private static String c2 = "C2";
   private static String c3 = "C3";
   private static UberDimension zipDim, cityDim, stateDim, countryDim;
+  private static Set<CubeDimension> zipAttrs = new HashSet<CubeDimension>();
+  private static Set<CubeDimension> cityAttrs = new HashSet<CubeDimension>();
+  private static Set<CubeDimension> stateAttrs = new HashSet<CubeDimension>();
+  private static Set<CubeDimension> countryAttrs = new HashSet<CubeDimension>();
 
   /**
    * Get the date partition as field schema
@@ -110,6 +114,7 @@ public class TestCubeMetastoreClient {
     Hive.get(conf).createDatabase(database);
     client.setCurrentDatabase(TestCubeMetastoreClient.class.getSimpleName());
     defineCube(cubeName, cubeNameWithProps, derivedCubeName, derivedCubeNameWithProps);
+    defineUberDims();
   }
 
   @AfterClass
@@ -245,7 +250,6 @@ public class TestCubeMetastoreClient {
 
   private static void defineUberDims() {
     // Define zip dimension
-    Set<CubeDimension> zipAttrs = new HashSet<CubeDimension>();
     zipAttrs.add(new BaseDimension(new FieldSchema("zipcode", "int",
         "code")));
     zipAttrs.add(new BaseDimension(new FieldSchema("f1", "string",
@@ -266,7 +270,6 @@ public class TestCubeMetastoreClient {
     zipDim = new UberDimension("zipdim", zipAttrs);
     
     // Define city table
-    Set<CubeDimension> cityAttrs = new HashSet<CubeDimension>();
     cityAttrs.add(new BaseDimension(new FieldSchema("id", "int",
         "code")));
     cityAttrs.add(new BaseDimension(new FieldSchema("name", "string",
@@ -277,7 +280,6 @@ public class TestCubeMetastoreClient {
     cityDim = new UberDimension("citydim", cityAttrs);
 
     // Define state table
-    Set<CubeDimension> stateAttrs = new HashSet<CubeDimension>();
     stateAttrs.add(new BaseDimension(new FieldSchema("id", "int",
         "state id")));
     stateAttrs.add(new BaseDimension(new FieldSchema("name", "string",
@@ -289,7 +291,6 @@ public class TestCubeMetastoreClient {
         new TableReference("countrydim", "id")));
     stateDim = new UberDimension("statedim", stateAttrs);
 
-    Set<CubeDimension> countryAttrs = new HashSet<CubeDimension>();
     countryAttrs.add(new BaseDimension(new FieldSchema("id", "int",
         "country id")));
     countryAttrs.add(new BaseDimension(new FieldSchema("name", "string",
@@ -298,16 +299,7 @@ public class TestCubeMetastoreClient {
         "country capital")));
     countryAttrs.add(new BaseDimension(new FieldSchema("region", "string",
         "region name")));
-    countryAttrs.add(new ReferencedDimension(
-        new FieldSchema("countryid", "int", "country id"),
-        new TableReference("countrydim", "id")));
     countryDim = new UberDimension("countrydim", stateAttrs);
-    
-
-    cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
-        cubeNameWithProps), "dt,mydate");
-    cubeWithProps = new Cube(cubeNameWithProps, cubeMeasures, cubeDimensions,
-        cubeProperties);
   }
 
   @Test
@@ -327,6 +319,41 @@ public class TestCubeMetastoreClient {
     Assert.assertEquals(hdfsStorage, client.getStorage(c1));
     Assert.assertEquals(hdfsStorage2, client.getStorage(c2));
     Assert.assertEquals(hdfsStorage3, client.getStorage(c3));
+  }
+
+  @Test
+  public void testUberDimension() throws Exception {
+    client.createUberDimension(zipDim);
+    client.createUberDimension(cityDim);
+    client.createUberDimension(stateDim);
+    client.createUberDimension(countryDim);
+    
+    Assert.assertEquals(client.getAllUberDimensions().size(), 4);
+    Assert.assertTrue(client.tableExists(cityDim.getName()));
+    Assert.assertTrue(client.tableExists(stateDim.getName()));
+    Assert.assertTrue(client.tableExists(countryDim.getName()));
+    
+    validateDim(zipDim, zipAttrs, "zipcode", "stateid");
+    validateDim(cityDim, cityAttrs, "id", "stateid");
+    validateDim(stateDim, stateAttrs, "id", "countryid");
+    validateDim(countryDim, countryAttrs, "id", null);
+  }
+
+  private void validateDim(UberDimension udim, Set<CubeDimension> attrs,
+      String basedim, String referdim) throws HiveException {
+    Assert.assertTrue(client.tableExists(udim.getName()));
+    Table dimTbl = client.getHiveTable(udim.getName());
+    Assert.assertTrue(client.isUberDimension(dimTbl));
+    UberDimension dim = new UberDimension(dimTbl);
+    Assert.assertTrue(udim.equals(dim));
+    Assert.assertTrue(udim.equals(client.getUberDimension(udim.getName())));
+    Assert.assertEquals(dim.getAttributes().size(), attrs.size());
+    Assert.assertNotNull(dim.getAttributeByName(basedim));
+    Assert.assertTrue(dim.getAttributeByName(basedim) instanceof BaseDimension);
+    if (referdim != null) {
+      Assert.assertNotNull(dim.getAttributeByName(referdim));
+      Assert.assertTrue(dim.getAttributeByName(referdim) instanceof ReferencedDimension);
+    }
   }
 
   @Test
@@ -1679,6 +1706,16 @@ public class TestCubeMetastoreClient {
     CubeDimensionTable cubeDim2 = new CubeDimensionTable(cubeTbl);
     Assert.assertTrue(cubeDim.equals(cubeDim2));
 
+    List<CubeDimensionTable> stateTbls = client.getAllDimensionTables(stateDim);
+    boolean found = false;
+    for (CubeDimensionTable dim : stateTbls) {
+      if (dim.getName().equalsIgnoreCase(dimName)) {
+        found = true;
+        break;
+      }
+    }
+    Assert.assertTrue(found);
+
     // Assert for storage tables
     for (String storage : storageTables.keySet()) {
       String storageTableName = MetastoreUtil.getStorageTableName(dimName,
@@ -1751,6 +1788,16 @@ public class TestCubeMetastoreClient {
 
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
+
+    List<CubeDimensionTable> tbls = client.getAllDimensionTables(zipDim);
+    boolean found = false;
+    for (CubeDimensionTable dim : tbls) {
+      if (dim.getName().equalsIgnoreCase(dimName)) {
+        found = true;
+        break;
+      }
+    }
+    Assert.assertTrue(found);
 
     CubeDimensionTable cubeDim2 = new CubeDimensionTable(cubeTbl);
     Assert.assertTrue(cubeDim.equals(cubeDim2));
@@ -1867,6 +1914,16 @@ public class TestCubeMetastoreClient {
     CubeDimensionTable dimTable = client.getDimensionTable(dimName);
     dimTable.alterColumn(new FieldSchema("testAddDim", "string", "test add column"));
 
+    List<CubeDimensionTable> tbls = client.getAllDimensionTables(zipDim);
+    boolean found = false;
+    for (CubeDimensionTable dim : tbls) {
+      if (dim.getName().equalsIgnoreCase(dimName)) {
+        found = true;
+        break;
+      }
+    }
+    Assert.assertTrue(found);
+
     client.alterCubeDimensionTable(dimName, dimTable);
 
     Table alteredHiveTable = Hive.get(conf).getTable(dimName);
@@ -1916,7 +1973,6 @@ public class TestCubeMetastoreClient {
     Assert.assertFalse(client.tableExists(dimName));
   }
 
-
   @Test
   public void testCubeDimWithoutDumps() throws Exception {
     String dimName = "countrytableMeta";
@@ -1947,6 +2003,17 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
+
+    List<CubeDimensionTable> tbls = client.getAllDimensionTables(countryDim);
+    boolean found = false;
+    for (CubeDimensionTable dim : tbls) {
+      if (dim.getName().equalsIgnoreCase(dimName)) {
+        found = true;
+        break;
+      }
+    }
+    Assert.assertTrue(found);
+
     CubeDimensionTable cubeDim2 = new CubeDimensionTable(cubeTbl);
     Assert.assertTrue(cubeDim.equals(cubeDim2));
 
@@ -1997,6 +2064,17 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(client.tableExists(dimName));
     Table cubeTbl = client.getHiveTable(dimName);
     Assert.assertTrue(client.isDimensionTable(cubeTbl));
+
+    List<CubeDimensionTable> tbls = client.getAllDimensionTables(cityDim);
+    boolean found = false;
+    for (CubeDimensionTable dim : tbls) {
+      if (dim.getName().equalsIgnoreCase(dimName)) {
+        found = true;
+        break;
+      }
+    }
+    Assert.assertTrue(found);
+
     CubeDimensionTable cubeDim2 = new CubeDimensionTable(cubeTbl);
     Assert.assertTrue(cubeDim.equals(cubeDim2));
 
