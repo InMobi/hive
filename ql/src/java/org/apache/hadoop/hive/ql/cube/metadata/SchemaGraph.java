@@ -230,19 +230,15 @@ public class SchemaGraph {
       }
 
       if (edge.fromTable.equals(target)) {
-        System.out.println("Adding chain for target:" + edge);
         chain.add(edge);
         // Search successful
         foundPath = true;
         break;
       } else if (edge.fromTable instanceof UberDimension) {
         List<TableRelationship> tmpChain = new ArrayList<TableRelationship>();
-        System.out.println(" finding chain for" + edge.fromTable + ":" + target);
         if (findJoinChain((UberDimension) edge.fromTable, target,
           graph, tmpChain, visited)) {
           // This dim eventually leads to the cube
-          System.out.println("Adding chain for dim:" + edge);
-          System.out.println("Adding tmp chain :" + tmpChain);
           chain.add(edge);
           chain.addAll(tmpChain);
           foundPath = true;

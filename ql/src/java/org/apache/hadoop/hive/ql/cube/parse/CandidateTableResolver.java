@@ -166,8 +166,6 @@ public class CandidateTableResolver implements ContextRewriter {
             if(!dimCols.contains(col.toLowerCase())) {
               LOG.info("Not considering the dimension table:" + dimtable +
                   " as column " + col + " is not available");
-              System.out.println("Not considering the dimension table:" + dimtable +
-                  " as column " + col + " is not available");
               cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
                   dimtable.getName(), CubeTableCause.COLUMN_NOT_FOUND));
               i.remove();

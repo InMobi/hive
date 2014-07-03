@@ -109,7 +109,6 @@ public class JoinResolver implements ContextRewriter {
     }
 
     public String getFromString(HQLContext context, CubeQueryContext cubeql) {
-      System.out.println("dimsToQuery:" + context.getDimsToQuery());
       String fromString = "";
       if (autoJoinTarget instanceof CubeInterface) {
         fromString = context.getFactToQuery().getStorageString(
@@ -158,7 +157,6 @@ public class JoinResolver implements ContextRewriter {
         }
 
         for (TableRelationship rel : chain) {
-          System.out.println("looking at " + rel);
           StringBuilder clause = new StringBuilder(joinTypeStr)
           .append(" join ");
           // Add storage table name followed by alias
@@ -242,7 +240,6 @@ public class JoinResolver implements ContextRewriter {
           if (StringUtils.isNotBlank(storageFilter)) {
             clause.append (" and (").append(storageFilter).append(")");
           }
-          System.out.println("Adding clause:" + clause.toString());
           clauses.add(clause.toString());
         }
       }
@@ -315,12 +312,10 @@ public class JoinResolver implements ContextRewriter {
   }
 
   public void resolveJoins(CubeQueryContext cubeql) throws HiveException {
-    System.out.println("in resolve joins");
     QB cubeQB = cubeql.getQB();
     boolean joinResolverDisabled = conf.getBoolean(
         CubeQueryConfUtil.DISABLE_AUTO_JOINS, CubeQueryConfUtil.DEFAULT_DISABLE_AUTO_JOINS);
     if (joinResolverDisabled) {
-      System.out.println("join resolver disabled?");
       if (cubeql.getJoinTree() != null) {
         cubeQB.setQbJoinTree(genJoinTree(cubeQB, cubeql.getJoinTree(), cubeql));
       }
@@ -347,7 +342,6 @@ public class JoinResolver implements ContextRewriter {
     // Check if this query needs a join -
     // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
     // dimensions
-System.out.println("In auto resolve joins");
     Set<UberDimension> autoJoinDims = cubeql.getAutoJoinDimensions();
     // Add dimensions specified in the partial join tree
     ASTNode joinClause = cubeql.getQB().getParseInfo().getJoinExpr();
@@ -360,7 +354,6 @@ System.out.println("In auto resolve joins");
         String targetDimTable = cubeql.getQB().getTabNameForAlias(targetDimAlias);
         if (targetDimTable == null) {
           LOG.warn("Null table for alias " + targetDimAlias);
-          System.out.println("Null table for alias " + targetDimAlias);
         }
         target = getMetastoreClient().getUberDimension(targetDimTable);
       }
@@ -368,7 +361,6 @@ System.out.println("In auto resolve joins");
     searchDimensionTables(joinClause);
     if (target == null) {
       LOG.warn("Can't resolve joins for null target");
-      System.out.println("Can't resolve joins for null target");
       return;
     }
 
@@ -379,7 +371,7 @@ System.out.println("In auto resolve joins");
     boolean dimOnlyQuery = !cubeql.hasCubeInQuery() && hasDimensions;
 
     if (!cubeAndDimQuery && !dimOnlyQuery) {
-      System.out.println("Not a cube query or dim only quey");
+      LOG.info("Not a cube query or dim only quey");
       return;
     }
 
@@ -388,12 +380,11 @@ System.out.println("In auto resolve joins");
     for (AbstractCubeTable partiallyJoinedTable : partialJoinConditions.keySet()) {
       dimTables.add((UberDimension) partiallyJoinedTable);
     }
-    System.out.println("Dim tables :" + dimTables);
     // Remove target
     dimTables.remove(target);
     if (dimTables.isEmpty()) {
       // Joins not required
-      System.out.println("Dim tables are empty");
+      LOG.info("No dimension tables to resolve!");
       return;
     }
 
@@ -412,13 +403,12 @@ System.out.println("In auto resolve joins");
         if (LOG.isDebugEnabled()) {
           graph.print();
         }
-        System.out.println("No join path between: " + joinee.getName() + " : " + target.getName());
+        LOG.warn("No join path between " + joinee.getName() + " and " + target.getName());
         throw new SemanticException(ErrorMsg.NO_JOIN_PATH, joinee.getName(), target.getName());
       }
     }
 
     if (joinsResolved) {
-      System.out.println("In auto resolve joins: joins resolved!");
       for (List<TableRelationship> chain : joinChain.values()) {
         for (TableRelationship rel : chain) {
           if (rel.getToTable() instanceof UberDimension) {
