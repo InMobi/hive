@@ -106,10 +106,6 @@ public class MetastoreUtil implements MetastoreConstants {
         dimName).length()));
   }
 
-  public static String getDimNameKey(String dimTblName) {
-    return getDimensionKeyPrefix(dimTblName) + DIM_NAME_SFX;
-  }
-
   public static final String getDimensionSrcReferenceKey(String dimName) {
     return getDimensionKeyPrefix(dimName) + DIM_REFERS_SFX;
   }
@@ -167,6 +163,11 @@ public class MetastoreUtil implements MetastoreConstants {
   public static String getDimensionStorageListKey(String dimTblName) {
     return getDimensionTablePrefix(dimTblName) + STORAGE_LIST_SFX;
   }
+
+  public static String getDimNameKey(String dimTblName) {
+    return getDimensionTablePrefix(dimTblName) + DIM_NAME_SFX;
+  }
+
 
   // //////////////////////////
   // Measure properties ///
