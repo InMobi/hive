@@ -225,7 +225,7 @@ public class CubeQueryContext {
             throw new SemanticException(ErrorMsg.CUBE_NOT_QUERYABLE, tblName);
           }
           cubeMeasureNames = cube.getMeasureNames();
-          cubeDimNames = cube.getDimKeyNames();
+          cubeDimNames = cube.getDimAttributeNames();
           timedDimensions = cube.getTimedDimensions();
           Set<String> cubeCols = new HashSet<String>();
           cubeCols.addAll(cubeMeasureNames);

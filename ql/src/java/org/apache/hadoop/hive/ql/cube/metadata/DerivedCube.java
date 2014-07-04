@@ -64,11 +64,11 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
     return cachedMeasures;
   }
 
-  public Set<CubeDimAttribute> getDimKeys() {
+  public Set<CubeDimAttribute> getDimAttributes() {
     if (cachedDims == null) {
       cachedDims = new HashSet<CubeDimAttribute>();
       for (String dim : dimensions) {
-        cachedDims.add(parent.getDimKeyByName(dim));
+        cachedDims.add(parent.getDimAttributeByName(dim));
       }
     }
     return cachedDims;
@@ -145,19 +145,19 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
     } else if (!this.getMeasureNames().equals(other.getMeasureNames())) {
       return false;
     }
-    if (this.getDimKeyNames() == null) {
-      if (other.getDimKeyNames() != null) {
+    if (this.getDimAttributeNames() == null) {
+      if (other.getDimAttributeNames() != null) {
         return false;
       }
-    } else if (!this.getDimKeyNames().equals(other.getDimKeyNames())) {
+    } else if (!this.getDimAttributeNames().equals(other.getDimAttributeNames())) {
       return false;
     }
     return true;
   }
 
-  public CubeDimAttribute getDimKeyByName(String dimension) {
+  public CubeDimAttribute getDimAttributeByName(String dimension) {
     if (dimensions.contains(dimension.toLowerCase())) {
-      return parent.getDimKeyByName(dimension);
+      return parent.getDimAttributeByName(dimension);
     }
     return null;
   }
@@ -172,7 +172,7 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   public CubeColumn getColumnByName(String column) {
     CubeColumn cubeCol = (CubeColumn)getMeasureByName(column);
     if (cubeCol == null) {
-      cubeCol = (CubeColumn)getDimKeyByName(column);
+      cubeCol = (CubeColumn)getDimAttributeByName(column);
     }
     return cubeCol;
   }
@@ -234,7 +234,7 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   }
 
   @Override
-  public Set<String> getDimKeyNames() {
+  public Set<String> getDimAttributeNames() {
     return dimensions;
   }
 

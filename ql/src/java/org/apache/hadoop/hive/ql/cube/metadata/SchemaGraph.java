@@ -137,7 +137,7 @@ public class SchemaGraph {
     List<CubeDimAttribute> refDimensions = new ArrayList<CubeDimAttribute>();
     Set<CubeDimAttribute> allAttrs = null;
     if (cube instanceof CubeInterface) {
-      allAttrs = ((CubeInterface)cube).getDimKeys();
+      allAttrs = ((CubeInterface)cube).getDimAttributes();
     } else if (cube instanceof Dimension) {
       allAttrs = ((Dimension)cube).getAttributes();
     } else {

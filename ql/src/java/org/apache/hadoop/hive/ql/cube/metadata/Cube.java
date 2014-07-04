@@ -102,7 +102,7 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
     return measures;
   }
 
-  public Set<CubeDimAttribute> getDimKeys() {
+  public Set<CubeDimAttribute> getDimAttributes() {
     return dimensions;
   }
 
@@ -211,17 +211,17 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
     } else if (!this.getMeasures().equals(other.getMeasures())) {
       return false;
     }
-    if (this.getDimKeys() == null) {
-      if (other.getDimKeys() != null) {
+    if (this.getDimAttributes() == null) {
+      if (other.getDimAttributes() != null) {
         return false;
       }
-    } else if (!this.getDimKeys().equals(other.getDimKeys())) {
+    } else if (!this.getDimAttributes().equals(other.getDimAttributes())) {
       return false;
     }
     return true;
   }
 
-  public CubeDimAttribute getDimKeyByName(String dimension) {
+  public CubeDimAttribute getDimAttributeByName(String dimension) {
     return dimMap.get(dimension == null ? dimension : dimension.toLowerCase());
   }
 
@@ -232,7 +232,7 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   public CubeColumn getColumnByName(String column) {
     CubeColumn cubeCol = (CubeColumn)getMeasureByName(column);
     if (cubeCol == null) {
-      cubeCol = (CubeColumn)getDimKeyByName(column);
+      cubeCol = (CubeColumn)getDimAttributeByName(column);
     }
     return cubeCol;
   }
@@ -275,8 +275,8 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
 
     // Replace dimension if already existing
     if (dimMap.containsKey(dimension.getName().toLowerCase())) {
-      dimensions.remove(getDimKeyByName(dimension.getName()));
-      LOG.info("Replacing dimension " + getDimKeyByName(dimension.getName())
+      dimensions.remove(getDimAttributeByName(dimension.getName()));
+      LOG.info("Replacing dimension " + getDimAttributeByName(dimension.getName())
         + " with " + dimension);
     }
 
@@ -294,8 +294,8 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
    */
   public void removeDimension(String dimName) {
     if (dimMap.containsKey(dimName.toLowerCase())) {
-      LOG.info("Removing dimension " + getDimKeyByName(dimName));
-      dimensions.remove(getDimKeyByName(dimName));
+      LOG.info("Removing dimension " + getDimAttributeByName(dimName));
+      dimensions.remove(getDimAttributeByName(dimName));
       dimMap.remove(dimName.toLowerCase());
       getProperties().put(MetastoreUtil.getCubeDimensionListKey(getName()),
           MetastoreUtil.getNamedStr(dimensions));
@@ -377,9 +377,9 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   }
 
   @Override
-  public Set<String> getDimKeyNames() {
+  public Set<String> getDimAttributeNames() {
     Set<String> dimNames = new HashSet<String>();
-    for (CubeDimAttribute f : getDimKeys()) {
+    for (CubeDimAttribute f : getDimAttributes()) {
       MetastoreUtil.addColumnNames(f, dimNames);
     }
     return dimNames;

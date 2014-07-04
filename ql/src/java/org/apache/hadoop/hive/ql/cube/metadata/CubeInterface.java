@@ -35,20 +35,20 @@ public interface CubeInterface extends Named {
   public Set<CubeMeasure> getMeasures();
 
   /**
-   * Get all dimension keys of the cube
+   * Get all dimension attributes of the cube
    *
    * @return set {@link CubeDimAttribute}
    */
-  public Set<CubeDimAttribute> getDimKeys();
+  public Set<CubeDimAttribute> getDimAttributes();
 
   /**
-   * Get dimension key given by name
+   * Get dimension attribute given by name
    *
-   * @param dimKeyName dimension key name
+   * @param dimAttrName dimension attribute name
    *
    * @return A {@link CubeDimAttribute} object
    */
-  public CubeDimAttribute getDimKeyByName(String dimKeyName);
+  public CubeDimAttribute getDimAttributeByName(String dimAttrName);
 
   /**
    * Get measure by given by name
@@ -90,11 +90,11 @@ public interface CubeInterface extends Named {
   public Set<String> getMeasureNames();
 
   /**
-   * Get all dimension key names
+   * Get all dimension attribute names
    *
    * @return Set of strings
    */
-  public Set<String> getDimKeyNames();
+  public Set<String> getDimAttributeNames();
 
   /**
    * Whether cube can be queried directly. 

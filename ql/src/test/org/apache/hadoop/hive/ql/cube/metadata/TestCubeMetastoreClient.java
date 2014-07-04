@@ -419,11 +419,11 @@ public class TestCubeMetastoreClient {
     Assert.assertNull(cube2.getTimedDimensions());
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasureNames().size());
     // +8 is for hierarchical dimension
-    Assert.assertEquals(cubeDimensions.size() + 8, cube2.getDimKeyNames().size());
+    Assert.assertEquals(cubeDimensions.size() + 8, cube2.getDimAttributeNames().size());
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasures().size());
-    Assert.assertEquals(cubeDimensions.size(), cube2.getDimKeys().size());
+    Assert.assertEquals(cubeDimensions.size(), cube2.getDimAttributes().size());
     Assert.assertNotNull(cube2.getMeasureByName("msr4"));
-    Assert.assertNotNull(cube2.getDimKeyByName("location"));
+    Assert.assertNotNull(cube2.getDimAttributeByName("location"));
     Assert.assertTrue(cube2.canBeQueried());
 
     client.createDerivedCube(cubeName, derivedCubeName, measures, dimensions, new HashMap<String, String>(), 0L);
@@ -435,13 +435,13 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(dcube2.isDerivedCube());
     Assert.assertNull(dcube2.getTimedDimensions());
     Assert.assertEquals(measures.size(), dcube2.getMeasureNames().size());
-    Assert.assertEquals(dimensions.size(), dcube2.getDimKeyNames().size());
+    Assert.assertEquals(dimensions.size(), dcube2.getDimAttributeNames().size());
     Assert.assertEquals(measures.size(), dcube2.getMeasures().size());
-    Assert.assertEquals(dimensions.size(), dcube2.getDimKeys().size());
+    Assert.assertEquals(dimensions.size(), dcube2.getDimAttributes().size());
     Assert.assertNotNull(dcube2.getMeasureByName("msr3"));
     Assert.assertNull(dcube2.getMeasureByName("msr4"));
-    Assert.assertNull(dcube2.getDimKeyByName("location"));
-    Assert.assertNotNull(dcube2.getDimKeyByName("dim1"));
+    Assert.assertNull(dcube2.getDimAttributeByName("location"));
+    Assert.assertNotNull(dcube2.getDimAttributeByName("dim1"));
     Assert.assertTrue(dcube2.canBeQueried());
 
     client.createCube(cubeNameWithProps, cubeMeasures, cubeDimensions,
@@ -456,11 +456,11 @@ public class TestCubeMetastoreClient {
     Assert.assertTrue(cubeWithProps.getTimedDimensions().contains("dt"));
     Assert.assertTrue(cubeWithProps.getTimedDimensions().contains("mydate"));
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasureNames().size());
-    Assert.assertEquals(cubeDimensions.size() + 8, cube2.getDimKeyNames().size());
+    Assert.assertEquals(cubeDimensions.size() + 8, cube2.getDimAttributeNames().size());
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasures().size());
-    Assert.assertEquals(cubeDimensions.size(), cube2.getDimKeys().size());
+    Assert.assertEquals(cubeDimensions.size(), cube2.getDimAttributes().size());
     Assert.assertNotNull(cube2.getMeasureByName("msr4"));
-    Assert.assertNotNull(cube2.getDimKeyByName("location"));
+    Assert.assertNotNull(cube2.getDimAttributeByName("location"));
     Assert.assertFalse(cube2.canBeQueried());
 
     client.createDerivedCube(cubeNameWithProps, derivedCubeNameWithProps, measures, dimensions,
@@ -475,8 +475,8 @@ public class TestCubeMetastoreClient {
     Assert.assertEquals(derivedCubeWithProps.getProperties().get("cube.custom.prop"), "myval");
     Assert.assertNull(dcube2.getMeasureByName("msr4"));
     Assert.assertNotNull(dcube2.getMeasureByName("msr3"));
-    Assert.assertNull(dcube2.getDimKeyByName("location"));
-    Assert.assertNotNull(dcube2.getDimKeyByName("dim1"));
+    Assert.assertNull(dcube2.getDimAttributeByName("location"));
+    Assert.assertNotNull(dcube2.getDimAttributeByName("dim1"));
     Assert.assertTrue(dcube2.canBeQueried());
   }
 
@@ -504,9 +504,9 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(toAlter.getMeasureByName("testAddMsr1"));
     Assert.assertNotNull(toAlter.getMeasureByName("msr3"));
     Assert.assertNull(toAlter.getMeasureByName("msr4"));
-    Assert.assertNotNull(toAlter.getDimKeyByName("testAddDim1"));
-    Assert.assertNotNull(toAlter.getDimKeyByName("dim1"));
-    Assert.assertNull(toAlter.getDimKeyByName("location2"));
+    Assert.assertNotNull(toAlter.getDimAttributeByName("testAddDim1"));
+    Assert.assertNotNull(toAlter.getDimAttributeByName("dim1"));
+    Assert.assertNull(toAlter.getDimAttributeByName("location2"));
 
     client.alterCube(cubeName, toAlter);
 
@@ -518,8 +518,8 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(altered.getMeasureByName("testAddMsr1"));
     CubeMeasure addedMsr = altered.getMeasureByName("testAddMsr1");
     Assert.assertEquals(addedMsr.getType(), "int");
-    Assert.assertNotNull(altered.getDimKeyByName("testAddDim1"));
-    BaseDimAttribute addedDim = (BaseDimAttribute) altered.getDimKeyByName("testAddDim1");
+    Assert.assertNotNull(altered.getDimAttributeByName("testAddDim1"));
+    BaseDimAttribute addedDim = (BaseDimAttribute) altered.getDimAttributeByName("testAddDim1");
     Assert.assertEquals(addedDim.getType(), "string");
     Assert.assertTrue(altered.getTimedDimensions().contains("zt"));
 
@@ -549,9 +549,9 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(toAlter.getMeasureByName("msr4"));
     Assert.assertNotNull(toAlter.getMeasureByName("msr2"));
     Assert.assertNull(toAlter.getMeasureByName("msr3"));
-    Assert.assertNotNull(toAlter.getDimKeyByName("dim1StartTime"));
-    Assert.assertNotNull(toAlter.getDimKeyByName("dim2"));
-    Assert.assertNull(toAlter.getDimKeyByName("dim1"));
+    Assert.assertNotNull(toAlter.getDimAttributeByName("dim1StartTime"));
+    Assert.assertNotNull(toAlter.getDimAttributeByName("dim2"));
+    Assert.assertNull(toAlter.getDimAttributeByName("dim1"));
 
     client.alterCube(name, toAlter);
 
@@ -561,8 +561,8 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(altered.getMeasureByName("msr4"));
     CubeMeasure addedMsr = altered.getMeasureByName("msr4");
     Assert.assertEquals(addedMsr.getType(), "bigint");
-    Assert.assertNotNull(altered.getDimKeyByName("dim1StartTime"));
-    BaseDimAttribute addedDim = (BaseDimAttribute) altered.getDimKeyByName("dim1StartTime");
+    Assert.assertNotNull(altered.getDimAttributeByName("dim1StartTime"));
+    BaseDimAttribute addedDim = (BaseDimAttribute) altered.getDimAttributeByName("dim1StartTime");
     Assert.assertEquals(addedDim.getType(), "string");
     Assert.assertNotNull(addedDim.getStartTime());
     
