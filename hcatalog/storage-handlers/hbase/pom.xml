@@ -260,6 +260,39 @@
         </dependency>
       </dependencies>
     </profile>
+    <profile>
+      <id>protobuf</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>generate-protobuf-sources</id>
+                <phase>generate-sources</phase>
+                <configuration>
+                  <target>
+                    <property name="protobuf.src.dir" location="${basedir}/src/protobuf" />
+                    <property name="protobuf.build.dir" location="${basedir}/src/gen-java" />
+                    <echo>Building Hcatalog Hbase Handler Protobuf</echo>
+                    <mkdir dir="${protobuf.build.dir}" />
+                    <exec executable="${protobuf.exec.path}" failonerror="true">
+                      <arg value="--java_out=${protobuf.build.dir}" />
+                      <arg value="-I=${protobuf.src.dir}/org/apache/hcatalog/hbase/snapshot/" />
+                      <arg value="${protobuf.src.dir}/org/apache/hcatalog/hbase/snapshot/RevisionManagerEndpoint.proto" />
+                    </exec>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
 
