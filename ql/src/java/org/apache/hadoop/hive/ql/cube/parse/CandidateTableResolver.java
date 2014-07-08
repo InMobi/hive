@@ -72,7 +72,12 @@ public class CandidateTableResolver implements ContextRewriter {
   private void populateCandidateTables(CubeQueryContext cubeql) throws SemanticException {
     try {
     if (cubeql.getCube() != null) {
-      for (CubeFactTable fact : cubeql.getMetastoreClient().getAllFactTables(cubeql.getCube())) {
+      List<CubeFactTable> factTables = cubeql.getMetastoreClient().getAllFactTables(cubeql.getCube());
+      if (factTables.isEmpty()) {
+        throw new SemanticException(ErrorMsg.NO_CANDIDATE_FACT_AVAILABLE,
+            cubeql.getCube().getName() + " does not have any facts");
+      }
+      for (CubeFactTable fact : factTables) {
         CandidateFact cfact = new CandidateFact(fact);
         cfact.enabledMultiTableSelect = qlEnabledMultiTableSelect;
         cubeql.getCandidateFactTables().add(cfact);
@@ -84,7 +89,12 @@ public class CandidateTableResolver implements ContextRewriter {
       for (Dimension dim : cubeql.getDimensions()) {
         Set<CandidateDim> candidates = new HashSet<CandidateDim>();
         cubeql.getCandidateDimTables().put(dim, candidates);
-        for (CubeDimensionTable dimtable : cubeql.getMetastoreClient().getAllDimensionTables(dim)) {
+        List<CubeDimensionTable> dimtables = cubeql.getMetastoreClient().getAllDimensionTables(dim);
+        if (dimtables.isEmpty()) {
+          throw new SemanticException(ErrorMsg.NO_CANDIDATE_DIM_AVAILABLE,
+              dim.getName(), "Dimension tables do not exist");
+        }
+        for (CubeDimensionTable dimtable : dimtables) {
           CandidateDim cdim = new CandidateDim(dimtable);
           candidates.add(cdim);
           cubeTabToCols.put(dimtable, MetastoreUtil.getColumnNames(dimtable));
