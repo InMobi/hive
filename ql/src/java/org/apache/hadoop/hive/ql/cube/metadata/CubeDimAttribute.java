@@ -24,17 +24,17 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 import java.util.Date;
 import java.util.Map;
 
-public abstract class CubeDimension extends CubeColumn {
+public abstract class CubeDimAttribute extends CubeColumn {
 
-  public CubeDimension(String name) {
+  public CubeDimAttribute(String name) {
     this(name, null, null, null);
   }
 
-  public CubeDimension(String name, Date startTime, Date endTime, Double cost) {
+  public CubeDimAttribute(String name, Date startTime, Date endTime, Double cost) {
     super(name, startTime, endTime, cost);
   }
 
-  public CubeDimension(String name, Map<String, String> props) {
+  public CubeDimAttribute(String name, Map<String, String> props) {
     super(name, props);
   }
 

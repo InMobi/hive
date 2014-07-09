@@ -42,24 +42,25 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.ql.cube.metadata.BaseDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.BaseDimAttribute;
 import org.apache.hadoop.hive.ql.cube.metadata.ColumnMeasure;
-import org.apache.hadoop.hive.ql.cube.metadata.CubeDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeDimAttribute;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.ExprMeasure;
 import org.apache.hadoop.hive.ql.cube.metadata.HDFSStorage;
-import org.apache.hadoop.hive.ql.cube.metadata.HierarchicalDimension;
-import org.apache.hadoop.hive.ql.cube.metadata.InlineDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.HierarchicalDimAttribute;
+import org.apache.hadoop.hive.ql.cube.metadata.InlineDimAttribute;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
-import org.apache.hadoop.hive.ql.cube.metadata.ReferencedDimension;
+import org.apache.hadoop.hive.ql.cube.metadata.ReferencedDimAtrribute;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.cube.metadata.StoragePartitionDesc;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageTableDesc;
 import org.apache.hadoop.hive.ql.cube.metadata.TableReference;
 import org.apache.hadoop.hive.ql.cube.metadata.TestCubeMetastoreClient;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
@@ -96,7 +97,7 @@ public class CubeTestSetup {
   public static final SimpleDateFormat MONTH_PARSER = new SimpleDateFormat(
       MONTH_FMT);
   private Set<CubeMeasure> cubeMeasures;
-  private Set<CubeDimension> cubeDimensions;
+  private Set<CubeDimAttribute> cubeDimensions;
   public static final String TEST_CUBE_NAME= "testCube";
   public static final String DERIVED_CUBE_NAME= "derivedCube";
   public static Date now;
@@ -109,7 +110,6 @@ public class CubeTestSetup {
   public static Date before4daysStart;
   public static Date before4daysEnd;
   private static boolean zerothHour;
-  public static Map<String, String> dimProps = new HashMap<String, String>();
   private static String c1 = "C1";
   private static String c2 = "C2";
   private static String c3 = "C3";
@@ -145,9 +145,6 @@ public class CubeTestSetup {
         getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
     twoMonthsRangeUptoHours = "time_range_in('dt', '" +
         getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
-
-    dimProps.put(MetastoreConstants.TIMED_DIMENSION,
-        TestCubeMetastoreClient.getDatePartitionKey());
   }
 
   private static boolean inited;
@@ -283,11 +280,22 @@ public class CubeTestSetup {
     String whereClause = getWhereForDailyAndHourly2daysWithTimeDim(cubeName,
         timedDimension, from,
         to);
-    storageTableToWhereClause.put(getDbName() + StringUtils.join(storageTables, ","),
+    storageTableToWhereClause.put(getStorageTableString(storageTables),
         whereClause);
     return storageTableToWhereClause;
   }
 
+  private static String getStorageTableString(String... storageTables) {
+    String dbName = getDbName();
+    if (!StringUtils.isBlank(dbName)) {
+      List<String> tbls = new ArrayList<String>();
+      for (String tbl : storageTables) {
+        tbls.add(dbName + tbl);
+      }
+      return  StringUtils.join(tbls, ",");
+    }
+    return StringUtils.join(storageTables, ",");
+  }
   public static String getWhereForDailyAndHourly2daysWithTimeDim(
       String cubeName, String timedDimension, Date from, Date to) {
     List<String> hourlyparts = new ArrayList<String>();
@@ -352,19 +360,23 @@ public class CubeTestSetup {
     StringBuilder tables = new StringBuilder();
     if (storageTables.length > 1) {
       if (!hourlyparts.isEmpty()) {
+        tables.append(getDbName());
         tables.append(storageTables[0]);
         tables.append(",");
       }
       if (!dailyparts.isEmpty()) {
+        tables.append(getDbName());
         tables.append(storageTables[1]);
         tables.append(",");
       }
+      tables.append(getDbName());
       tables.append(storageTables[2]);
     } else {
+      tables.append(getDbName());
       tables.append(storageTables[0]);
     }
     Collections.sort(parts);
-    storageTableToWhereClause.put(getDbName() + tables.toString(),
+    storageTableToWhereClause.put(tables.toString(),
         StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
     return storageTableToWhereClause;
   }
@@ -475,27 +487,27 @@ public class CubeTestSetup {
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("newmeasure", "bigint",
         "measure available  from now"), null, null, null, now, null, 100.0));
 
-    cubeDimensions = new HashSet<CubeDimension>();
-    List<CubeDimension> locationHierarchy = new ArrayList<CubeDimension>();
-    locationHierarchy.add(new ReferencedDimension(new FieldSchema("zipcode",
-        "int", "zip"), new TableReference("ziptable", "zipcode")));
-    locationHierarchy.add(new ReferencedDimension(new FieldSchema("cityid",
-        "int", "city"), new TableReference("citytable", "id")));
-    locationHierarchy.add(new ReferencedDimension(new FieldSchema("stateid",
-        "int", "state"), new TableReference("statetable", "id")));
-    locationHierarchy.add(new ReferencedDimension(new FieldSchema("countryid",
-        "int", "country"), new TableReference("countrytable", "id")));
+    cubeDimensions = new HashSet<CubeDimAttribute>();
+    List<CubeDimAttribute> locationHierarchy = new ArrayList<CubeDimAttribute>();
+    locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("zipcode",
+        "int", "zip"), new TableReference("zipdim", "code")));
+    locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("cityid",
+        "int", "city"), new TableReference("citydim", "id")));
+    locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("stateid",
+        "int", "state"), new TableReference("statedim", "id")));
+    locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("countryid",
+        "int", "country"), new TableReference("countrydim", "id")));
     List<String> regions = Arrays.asList("APAC", "EMEA", "USA");
-    locationHierarchy.add(new InlineDimension(new FieldSchema("regionname",
+    locationHierarchy.add(new InlineDimAttribute(new FieldSchema("regionname",
         "string", "region"), regions));
 
-    cubeDimensions.add(new HierarchicalDimension("location", locationHierarchy));
-    cubeDimensions.add(new BaseDimension(new FieldSchema("dim1", "string",
+    cubeDimensions.add(new HierarchicalDimAttribute("location", locationHierarchy));
+    cubeDimensions.add(new BaseDimAttribute(new FieldSchema("dim1", "string",
         "basedim")));
     // Added for ambiguity test
-    cubeDimensions.add(new BaseDimension(new FieldSchema("ambigdim1", "string",
+    cubeDimensions.add(new BaseDimAttribute(new FieldSchema("ambigdim1", "string",
         "used in testColumnAmbiguity")));
-    cubeDimensions.add(new ReferencedDimension(
+    cubeDimensions.add(new ReferencedDimAtrribute(
         new FieldSchema("dim2", "string", "ref dim"),
         new TableReference("testdim2", "id")));
     Map<String, String> cubeProperties =
@@ -738,6 +750,27 @@ public class CubeTestSetup {
   //DimWithTwoStorages
   private void createCityTbale(CubeMetastoreClient client)
       throws HiveException {
+    Set<CubeDimAttribute> cityAttrs = new HashSet<CubeDimAttribute>();
+    cityAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    cityAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "city name")));
+    cityAttrs.add(new BaseDimAttribute(new FieldSchema("ambigdim1", "string",
+        "used in testColumnAmbiguity")));
+    cityAttrs.add(new BaseDimAttribute(new FieldSchema("ambigdim2", "string",
+        "used in testColumnAmbiguity")));
+    cityAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("stateid", "int", "state id"),
+        new TableReference("statedim", "id")));
+    cityAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("zipcode", "int", "zip code"),
+        new TableReference("zipdim", "code")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey("citydim"),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension cityDim = new Dimension("citydim", cityAttrs, dimProps, 0L);
+    client.createDimension(cityDim);
+
     String dimName = "citytable";
 
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
@@ -749,10 +782,6 @@ public class CubeTestSetup {
         " testColumnAmbiguity"));
     dimColumns.add(new FieldSchema("ambigdim2", "string", "used in " +
         "testColumnAmbiguity"));
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    dimensionReferences.put("stateid", Arrays.asList(new TableReference("statetable", "id")));
-    dimensionReferences.put("zipcode", Arrays.asList(new TableReference("ziptable", "code")));
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
@@ -775,24 +804,33 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(cityDim.getName(), dimName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
 
   private void createTestDim2(CubeMetastoreClient client)
       throws HiveException {
     String dimName = "testDim2";
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    dimAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("testDim3id", "string", "f-key to testdim3"),
+        new TableReference("testdim3", "id")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension testDim2 = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(testDim2);
 
+    String dimTblName = "testDim2Tbl";
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
     dimColumns.add(new FieldSchema("name", "string", "field1"));
-    dimColumns.add(new FieldSchema("tetDim3id", "string", "f-key to testdim3"));
-
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-
-    dimensionReferences.put("testDim3id", Arrays.asList(new TableReference("testdim3", "id")));
+    dimColumns.add(new FieldSchema("testDim3id", "string", "f-key to testdim3"));
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
@@ -815,8 +853,8 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
 
@@ -825,14 +863,25 @@ public class CubeTestSetup {
       throws HiveException {
     String dimName = "testDim3";
 
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    dimAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("testDim4id", "string", "f-key to testdim4"),
+        new TableReference("testdim4", "id")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension testDim3 = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(testDim3);
+
+    String dimTblName = "testDim3Tbl";
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
     dimColumns.add(new FieldSchema("name", "string", "field1"));
     dimColumns.add(new FieldSchema("testDim4id", "string", "f-key to testDim4"));
-
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    dimensionReferences.put("testDim4id", Arrays.asList(new TableReference("testdim4", "id")));
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
@@ -855,20 +904,30 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   private void createTestDim4(CubeMetastoreClient client)
       throws HiveException {
     String dimName = "testDim4";
 
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension testDim4 = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(testDim4);
+
+    String dimTblName = "testDim4Tbl";
+
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
     dimColumns.add(new FieldSchema("name", "string", "field1"));
-
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
@@ -891,13 +950,29 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   private void createCyclicDim1(CubeMetastoreClient client)
       throws HiveException {
     String dimName = "cycleDim1";
+
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    dimAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("cyleDim2Id", "string", "link to cyclic dim 2"),
+        new TableReference("cycleDim2", "id")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension cycleDim1 = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(cycleDim1);
+
+    String dimTblName = "cycleDim1Tbl";
 
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
@@ -929,14 +1004,29 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   private void createCyclicDim2(CubeMetastoreClient client)
       throws HiveException {
     String dimName = "cycleDim2";
 
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    dimAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("cyleDim1Id", "string", "link to cyclic dim 1"),
+        new TableReference("cycleDim1", "id")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension cycleDim2 = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(cycleDim2);
+
+    String dimTblName = "cycleDim2Tbl";
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
     dimColumns.add(new FieldSchema("name", "string", "field1"));
@@ -967,20 +1057,32 @@ public class CubeTestSetup {
     storageTables.put(c1, s1);
     storageTables.put(c2, s2);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   private void createZiptable(CubeMetastoreClient client) throws Exception {
-    String dimName = "ziptable";
+    String dimName = "zipdim";
 
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("code", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("f1", "string",
+        "name")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("f2", "string",
+        "name")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension zipDim = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(zipDim);
+
+    String dimTblName = "ziptable";
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("code", "int", "code"));
     dimColumns.add(new FieldSchema("f1", "string", "field1"));
     dimColumns.add(new FieldSchema("f2", "string", "field2"));
 
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
@@ -996,13 +1098,31 @@ public class CubeTestSetup {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   private void createCountryTable(CubeMetastoreClient client) throws Exception {
-    String dimName = "countrytable";
+    String dimName = "countrydim";
 
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("captial", "string",
+        "field2")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("region", "string",
+        "region name")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("ambigdim2", "string",
+        "used in testColumnAmbiguity")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension countryDim = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(countryDim);
+
+    String dimTblName = "countrytable";
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
     dimColumns.add(new FieldSchema("name", "string", "field1"));
@@ -1010,8 +1130,6 @@ public class CubeTestSetup {
     dimColumns.add(new FieldSchema("region", "string", "region name"));
     dimColumns.add(new FieldSchema("ambigdim2", "string", "used in" +
         " testColumnAmbiguity"));
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     StorageTableDesc s1 = new StorageTableDesc();
@@ -1022,23 +1140,35 @@ public class CubeTestSetup {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   private void createStateTable(CubeMetastoreClient client) throws Exception {
-    String dimName = "statetable";
+    String dimName = "statedim";
 
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
+        "name")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("capital", "string",
+        "field2")));
+    dimAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("countryid", "string", "link to country table"),
+        new TableReference("countrydim", "id")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension countryDim = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(countryDim);
+
+    String dimTblName = "statetable";
     List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
     dimColumns.add(new FieldSchema("id", "int", "code"));
     dimColumns.add(new FieldSchema("name", "string", "field1"));
     dimColumns.add(new FieldSchema("capital", "string", "field2"));
     dimColumns.add(new FieldSchema("countryid", "string", "region name"));
-
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    dimensionReferences.put("countryid", Arrays.asList(new TableReference("countrytable",
-        "id")));
 
     Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
@@ -1055,8 +1185,8 @@ public class CubeTestSetup {
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
 
-    client.createCubeDimensionTable(dimName, dimColumns, 0L,
-        dimensionReferences, dumpPeriods, dimProps, storageTables);
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
   }
 
   public void createSources(HiveConf conf, String dbName) throws Exception {
@@ -1074,6 +1204,7 @@ public class CubeTestSetup {
     //createCubeFactWeekly(client);
     createCubeFactOnlyHourly(client);
     createCubeFactOnlyHourlyRaw(client);
+
     createCityTbale(client);
     // For join resolver test
     createTestDim2(client);

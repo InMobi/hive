@@ -28,15 +28,15 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-public class InlineDimension extends BaseDimension {
+public class InlineDimAttribute extends BaseDimAttribute {
 
   private final List<String> values;
 
-  public InlineDimension(FieldSchema column, List<String> values) {
+  public InlineDimAttribute(FieldSchema column, List<String> values) {
     this(column, null, null, null, values);
   }
 
-  public InlineDimension(FieldSchema column, Date startTime, Date endTime,
+  public InlineDimAttribute(FieldSchema column, Date startTime, Date endTime,
       Double cost, List<String> values) {
     super(column, startTime, endTime, cost);
     this.values = values;
@@ -61,7 +61,7 @@ public class InlineDimension extends BaseDimension {
    * @param name
    * @param props
    */
-  public InlineDimension(String name, Map<String, String> props) {
+  public InlineDimAttribute(String name, Map<String, String> props) {
     super(name, props);
     String valueStr = props.get(MetastoreUtil.getInlineDimensionValuesKey(
         name));
@@ -82,7 +82,7 @@ public class InlineDimension extends BaseDimension {
     if (!super.equals(obj)) {
       return false;
     }
-    InlineDimension other = (InlineDimension) obj;
+    InlineDimAttribute other = (InlineDimAttribute) obj;
     if (this.getValues() == null) {
       if (other.getValues() != null) {
         return false;

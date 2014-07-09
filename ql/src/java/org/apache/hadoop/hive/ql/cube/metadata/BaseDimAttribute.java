@@ -26,14 +26,14 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-public class BaseDimension extends CubeDimension {
+public class BaseDimAttribute extends CubeDimAttribute {
   private final String type;
 
-  public BaseDimension(FieldSchema column) {
+  public BaseDimAttribute(FieldSchema column) {
     this(column, null, null, null);
   }
 
-  public BaseDimension(FieldSchema column, Date startTime, Date endTime,
+  public BaseDimAttribute(FieldSchema column, Date startTime, Date endTime,
       Double cost) {
     super(column.getName(), startTime, endTime, cost);
     this.type = column.getType();
@@ -56,7 +56,7 @@ public class BaseDimension extends CubeDimension {
    * @param name
    * @param props
    */
-  public BaseDimension(String name, Map<String, String> props) {
+  public BaseDimAttribute(String name, Map<String, String> props) {
     super(name, props);
     this.type = getDimType(name, props);
   }
@@ -79,7 +79,7 @@ public class BaseDimension extends CubeDimension {
     if (!super.equals(obj)) {
       return false;
     }
-    BaseDimension other = (BaseDimension) obj;
+    BaseDimAttribute other = (BaseDimAttribute) obj;
     if (this.getType() == null) {
       if (other.getType() != null) {
         return false;
