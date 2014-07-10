@@ -19,16 +19,13 @@ package org.apache.hadoop.hive.shims;
 
 import java.io.IOException;
 import java.lang.Integer;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.io.FileNotFoundException;
 
@@ -105,8 +102,13 @@ public class Hadoop23Shims extends HadoopShimsSecure {
       return null;
     } else {
       // if the cluster is running in MR1 mode, using HostUtil to construct TaskLogURL
-      URL taskTrackerHttpURL = new URL(taskTrackerHttpAddress);
-      return HostUtil.getTaskLogUrl(taskTrackerHttpURL.getHost(),
+      URI taskTrackerHttpURL = null;
+      try {
+        taskTrackerHttpURL = new URI(taskTrackerHttpAddress);
+      } catch (URISyntaxException e) {
+        e.printStackTrace();
+      }
+      return HostUtil.getTaskLogUrl(taskTrackerHttpURL.getScheme(), taskTrackerHttpURL.getHost(),
         Integer.toString(taskTrackerHttpURL.getPort()),
         taskAttemptId);
     }
