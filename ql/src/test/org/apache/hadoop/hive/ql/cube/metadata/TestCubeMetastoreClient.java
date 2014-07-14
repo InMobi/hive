@@ -429,7 +429,6 @@ public class TestCubeMetastoreClient {
     Table dimTbl = client.getHiveTable(udim.getName());
     Assert.assertTrue(client.isDimension(dimTbl));
     Dimension dim = new Dimension(dimTbl);
-    System.out.println("udim expr:" + udim.getExpressions() + "dim expr:" + dim.getExpressions());
     Assert.assertTrue(udim.equals(dim));
     Assert.assertTrue(udim.equals(client.getDimension(udim.getName())));
     Assert.assertEquals(dim.getAttributes().size(), attrs.size());
