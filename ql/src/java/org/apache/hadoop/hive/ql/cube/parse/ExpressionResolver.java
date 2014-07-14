@@ -24,6 +24,7 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
 
+import org.antlr.runtime.CommonToken;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractBaseTable;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hive.ql.cube.metadata.ExprColumn;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.ASTNodeVisitor;
 import org.apache.hadoop.hive.ql.cube.parse.HQLParser.TreeNode;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
+import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
@@ -70,7 +72,7 @@ public class ExpressionResolver implements ContextRewriter {
             String column = ident.getText().toLowerCase();
             ASTNode childExpr = getExprAST(cubeql, column);
             if (childExpr != null) {
-              node.setChild(i, HQLParser.copyAST(childExpr));
+              node.setChild(i, replaceAlias(childExpr, cubeql));
             }
           } else if (current.getToken().getType() == DOT) {
             // This is for the case where column name is prefixed by table name
@@ -85,7 +87,7 @@ public class ExpressionResolver implements ContextRewriter {
 
             ASTNode childExpr = getExprAST(cubeql, tabident.getText().toLowerCase(), column);
             if (childExpr != null) {
-              node.setChild(i, HQLParser.copyAST(childExpr));
+              node.setChild(i, replaceAlias(childExpr, cubeql));
             }
           }
         }
@@ -143,49 +145,31 @@ public class ExpressionResolver implements ContextRewriter {
     }
   }
 
-  /*  // Fully resolve the expression by resolving all the children, if they expressions by themselves
-  private ASTNode getExprAST(final CubeQueryContext cubeql, 
-      final AbstractBaseTable table, final ExprColumn expr)
-          throws ParseException, SemanticException {
-    // Traverse the tree and resolve expression columns
-    HQLParser.bft(expr.getAst(), new ASTNodeVisitor() {
+  private ASTNode replaceAlias(final ASTNode expr, final CubeQueryContext cubeql) throws SemanticException {
+    ASTNode finalAST = HQLParser.copyAST(expr);
+    HQLParser.bft(finalAST, new ASTNodeVisitor() {
       @Override
-      public void visit(TreeNode visited) throws SemanticException {
+      public void visit(TreeNode visited) {
         ASTNode node = visited.getNode();
+        ASTNode parent = null;
+        if (visited.getParent() != null) {
+          parent = visited.getParent().getNode();
+        }
 
-        int childcount = node.getChildCount();
-        for (int i = 0; i < childcount; i++) {
-          ASTNode current = (ASTNode)node.getChild(i);
-          if (current.getToken().getType() == TOK_TABLE_OR_COL
-              && (node != null && node.getToken().getType() != DOT)) {
-            // Take child ident.totext
-            ASTNode ident = (ASTNode) current.getChild(0);
-            String column = ident.getText().toLowerCase();
-            ASTNode childExpr = getExprAST(cubeql, table, column);
-            if (childExpr != null) {
-              node.setChild(i, childExpr);
-            }
-          } else if (current.getToken().getType() == DOT) {
-            // This is for the case where column name is prefixed by table name
-            // or table alias
-            // For example 'select fact.id, dim2.id ...'
-            // Right child is the column name, left child.ident is table name
-            ASTNode tabident = HQLParser.findNodeByPath(current, TOK_TABLE_OR_COL,
-                Identifier);
-            ASTNode colIdent = (ASTNode) current.getChild(1);
-
-            String column = colIdent.getText().toLowerCase();
-
-            ASTNode childExpr = getExprAST(cubeql, tabident.getText().toLowerCase(), column);
-            if (childExpr != null) {
-              node.setChild(i, childExpr);
+        if (node.getToken().getType() == TOK_TABLE_OR_COL
+            && (parent != null && parent.getToken().getType() == DOT)) {
+          ASTNode current = (ASTNode)node.getChild(0);
+          if (current.getToken().getType() == Identifier) {
+            String tableName = current.getToken().getText().toLowerCase();
+            String alias = cubeql.getAliasForTabName(tableName);
+            if (!alias.equalsIgnoreCase(tableName)) {
+              node.setChild(0, new ASTNode(new CommonToken(
+                  HiveParser.Identifier, alias)));
             }
           }
         }
       }
     });
-
-    return expr.getAst();
+    return finalAST;
   }
-   */
 }

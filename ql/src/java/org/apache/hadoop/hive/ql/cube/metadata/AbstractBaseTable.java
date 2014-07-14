@@ -64,7 +64,6 @@ public abstract class AbstractBaseTable extends AbstractCubeTable {
   public AbstractBaseTable(Table tbl) {
     super(tbl);
     this.expressions = getExpressions(getName(), getProperties());
-    System.out.println("Got expressoins:" + expressions);
     exprMap = new HashMap<String, ExprColumn>();
     for (ExprColumn expr : expressions) {
       exprMap.put(expr.getName().toLowerCase(), expr);
@@ -79,10 +78,8 @@ public abstract class AbstractBaseTable extends AbstractCubeTable {
   @Override
   public void addProperties() {
     super.addProperties();
-    System.out.println("Adding expressoins:" + expressions);
     getProperties().put(MetastoreUtil.getExpressionListKey(getName()),
         MetastoreUtil.getNamedStr(expressions));
-    System.out.println("Add properties exprkey:" +getProperties().get(MetastoreUtil.getExpressionListKey(getName())));
     setExpressionProperties(getProperties(), expressions);
   }
 
@@ -95,7 +92,6 @@ public abstract class AbstractBaseTable extends AbstractCubeTable {
 
   private static Set<ExprColumn> getExpressions(String name,
       Map<String, String> props) {
-    System.out.println("In get expressions exprkey:" +props.get(MetastoreUtil.getExpressionListKey(name)));
     Set<ExprColumn> exprs = new HashSet<ExprColumn>();
     String exprStr = props.get(MetastoreUtil.getExpressionListKey(name));
     if (!StringUtils.isBlank(exprStr)) {
@@ -111,7 +107,6 @@ public abstract class AbstractBaseTable extends AbstractCubeTable {
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
-      System.out.println("Super are not equal");
       return false;
     }
     AbstractBaseTable other = (AbstractBaseTable) obj;
@@ -120,7 +115,6 @@ public abstract class AbstractBaseTable extends AbstractCubeTable {
         return false;
       }
     } else if (!this.getExpressions().equals(other.getExpressions())) {
-      System.out.println("Expressions are not equal this.expr:" + this.getExpressions() + " other.expr:" + other.getExpressions());
       return false;
     }
     return true;

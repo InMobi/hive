@@ -134,7 +134,6 @@ public class Dimension extends AbstractBaseTable {
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
-      System.out.println("Supers are not equal");
       return false;
     }
     Dimension other = (Dimension) obj;
@@ -143,7 +142,6 @@ public class Dimension extends AbstractBaseTable {
         return false;
       }
     } else if (!this.getAttributes().equals(other.getAttributes())) {
-      System.out.println("attributes are not equal");
       return false;
     }
     return true;

@@ -522,8 +522,11 @@ public class CubeTestSetup {
         "a boolean expression"),
         "dim1 != 'x' AND dim2 != 10 "));
     exprs.add(new ExprColumn(new FieldSchema("substrexpr", "string",
-        "a subt string expression"),
+        "a sub-string expression"),
         "substr(dim1, 3)"));
+    exprs.add(new ExprColumn(new FieldSchema("indiasubstr", "boolean",
+        "nested sub string expression"),
+        "substrexpr = 'INDIA'"));
     exprs.add(new ExprColumn(new FieldSchema("refexpr", "string",
         "expression which facts and dimensions"),
         "concat(dim1, \":\", citydim.name)"));

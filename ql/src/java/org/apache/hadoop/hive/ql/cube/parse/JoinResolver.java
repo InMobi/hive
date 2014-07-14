@@ -282,15 +282,13 @@ public class JoinResolver implements ContextRewriter {
   }
 
   private CubeMetastoreClient metastore;
-  private final Map<AbstractCubeTable, String> partialJoinConditions;
-  private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
+  private Map<AbstractCubeTable, String> partialJoinConditions;
+  private Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
   private boolean partialJoinChain;
   private AbstractCubeTable target;
   private HiveConf conf;
 
   public JoinResolver(Configuration conf) {
-    partialJoinConditions = new HashMap<AbstractCubeTable, String>();
-    tableJoinTypeMap = new HashMap<AbstractCubeTable, JoinType>();
   }
 
   private CubeMetastoreClient getMetastoreClient() throws HiveException {
@@ -303,6 +301,8 @@ public class JoinResolver implements ContextRewriter {
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
+    partialJoinConditions = new HashMap<AbstractCubeTable, String>();
+    tableJoinTypeMap = new HashMap<AbstractCubeTable, JoinType>();
     try {
       conf = cubeql.getHiveConf();
       resolveJoins(cubeql);

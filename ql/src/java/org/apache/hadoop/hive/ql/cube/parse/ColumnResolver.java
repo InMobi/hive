@@ -80,7 +80,6 @@ public class ColumnResolver implements ContextRewriter {
         throw new SemanticException(e);
       }
     }
-
   }
 
   private void getColsForTree(final CubeQueryContext cubeql, ASTNode tree) throws SemanticException {

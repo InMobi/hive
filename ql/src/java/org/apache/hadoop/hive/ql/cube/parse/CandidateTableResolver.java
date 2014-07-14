@@ -137,8 +137,6 @@ public class CandidateTableResolver implements ContextRewriter {
               if (!validFactCols.contains(col.toLowerCase())) {
                 LOG.info("Not considering the fact table:" + fact +
                     " as column " + col + " is not valid");
-                System.out.println("Not considering the fact table:" + fact +
-                    " as column " + col + " is not valid");
                 cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
                     fact.getName(), CubeTableCause.COLUMN_NOT_VALID));
                 i.remove();
@@ -146,8 +144,6 @@ public class CandidateTableResolver implements ContextRewriter {
               }
             } else if(!factCols.contains(col.toLowerCase())) {
               LOG.info("Not considering the fact table:" + fact +
-                  " as column " + col + " is not available");
-              System.out.println("Not considering the fact table:" + fact +
                   " as column " + col + " is not available");
               cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
                   fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));

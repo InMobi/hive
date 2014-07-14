@@ -154,6 +154,14 @@ public class TestExpressionResolver {
         getWhereForDailyAndHourly2days(cubeName, "c1_summary1"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
+    hqlQuery = rewrite(driver, "select avgmsr from testCube" +
+        " where " + twoDaysRange + " and indiasubstr = true");
+    expected = getExpectedQuery(cubeName,
+        "select avg(testCube.msr1 + testCube.msr2) FROM ",
+        null, " and (substr(testCube.dim1, 3) = 'INDIA') = true",
+        getWhereForDailyAndHourly2days(cubeName, "c1_summary1"));
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
+
     // expression with alias
     hqlQuery = rewrite(driver, "select TC.avgmsr from testCube TC" +
         " where " + twoDaysRange + " and TC.substrexpr != 'XYZ'");
@@ -206,6 +214,22 @@ public class TestExpressionResolver {
       null, " and substr(testcube.dim1, 3) != 'XYZ'" +
       " group by concat(citydim.name, \":\", statedim.name)", null,
       getWhereForDailyAndHourly2days(cubeName, "c1_summary3"));
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select cityAndState, avgmsr from testCube tc" +
+        " join citydim cd join statedim sd " +
+        " where " + twoDaysRange + " and substrexpr != 'XYZ'");
+
+    joinExpr = " inner join " + getDbName() + "c1_citytable cd" +
+        " on tc.cityid = cd.id and (cd.dt = 'latest') inner join" +
+        getDbName() + "c1_statetable sd on" +
+        " tc.stateid = sd.id and (sd.dt = 'latest')";
+    expected = getExpectedQuery("tc",
+      "select concat(cd.name, \":\", sd.name)," +
+      " avg(tc.msr1 + tc.msr2) FROM ", joinExpr,
+      null, " and substr(tc.dim1, 3) != 'XYZ'" +
+      " group by concat(cd.name, \":\", sd.name)", null,
+      getWhereForDailyAndHourly2days("tc", "c1_summary3"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression with having clause
@@ -272,12 +296,31 @@ public class TestExpressionResolver {
     String hqlQuery = rewrite(driver, "select citydim.name, cityaddress from" +
       " citydim");
     
-    String joinExpr = "join TestExpressionResolver.c1_ziptable zipdim on citydim.zipcode = zipdim.code and (zipdim.dt = 'latest')" +
-    " join TestExpressionResolver.c1_statetable statedim on citydim.stateid = statedim.id and (statedim.dt = 'latest')" +
-    " join TestExpressionResolver.c1_countrytable countrydim on statedim.countryid = countrydim.id";
-    
+    String joinExpr = "join TestExpressionResolver.c1_ziptable zipdim on" +
+        " citydim.zipcode = zipdim.code and (zipdim.dt = 'latest')" +
+        " join TestExpressionResolver.c1_statetable statedim on" +
+        " citydim.stateid = statedim.id and (statedim.dt = 'latest')" +
+        " join TestExpressionResolver.c1_countrytable countrydim on" +
+        " statedim.countryid = countrydim.id";
+
     String expected = getExpectedQuery("citydim",
         "SELECT citydim.name, concat((citydim.name), \":\", (statedim.name )," +
+        " \":\",(countrydim.name),  \":\" , ( zipdim . code )) FROM ", joinExpr,
+        null, null, "c1_citytable", true);
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select ct.name, ct.cityaddress from" +
+        " citydim ct");
+
+    joinExpr = "join TestExpressionResolver.c1_ziptable zipdim on " +
+        "ct.zipcode = zipdim.code and (zipdim.dt = 'latest')" +
+        " join TestExpressionResolver.c1_statetable statedim on " +
+        "ct.stateid = statedim.id and (statedim.dt = 'latest')" +
+        " join TestExpressionResolver.c1_countrytable countrydim on " +
+        "statedim.countryid = countrydim.id";
+
+    expected = getExpectedQuery("ct",
+        "SELECT ct.name, concat((ct.name), \":\", (statedim.name )," +
         " \":\",(countrydim.name),  \":\" , ( zipdim . code )) FROM ", joinExpr,
         null, null, "c1_citytable", true);
     TestCubeRewriter.compareQueries(expected, hqlQuery);
