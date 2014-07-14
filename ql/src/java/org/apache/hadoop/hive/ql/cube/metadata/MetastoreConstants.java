@@ -26,6 +26,9 @@ public interface MetastoreConstants {
   public static final String CUBE_TABLE_PFX = "cube.table.";
   public static final String WEIGHT_KEY_SFX = ".weight";
 
+  public static final String BASE_KEY_PFX = "base.";
+  public static final String EXPRESSIONS_LIST_SFX = ".expressions.list";
+
   // Cube constants
   public static final String CUBE_KEY_PFX = "cube.";
   public static final String MEASURES_LIST_SFX = ".measures.list";

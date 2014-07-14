@@ -89,12 +89,13 @@ import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.ParseDriver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.ParseUtils;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 
 public class HQLParser {
 
   public static interface ASTNodeVisitor {
-    public void visit(TreeNode node);
+    public void visit(TreeNode node) throws SemanticException;
   }
 
   public static class TreeNode {
@@ -280,13 +281,28 @@ public class HQLParser {
     return null;
   }
 
+  public static ASTNode copyAST(ASTNode original) {
+
+    ASTNode copy = new ASTNode(original); // Leverage constructor
+
+    if(original.getChildren() != null) {
+      for(Object o : original.getChildren()) {
+        ASTNode childCopy  = copyAST((ASTNode)o);
+        childCopy.setParent(copy);
+        copy.addChild(childCopy);
+      }
+    };
+    return copy;
+  }
+
   /**
    * Breadth first traversal of AST
    *
    * @param root
    * @param visitor
+   * @throws SemanticException 
    */
-  public static void bft(ASTNode root, ASTNodeVisitor visitor) {
+  public static void bft(ASTNode root, ASTNodeVisitor visitor) throws SemanticException {
     if (root == null) {
       throw new NullPointerException("Root cannot be null");
     }

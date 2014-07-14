@@ -23,6 +23,7 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -209,5 +210,14 @@ public abstract class AbstractCubeTable implements Named {
     result = prime * result + ((getName() == null) ? 0 :
       getName().hashCode());
     return result;
+  }
+
+  public Set<String> getAllFieldNames() {
+    List<FieldSchema> fields = getColumns();
+    Set<String> columns = new HashSet<String>(fields.size());
+    for (FieldSchema f : fields) {
+      columns.add(f.getName().toLowerCase());
+    }
+    return columns;
   }
 }

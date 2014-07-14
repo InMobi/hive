@@ -21,30 +21,22 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 */
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
-public class Cube extends AbstractCubeTable implements CubeInterface {
+public class Cube extends AbstractBaseTable implements CubeInterface {
   private final Set<CubeMeasure> measures;
   private final Set<CubeDimAttribute> dimensions;
-  private static final List<FieldSchema> columns = new ArrayList<FieldSchema>();
   private final Map<String, CubeMeasure> measureMap;
   private final Map<String, CubeDimAttribute> dimMap;
-
-  static {
-    columns.add(new FieldSchema("dummy", "string", "dummy column"));
-  }
 
   public Cube(String name, Set<CubeMeasure> measures,
       Set<CubeDimAttribute> dimensions) {
@@ -59,7 +51,14 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   public Cube(String name, Set<CubeMeasure> measures,
       Set<CubeDimAttribute> dimensions, Map<String, String> properties,
       double weight) {
-    super(name, columns, properties, weight);
+    this(name, measures, dimensions, null, properties, weight);
+  }
+
+  public Cube(String name, Set<CubeMeasure> measures,
+      Set<CubeDimAttribute> dimensions, Set<ExprColumn> expressions,
+      Map<String, String> properties,
+      double weight) {
+    super(name, expressions, properties, weight);
     this.measures = measures;
     this.dimensions = dimensions;
 
@@ -75,6 +74,7 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
 
     addProperties();
   }
+
   public Cube(Table tbl) {
     super(tbl);
     this.measures = getMeasures(getName(), getProperties());
@@ -109,22 +109,16 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   public Set<String> getTimedDimensions() {
     String str = getProperties().get(
         MetastoreUtil.getCubeTimedDimensionListKey(getName()));
+    Set<String> timedDimensions = new HashSet<String>();
     if (str != null) {
-      Set<String> timedDimensions = new HashSet<String>();
       timedDimensions.addAll(Arrays.asList(StringUtils.split(str, ',')));
-      return timedDimensions;
     }
-    return null;
+    return timedDimensions;
   }
 
   @Override
   public CubeTableType getTableType() {
     return CubeTableType.CUBE;
-  }
-
-  @Override
-  public Set<String> getStorages() {
-    return null;
   }
 
   @Override
@@ -230,9 +224,12 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   }
 
   public CubeColumn getColumnByName(String column) {
-    CubeColumn cubeCol = (CubeColumn)getMeasureByName(column);
+    CubeColumn cubeCol = (CubeColumn)super.getExpressionByName(column);
     if (cubeCol == null) {
-      cubeCol = (CubeColumn)getDimAttributeByName(column);
+      cubeCol = (CubeColumn)getMeasureByName(column);
+      if (cubeCol == null) {
+        cubeCol = (CubeColumn)getDimAttributeByName(column);
+      }
     }
     return cubeCol;
   }
@@ -392,5 +389,14 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
       return Boolean.parseBoolean(canbeQueried);
     }
     return true;
+  }
+
+  @Override
+  public Set<String> getAllFieldNames() {
+    Set<String> fieldNames = super.getAllFieldNames();
+    fieldNames.addAll(getMeasureNames());
+    fieldNames.addAll(getDimAttributeNames());
+    fieldNames.addAll(getTimedDimensions());
+    return fieldNames;
   }
 }

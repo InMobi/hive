@@ -148,6 +148,14 @@ public class MetastoreUtil implements MetastoreConstants {
     return getColumnKeyPrefix(colName) + COST_SFX;
   }
 
+  public static final String getExprColumnKey(String colName) {
+    return getColumnKeyPrefix(colName) + EXPR_SFX;
+  }
+
+  public static final String getExprTypePropertyKey(String colName) {
+    return getColumnKeyPrefix(colName) + TYPE_SFX;
+  }
+
   //////////////////////////
   // Dimension table properties //
   //////////////////////////
@@ -196,13 +204,17 @@ public class MetastoreUtil implements MetastoreConstants {
     return getMeasurePrefix(measureName) + AGGR_SFX;
   }
 
-  public static final String getMeasureExprPropertyKey(String measureName) {
-    return getMeasurePrefix(measureName) + EXPR_SFX;
+  public static final String getExpressionListKey(String name) {
+    return getBasePrefix(name) + EXPRESSIONS_LIST_SFX;
   }
 
   // //////////////////////////
   // Cube properties ///
   // /////////////////////////
+  public static final String getBasePrefix(String base) {
+    return BASE_KEY_PFX + base.toLowerCase();
+  }
+
   public static final String getCubePrefix(String cubeName) {
     return CUBE_KEY_PFX + cubeName.toLowerCase();
   }
@@ -310,14 +322,6 @@ public class MetastoreUtil implements MetastoreConstants {
     Set<String> columns = new HashSet<String>(fields.size());
     for (FieldSchema f : fields) {
       columns.add(f.getName().toLowerCase());
-    }
-    return columns;
-  }
-
-  public static Set<String> getAttributeNames(Dimension table) {
-    Set<String> columns = new HashSet<String>();
-    for (CubeDimAttribute f : table.getAttributes()) {
-      addColumnNames(f, columns);
     }
     return columns;
   }

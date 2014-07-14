@@ -37,7 +37,6 @@ import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
-import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
@@ -49,8 +48,7 @@ public class CandidateTableResolver implements ContextRewriter {
 
   private static Log LOG = LogFactory.getLog(
       CandidateTableResolver.class.getName());
-  private final Map<AbstractCubeTable, Set<String>> cubeTabToCols =
-      new HashMap<AbstractCubeTable, Set<String>>();
+  private Map<AbstractCubeTable, Set<String>> cubeTabToCols;
   final boolean qlEnabledMultiTableSelect;
   private Configuration conf;
 
@@ -64,6 +62,7 @@ public class CandidateTableResolver implements ContextRewriter {
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
+    cubeTabToCols = new HashMap<AbstractCubeTable, Set<String>>();
     populateCandidateTables(cubeql);
     resolveCandidateFactTables(cubeql);
     resolveCandidateDimTables(cubeql);
@@ -81,7 +80,7 @@ public class CandidateTableResolver implements ContextRewriter {
         CandidateFact cfact = new CandidateFact(fact);
         cfact.enabledMultiTableSelect = qlEnabledMultiTableSelect;
         cubeql.getCandidateFactTables().add(cfact);
-        cubeTabToCols.put(fact, MetastoreUtil.getColumnNames(fact));
+        cubeTabToCols.put(fact, fact.getAllFieldNames());
       }
     }
     
@@ -97,7 +96,7 @@ public class CandidateTableResolver implements ContextRewriter {
         for (CubeDimensionTable dimtable : dimtables) {
           CandidateDim cdim = new CandidateDim(dimtable);
           candidates.add(cdim);
-          cubeTabToCols.put(dimtable, MetastoreUtil.getColumnNames(dimtable));
+          cubeTabToCols.put(dimtable, dimtable.getAllFieldNames());
         }
       }
     }    
@@ -112,6 +111,7 @@ public class CandidateTableResolver implements ContextRewriter {
           cubeql.getCube().getName()));
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
         Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
+      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
       for (Iterator<CandidateFact> i = cubeql.getCandidateFactTables().iterator();
           i.hasNext();) {
         CubeFactTable fact = i.next().fact;
@@ -131,33 +131,35 @@ public class CandidateTableResolver implements ContextRewriter {
         Set<String> factCols = cubeTabToCols.get(fact);
         List<String> validFactCols = fact.getValidColumns();
 
-        for (String col : cubeql.getCubeColumnsQueried()) {
+        for (String col : cubeColsQueried) {
           if (!cubeql.getCube().getTimedDimensions().contains(col.toLowerCase())) {
-            if(!factCols.contains(col.toLowerCase())) {
+            if (validFactCols != null) {
+              if (!validFactCols.contains(col.toLowerCase())) {
+                LOG.info("Not considering the fact table:" + fact +
+                    " as column " + col + " is not valid");
+                System.out.println("Not considering the fact table:" + fact +
+                    " as column " + col + " is not valid");
+                cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
+                    fact.getName(), CubeTableCause.COLUMN_NOT_VALID));
+                i.remove();
+                break;
+              }
+            } else if(!factCols.contains(col.toLowerCase())) {
               LOG.info("Not considering the fact table:" + fact +
+                  " as column " + col + " is not available");
+              System.out.println("Not considering the fact table:" + fact +
                   " as column " + col + " is not available");
               cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
                   fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));
               i.remove();
               break;
-            } else {
-              if (validFactCols != null) {
-                if (!validFactCols.contains(col.toLowerCase())) {
-                  LOG.info("Not considering the fact table:" + fact +
-                      " as column " + col + " is not valid");
-                  cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
-                      fact.getName(), CubeTableCause.COLUMN_NOT_VALID));
-                  i.remove();
-                  break;
-                }
-              }
             }
           }
         }
       }
       if (cubeql.getCandidateFactTables().size() == 0) {
         throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN,
-            cubeql.getCubeColumnsQueried().toString());
+            cubeColsQueried.toString());
       }
     }
   }

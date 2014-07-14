@@ -227,7 +227,7 @@ public class TestCubeRewriter {
         "select testdim2.name, sum(derivedCube.msr2) FROM ",
         " JOIN " + getDbName() + "c1_testdim2tbl testdim2 ON derivedCube.dim2 = " +
           " testdim2.id and (testdim2.dt = 'latest') ", null, "group by (testdim2.name)", null,
-          getWhereForDailyAndHourly2days(CubeTestSetup.DERIVED_CUBE_NAME, "C2_testfact"));
+          getWhereForDailyAndHourly2days(CubeTestSetup.DERIVED_CUBE_NAME, "c1_summary2"));
     compareQueries(expected, hqlQuery);
 
     conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
@@ -271,7 +271,7 @@ public class TestCubeRewriter {
 
   }
 
-  private void compareQueries(String expected, String actual) {
+  static void compareQueries(String expected, String actual) {
     if (expected == null && actual == null) {
       return;
     } else if (expected == null) {
@@ -292,7 +292,6 @@ public class TestCubeRewriter {
 
       System.err.println("__FAILED__ " + method
         + "\n\tExpected: " + expected + "\n\t---------\n\tActual: " + actual);
-      System.err.println("\t__AGGR_EXPRS:" + rewrittenQuery.getAggregateExprs());
     }
     Assert.assertTrue(expectedTrimmed.equalsIgnoreCase(actualTrimmed));
   }
@@ -448,12 +447,13 @@ public class TestCubeRewriter {
     if (!CubeTestSetup.isZerothHour()) {
       expected = getExpectedQuery(cubeName,
         "select sum(testcube.msr2) FROM ", null, null,
-        getWhereForMonthlyDailyAndHourly2months("c1_testfact","C3_testfact",
-          "c2_testFact"));
+        getWhereForMonthlyDailyAndHourly2months("c1_testfact","c2_testFact",
+            "C3_testfact"));
     } else {
       expected = getExpectedQuery(cubeName,
         "select sum(testcube.msr2) FROM ", null, null,
-        getWhereForMonthlyDailyAndHourly2months("c1_testfact", "c2_testfact", "c3_testFact"));
+        getWhereForMonthlyDailyAndHourly2months("c1_testfact", "c2_testfact",
+            "c3_testFact"));
     }
     compareQueries(expected, hqlQuery);
 
@@ -905,7 +905,7 @@ public class TestCubeRewriter {
     // run a query with time range function
     hqlQuery = rewrite(driver, "select name, stateid from citydim where " + twoDaysRange);
     expected = getExpectedQuery("citydim", "select citydim.name," +
-        " citydim.stateid from ", twoDaysRange,  null, "c1_citytable", true);
+        " citydim.stateid from ", null,  twoDaysRange, null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     // query with alias
@@ -919,32 +919,32 @@ public class TestCubeRewriter {
     hqlQuery = rewrite(driver, "select name, c.stateid from citydim" +
         " c where name != 'xyz' ");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ",
-        " c.name != 'xyz' ", null,
-        "c1_citytable", true);
+        null, " c.name != 'xyz' ",
+        null, "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     // query with orderby
     hqlQuery = rewrite(driver, "select name, c.stateid from citydim" +
         " c where name != 'xyz' order by name");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ",
-        " c.name != 'xyz' ", " order by c.name asc",
-        "c1_citytable", true);
+        null, " c.name != 'xyz' ",
+        " order by c.name asc", "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     // query with where and orderby
     hqlQuery = rewrite(driver, "select name, c.stateid from citydim" +
         " c where name != 'xyz' order by name");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ",
-        " c.name != 'xyz' ", " order by c.name asc ",
-        "c1_citytable", true);
+        null, " c.name != 'xyz' ",
+        " order by c.name asc ", "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     // query with orderby with order specified
     hqlQuery = rewrite(driver, "select name, c.stateid from citydim" +
         " c where name != 'xyz' order by name desc ");
     expected = getExpectedQuery("c", "select c.name, c.stateid from ",
-        " c.name != 'xyz' ", " order by c.name desc",
-        "c1_citytable", true);
+        null, " c.name != 'xyz' ",
+        " order by c.name desc", "c1_citytable", true);
     compareQueries(expected, hqlQuery);
 
     conf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C2");
@@ -1461,21 +1461,21 @@ public class TestCubeRewriter {
 
   @Test
   public void testJoinWithMultipleAliases() throws Exception {
-    HiveConf conf = new HiveConf();
-    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
     String cubeQl = "SELECT SUM(msr2) from testCube left outer join citydim c1 on testCube.cityid = c1.id" +
-      " left outer join statedim s1 on c1.stateid = s1.id" +
-      " left outer join citydim c2 on s1.countryid = c2.id where " + twoDaysRange;
-    CubeQueryRewriter rewriter = new CubeQueryRewriter(conf);
-    CubeQueryContext context  = rewriter.rewrite(cubeQl);
-    String hql = context.toHQL();
+        " left outer join statedim s1 on c1.stateid = s1.id" +
+        " left outer join citydim c2 on s1.countryid = c2.id where " + twoDaysRange;
+    conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    String hqlQuery  = rewrite(driver, cubeQl);
     String db = getDbName();
-    String expectedJoin = "FROM " + db + ".c3_testfact testcube " +
-      "LEFT OUTER JOIN " + db + ".c1_citytable c1 ON (( testcube . cityid ) = ( c1 . id )) AND (c1.dt = 'latest') " +
-      "LEFT OUTER JOIN " + db + ".c1_statetable s1 ON (( c1 . stateid ) = ( s1 . id )) AND (s1.dt = 'latest') " +
-      "LEFT OUTER JOIN " + db + ".c1_citytable c2 ON (( s1 . countryid ) = ( c2 . id ))";
+    String expectedJoin = 
+      " LEFT OUTER JOIN " + db + ".c1_citytable c1 ON (( testcube . cityid ) = ( c1 . id )) AND (c1.dt = 'latest') " +
+      " LEFT OUTER JOIN " + db + ".c1_statetable s1 ON (( c1 . stateid ) = ( s1 . id )) AND (s1.dt = 'latest') " +
+      " LEFT OUTER JOIN " + db + ".c1_citytable c2 ON (( s1 . countryid ) = ( c2 . id )) AND (c2.dt = 'latest')";
 
-    Assert.assertTrue(hql.replaceAll("\\W+", "").contains(expectedJoin.replaceAll("\\W+", "")));
-    System.out.println("%%% " + hql);
+    String expected = getExpectedQuery(cubeName, "select sum(testcube.msr2)" +
+        " FROM ", expectedJoin, null, null, null, getWhereForDailyAndHourly2days(cubeName,
+        "C2_testfact"));
+    compareQueries(expected, hqlQuery);
    }
 }

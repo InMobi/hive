@@ -42,6 +42,13 @@ public interface CubeInterface extends Named {
   public Set<CubeDimAttribute> getDimAttributes();
 
   /**
+   * Get all expressions defined on the cube
+   *
+   * @return set {@link ExprColumn}
+   */
+  public Set<ExprColumn> getExpressions();
+
+  /**
    * Get dimension attribute given by name
    *
    * @param dimAttrName dimension attribute name
@@ -60,7 +67,18 @@ public interface CubeInterface extends Named {
   public CubeMeasure getMeasureByName(String msrName);
 
   /**
-   * Get cube column given by column name
+   * Get expression by given by name
+   *
+   * @param exprName Expression name
+   *
+   * @return A {@link ExprColumn} object
+   */
+  public ExprColumn getExpressionByName(String exprName);
+
+  /**
+   * Get cube column given by column name.
+   * 
+   * It can be a measure, dimension attribute or an expression.
    *
    * @param colName Column name
    *
@@ -95,6 +113,21 @@ public interface CubeInterface extends Named {
    * @return Set of strings
    */
   public Set<String> getDimAttributeNames();
+
+
+  /**
+   * Get all expression names
+   *
+   * @return Set of strings
+   */
+  public Set<String> getExpressionNames();
+
+  /**
+   * Get all field names reachable from cube
+   *
+   * @return Set of strings
+   */
+  public Set<String> getAllFieldNames();
 
   /**
    * Whether cube can be queried directly. 
