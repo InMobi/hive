@@ -159,7 +159,7 @@ public class StorageTableResolver implements ContextRewriter {
                 dimtable.getName(), storage).toLowerCase();
             try {
               if (!client.tableExists(tableName)) {
-                LOG.info("Not considering the dim storage table:" + tableName
+                LOG.info("Not considering dim storage table:" + tableName
                     + ", as it does not exist");
                 skipStorageCauses.put(tableName, SkipStorageCause.TABLE_NOT_EXIST);
                 continue;
@@ -168,7 +168,7 @@ public class StorageTableResolver implements ContextRewriter {
               throw new SemanticException(e);
             }
             if (validDimTables != null && !validDimTables.contains(tableName)) {
-              LOG.info("Not considering the dim storage table:" + tableName
+              LOG.info("Not considering dim storage table:" + tableName
                   + " as it is not a valid dim storage");
               skipStorageCauses.put(tableName, SkipStorageCause.INVALID);
               continue;
@@ -199,7 +199,7 @@ public class StorageTableResolver implements ContextRewriter {
                     StorageConstants.getPartitionsForLatest());
                 whereClauses.put(tableName, whereClause);
               } else {
-                LOG.info("Not considering the dim storage table:" + tableName
+                LOG.info("Not considering dim storage table:" + tableName
                     + " as no dim partitions exist");
                 skipStorageCauses.put(tableName, SkipStorageCause.NO_PARTITIONS);
               }
@@ -216,7 +216,7 @@ public class StorageTableResolver implements ContextRewriter {
           addNonExistingParts(dim.getName(), StorageConstants.getPartitionsForLatest());
         }
         if (storageTables.isEmpty()) {
-          LOG.info("Not considering the dim table:" + dimtable
+          LOG.info("Not considering dim table:" + dimtable
               + " as no candidate storage tables eixst");
           CandidateTablePruneCause cause =  new CandidateTablePruneCause(
               dimtable.getName(), CubeTableCause.NO_CANDIDATE_STORAGES);
@@ -319,7 +319,7 @@ public class StorageTableResolver implements ContextRewriter {
         }
       }
       if (storageTableMap.isEmpty()) {
-        LOG.info("Not considering the fact table:" + fact + " as it does not" +
+        LOG.info("Not considering fact table:" + fact + " as it does not" +
             " have any storage tables");
         CandidateTablePruneCause cause = new CandidateTablePruneCause(fact.getName(),
             CubeTableCause.NO_CANDIDATE_STORAGES);
@@ -373,7 +373,7 @@ public class StorageTableResolver implements ContextRewriter {
         addNonExistingParts(cfact.fact.getName(), nonExistingParts);        
       }
       if (cfact.numQueriedParts == 0 || (failOnPartialData && !nonExistingParts.isEmpty())) {
-        LOG.info("Not considering the fact table:" + cfact.fact + " as it could"
+        LOG.info("Not considering fact table:" + cfact.fact + " as it could"
             + " not find partition for given ranges: " + cubeql.getTimeRanges());
         if (!skipStorageCauses.isEmpty()) {
           CandidateTablePruneCause cause = new CandidateTablePruneCause(
@@ -399,7 +399,7 @@ public class StorageTableResolver implements ContextRewriter {
       boolean enabledMultiTableSelect = StorageUtil.getMinimalAnsweringTables(
           answeringParts, minimalStorageTables);
       if (minimalStorageTables.isEmpty()) {
-        LOG.info("Not considering the fact table:" + cfact + " as it does not" +
+        LOG.info("Not considering fact table:" + cfact + " as it does not" +
             " have any storage tables");
         CandidateTablePruneCause cause = new CandidateTablePruneCause(
             cfact.fact.getName(),

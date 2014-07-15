@@ -62,7 +62,7 @@ public class LightestDimensionResolver implements ContextRewriter {
             entry.getValue().iterator(); i.hasNext();) {
           CandidateDim dim = i.next();
           if (dimWeightMap.get(dim) > minWeight) {
-            LOG.info("Not considering dim table:" + dim +
+            LOG.info("Not considering dimtable:" + dim +
                 " from candidate dimension tables as it has more weight:"
                 + dimWeightMap.get(dim) + " minimum:"
                 + minWeight);

@@ -508,7 +508,7 @@ public class CubeTestSetup {
     cubeDimensions.add(new BaseDimAttribute(new FieldSchema("ambigdim1", "string",
         "used in testColumnAmbiguity")));
     cubeDimensions.add(new ReferencedDimAtrribute(
-        new FieldSchema("dim2", "id", "ref dim"),
+        new FieldSchema("dim2", "int", "ref dim"),
         new TableReference("testdim2", "id")));
 
     Set<ExprColumn> exprs = new HashSet<ExprColumn>(); 
@@ -701,6 +701,10 @@ public class CubeTestSetup {
     // add dimensions of the cube
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
     factColumns.add(new FieldSchema("cityid","int", "city id"));
+    factColumns.add(new FieldSchema("stateid","int", "state id"));
+    factColumns.add(new FieldSchema("countryid","int", "country id"));
+    factColumns.add(new FieldSchema("dim1","string", "dim1"));
+    factColumns.add(new FieldSchema("dim2","int", "dim2"));
 
     Map<String, Set<UpdatePeriod>> storageAggregatePeriods =
         new HashMap<String, Set<UpdatePeriod>>();

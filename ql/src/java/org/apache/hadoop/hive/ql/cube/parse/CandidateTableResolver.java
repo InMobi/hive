@@ -49,20 +49,17 @@ public class CandidateTableResolver implements ContextRewriter {
   private static Log LOG = LogFactory.getLog(
       CandidateTableResolver.class.getName());
   private Map<AbstractCubeTable, Set<String>> cubeTabToCols;
-  final boolean qlEnabledMultiTableSelect;
-  private Configuration conf;
+  private boolean qlEnabledMultiTableSelect;
 
   public CandidateTableResolver(Configuration conf) {
-    qlEnabledMultiTableSelect = conf.getBoolean(
-        CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
-        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT);
-    this.conf = conf;
- 
   }
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
     cubeTabToCols = new HashMap<AbstractCubeTable, Set<String>>();
+    qlEnabledMultiTableSelect = cubeql.getHiveConf().getBoolean(
+        CubeQueryConfUtil.ENABLE_MULTI_TABLE_SELECT,
+        CubeQueryConfUtil.DEFAULT_MULTI_TABLE_SELECT); 
     populateCandidateTables(cubeql);
     resolveCandidateFactTables(cubeql);
     resolveCandidateDimTables(cubeql);
@@ -107,7 +104,7 @@ public class CandidateTableResolver implements ContextRewriter {
 
   void resolveCandidateFactTables(CubeQueryContext cubeql) throws SemanticException {
     if (cubeql.getCube() != null) {
-      String str = conf.get(CubeQueryConfUtil.getValidFactTablesKey(
+      String str = cubeql.getHiveConf().get(CubeQueryConfUtil.getValidFactTablesKey(
           cubeql.getCube().getName()));
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
         Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
@@ -117,7 +114,7 @@ public class CandidateTableResolver implements ContextRewriter {
         CubeFactTable fact = i.next().fact;
         if (validFactTables != null) {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
-            LOG.info("Not considering the fact table:" + fact + " as it is" +
+            LOG.info("Not considering fact table:" + fact + " as it is" +
                 " not a valid fact");
             cubeql.addFactPruningMsgs(fact,
                 new CandidateTablePruneCause(fact.getName(), CubeTableCause.INVALID));
@@ -135,7 +132,7 @@ public class CandidateTableResolver implements ContextRewriter {
           if (!cubeql.getCube().getTimedDimensions().contains(col.toLowerCase())) {
             if (validFactCols != null) {
               if (!validFactCols.contains(col.toLowerCase())) {
-                LOG.info("Not considering the fact table:" + fact +
+                LOG.info("Not considering fact table:" + fact +
                     " as column " + col + " is not valid");
                 cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
                     fact.getName(), CubeTableCause.COLUMN_NOT_VALID));
@@ -143,7 +140,7 @@ public class CandidateTableResolver implements ContextRewriter {
                 break;
               }
             } else if(!factCols.contains(col.toLowerCase())) {
-              LOG.info("Not considering the fact table:" + fact +
+              LOG.info("Not considering fact table:" + fact +
                   " as column " + col + " is not available");
               cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
                   fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));
@@ -172,7 +169,7 @@ public class CandidateTableResolver implements ContextRewriter {
 
           for (String col : cubeql.getColumnsQueried(dim.getName())) {
             if(!dimCols.contains(col.toLowerCase())) {
-              LOG.info("Not considering the dimension table:" + dimtable +
+              LOG.info("Not considering dimtable:" + dimtable +
                   " as column " + col + " is not available");
               cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
                   dimtable.getName(), CubeTableCause.COLUMN_NOT_FOUND));
