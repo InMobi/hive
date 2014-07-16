@@ -55,10 +55,17 @@ public class CubeQueryRewriter {
   }
 
   private void setupRewriters() {
+    // Rewrite base trees with expressions expanded
+    rewriters.add(new ExpressionResolver(conf));
+    // Resolve columns - the column alias and table alias
+    rewriters.add(new ColumnResolver(conf));
     // Rewrite base trees (groupby, having, orderby, limit) using aliases
     rewriters.add(new AliasReplacer(conf));
     // Resolve joins and generate base join tree
     rewriters.add(new JoinResolver(conf));
+    // resolve time ranges and do col life validation
+    rewriters.add(new TimerangeResolver(conf));
+    // Resolve candidate fact tables and dimension tables
     rewriters.add(new CandidateTableResolver(conf));
     // Resolve aggregations and generate base select tree
     rewriters.add(new AggregateResolver(conf));

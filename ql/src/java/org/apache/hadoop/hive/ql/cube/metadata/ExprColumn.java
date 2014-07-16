@@ -1,4 +1,5 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
+
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -18,54 +19,60 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
-
-import java.util.Date;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.parse.ASTNode;
+import org.apache.hadoop.hive.ql.parse.ParseDriver;
+import org.apache.hadoop.hive.ql.parse.ParseException;
+import org.apache.hadoop.hive.ql.parse.ParseUtils;
 
-public final class ExprMeasure extends CubeMeasure {
+public class ExprColumn extends CubeColumn {
   private final String expr;
+  private final String type;
+  private ASTNode ast;
 
-  public ExprMeasure(FieldSchema column, String expr, String formatString,
-      String aggregate, String unit) {
-    this(column, expr, formatString, aggregate, unit, null, null, null);
-  }
-
-  public ExprMeasure(FieldSchema column, String expr, String formatString,
-      String aggregate, String unit, Date startTime, Date endTime, Double cost) {
-    super(column, formatString, aggregate, unit, startTime, endTime, cost);
+  public ExprColumn(FieldSchema column, String expr) throws ParseException {
+    super(column.getName(), null, null, 0.0);
     this.expr = expr;
-    assert (expr != null);
+    this.type = column.getType();
+    assert(getAst() != null);
   }
 
-  public ExprMeasure(FieldSchema column, String expr) {
-    this(column, expr, null, null, null);
-  }
-
-  public ExprMeasure(String name, Map<String, String> props) {
+  public ExprColumn(String name, Map<String, String> props) {
     super(name, props);
-    this.expr = props.get(MetastoreUtil.getMeasureExprPropertyKey(getName()));
+    this.expr = props.get(MetastoreUtil.getExprColumnKey(getName()));
+    this.type = props.get(MetastoreUtil.getExprTypePropertyKey(getName()));
   }
 
+  /**
+   * @return the expression
+   */
   public String getExpr() {
     return expr;
+  }
+
+  public String getType() {
+    return type;
   }
 
   @Override
   public void addProperties(Map<String, String> props) {
     super.addProperties(props);
-    props.put(MetastoreUtil.getMeasureExprPropertyKey(getName()), expr);
+    props.put(MetastoreUtil.getExprColumnKey(getName()), expr);
+    props.put(MetastoreUtil.getExprTypePropertyKey(getName()), type);
   }
 
   @Override
   public int hashCode() {
     final int prime = 31;
     int result = super.hashCode();
+    result = prime * result + ((getType() == null) ? 0 :
+      getType().toLowerCase().hashCode());
     result = prime * result + ((getExpr() == null) ? 0 :
-        getExpr().toLowerCase().hashCode());
+      getExpr().toLowerCase().hashCode());
     return result;
   }
 
@@ -74,7 +81,14 @@ public final class ExprMeasure extends CubeMeasure {
     if (!super.equals(obj)) {
       return false;
     }
-    ExprMeasure other = (ExprMeasure) obj;
+    ExprColumn other = (ExprColumn) obj;
+    if (this.getType() == null) {
+      if (other.getType() != null) {
+        return false;
+      }
+    } else if (!this.getType().equalsIgnoreCase(other.getType())) {
+      return false;
+    }
     if (this.getExpr() == null) {
       if (other.getExpr() != null) {
         return false;
@@ -88,7 +102,24 @@ public final class ExprMeasure extends CubeMeasure {
   @Override
   public String toString() {
     String str = super.toString();
-    str += "expr:" + expr;
+    str += "#type:" + type;
+    str += "#expr:" + expr;
     return str;
+  }
+
+  /**
+   * Get the AST corresponding to the expression
+   *
+   * @return the ast
+   * @throws ParseException 
+   */
+  public ASTNode getAst() throws ParseException {
+    if (ast == null) {
+      ParseDriver driver = new ParseDriver();
+      ASTNode tree = driver.parseExpression(expr);
+      tree = ParseUtils.findRootNonNullToken(tree);
+      this.ast = tree;
+    }
+    return ast;
   }
 }

@@ -242,4 +242,29 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   public boolean canBeQueried() {
     return true;
   }
+
+  @Override
+  public Set<ExprColumn> getExpressions() {
+    return null;
+  }
+
+  @Override
+  public ExprColumn getExpressionByName(String exprName) {
+    return null;
+  }
+
+  @Override
+  public Set<String> getAllFieldNames() {
+    Set<String> fieldNames = new HashSet<String>();
+    fieldNames.addAll(getMeasureNames());
+    fieldNames.addAll(getDimAttributeNames());
+    fieldNames.addAll(getTimedDimensions());
+    return fieldNames;
+  }
+
+  @Override
+  public Set<String> getExpressionNames() {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

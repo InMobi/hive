@@ -21,26 +21,18 @@
 package org.apache.hadoop.hive.ql.cube.metadata;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
-public class Dimension extends AbstractCubeTable {
+public class Dimension extends AbstractBaseTable {
 
   private final Set<CubeDimAttribute> attributes;
-  private static final List<FieldSchema> columns = new ArrayList<FieldSchema>();
   private final Map<String, CubeDimAttribute> attributeMap;
-
-  static {
-    columns.add(new FieldSchema("dummy", "string", "dummy column"));
-  }
 
   public Dimension(String name,
       Set<CubeDimAttribute> attributes) {
@@ -50,7 +42,14 @@ public class Dimension extends AbstractCubeTable {
   public Dimension(String name,
       Set<CubeDimAttribute> attributes, Map<String, String> properties,
       double weight) {
-    super(name, columns, properties, weight);
+    this(name, attributes, null, properties, weight);
+  }
+
+  public Dimension(String name,
+      Set<CubeDimAttribute> attributes, Set<ExprColumn> expressions,
+      Map<String, String> properties,
+      double weight) {
+    super(name, expressions, properties, weight);
     this.attributes = attributes;
 
     attributeMap = new HashMap<String, CubeDimAttribute>();
@@ -188,7 +187,7 @@ public class Dimension extends AbstractCubeTable {
    */
   public void removeAttribute(String attrName) {
     if (attributeMap.containsKey(attrName.toLowerCase())) {
-      LOG.info("Removing dimension " + getAttributeByName(attrName));
+      LOG.info("Removing attribute " + getAttributeByName(attrName));
       attributes.remove(getAttributeByName(attrName));
       attributeMap.remove(attrName.toLowerCase());
       getProperties().put(MetastoreUtil.getDimAttributeListKey(getName()),
@@ -201,6 +200,21 @@ public class Dimension extends AbstractCubeTable {
    */
   public String getTimedDimension() {
     return getProperties().get(MetastoreUtil.getDimTimedDimensionKey(getName()));
+  }
+
+  public Set<String> getAttributeNames() {
+    Set<String> dimNames = new HashSet<String>();
+    for (CubeDimAttribute f : getAttributes()) {
+      MetastoreUtil.addColumnNames(f, dimNames);
+    }
+    return dimNames;
+  }
+
+  @Override
+  public Set<String> getAllFieldNames() {
+    Set<String> fieldNames = super.getAllFieldNames();
+    fieldNames.addAll(getAttributeNames());
+    return fieldNames;
   }
 
 }

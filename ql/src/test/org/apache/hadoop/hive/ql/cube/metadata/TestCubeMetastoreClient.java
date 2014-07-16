@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
@@ -82,6 +83,8 @@ public class TestCubeMetastoreClient {
   private static Set<CubeDimAttribute> cityAttrs = new HashSet<CubeDimAttribute>();
   private static Set<CubeDimAttribute> stateAttrs = new HashSet<CubeDimAttribute>();
   private static Set<CubeDimAttribute> countryAttrs = new HashSet<CubeDimAttribute>();
+  private static Set<ExprColumn> cubeExpressions = new HashSet<ExprColumn>();
+  private static Set<ExprColumn> dimExpressions = new HashSet<ExprColumn>();
 
   /**
    * Get the date partition as field schema
@@ -102,7 +105,7 @@ public class TestCubeMetastoreClient {
   }
 
   @BeforeClass
-  public static void setup() throws HiveException, AlreadyExistsException {
+  public static void setup() throws HiveException, AlreadyExistsException, ParseException {
     SessionState.start(conf);
     client =  CubeMetastoreClient.getInstance(conf);
     now = new Date();
@@ -130,7 +133,7 @@ public class TestCubeMetastoreClient {
   }
 
   private static void defineCube(String cubeName, String cubeNameWithProps,
-      String derivedCubeName, String derivedCubeNameWithProps) {
+      String derivedCubeName, String derivedCubeNameWithProps) throws ParseException {
     cubeMeasures = new HashSet<CubeMeasure>();
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
         "first measure")));
@@ -143,12 +146,6 @@ public class TestCubeMetastoreClient {
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr4", "bigint",
         "fourth measure"),
         null, "COUNT", null));
-    cubeMeasures.add(new ExprMeasure(new FieldSchema("msr5", "double",
-        "fifth measure"),
-        "avg(msr1 + msr2)"));
-    cubeMeasures.add(new ExprMeasure(new FieldSchema("msr6", "bigint",
-        "sixth measure"),
-        "(msr1 + msr2)/ msr4", "", "SUM", "RS"));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrstarttime", "int",
         "measure with start time"), null, null, null, now, null, null));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrendtime", "float",
@@ -157,12 +154,6 @@ public class TestCubeMetastoreClient {
         "measure with cost"), null, "MAX", null, now, now, 100.0));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msrcost2", "bigint",
         "measure with cost"), null, "MAX", null, null, null, 100.0));
-    cubeMeasures.add(new ExprMeasure(new FieldSchema("msr5start", "double",
-        "expr measure with start and end times"),
-        "avg(msr1 + msr2)", null, null, null, now, now, 100.0));
-    cubeMeasures.add(new ExprMeasure(new FieldSchema("msrexpr", "bigint",
-        "expr measure with all fields"),
-        "(msr1 + msr2)/ msr4", "", "SUM", "RS", now, now, 100.0));
 
     cubeDimensions = new HashSet<CubeDimAttribute>();
     List<CubeDimAttribute> locationHierarchy = new ArrayList<CubeDimAttribute>();
@@ -181,8 +172,21 @@ public class TestCubeMetastoreClient {
     cubeDimensions.add(new BaseDimAttribute(new FieldSchema("dim1", "string",
         "basedim")));
     cubeDimensions.add(new ReferencedDimAtrribute(
-        new FieldSchema("dim2", "string", "ref dim"),
+        new FieldSchema("dim2", "id", "ref dim"),
         new TableReference("testdim2", "id")));
+
+    cubeExpressions.add(new ExprColumn(new FieldSchema("msr5", "double",
+        "fifth measure"),
+        "avg(msr1 + msr2)"));
+    cubeExpressions.add(new ExprColumn(new FieldSchema("msr5start", "double",
+        "expr measure with start and end times"),
+        "avg(msr1 + msr2)"));
+    cubeExpressions.add(new ExprColumn(new FieldSchema("booleancut", "boolean",
+        "a boolean expression"),
+        "dim1 != 'x' AND dim2 != 10 "));
+    cubeExpressions.add(new ExprColumn(new FieldSchema("substrexpr", "string",
+        "a subt string expression"),
+        "substr(dim1, 3)"));
 
     List<CubeDimAttribute> locationHierarchyWithStartTime = new ArrayList<CubeDimAttribute>();
     locationHierarchyWithStartTime.add(new ReferencedDimAtrribute(
@@ -227,7 +231,8 @@ public class TestCubeMetastoreClient {
     cubeDimensions.add(new InlineDimAttribute(
         new FieldSchema("regionstart", "string", "region dim"), now,
         null, 100.0, regions));
-    cube = new Cube(cubeName, cubeMeasures, cubeDimensions);
+    cube = new Cube(cubeName, cubeMeasures, cubeDimensions, cubeExpressions,
+        new HashMap<String, String>(), 0.0);
     measures = new HashSet<String>();
     measures.add("msr1");
     measures.add("msr2");
@@ -248,7 +253,7 @@ public class TestCubeMetastoreClient {
         dimensions, cubeProperties, 0L, cubeWithProps);
   }
 
-  private static void defineUberDims() {
+  private static void defineUberDims() throws ParseException {
     // Define zip dimension
     zipAttrs.add(new BaseDimAttribute(new FieldSchema("zipcode", "int",
         "code")));
@@ -277,7 +282,16 @@ public class TestCubeMetastoreClient {
     cityAttrs.add(new ReferencedDimAtrribute(
         new FieldSchema("stateid", "int", "state id"),
         new TableReference("statedim", "id")));
-    cityDim = new Dimension("citydim", cityAttrs);
+    dimExpressions.add(new ExprColumn(new FieldSchema("stateAndCountry", "String",
+        "state and country together"),
+        "concat(statedim.name, \":\", countrydim.name)"));
+    dimExpressions.add(new ExprColumn(new FieldSchema("CityAddress", "string",
+        "city with state and city and zip"),
+        "concat(citydim.name, \":\", statedim.name, \":\", countrydim.name, \":\", zipcode.code)"));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey("citydim"),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    cityDim = new Dimension("citydim", cityAttrs, dimExpressions, dimProps, 0L);
 
     // Define state table
     stateAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
@@ -300,6 +314,7 @@ public class TestCubeMetastoreClient {
     countryAttrs.add(new BaseDimAttribute(new FieldSchema("region", "string",
         "region name")));
     countryDim = new Dimension("countrydim", stateAttrs);
+
   }
 
   @Test
@@ -337,7 +352,22 @@ public class TestCubeMetastoreClient {
     validateDim(cityDim, cityAttrs, "id", "stateid");
     validateDim(stateDim, stateAttrs, "id", "countryid");
     validateDim(countryDim, countryAttrs, "id", null);
-    
+
+    // validate expression in citydim
+    Dimension city = client.getDimension(cityDim.getName());
+    Assert.assertEquals(dimExpressions.size(), city.getExpressions().size());
+    Assert.assertEquals(dimExpressions.size(), city.getExpressionNames().size());
+    Assert.assertNotNull(city.getExpressionByName("stateAndCountry"));
+    Assert.assertNotNull(city.getExpressionByName("cityaddress"));
+    city.alterExpression(new ExprColumn(new FieldSchema("stateAndCountry", "String",
+        "state and country together with hiphen as separator"),
+        "concat(statedim.name, \"-\", countrydim.name)"));
+    city.removeExpression("cityAddress");
+    city = client.getDimension(cityDim.getName());
+    Assert.assertEquals(1, city.getExpressions().size());
+    Assert.assertNotNull(city.getExpressionByName("stateAndCountry"));
+    Assert.assertEquals(city.getExpressionByName("stateAndCountry").getExpr(), "concat(statedim.name, \"-\", countrydim.name)");
+
     // alter dimension
     Table tbl = client.getHiveTable(zipDim.getName());
     Dimension toAlter = new Dimension(tbl);
@@ -353,6 +383,8 @@ public class TestCubeMetastoreClient {
         new FieldSchema("stateid", "int", "state id"), stateRefs));
     toAlter.removeAttribute("f1");
     toAlter.getProperties().put("alter.prop", "altered");
+    toAlter.alterExpression(new ExprColumn(new FieldSchema("formattedcode",
+        "string", "formatted zipcode"), "format_number(code, \"#,###,###\")"));
 
     client.alterDimension(zipDim.getName(), toAlter);
     Dimension altered = client.getDimension(zipDim.getName());
@@ -363,6 +395,9 @@ public class TestCubeMetastoreClient {
     Assert.assertNotNull(altered.getAttributeByName("f2"));
     Assert.assertNotNull(altered.getAttributeByName("stateid"));
     Assert.assertNull(altered.getAttributeByName("f1"));
+    Assert.assertEquals(1, altered.getExpressions().size());
+    Assert.assertNotNull(altered.getExpressionByName("formattedcode"));
+    Assert.assertEquals(altered.getExpressionByName("formattedcode").getExpr(), "format_number(code, \"#,###,###\")");
 
     CubeDimAttribute newzipdim = altered.getAttributeByName("newZipDim");
     Assert.assertTrue(newzipdim instanceof BaseDimAttribute);
@@ -403,27 +438,35 @@ public class TestCubeMetastoreClient {
       Assert.assertNotNull(dim.getAttributeByName(referdim));
       Assert.assertTrue(dim.getAttributeByName(referdim) instanceof ReferencedDimAtrribute);
     }
+    Assert.assertEquals(udim.getAttributeNames().size() + udim.getExpressionNames().size(),
+        dim.getAllFieldNames().size());
   }
 
   @Test
   public void testCube() throws Exception {
     Assert.assertEquals(client.getCurrentDatabase(),
         this.getClass().getSimpleName());
-    client.createCube(cubeName, cubeMeasures, cubeDimensions);
+    client.createCube(cubeName, cubeMeasures, cubeDimensions, cubeExpressions, new HashMap<String, String>());
     Assert.assertTrue(client.tableExists(cubeName));
     Table cubeTbl = client.getHiveTable(cubeName);
     Assert.assertTrue(client.isCube(cubeTbl));
     Cube cube2 = new Cube(cubeTbl);
     Assert.assertTrue(cube.equals(cube2));
     Assert.assertFalse(cube2.isDerivedCube());
-    Assert.assertNull(cube2.getTimedDimensions());
+    Assert.assertTrue(cube2.getTimedDimensions().isEmpty());
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasureNames().size());
     // +8 is for hierarchical dimension
     Assert.assertEquals(cubeDimensions.size() + 8, cube2.getDimAttributeNames().size());
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasures().size());
+    Assert.assertEquals(cubeExpressions.size(), cube2.getExpressions().size());
+    Assert.assertEquals(cubeExpressions.size(), cube2.getExpressionNames().size());
     Assert.assertEquals(cubeDimensions.size(), cube2.getDimAttributes().size());
+    Assert.assertEquals(cubeDimensions.size() + 8 + cubeMeasures.size() + cubeExpressions.size(),
+        cube2.getAllFieldNames().size());
     Assert.assertNotNull(cube2.getMeasureByName("msr4"));
     Assert.assertNotNull(cube2.getDimAttributeByName("location"));
+    Assert.assertNotNull(cube2.getExpressionByName("msr5"));
+    Assert.assertNotNull(cube2.getExpressionByName("booleancut"));
     Assert.assertTrue(cube2.canBeQueried());
 
     client.createDerivedCube(cubeName, derivedCubeName, measures, dimensions, new HashMap<String, String>(), 0L);
@@ -433,7 +476,7 @@ public class TestCubeMetastoreClient {
     DerivedCube dcube2 = new DerivedCube(derivedTbl, cube);
     Assert.assertTrue(derivedCube.equals(dcube2));
     Assert.assertTrue(dcube2.isDerivedCube());
-    Assert.assertNull(dcube2.getTimedDimensions());
+    Assert.assertTrue(dcube2.getTimedDimensions().isEmpty());
     Assert.assertEquals(measures.size(), dcube2.getMeasureNames().size());
     Assert.assertEquals(dimensions.size(), dcube2.getDimAttributeNames().size());
     Assert.assertEquals(measures.size(), dcube2.getMeasures().size());
@@ -452,7 +495,7 @@ public class TestCubeMetastoreClient {
     cube2 = new Cube(cubeTbl);
     Assert.assertTrue(cubeWithProps.equals(cube2));
     Assert.assertFalse(cube2.isDerivedCube());
-    Assert.assertNotNull(cubeWithProps.getTimedDimensions());
+    Assert.assertFalse(cubeWithProps.getTimedDimensions().isEmpty());
     Assert.assertTrue(cubeWithProps.getTimedDimensions().contains("dt"));
     Assert.assertTrue(cubeWithProps.getTimedDimensions().contains("mydate"));
     Assert.assertEquals(cubeMeasures.size(), cube2.getMeasureNames().size());
@@ -2139,7 +2182,7 @@ public class TestCubeMetastoreClient {
   }
 
   @Test
-  public void testCaching() throws HiveException {
+  public void testCaching() throws HiveException, ParseException {
     client = CubeMetastoreClient.getInstance(conf);
     CubeMetastoreClient client2 = CubeMetastoreClient.getInstance(
         new HiveConf(TestCubeMetastoreClient.class));

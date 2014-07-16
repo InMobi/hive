@@ -247,21 +247,6 @@ public class JoinResolver implements ContextRewriter {
       return mergedJoinClause;
     }
 
-    private String getJoinTypeStr(JoinType joinType) {
-      if (joinType == null) {
-        return "";
-      }
-      switch (joinType) {
-        case FULLOUTER: return " full outer";
-        case INNER: return " inner";
-        case LEFTOUTER: return " left outer";
-        case LEFTSEMI: return " left semi";
-        case UNIQUE: return " unique";
-        case RIGHTOUTER: return " right outer";
-        default: return "";
-      }
-    }
-
     private String getStorageFilter(Map<Dimension, CandidateDim> dimsToQuery,
                                     AbstractCubeTable table) {
       String whereClause = "";
@@ -281,16 +266,29 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
+  static String getJoinTypeStr(JoinType joinType) {
+    if (joinType == null) {
+      return "";
+    }
+    switch (joinType) {
+      case FULLOUTER: return " full outer";
+      case INNER: return " inner";
+      case LEFTOUTER: return " left outer";
+      case LEFTSEMI: return " left semi";
+      case UNIQUE: return " unique";
+      case RIGHTOUTER: return " right outer";
+      default: return "";
+    }
+  }
+
   private CubeMetastoreClient metastore;
-  private final Map<AbstractCubeTable, String> partialJoinConditions;
-  private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
+  private Map<AbstractCubeTable, String> partialJoinConditions;
+  private Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
   private boolean partialJoinChain;
   private AbstractCubeTable target;
   private HiveConf conf;
 
   public JoinResolver(Configuration conf) {
-    partialJoinConditions = new HashMap<AbstractCubeTable, String>();
-    tableJoinTypeMap = new HashMap<AbstractCubeTable, JoinType>();
   }
 
   private CubeMetastoreClient getMetastoreClient() throws HiveException {
@@ -303,6 +301,8 @@ public class JoinResolver implements ContextRewriter {
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
+    partialJoinConditions = new HashMap<AbstractCubeTable, String>();
+    tableJoinTypeMap = new HashMap<AbstractCubeTable, JoinType>();
     try {
       conf = cubeql.getHiveConf();
       resolveJoins(cubeql);
@@ -342,7 +342,7 @@ public class JoinResolver implements ContextRewriter {
     // Check if this query needs a join -
     // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
     // dimensions
-    Set<Dimension> autoJoinDims = cubeql.getAutoJoinDimensions();
+    Set<Dimension> dimensions = cubeql.getDimensions();
     // Add dimensions specified in the partial join tree
     ASTNode joinClause = cubeql.getQB().getParseInfo().getJoinExpr();
     if (joinClause == null) {
@@ -364,7 +364,7 @@ public class JoinResolver implements ContextRewriter {
       return;
     }
 
-    boolean hasDimensions = (autoJoinDims != null && !autoJoinDims.isEmpty()) || !partialJoinConditions.isEmpty();
+    boolean hasDimensions = (dimensions != null && !dimensions.isEmpty()) || !partialJoinConditions.isEmpty();
     // Query has a cube and at least one dimension
     boolean cubeAndDimQuery = cubeql.hasCubeInQuery() && hasDimensions;
     // This query has only dimensions in it
@@ -376,7 +376,7 @@ public class JoinResolver implements ContextRewriter {
     }
 
     Set<Dimension> dimTables =
-        new HashSet<Dimension>(autoJoinDims);
+        new HashSet<Dimension>(dimensions);
     for (AbstractCubeTable partiallyJoinedTable : partialJoinConditions.keySet()) {
       dimTables.add((Dimension) partiallyJoinedTable);
     }
@@ -411,12 +411,8 @@ public class JoinResolver implements ContextRewriter {
     if (joinsResolved) {
       for (List<TableRelationship> chain : joinChain.values()) {
         for (TableRelationship rel : chain) {
-          if (rel.getToTable() instanceof Dimension) {
-            autoJoinDims.add((Dimension) rel.getToTable());
-          }
-          if (rel.getFromTable() instanceof  Dimension) {
-            autoJoinDims.add((Dimension) rel.getFromTable());
-          }
+          cubeql.addQueriedTable(rel.getToTable().getName());
+          cubeql.addQueriedTable(rel.getFromTable().getName());
           // update query context with new columns queried for the joined tables
           cubeql.addColumnsQueried(rel.getToTable(), rel.getToColumn());
           cubeql.addColumnsQueried(rel.getFromTable(), rel.getFromColumn());   
@@ -426,8 +422,6 @@ public class JoinResolver implements ContextRewriter {
           partialJoinChain, tableJoinTypeMap, target,
           conf.get(CubeQueryConfUtil.JOIN_TYPE_KEY), joinsResolved);
       cubeql.setAutoJoinCtx(joinCtx);
-      // add autojoin dims to cubeql dimensions
-      cubeql.getDimensions().addAll(autoJoinDims);
     }
     
   }
