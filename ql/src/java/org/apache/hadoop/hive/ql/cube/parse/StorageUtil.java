@@ -23,7 +23,6 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,40 +42,26 @@ public class StorageUtil {
     }
     StringBuilder partStr = new StringBuilder();
     for (int i = 0; i < parts.size() - 1; i++) {
+      partStr.append(" (");
       partStr.append(tableName);
       partStr.append(".");
       partStr.append(timeDimName);
-      partStr.append(" = '");
+      partStr.append("='");
       partStr.append(parts.get(i));
       partStr.append("'");
+      partStr.append(") ");
       partStr.append(" OR ");
     }
 
     // add the last partition
+    partStr.append(" (");
     partStr.append(tableName);
     partStr.append(".");
     partStr.append(timeDimName);
-    partStr.append(" = '");
+    partStr.append("='");
     partStr.append(parts.get(parts.size() - 1));
     partStr.append("'");
-    return partStr.toString();
-  }
-
-  public static String getWherePartClause(String tableName,
-      Set<FactPartition> rangeParts) {
-    if (rangeParts.size() == 0) {
-      return "";
-    }
-    StringBuilder partStr = new StringBuilder();
-    Iterator<FactPartition> it = rangeParts.iterator();
-    while (it.hasNext()) {
-      partStr.append(" ( ");
-      partStr.append(it.next().getFilter(tableName));
-      partStr.append(" ) ");
-      if (it.hasNext()) {
-        partStr.append(" OR ");
-      }
-    }
+    partStr.append(") ");
     return partStr.toString();
   }
 
@@ -97,7 +82,7 @@ public class StorageUtil {
     boolean enableMultiTableSelect = true;
     // invert the answering tables map and put in inverted map
     for (FactPartition part : answeringParts) {
-      for (String table : part.storageTables) {
+      for (String table : part.getStorageTables()) {
         Set<FactPartition> partsCovered = invertedMap.get(table);
         if (partsCovered == null) {
           partsCovered = new TreeSet<FactPartition>();
@@ -164,7 +149,7 @@ public class StorageUtil {
       partStr.append(" OR ");
     }
     partStr.append(" ( ");
-    partStr.append(part.getFilter(tableName));
+    partStr.append(part.getEqualFilter(tableName));
     partStr.append(" ) ");
 
     return null;

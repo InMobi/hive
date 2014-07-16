@@ -21,36 +21,68 @@ package org.apache.hadoop.hive.ql.cube.parse;
 */
 
 
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 
-class FactPartition implements Comparable<FactPartition> {
-  final String partCol;
-  final String partSpec;
-  final Set<String> storageTables = new LinkedHashSet<String>();
-  final UpdatePeriod period;
-  final FactPartition containingPart;
+public class FactPartition implements Comparable<FactPartition> {
+  private final String partCol;
+  private final Date partSpec;
+  private final Set<String> storageTables = new LinkedHashSet<String>();
+  private final UpdatePeriod period;
+  private final FactPartition containingPart;
+  private final DateFormat partFormat;
 
-  FactPartition(String partCol, String partSpec, UpdatePeriod period,
-      FactPartition containingPart) {
+  FactPartition(String partCol, Date partSpec, UpdatePeriod period,
+      FactPartition containingPart, DateFormat partFormat) {
     this.partCol = partCol;
     this.partSpec = partSpec;
     this.period = period;
     this.containingPart = containingPart;
+    this.partFormat = partFormat;
   }
 
-  FactPartition(String partCol, String partSpec, UpdatePeriod period,
-      FactPartition containingPart, Set<String> storageTables) {
-    this(partCol, partSpec, period, containingPart);
+  FactPartition(String partCol, Date partSpec, UpdatePeriod period,
+      FactPartition containingPart, DateFormat partFormat, Set<String> storageTables) {
+    this(partCol, partSpec, period, containingPart, partFormat);
     this.storageTables.addAll(storageTables);
   }
 
-  String getFilter(String tableName) {
+  public boolean hasContainingPart() {
+    return containingPart != null;
+  }
+
+  public String getPartCol() {
+    return partCol;
+  }
+
+  public UpdatePeriod getPeriod() {
+    return period;
+  }
+
+  public Date getPartSpec() {
+    return partSpec;
+  }
+
+  public String getFormattedPartSpec() {
+    if (partFormat == null) {
+      return period.format().format(partSpec);
+    } else {
+      return partFormat.format(partSpec);
+    }
+  }
+
+  public Set<String> getStorageTables() {
+    return storageTables;
+  }
+
+  public String getEqualFilter(String tableName) {
     StringBuilder builder = new StringBuilder();
     if (containingPart != null) {
-        builder.append(containingPart.getFilter(tableName));
+        builder.append(containingPart.getEqualFilter(tableName));
         builder.append(" AND ");
     }
     if (tableName != null) {
@@ -58,13 +90,14 @@ class FactPartition implements Comparable<FactPartition> {
       builder.append(".");
     }
     builder.append(partCol);
-    builder.append("='").append(partSpec).append("'");
+    System.out.println("Adding " + getFormattedPartSpec());
+    builder.append("='").append(getFormattedPartSpec()).append("'");
     return builder.toString();
   }
 
   @Override
   public String toString() {
-    return getFilter(null);
+    return getEqualFilter(null);
   }
 
   public int compareTo(FactPartition o) {

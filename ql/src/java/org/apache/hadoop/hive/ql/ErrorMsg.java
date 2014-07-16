@@ -434,6 +434,7 @@ public enum ErrorMsg {
   CUBE_NOT_QUERYABLE(15025, "Cube {0} cannot be queried", true),
   NO_DIM_HAS_COLUMN(15026, "No dimension table has the queried columns for {0}, columns: {1}", true),
   NO_CANDIDATE_DIM_AVAILABLE(15027, "No candidate dimension table available for {0} to answer the query, because {1}", true),
+  CANNOT_USE_TIMERANGE_WRITER(15028, "Configured timerange writer cannot be used. Reason {0}", true),
 
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),
