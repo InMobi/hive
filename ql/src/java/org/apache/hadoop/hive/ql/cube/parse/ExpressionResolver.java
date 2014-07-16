@@ -47,6 +47,7 @@ public class ExpressionResolver implements ContextRewriter {
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
     resolveClause(cubeql, cubeql.getSelectAST());
     resolveClause(cubeql, cubeql.getWhereAST());
+    resolveClause(cubeql, cubeql.getJoinTree());
     resolveClause(cubeql, cubeql.getGroupByAST());
     resolveClause(cubeql, cubeql.getHavingAST());
     resolveClause(cubeql, cubeql.getOrderByAST());
