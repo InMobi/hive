@@ -25,9 +25,13 @@ import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getExpectedQuer
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2days;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -230,6 +234,25 @@ public class TestExpressionResolver {
       null, " and substr(tc.dim1, 3) != 'XYZ'" +
       " group by concat(cd.name, \":\", sd.name)", null,
       getWhereForDailyAndHourly2days("tc", "c1_summary3"));
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
+
+    // expression in join clause
+    List<String> joinWhereConds = new ArrayList<String>();
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+      "statedim", StorageConstants.getPartitionsForLatest()));
+    hqlQuery = rewrite(driver, "select cityAndState, avgmsr from testCube " +
+        " join citydim on substrexpr != 'XYZ' where " + twoDaysRange);
+
+    joinExpr = " inner join " + getDbName() + "c1_citytable citydim" +
+        " on testcube.cityid = citydim.id " +
+        " and substr(testcube.dim1, 3) != 'XYZ' and (citydim.dt = 'latest') join" +
+        getDbName() + "c1_statetable statedim on" +
+        " testcube.stateid = statedim.id ";
+    expected = getExpectedQuery(cubeName,
+      "select concat(citydim.name, \":\", statedim.name)," +
+      " avg(testcube.msr1 + testcube.msr2) FROM ", joinExpr,
+      null, " group by concat(citydim.name, \":\", statedim.name)", joinWhereConds,
+      getWhereForDailyAndHourly2days(cubeName, "c1_summary3"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression with having clause
