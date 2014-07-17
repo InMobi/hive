@@ -21,6 +21,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
  */
 
 import java.text.DateFormat;
+import java.util.Date;
 
 import junit.framework.Assert;
 
@@ -45,19 +46,20 @@ public class TestBetweenTimeRangeWriter extends TestTimeRangeWriter {
 
   @Override
   public void validateConsecutive(String whereClause, DateFormat format) {
-
-    String first = null;
-    String last = null;
+    String expected = null;
     if (format == null) {
-      first = UpdatePeriod.DAILY.format().format(CubeTestSetup.twodaysBack);
-      last = UpdatePeriod.DAILY.format().format(CubeTestSetup.now);
-
+      expected = getBetweenClause("test", "dt", CubeTestSetup.twodaysBack,
+          CubeTestSetup.now, UpdatePeriod.DAILY.format());
     } else {
-      first = format.format(CubeTestSetup.twodaysBack);
-      last = format.format(CubeTestSetup.now);
+      expected = getBetweenClause("test", "dt", CubeTestSetup.twodaysBack,
+          CubeTestSetup.now, format);
     }
-    String expected = " (test.dt BETWEEN " + first + " AND " + last + ") ";
     Assert.assertEquals(expected, whereClause);
   }
 
+  public static String getBetweenClause(String alias, String colName, Date start, Date end, DateFormat format) {
+    String first = format.format(start);
+    String last = format.format(end);
+    return " (" + alias + "." + colName + " BETWEEN " + first + " AND " + last + ") ";
+  }
 }

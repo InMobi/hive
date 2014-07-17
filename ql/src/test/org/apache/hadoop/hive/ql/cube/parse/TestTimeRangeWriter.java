@@ -46,16 +46,11 @@ public abstract class TestTimeRangeWriter {
 
   public abstract void validateConsecutive(String whereClause, DateFormat format);
 
-  protected DateFormat dbFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-  protected Date oneDayBack;
+  public static DateFormat dbFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
   @Before
   public void setup() {
     CubeTestSetup.init();
-    Calendar cal = Calendar.getInstance();
-    cal.setTime(CubeTestSetup.now);
-    cal.add(Calendar.DAY_OF_MONTH, -1);
-    oneDayBack = cal.getTime();  
   }
 
   @Test
@@ -111,7 +106,7 @@ public abstract class TestTimeRangeWriter {
   public void testConsecutiveDayParts() throws SemanticException {
     Set<FactPartition> answeringParts =
         new LinkedHashSet<FactPartition>();
-    answeringParts.add(new FactPartition("dt", oneDayBack, UpdatePeriod.DAILY, null, null));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.oneDayBack, UpdatePeriod.DAILY, null, null));
     answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null));
     answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.DAILY, null, null));
 
@@ -120,7 +115,7 @@ public abstract class TestTimeRangeWriter {
 
     answeringParts =
         new LinkedHashSet<FactPartition>();
-    answeringParts.add(new FactPartition("dt", oneDayBack, UpdatePeriod.DAILY, null, dbFormat));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.oneDayBack, UpdatePeriod.DAILY, null, dbFormat));
     answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, dbFormat));
     answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.DAILY, null, dbFormat));
 

@@ -39,7 +39,7 @@ public class BetweenTimeRangeWriter implements TimeRangeWriter {
     StringBuilder partStr = new StringBuilder();
     if (rangeParts.size() == 1) {
       partStr.append(" ( ");
-      partStr.append(rangeParts.iterator().next().getEqualFilter(tableName));
+      partStr.append(rangeParts.iterator().next().getFormattedFilter(tableName));
       partStr.append(" ) "); 
     } else {
       TreeSet<FactPartition> parts = new TreeSet<FactPartition>();

@@ -139,19 +139,4 @@ public class StorageUtil {
     }
     return Collections.singletonMap(maxCoveringStorage, maxCoveringSet);
   }
-
-  public static String appenWherePartClause(String existingClause,
-      String tableName,
-      FactPartition part) {
-    StringBuilder partStr = new StringBuilder();
-    if (existingClause != null) {
-      partStr.append(existingClause);
-      partStr.append(" OR ");
-    }
-    partStr.append(" ( ");
-    partStr.append(part.getEqualFilter(tableName));
-    partStr.append(" ) ");
-
-    return null;
-  }
 }

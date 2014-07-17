@@ -369,10 +369,13 @@ public class StorageTableResolver implements ContextRewriter {
       List<FactPartition> answeringParts = new ArrayList<FactPartition>();
       Map<String, SkipStorageCause> skipStorageCauses = new HashMap<String, SkipStorageCause>();
       List<String> nonExistingParts = new ArrayList<String>();
+      boolean noPartsForRange = false;
       for (TimeRange range : cubeql.getTimeRanges()) {
         Set<FactPartition> rangeParts = getPartitions(cfact.fact, range,
             skipStorageCauses, nonExistingParts);
         if (rangeParts == null || rangeParts.isEmpty()) {
+          LOG.info("No partitions for range:" + range);
+          noPartsForRange = true;
           continue;
         }
         cfact.numQueriedParts += rangeParts.size();
@@ -383,7 +386,8 @@ public class StorageTableResolver implements ContextRewriter {
       if (!nonExistingParts.isEmpty()) {
         addNonExistingParts(cfact.fact.getName(), nonExistingParts);        
       }
-      if (cfact.numQueriedParts == 0 || (failOnPartialData && !nonExistingParts.isEmpty())) {
+      if (cfact.numQueriedParts == 0 || (failOnPartialData &&
+          (noPartsForRange || !nonExistingParts.isEmpty()))) {
         LOG.info("Not considering fact table:" + cfact.fact + " as it could"
             + " not find partition for given ranges: " + cubeql.getTimeRanges());
         if (!skipStorageCauses.isEmpty()) {
@@ -530,10 +534,10 @@ public class StorageTableResolver implements ContextRewriter {
         int numParts;
         if (leastInterval) {
           numParts = client.getNumPartitionsByFilter(
-              storageTableName, part.getEqualFilter(null));
+              storageTableName, part.getFilter());
         } else {
           List<Partition> sParts = client.getPartitionsByFilter(
-              storageTableName, part.getEqualFilter(null));
+              storageTableName, part.getFilter());
           metaParts.put(storageTableName, sParts);
           numParts = sParts.size();
         }
@@ -564,7 +568,7 @@ public class StorageTableResolver implements ContextRewriter {
                 // add all storage tables as the answering tables
                 part.getStorageTables().addAll(storageTbls);
               }
-              nonExistingParts.add(part.getFormattedPartSpec());
+              nonExistingParts.add(part.getPartString());
             } else {
               LOG.info("No finer granual partitions exist for" + part);
               return false;

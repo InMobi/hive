@@ -69,20 +69,24 @@ public class FactPartition implements Comparable<FactPartition> {
 
   public String getFormattedPartSpec() {
     if (partFormat == null) {
-      return period.format().format(partSpec);
+      return getPartString();
     } else {
       return partFormat.format(partSpec);
     }
+  }
+
+  public String getPartString() {
+    return period.format().format(partSpec);
   }
 
   public Set<String> getStorageTables() {
     return storageTables;
   }
 
-  public String getEqualFilter(String tableName) {
+  public String getFormattedFilter(String tableName) {
     StringBuilder builder = new StringBuilder();
     if (containingPart != null) {
-        builder.append(containingPart.getEqualFilter(tableName));
+        builder.append(containingPart.getFormattedFilter(tableName));
         builder.append(" AND ");
     }
     if (tableName != null) {
@@ -90,14 +94,24 @@ public class FactPartition implements Comparable<FactPartition> {
       builder.append(".");
     }
     builder.append(partCol);
-    System.out.println("Adding " + getFormattedPartSpec());
     builder.append("='").append(getFormattedPartSpec()).append("'");
+    return builder.toString();
+  }
+
+  public String getFilter() {
+    StringBuilder builder = new StringBuilder();
+    if (containingPart != null) {
+        builder.append(containingPart.getFilter());
+        builder.append(" AND ");
+    }
+    builder.append(partCol);
+    builder.append("='").append(getPartString()).append("'");
     return builder.toString();
   }
 
   @Override
   public String toString() {
-    return getEqualFilter(null);
+    return getFilter();
   }
 
   public int compareTo(FactPartition o) {

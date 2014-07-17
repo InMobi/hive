@@ -102,6 +102,7 @@ public class CubeTestSetup {
   public static final String DERIVED_CUBE_NAME= "derivedCube";
   public static Date now;
   public static Date twodaysBack;
+  public static Date oneDayBack;
   public static String twoDaysRange;
   public static Date twoMonthsBack;
   public static String twoMonthsRangeUptoMonth;
@@ -115,11 +116,16 @@ public class CubeTestSetup {
   private static String c3 = "C3";
 
   public static void init () {
+    if (inited) {
+      return;
+    }
     Calendar cal = Calendar.getInstance();
     now = cal.getTime();
     zerothHour = (cal.get(Calendar.HOUR_OF_DAY) == 0);
     System.out.println("Test now:" + now);
-    cal.add(Calendar.DAY_OF_MONTH, -2);
+    cal.add(Calendar.DAY_OF_MONTH, -1);
+    oneDayBack = cal.getTime();  
+    cal.add(Calendar.DAY_OF_MONTH, -1);
     twodaysBack = cal.getTime();
     System.out.println("Test twodaysBack:" + twodaysBack);
    
@@ -145,15 +151,13 @@ public class CubeTestSetup {
         getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
     twoMonthsRangeUptoHours = "time_range_in('dt', '" +
         getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
+    inited = true;
   }
 
   private static boolean inited;
 
   public CubeTestSetup() {
-    if (!inited) {
-      init();
-      inited = true;
-    }
+    init();
   }
 
   public static boolean isZerothHour() {
@@ -679,6 +683,19 @@ public class CubeTestSetup {
     cal.setTime(twodaysBack);
     Date temp = cal.getTime();
     while (!(temp.after(now))) {
+      Map<String, Date> timeParts = new HashMap<String, Date>();
+      timeParts.put(TestCubeMetastoreClient.getDatePartitionKey(), temp);
+      StoragePartitionDesc sPartSpec = new StoragePartitionDesc(fact2.getName(),
+          timeParts, null, UpdatePeriod.HOURLY);
+      client.addPartition(sPartSpec, c1);
+      cal.add(Calendar.HOUR_OF_DAY, 1);
+      temp = cal.getTime();
+    }
+
+    // Add all hourly partitions for twoDaysRangeBefore4days
+    cal.setTime(before4daysStart);
+    temp = cal.getTime();
+    while (!(temp.after(before4daysEnd))) {
       Map<String, Date> timeParts = new HashMap<String, Date>();
       timeParts.put(TestCubeMetastoreClient.getDatePartitionKey(), temp);
       StoragePartitionDesc sPartSpec = new StoragePartitionDesc(fact2.getName(),
