@@ -246,7 +246,7 @@ public class TestJoinResolver {
     System.out.println("testPartialJoinResolver Partial join hql: " + hql);
     String partSQL = " left outer join " + getDbName() 
         + "c1_citytable citydim on testcube.cityid " +
-        "= citydim.id and ((( citydim . name ) =  'FOOBAR' )) " +
+        "= citydim.id and (( citydim . name ) =  'FOOBAR' ) " +
         "and (citydim.dt = 'latest')";
     assertTrue(hql.contains(partSQL));
     partSQL = " right outer join "+ getDbName() +"c1_testdim2tbl testdim2 on " +
@@ -254,7 +254,7 @@ public class TestJoinResolver {
         "c1_testdim3tbl testdim3 on testdim2.testdim3id = testdim3.id and " +
         "(testdim2.dt = 'latest') right outer join "+ getDbName() +
         "c1_testdim4tbl testdim4 on testdim3.testdim4id = testdim4.id and " +
-        "((( testdim4 . name ) =  'TESTDIM4NAME' )) and (testdim3.dt = 'latest')";
+        "(( testdim4 . name ) =  'TESTDIM4NAME' ) and (testdim3.dt = 'latest')";
 
     assertTrue(hql.contains(partSQL));
   }
@@ -328,9 +328,9 @@ public class TestJoinResolver {
     CubeQueryRewriter rewriter = new CubeQueryRewriter(dimOnlyConf);
     CubeQueryContext ctx = rewriter.rewrite(query);
     String hql = ctx.toHQL();
-    assertTrue(hql.contains("WHERE (citydim.dt = 'latest') LIMIT 10"));
     System.out.println("testDimOnlyQuery@@@HQL:" + hql);
     System.out.println("testDimOnlyQuery@@@Resolved join clause: " + getAutoResolvedFromString(ctx));
+    assertTrue(hql.contains("WHERE ((citydim.dt = 'latest')) LIMIT 10"));
     assertEquals(getDbName() +  "c1_citytable citydim inner join "+ getDbName() + "c1_statetable statedim on citydim.stateid = statedim.id and (statedim.dt = 'latest')",
         getAutoResolvedFromString(ctx).trim());
 
@@ -355,7 +355,7 @@ public class TestJoinResolver {
     System.out.println("##1 " + getAutoResolvedFromString(context));
     assertEquals(getDbName() +  "c1_citytable citydim left outer join " + getDbName() + "c1_statetable statedim on citydim.stateid = statedim.id" +
       " and (statedim.dt = 'latest')", getAutoResolvedFromString(context).trim());
-    assertTrue(hql.contains("WHERE (citydim.dt = 'latest')"));
+    assertTrue(hql.contains("WHERE ((citydim.dt = 'latest'))"));
 
     conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "RIGHTOUTER");
     rewriter = new CubeQueryRewriter(conf);
@@ -365,7 +365,7 @@ public class TestJoinResolver {
     System.out.println("##2 " + getAutoResolvedFromString(context));
     assertEquals(getDbName() +  "c1_citytable citydim right outer join " + getDbName() + "c1_statetable statedim on citydim.stateid = statedim.id " +
       "and (citydim.dt = 'latest')", getAutoResolvedFromString(context).trim());
-    assertTrue(hql.contains("WHERE (statedim.dt = 'latest')"));
+    assertTrue(hql.contains("WHERE ((statedim.dt = 'latest'))"));
 
     conf.set(CubeQueryConfUtil.JOIN_TYPE_KEY, "FULLOUTER");
     rewriter = new CubeQueryRewriter(conf);
@@ -374,7 +374,7 @@ public class TestJoinResolver {
     System.out.println("##3 hql " + hql);
     System.out.println("##3 " + getAutoResolvedFromString(context));
     assertEquals(getDbName() +  "c1_citytable citydim full outer join " + getDbName() + "c1_statetable statedim on citydim.stateid = statedim.id " +
-      "and (citydim.dt = 'latest' and statedim.dt = 'latest')", getAutoResolvedFromString(context).trim());
+      "and (citydim.dt = 'latest') and (statedim.dt = 'latest')", getAutoResolvedFromString(context).trim());
     assertTrue(!hql.contains("WHERE"));
   }
 }

@@ -46,6 +46,8 @@ public abstract class TestTimeRangeWriter {
 
   public abstract void validateConsecutive(String whereClause, DateFormat format);
 
+  public abstract void validateSingle(String whereClause, DateFormat object);
+
   public static DateFormat dbFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
   @Before
@@ -121,7 +123,21 @@ public abstract class TestTimeRangeWriter {
 
     whereClause = getTimerangeWriter().getTimeRangeWhereClause("test", answeringParts);
     validateConsecutive(whereClause, dbFormat);
-
   }
 
+  @Test
+  public void testSinglePart() throws SemanticException {
+    Set<FactPartition> answeringParts =
+        new LinkedHashSet<FactPartition>();
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.oneDayBack, UpdatePeriod.DAILY, null, null));
+    String whereClause = getTimerangeWriter().getTimeRangeWhereClause("test", answeringParts);
+    validateSingle(whereClause, null);
+
+    answeringParts =
+        new LinkedHashSet<FactPartition>();
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.oneDayBack, UpdatePeriod.DAILY, null, dbFormat));
+    whereClause = getTimerangeWriter().getTimeRangeWhereClause("test", answeringParts);
+    validateSingle(whereClause, dbFormat);
+
+  }
 }

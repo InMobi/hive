@@ -42,26 +42,26 @@ public class StorageUtil {
     }
     StringBuilder partStr = new StringBuilder();
     for (int i = 0; i < parts.size() - 1; i++) {
-      partStr.append(" (");
+      partStr.append("(");
       partStr.append(tableName);
       partStr.append(".");
       partStr.append(timeDimName);
-      partStr.append("='");
+      partStr.append(" = '");
       partStr.append(parts.get(i));
       partStr.append("'");
-      partStr.append(") ");
+      partStr.append(")");
       partStr.append(" OR ");
     }
 
     // add the last partition
-    partStr.append(" (");
+    partStr.append("(");
     partStr.append(tableName);
     partStr.append(".");
     partStr.append(timeDimName);
-    partStr.append("='");
+    partStr.append(" = '");
     partStr.append(parts.get(parts.size() - 1));
     partStr.append("'");
-    partStr.append(") ");
+    partStr.append(")");
     return partStr.toString();
   }
 

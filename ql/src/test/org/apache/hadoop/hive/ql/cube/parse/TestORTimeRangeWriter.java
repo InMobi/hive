@@ -61,13 +61,26 @@ public class TestORTimeRangeWriter extends TestTimeRangeWriter {
   public void validateConsecutive(String whereClause, DateFormat format) {
     List<String> parts = new ArrayList<String>();
     if (format == null) {
-      parts.add(UpdatePeriod.DAILY.format().format(oneDayBack)); 
+      parts.add(UpdatePeriod.DAILY.format().format(CubeTestSetup.oneDayBack)); 
       parts.add(UpdatePeriod.DAILY.format().format(CubeTestSetup.twodaysBack)); 
       parts.add(UpdatePeriod.DAILY.format().format(CubeTestSetup.now));
     } else {
-      parts.add(format.format(oneDayBack)); 
+      parts.add(format.format(CubeTestSetup.oneDayBack)); 
       parts.add(format.format(CubeTestSetup.twodaysBack)); 
       parts.add(format.format(CubeTestSetup.now));
+    }
+
+    System.out.println("Expected :" + StorageUtil.getWherePartClause("dt", "test", parts));
+    Assert.assertEquals(whereClause, StorageUtil.getWherePartClause("dt", "test", parts));
+  }
+
+  @Override
+  public void validateSingle(String whereClause, DateFormat format) {
+    List<String> parts = new ArrayList<String>();
+    if (format == null) {
+      parts.add(UpdatePeriod.DAILY.format().format(CubeTestSetup.oneDayBack));
+    } else {
+      parts.add(format.format(CubeTestSetup.oneDayBack));
     }
 
     System.out.println("Expected :" + StorageUtil.getWherePartClause("dt", "test", parts));

@@ -235,10 +235,10 @@ public class JoinResolver implements ContextRewriter {
           }
 
           if (StringUtils.isNotBlank(userFilter)) {
-            clause.append(" and (").append(userFilter).append(")");
+            clause.append(" and ").append(userFilter);
           }
           if (StringUtils.isNotBlank(storageFilter)) {
-            clause.append (" and (").append(storageFilter).append(")");
+            clause.append (" and ").append(storageFilter);
           }
           clauses.add(clause.toString());
         }

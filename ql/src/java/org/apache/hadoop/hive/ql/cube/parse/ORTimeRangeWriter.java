@@ -34,9 +34,9 @@ public class ORTimeRangeWriter implements TimeRangeWriter {
     StringBuilder partStr = new StringBuilder();
     Iterator<FactPartition> it = rangeParts.iterator();
     while (it.hasNext()) {
-      partStr.append(" (");
+      partStr.append("(");
       partStr.append(it.next().getFormattedFilter(tableName));
-      partStr.append(") ");
+      partStr.append(")");
       if (it.hasNext()) {
         partStr.append(" OR ");
       }

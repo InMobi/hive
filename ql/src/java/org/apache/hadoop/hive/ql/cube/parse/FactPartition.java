@@ -94,7 +94,7 @@ public class FactPartition implements Comparable<FactPartition> {
       builder.append(".");
     }
     builder.append(partCol);
-    builder.append("='").append(getFormattedPartSpec()).append("'");
+    builder.append(" = '").append(getFormattedPartSpec()).append("'");
     return builder.toString();
   }
 
@@ -105,7 +105,7 @@ public class FactPartition implements Comparable<FactPartition> {
         builder.append(" AND ");
     }
     builder.append(partCol);
-    builder.append("='").append(getPartString()).append("'");
+    builder.append(" = '").append(getPartString()).append("'");
     return builder.toString();
   }
 
@@ -117,7 +117,20 @@ public class FactPartition implements Comparable<FactPartition> {
   public int compareTo(FactPartition o) {
     int colComp = this.partCol.compareTo(o.partCol);
     if (colComp == 0) {
-      int partComp = this.partSpec.compareTo(o.partSpec);
+      int partComp = 0;
+      if (this.partSpec != null) {
+        if (o.partSpec == null) {
+          partComp = 1;
+        }
+        partComp = this.partSpec.compareTo(
+                o.partSpec);
+      } else {
+        if (o.partSpec != null) {
+          partComp = -1;
+        } else {
+          partComp = 0;
+        }
+      }
       if (partComp == 0) {
         int upComp = 0;
         if (this.period != null && o.period != null) {

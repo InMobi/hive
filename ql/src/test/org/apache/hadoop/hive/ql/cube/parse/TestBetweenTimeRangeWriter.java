@@ -21,7 +21,9 @@ package org.apache.hadoop.hive.ql.cube.parse;
  */
 
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import junit.framework.Assert;
 
@@ -61,5 +63,18 @@ public class TestBetweenTimeRangeWriter extends TestTimeRangeWriter {
     String first = format.format(start);
     String last = format.format(end);
     return " (" + alias + "." + colName + " BETWEEN " + first + " AND " + last + ") ";
+  }
+
+  @Override
+  public void validateSingle(String whereClause, DateFormat format) {
+    List<String> parts = new ArrayList<String>();
+    if (format == null) {
+      parts.add(UpdatePeriod.DAILY.format().format(CubeTestSetup.oneDayBack));
+    } else {
+      parts.add(format.format(CubeTestSetup.oneDayBack));
+    }
+
+    System.out.println("Expected :" + StorageUtil.getWherePartClause("dt", "test", parts));
+    Assert.assertEquals(whereClause, StorageUtil.getWherePartClause("dt", "test", parts));
   }
 }

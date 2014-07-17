@@ -33,9 +33,15 @@ import junit.framework.Assert;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
+import org.junit.Before;
 import org.junit.Test;
 
 public class TestStorageUtil {
+
+  @Before
+  public void setup() {
+    CubeTestSetup.init();
+  }
 
   @Test
   public void testMinimalAnsweringTables() {
