@@ -20,6 +20,8 @@ package org.apache.hadoop.hive.ql.cube.parse;
  *
 */
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -54,6 +56,7 @@ import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.util.ReflectionUtils;
 
 public class StorageTableResolver implements ContextRewriter {
   private static Log LOG = LogFactory.getLog(
@@ -72,7 +75,8 @@ public class StorageTableResolver implements ContextRewriter {
   private final UpdatePeriod maxInterval;
   private final boolean populateNonExistingParts;
   private final Map<String, List<String>> nonExistingPartitions = new HashMap<String, List<String>>();
-  private CubeQueryContext cubeql;
+  private TimeRangeWriter rangeWriter;
+  private DateFormat partWhereClauseFormat = null;
 
   public StorageTableResolver(Configuration conf) {
     this.conf = conf;
@@ -96,6 +100,14 @@ public class StorageTableResolver implements ContextRewriter {
       this.maxInterval = UpdatePeriod.valueOf(maxIntervalStr);
     } else {
       this.maxInterval = null;
+    }
+    rangeWriter = ReflectionUtils.newInstance(
+    conf.getClass(CubeQueryConfUtil.TIME_RANGE_WRITER_CLASS,
+        CubeQueryConfUtil.DEFAULT_TIME_RANGE_WRITER, TimeRangeWriter.class),
+        this.conf);
+    String formatStr = conf.get(CubeQueryConfUtil.PART_WHERE_CLAUSE_DATE_FORMAT);
+    if (formatStr != null) {
+      partWhereClauseFormat = new SimpleDateFormat(formatStr);
     }
   }
 
@@ -121,7 +133,6 @@ public class StorageTableResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
-    this.cubeql = cubeql;
     client = cubeql.getMetastoreClient();
 
     if (!cubeql.getCandidateFactTables().isEmpty()) {
@@ -358,21 +369,25 @@ public class StorageTableResolver implements ContextRewriter {
       List<FactPartition> answeringParts = new ArrayList<FactPartition>();
       Map<String, SkipStorageCause> skipStorageCauses = new HashMap<String, SkipStorageCause>();
       List<String> nonExistingParts = new ArrayList<String>();
+      boolean noPartsForRange = false;
       for (TimeRange range : cubeql.getTimeRanges()) {
         Set<FactPartition> rangeParts = getPartitions(cfact.fact, range,
             skipStorageCauses, nonExistingParts);
         if (rangeParts == null || rangeParts.isEmpty()) {
+          LOG.info("No partitions for range:" + range);
+          noPartsForRange = true;
           continue;
         }
         cfact.numQueriedParts += rangeParts.size();
         answeringParts.addAll(rangeParts);
-        cfact.rangeToWhereClause.put(range, StorageUtil.getWherePartClause(
+        cfact.rangeToWhereClause.put(range, rangeWriter.getTimeRangeWhereClause(
             cubeql.getAliasForTabName(cubeql.getCube().getName()), rangeParts));
       }
       if (!nonExistingParts.isEmpty()) {
         addNonExistingParts(cfact.fact.getName(), nonExistingParts);        
       }
-      if (cfact.numQueriedParts == 0 || (failOnPartialData && !nonExistingParts.isEmpty())) {
+      if (cfact.numQueriedParts == 0 || (failOnPartialData &&
+          (noPartsForRange || !nonExistingParts.isEmpty()))) {
         LOG.info("Not considering fact table:" + cfact.fact + " as it could"
             + " not find partition for given ranges: " + cubeql.getTimeRanges());
         if (!skipStorageCauses.isEmpty()) {
@@ -483,7 +498,7 @@ public class StorageTableResolver implements ContextRewriter {
         continue;
       }
       if (containingPart != null) {
-        if (!client.partColExists(storageTableName, containingPart.partCol)) {
+        if (!client.partColExists(storageTableName, containingPart.getPartCol())) {
           LOG.info(partCol + " does not exist in" + storageTableName);
           skipStorageCauses.put(storageTableName, SkipStorageCause.PART_COL_DOES_NOT_EXIST);
           it.remove();
@@ -513,16 +528,16 @@ public class StorageTableResolver implements ContextRewriter {
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
       FactPartition part = new FactPartition(partCol,
-          interval.format().format(dt), interval, containingPart);
+          dt, interval, containingPart, partWhereClauseFormat);
       Map<String, List<Partition>> metaParts = new HashMap<String, List<Partition>>();
       for (String storageTableName : storageTbls) {
         int numParts;
         if (leastInterval) {
           numParts = client.getNumPartitionsByFilter(
-              storageTableName, part.getFilter(null));
+              storageTableName, part.getFilter());
         } else {
           List<Partition> sParts = client.getPartitionsByFilter(
-              storageTableName, part.getFilter(null));
+              storageTableName, part.getFilter());
           metaParts.put(storageTableName, sParts);
           numParts = sParts.size();
         }
@@ -532,7 +547,7 @@ public class StorageTableResolver implements ContextRewriter {
             partitions.add(part);
             foundPart = true;
           }
-          part.storageTables.add(storageTableName);
+          part.getStorageTables().add(storageTableName);
         } else {
           LOG.info("Partition " + part + " does not exist on " + storageTableName);
         }
@@ -551,9 +566,9 @@ public class StorageTableResolver implements ContextRewriter {
                 partitions.add(part);
                 foundPart = true;
                 // add all storage tables as the answering tables
-                part.storageTables.addAll(storageTbls);
+                part.getStorageTables().addAll(storageTbls);
               }
-              nonExistingParts.add(part.partSpec);
+              nonExistingParts.add(part.getPartString());
             } else {
               LOG.info("No finer granual partitions exist for" + part);
               return false;
