@@ -617,22 +617,4 @@ public class HQLParser {
 
     return colname;
   }
-
-  public static boolean isAggregateAST(ASTNode node) {
-    int exprTokenType = node.getToken().getType();
-    if (exprTokenType == HiveParser.TOK_FUNCTION
-        || exprTokenType == HiveParser.TOK_FUNCTIONDI
-        || exprTokenType == HiveParser.TOK_FUNCTIONSTAR) {
-      assert (node.getChildCount() != 0);
-      if (node.getChild(0).getType() == HiveParser.Identifier) {
-        String functionName = BaseSemanticAnalyzer.unescapeIdentifier(
-            node.getChild(0).getText());
-        if (FunctionRegistry.getGenericUDAFResolver(functionName) != null) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
 }

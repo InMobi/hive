@@ -23,6 +23,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getDbName;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getExpectedQuery;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2days;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForHourly2days;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
 
 import java.util.ArrayList;
@@ -130,12 +131,19 @@ public class TestExpressionResolver {
         " avgmsr from testCube where " + twoDaysRange);
     String expected = getExpectedQuery(cubeName,
         "select avg(testCube.msr1 + testCube.msr2) FROM ", null, null,
-        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
-    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
+
+    hqlQuery = rewrite(driver, "select dim1, roundedmsr2 from testCube" +
+        " where " + twoDaysRange);
+    expected = getExpectedQuery(cubeName,
+        "select testcube.dim1, round(sum(testcube.msr2)/1000) FROM ", null,
+        " group by testcube.dim1",
+        getWhereForDailyAndHourly2days(cubeName, "c1_summary1"));
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // where with expression
-    hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +
+    hqlQuery = rewrite(driver, "select msr2 from testCube" +
         " where " + twoDaysRange + " and substrexpr != 'XYZ'");
     expected = getExpectedQuery(cubeName,
         "select sum(testcube.msr2) FROM ", null, " and substr(testCube.dim1, 3) != 'XYZ'",
@@ -155,7 +163,7 @@ public class TestExpressionResolver {
     expected = getExpectedQuery(cubeName,
         "select avg(testCube.msr1 + testCube.msr2) FROM ",
         null, " and substr(testCube.dim1, 3) != 'XYZ'",
-        getWhereForDailyAndHourly2days(cubeName, "c1_summary1"));
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select avgmsr from testCube" +
@@ -163,7 +171,7 @@ public class TestExpressionResolver {
     expected = getExpectedQuery(cubeName,
         "select avg(testCube.msr1 + testCube.msr2) FROM ",
         null, " and (substr(testCube.dim1, 3) = 'INDIA') = true",
-        getWhereForDailyAndHourly2days(cubeName, "c1_summary1"));
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression with alias
@@ -171,7 +179,7 @@ public class TestExpressionResolver {
         " where " + twoDaysRange + " and TC.substrexpr != 'XYZ'");
     expected = getExpectedQuery("tc",
         "select avg(tc.msr1 + tc.msr2) FROM ", null, " and substr(tc.dim1, 3) != 'XYZ'",
-        getWhereForDailyAndHourly2days("TC", "c1_summary1"));
+        getWhereForHourly2days("tc", "C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression with column alias
@@ -180,7 +188,7 @@ public class TestExpressionResolver {
     expected = getExpectedQuery("tc",
         "select substr(tc.dim1, 3) subdim1, avg(tc.msr1 + tc.msr2) FROM ",
         null, " and subdim1 != 'XYZ' group by substr(tc.dim1, 3)",
-        getWhereForDailyAndHourly2days("TC", "c1_summary1"));
+        getWhereForHourly2days("tc", "C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression with groupby
@@ -191,7 +199,7 @@ public class TestExpressionResolver {
         " avg(testCube.msr1 + testCube.msr2) FROM ", null,
         " and substr(testCube.dim1, 3) != 'XYZ'" +
         " group by testCube.dim1 != 'x' AND testCube.dim2 != 10",
-        getWhereForDailyAndHourly2days(cubeName, "C1_summary2"));
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select booleancut, avgmsr from testCube" +
@@ -201,7 +209,7 @@ public class TestExpressionResolver {
         " avg(testCube.msr1 + testCube.msr2) FROM ", null,
         " and substr(testCube.dim1, 3) != 'XYZ' " +
         "group by testCube.dim1 != 'x' AND testCube.dim2 != 10",
-        getWhereForDailyAndHourly2days(cubeName, "C1_summary2"));
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression which results in join
@@ -217,7 +225,7 @@ public class TestExpressionResolver {
       " avg(testcube.msr1 + testcube.msr2) FROM ", joinExpr,
       null, " and substr(testcube.dim1, 3) != 'XYZ'" +
       " group by concat(citydim.name, \":\", statedim.name)", null,
-      getWhereForDailyAndHourly2days(cubeName, "c1_summary3"));
+      getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select cityAndState, avgmsr from testCube tc" +
@@ -233,7 +241,7 @@ public class TestExpressionResolver {
       " avg(tc.msr1 + tc.msr2) FROM ", joinExpr,
       null, " and substr(tc.dim1, 3) != 'XYZ'" +
       " group by concat(cd.name, \":\", sd.name)", null,
-      getWhereForDailyAndHourly2days("tc", "c1_summary3"));
+      getWhereForHourly2days("tc", "C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression in join clause
@@ -252,7 +260,7 @@ public class TestExpressionResolver {
       "select concat(citydim.name, \":\", statedim.name)," +
       " avg(testcube.msr1 + testcube.msr2) FROM ", joinExpr,
       null, " group by concat(citydim.name, \":\", statedim.name)", joinWhereConds,
-      getWhereForDailyAndHourly2days(cubeName, "c1_summary3"));
+      getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     // expression with having clause
@@ -264,10 +272,9 @@ public class TestExpressionResolver {
         " avg(testCube.msr1 + testCube.msr2) FROM ", null,
         " and substr(testCube.dim1, 3) != 'XYZ' " +
         " group by testCube.dim1 != 'x' AND testCube.dim2 != 10" +
-        " having sum(testCube.msr2 + testCube.msr3)/ count(testcube.msr4) > 100.0",
-        getWhereForDailyAndHourly2days(cubeName, "C1_summary2"));
+        " having (sum(testCube.msr2) + max(testCube.msr3))/ count(testcube.msr4) > 100.0",
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
-    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
 
     // expression with orderby clause
     hqlQuery = rewrite(driver, "cube select avgmsr from testCube " +
@@ -278,25 +285,23 @@ public class TestExpressionResolver {
         " avg(testCube.msr1 + testCube.msr2) FROM ", null,
         " and substr(testCube.dim1, 3) != 'XYZ' " +
         " group by testCube.dim1 != 'x' AND testCube.dim2 != 10" +
-        " having sum(testCube.msr2 + testCube.msr3)/ count(testcube . msr4) > 100.0 " +
+        " having (sum(testCube.msr2) + max(testCube.msr3))/ count(testcube.msr4) > 100.0" +
         " order by testCube.dim1 != 'x' AND testCube.dim2 != 10 asc",
-        getWhereForDailyAndHourly2days(cubeName, "C1_summary2"));
+        getWhereForHourly2days("C1_testfact2_raw"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
-    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
 
-    hqlQuery = rewrite(driver, "cube select booleancut bc, avgmsr from testCube"
+    hqlQuery = rewrite(driver, "cube select booleancut bc, msr2 from testCube"
         + " where " + twoDaysRange + " and substrexpr != 'XYZ'" +
         " having msr6 > 100.0 order by bc");
     expected = getExpectedQuery(cubeName,
         "select testCube.dim1 != 'x' AND testCube.dim2 != 10 bc," +
-        " avg(testCube.msr1 + testCube.msr2) FROM ", null,
+        " sum(testCube.msr2) FROM ", null,
         " and substr(testCube.dim1, 3) != 'XYZ' " +
         " group by testCube.dim1 != 'x' AND testCube.dim2 != 10" +
-        " having sum(testCube.msr2 + testCube.msr3)/ count(testcube.msr4) > 100.0 " +
+        " having (sum(testCube.msr2) + max(testCube.msr3))/ count(testcube.msr4) > 100.0"+
         " order by bc asc",
-        getWhereForDailyAndHourly2days(cubeName, "C1_summary2"));
+        getWhereForDailyAndHourly2days(cubeName, "c1_summary2"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
-    Assert.assertNotNull(rewrittenQuery.getNonExistingParts());
   }
 
   @Test

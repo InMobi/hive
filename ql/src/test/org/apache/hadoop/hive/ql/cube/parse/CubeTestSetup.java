@@ -401,13 +401,17 @@ public class CubeTestSetup {
   }
 
   public static Map<String, String> getWhereForHourly2days(String hourlyTable) {
+    return getWhereForHourly2days(TEST_CUBE_NAME, hourlyTable);
+  }
+
+  public static Map<String, String> getWhereForHourly2days(String alias, String hourlyTable) {
     Map<String, String> storageTableToWhereClause =
         new LinkedHashMap<String, String>();
     List<String> parts = new ArrayList<String>();
     addParts(parts, UpdatePeriod.HOURLY, twodaysBack,
         DateUtil.getFloorDate(now, UpdatePeriod.HOURLY));
     storageTableToWhereClause.put(getDbName() + hourlyTable,
-        StorageUtil.getWherePartClause("dt", TEST_CUBE_NAME, parts));
+        StorageUtil.getWherePartClause("dt", alias, parts));
     return storageTableToWhereClause;
   }
 
@@ -519,9 +523,12 @@ public class CubeTestSetup {
     exprs.add(new ExprColumn(new FieldSchema("avgmsr", "double",
         "avg measure"),
         "avg(msr1 + msr2)"));
+    exprs.add(new ExprColumn(new FieldSchema("roundedmsr2", "double",
+        "rounded measure2"),
+        "round(msr2/1000)"));
     exprs.add(new ExprColumn(new FieldSchema("msr6", "bigint",
         "sixth measure"),
-        "sum(msr2 + msr3)/ msr4"));
+        "sum(msr2) + max(msr3)/ count(msr4)"));
     exprs.add(new ExprColumn(new FieldSchema("booleancut", "boolean",
         "a boolean expression"),
         "dim1 != 'x' AND dim2 != 10 "));
