@@ -1055,9 +1055,9 @@ public class TestCubeRewriter {
   public void testAliasReplacer() throws Exception {
     String queries[] = {
       "SELECT cityid, t.msr2 FROM testCube t where " + twoDaysRange,
-      "SELECT cityid, msr2 FROM testCube where msr2 > 100 and " + twoDaysRange +
+      "SELECT cityid, msr2 FROM testCube where cityid > 100 and " + twoDaysRange +
         " HAVING msr2 < 1000",
-      "SELECT cityid, testCube.msr2 FROM testCube where msr2 > 100 and "
+      "SELECT cityid, testCube.msr2 FROM testCube where cityid > 100 and "
         + twoDaysRange + " HAVING msr2 < 1000 ORDER BY cityid"
     };
 
@@ -1066,11 +1066,11 @@ public class TestCubeRewriter {
         " group by t.cityid", getWhereForDailyAndHourly2days("t",
         "C2_testfact")),
       getExpectedQuery(cubeName, "SELECT testCube.cityid, sum(testCube.msr2)" +
-        " FROM ", " testcube.msr2 > 100 ", " group by testcube.cityid having" +
+        " FROM ", " testcube.cityid > 100 ", " group by testcube.cityid having" +
         " sum(testCube.msr2 < 1000)", getWhereForDailyAndHourly2days(
         cubeName, "C2_testfact")),
       getExpectedQuery(cubeName, "SELECT testCube.cityid, sum(testCube.msr2)" +
-        " FROM ", " testcube.msr2 > 100 ", " group by testcube.cityid having" +
+        " FROM ", " testcube.cityid > 100 ", " group by testcube.cityid having" +
         " sum(testCube.msr2 < 1000) orderby testCube.cityid asc",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact")),
     };
