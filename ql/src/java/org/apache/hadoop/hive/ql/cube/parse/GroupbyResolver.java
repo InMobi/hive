@@ -177,7 +177,7 @@ public class GroupbyResolver implements ContextRewriter {
     if (nodeType == HiveParser.TOK_TABLE_OR_COL || nodeType == HiveParser.DOT) {
       return false;
     } else {
-      if (AggregateResolver.isAggregateAST(node)) {
+      if (HQLParser.isAggregateAST(node)) {
         return true;
       }
 

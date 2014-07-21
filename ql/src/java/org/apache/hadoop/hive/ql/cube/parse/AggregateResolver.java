@@ -136,7 +136,7 @@ public class AggregateResolver implements ContextRewriter {
     }
     int nodeType = node.getToken().getType();
 
-    if (!(isAggregateAST(node))) {
+    if (!(HQLParser.isAggregateAST(node))) {
       if (nodeType == HiveParser.TOK_TABLE_OR_COL ||
           nodeType == HiveParser.DOT) {
         // Leaf node
@@ -160,23 +160,6 @@ public class AggregateResolver implements ContextRewriter {
         }
       }
     }
-  }
-
-  static boolean isAggregateAST(ASTNode node) {
-    int exprTokenType = node.getToken().getType();
-    if (exprTokenType == HiveParser.TOK_FUNCTION
-        || exprTokenType == HiveParser.TOK_FUNCTIONDI
-        || exprTokenType == HiveParser.TOK_FUNCTIONSTAR) {
-      assert (node.getChildCount() != 0);
-      if (node.getChild(0).getType() == HiveParser.Identifier) {
-        String functionName = BaseSemanticAnalyzer.unescapeIdentifier(
-            node.getChild(0).getText());
-        if (FunctionRegistry.getGenericUDAFResolver(functionName) != null) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   static boolean hasDistinctClause(ASTNode node) {
@@ -245,7 +228,7 @@ public class AggregateResolver implements ContextRewriter {
       return true;
     }
 
-    if (isAggregateAST(node)) {
+    if (HQLParser.isAggregateAST(node)) {
       if (node.getChild(0).getType() == HiveParser.Identifier) {
         function = BaseSemanticAnalyzer.unescapeIdentifier(
           node.getChild(0).getText());
@@ -332,7 +315,7 @@ public class AggregateResolver implements ContextRewriter {
       return;
     }
   
-    if (isAggregateAST(root)) {
+    if (HQLParser.isAggregateAST(root)) {
       cubeql.addAggregateExpr(HQLParser.getString(root).trim());
     } else {
       for (int i = 0; i < root.getChildCount(); i++) {
