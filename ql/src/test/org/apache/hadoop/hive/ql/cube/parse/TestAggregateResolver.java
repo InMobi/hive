@@ -79,6 +79,7 @@ public class TestAggregateResolver {
   public void testAggregateResolver() throws Exception {
     conf.setBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER, false);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+
     // pass
     String q1 = "SELECT cityid, testCube.msr2 from testCube where "
         + twoDaysRange;
@@ -120,9 +121,6 @@ public class TestAggregateResolver {
     String q10 = "SELECT cityid, round(testCube.msr2) from testCube where "
         + twoDaysRange;
 
-    String q11 = "SELECT cityid, sum(testCube.msr2) FROM testCube WHERE " +
-        twoDaysRange + " having max(msr3) > 100";
-
     String expectedq1 = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
         " sum(testCube.msr2) from ", null, "group by testcube.cityid",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
@@ -161,19 +159,17 @@ public class TestAggregateResolver {
     String expectedq10 = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
         " round(sum(testCube.msr2)) from ", null, "group by testcube.cityid",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
-    String expectedq11 = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
-        " sum(testCube.msr2) from ", null, "group by testcube.cityid having max(testcube.msr3) > 100",
-        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
 
-    String tests[] = {q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11};
+    String tests[] = {q1, q2, q3, q4, q5, q6, q7, q8, q9, q10};
     String expected[] = {expectedq1, expectedq2, expectedq3, expectedq4,
-        expectedq5, expectedq6, expectedq7, expectedq8, expectedq9, expectedq10, expectedq11};
+        expectedq5, expectedq6, expectedq7, expectedq8, expectedq9, expectedq10};
 
     for (int i = 0; i < tests.length; i++) {
       String hql  = rewrite(driver, tests[i]);
       System.out.println("hql[" + i+ "]:" + hql);
       compareQueries(expected[i], hql);
     }
+    aggregateFactSelectionTests();
     rawFactSelectionTests();
   }
 
@@ -190,17 +186,45 @@ public class TestAggregateResolver {
     CubeQueryContext.CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     String expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
-        " testCube.msr2) from ", null, "group by testcube.cityid",
+        " testCube.msr2 from ", null, null,
         getWhereForHourly2days("c1_testfact2_raw"));
     compareQueries(expectedQL, hQL);
 
-    // with aggregate resolver off, msr with its default aggregate around it
+    aggregateFactSelectionTests();
+    rawFactSelectionTests();
+  }
+
+  private void aggregateFactSelectionTests() throws SemanticException, ParseException {
+    String query = "SELECT count(distinct cityid) from testcube where " + twoDaysRange;
+    CubeQueryContext cubeql = driver.rewrite(query);
+    String hQL = cubeql.toHQL();
+    String expectedQL = getExpectedQuery(cubeName, "SELECT count(distinct testcube.cityid)," +
+        " from ", null, null,
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+    compareQueries(expectedQL, hQL);
+
+    query = "SELECT distinct cityid from testcube where " + twoDaysRange;
+    hQL = driver.rewrite(query).toHQL();
+    expectedQL = getExpectedQuery(cubeName, "SELECT distinct testcube.cityid," +
+        " from ", null, null,
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+    compareQueries(expectedQL, hQL);
+
+    // with aggregate resolver on/off, msr with its default aggregate around it
     // should pick up aggregated fact
     query = "SELECT cityid, sum(testCube.msr2) FROM testCube WHERE " + twoDaysRange;
     cubeql = driver.rewrite(query);
     hQL = cubeql.toHQL();
     expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
         " sum(testCube.msr2) from ", null, "group by testcube.cityid",
+        getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
+    compareQueries(expectedQL, hQL);
+
+    query = "SELECT cityid, sum(testCube.msr2) m2 FROM testCube WHERE " + twoDaysRange + " order by m2";
+    cubeql = driver.rewrite(query);
+    hQL = cubeql.toHQL();
+    expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
+        " sum(testCube.msr2) m2 from ", null, "group by testcube.cityid order by m2 asc",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expectedQL, hQL);
 
@@ -211,12 +235,9 @@ public class TestAggregateResolver {
         " sum(testCube.msr2) from ", null, "group by testcube.cityid having max(testcube.msr3) > 100",
         getWhereForDailyAndHourly2days(cubeName, "C2_testfact"));
     compareQueries(expectedQL, hQL);
-
-    rawFactSelectionTests();
   }
 
   private void rawFactSelectionTests() throws SemanticException, ParseException {
-
     // Check a query with non default aggregate function
     String query = "SELECT cityid, avg(testCube.msr2) FROM testCube WHERE " + twoDaysRange;
     CubeQueryContext cubeql = driver.rewrite(query);
@@ -248,7 +269,7 @@ public class TestAggregateResolver {
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     hQL = cubeql.toHQL();
     expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
-        " testCube.msr2 from ", "testcube.msr2 < 100", "group by testcube.cityid",
+        " testCube.msr2 from ", "testcube.msr2 < 100", null,
         getWhereForHourly2days("c1_testfact2_raw"));
     compareQueries(expectedQL, hQL);
 
@@ -307,7 +328,7 @@ public class TestAggregateResolver {
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     hQL = cubeql.toHQL();
     expectedQL = getExpectedQuery(cubeName, "SELECT distinct testcube.cityid," +
-        " round(testCube.msr2) from ", null, "group by testcube.cityid",
+        " round(testCube.msr2) from ", null, null,
         getWhereForHourly2days("c1_testfact2_raw"));
     compareQueries(expectedQL, hQL);
 
@@ -330,7 +351,7 @@ public class TestAggregateResolver {
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     hQL = cubeql.toHQL();
     expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
-        " round(testCube.msr1) from ", null, "group by testcube.cityid",
+        " round(testCube.msr1) from ", null, null,
         getWhereForHourly2days("c1_testfact2_raw"));
     compareQueries(expectedQL, hQL);
 
@@ -341,7 +362,7 @@ public class TestAggregateResolver {
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     hQL = cubeql.toHQL();
     expectedQL = getExpectedQuery(cubeName, "SELECT distinct testcube.cityid," +
-        " round(testCube.msr1) from ", null, "group by testcube.cityid",
+        " round(testCube.msr1) from ", null, null,
         getWhereForHourly2days("c1_testfact2_raw"));
     compareQueries(expectedQL, hQL);
 

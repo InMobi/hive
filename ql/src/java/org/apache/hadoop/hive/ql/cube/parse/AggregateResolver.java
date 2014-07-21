@@ -34,7 +34,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
@@ -79,7 +78,9 @@ public class AggregateResolver implements ContextRewriter {
     // 3. there are distinct selection of measures
     // If yes, only the raw (non aggregated) fact can answer this query.
     // In that case remove aggregate facts from the candidate fact list
-    if (hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null,
+    if (hasMeasuresInDistinctClause(cubeql, cubeql.getSelectAST(), false)
+        || hasMeasuresInDistinctClause(cubeql, cubeql.getHavingAST(), false)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null,
         aggregateResolverDisabled)
         || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null,
             aggregateResolverDisabled)
@@ -162,15 +163,6 @@ public class AggregateResolver implements ContextRewriter {
     }
   }
 
-  static boolean hasDistinctClause(ASTNode node) {
-    int exprTokenType = node.getToken().getType();
-    if (exprTokenType == HiveParser.TOK_FUNCTIONDI ||
-        exprTokenType == HiveParser.TOK_SELECTDI) {
-      return true;
-    }
-    return false;
-  }
-
   // Wrap an aggregate function around the node if its a measure, leave it
   // unchanged otherwise
   private ASTNode wrapAggregate(CubeQueryContext cubeql, ASTNode node)
@@ -224,10 +216,6 @@ public class AggregateResolver implements ContextRewriter {
       return false;
     }
 
-    if (hasDistinctClause(node)) {
-      return true;
-    }
-
     if (HQLParser.isAggregateAST(node)) {
       if (node.getChild(0).getType() == HiveParser.Identifier) {
         function = BaseSemanticAnalyzer.unescapeIdentifier(
@@ -265,6 +253,32 @@ public class AggregateResolver implements ContextRewriter {
     return false;
   }
 
+  private boolean hasMeasuresInDistinctClause(CubeQueryContext cubeql,
+      ASTNode node, boolean hasDistinct) {
+    if (node == null) {
+      return false;
+    }
+
+    int exprTokenType = node.getToken().getType();
+    boolean isDistinct = hasDistinct;
+    if (exprTokenType == HiveParser.TOK_FUNCTIONDI ||
+        exprTokenType == HiveParser.TOK_SELECTDI) {
+      isDistinct = true;
+    } else if (isMeasure(cubeql, node) && isDistinct) {
+      // Exit for the recursion
+      return true;
+    }
+
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (hasMeasuresInDistinctClause(cubeql, (ASTNode) node.getChild(i),
+          isDistinct)) {
+        // Return on the first measure in distinct clause
+        return true;
+      }
+    }
+    return false;
+  }
+
   private boolean hasMeasures(CubeQueryContext cubeql,
       ASTNode node) {
     if (node == null) {
@@ -280,6 +294,7 @@ public class AggregateResolver implements ContextRewriter {
         return true;
       }
     }
+
     return false;
   }
 

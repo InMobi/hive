@@ -742,7 +742,7 @@ public class CubeQueryContext {
   }
 
   public boolean hasAggregates() {
-    return !aggregateExprs.isEmpty() || (cube !=null);
+    return !aggregateExprs.isEmpty();
   }
 
   public String getAlias(String expr) {
