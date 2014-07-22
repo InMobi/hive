@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.ql.cube.parse;
  *
  */
 
-import java.util.Calendar;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
@@ -61,32 +60,12 @@ public class BetweenTimeRangeWriter implements TimeRangeWriter {
           }
           if (!first.getPeriod().equals(part.getPeriod())) {
             throw new SemanticException(ErrorMsg.CANNOT_USE_TIMERANGE_WRITER,
-                "Part columns are different in update periods");
+                "Partitions are in different update periods");
           }
         }        
         parts.add(part);
       }
       
-      //Make sure there are no gaps
-      it = parts.iterator();
-      Calendar prev = null;
-      int calField = 0;
-      while (it.hasNext()) {
-        FactPartition part = it.next();
-        if (prev == null) {
-          prev = Calendar.getInstance();
-          prev.setTime(part.getPartSpec());
-          calField = part.getPeriod().calendarField();
-        } else {
-          prev.add(calField, 1);
-          if (!prev.getTime().equals(part.getPartSpec())) {
-            throw new SemanticException(ErrorMsg.CANNOT_USE_TIMERANGE_WRITER,
-                "There are gaps in partitions queried, expected:" +
-                prev.getTime() + ", was:" + part.getPartSpec());            
-          }
-        }
-      }
-
       FactPartition start = parts.first();
       FactPartition end = parts.last();
       partStr.append(" (").append(tableName).append(".")

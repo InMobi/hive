@@ -105,8 +105,8 @@ public class AliasReplacer implements ContextRewriter {
     replaceAliases(joinAST, 0, colToTableAlias);
 
     // Update the aggregate expression set
-    updateAggregates(selectAST, cubeql);
-    updateAggregates(havingAST, cubeql);
+    AggregateResolver.updateAggregates(selectAST, cubeql);
+    AggregateResolver.updateAggregates(havingAST, cubeql);
     // Update alias map as well
     updateAliasMap(selectAST, cubeql);
   }
@@ -201,21 +201,6 @@ public class AliasReplacer implements ContextRewriter {
       for (int i = 0; i < node.getChildCount(); i++) {
         ASTNode child = (ASTNode) node.getChild(i);
         replaceAliases(child, i, colToTableAlias);
-      }
-    }
-  }
-
-  private void updateAggregates(ASTNode root, CubeQueryContext cubeql) {
-    if (root == null) {
-      return;
-    }
-
-    if (HQLParser.isAggregateAST(root)) {
-      cubeql.addAggregateExpr(HQLParser.getString(root).trim());
-    } else {
-      for (int i = 0; i < root.getChildCount(); i++) {
-        ASTNode child = (ASTNode) root.getChild(i);
-        updateAggregates(child, cubeql);
       }
     }
   }

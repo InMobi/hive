@@ -34,7 +34,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
@@ -59,10 +58,8 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
-  private final Configuration conf;
 
   public AggregateResolver(Configuration conf) {
-    this.conf = conf;
   }
 
   @Override
@@ -71,27 +68,40 @@ public class AggregateResolver implements ContextRewriter {
       return;
     }
 
-    if (conf.getBoolean(CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER,
-        CubeQueryConfUtil.DEFAULT_DISABLE_AGGREGATE_RESOLVER)) {
-      // Check if the query contains measures not inside default aggregate expressions
-      // If yes, only the raw (non aggregated) fact can answer this query.
-      // In that case remove aggregate facts from the candidate fact list
-      if (hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null)
-        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null)
-        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getWhereAST(), null)
-        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getGroupByAST(), null)
-        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getOrderByAST(), null) ) {
-        Iterator<CubeQueryContext.CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
-        while (factItr.hasNext()) {
-          CubeQueryContext.CandidateFact candidate = factItr.next();
-          if (candidate.fact.isAggregated()) {
-            cubeql.addFactPruningMsgs(candidate.fact,
-                new CandidateTablePruneCause(candidate.fact.getName(),
-                    CubeTableCause.MISSING_DEFAULT_AGGREGATE));
-            factItr.remove();
-          }
+    boolean nonDefaultAggregates = false;
+    boolean aggregateResolverDisabled = cubeql.getHiveConf().getBoolean(
+        CubeQueryConfUtil.DISABLE_AGGREGATE_RESOLVER,
+        CubeQueryConfUtil.DEFAULT_DISABLE_AGGREGATE_RESOLVER);
+    // Check if the query contains measures
+    // 1. not inside default aggregate expressions
+    // 2. With no default aggregate defined
+    // 3. there are distinct selection of measures
+    // If yes, only the raw (non aggregated) fact can answer this query.
+    // In that case remove aggregate facts from the candidate fact list
+    if (hasMeasuresInDistinctClause(cubeql, cubeql.getSelectAST(), false)
+        || hasMeasuresInDistinctClause(cubeql, cubeql.getHavingAST(), false)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getSelectAST(), null,
+        aggregateResolverDisabled)
+        || hasMeasuresNotInDefaultAggregates(cubeql, cubeql.getHavingAST(), null,
+            aggregateResolverDisabled)
+        || hasMeasures(cubeql, cubeql.getWhereAST())
+        || hasMeasures(cubeql, cubeql.getGroupByAST())
+        || hasMeasures(cubeql, cubeql.getOrderByAST()) ) {
+      Iterator<CubeQueryContext.CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
+      while (factItr.hasNext()) {
+        CubeQueryContext.CandidateFact candidate = factItr.next();
+        if (candidate.fact.isAggregated()) {
+          cubeql.addFactPruningMsgs(candidate.fact,
+              new CandidateTablePruneCause(candidate.fact.getName(),
+                  CubeTableCause.MISSING_DEFAULT_AGGREGATE));
+          factItr.remove();
         }
       }
+      nonDefaultAggregates = true;
+      LOG.info("Query has non default aggregates, no aggregate resolution will be done");
+    }
+
+    if (nonDefaultAggregates || aggregateResolverDisabled) {
       return;
     }
 
@@ -127,7 +137,7 @@ public class AggregateResolver implements ContextRewriter {
     }
     int nodeType = node.getToken().getType();
 
-    if (!(isAggregateAST(node))) {
+    if (!(HQLParser.isAggregateAST(node))) {
       if (nodeType == HiveParser.TOK_TABLE_OR_COL ||
           nodeType == HiveParser.DOT) {
         // Leaf node
@@ -151,23 +161,6 @@ public class AggregateResolver implements ContextRewriter {
         }
       }
     }
-  }
-
-  static boolean isAggregateAST(ASTNode node) {
-    int exprTokenType = node.getToken().getType();
-    if (exprTokenType == HiveParser.TOK_FUNCTION
-        || exprTokenType == HiveParser.TOK_FUNCTIONDI
-        || exprTokenType == HiveParser.TOK_FUNCTIONSTAR) {
-      assert (node.getChildCount() != 0);
-      if (node.getChild(0).getType() == HiveParser.Identifier) {
-        String functionName = BaseSemanticAnalyzer.unescapeIdentifier(
-            node.getChild(0).getText());
-        if (FunctionRegistry.getGenericUDAFResolver(functionName) != null) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   // Wrap an aggregate function around the node if its a measure, leave it
@@ -217,12 +210,13 @@ public class AggregateResolver implements ContextRewriter {
     }
   }
 
-  private boolean hasMeasuresNotInDefaultAggregates(CubeQueryContext cubeql, ASTNode node, String function) {
+  private boolean hasMeasuresNotInDefaultAggregates(CubeQueryContext cubeql,
+      ASTNode node, String function, boolean aggregateResolverDisabled) {
     if (node == null) {
       return false;
     }
 
-    if (isAggregateAST(node)) {
+    if (HQLParser.isAggregateAST(node)) {
       if (node.getChild(0).getType() == HiveParser.Identifier) {
         function = BaseSemanticAnalyzer.unescapeIdentifier(
           node.getChild(0).getText());
@@ -230,28 +224,77 @@ public class AggregateResolver implements ContextRewriter {
     } else if (isMeasure(cubeql, node)) {
       // Exit for the recursion
 
+      String colname;
+      if (node.getToken().getType() == HiveParser.TOK_TABLE_OR_COL) {
+        colname = ((ASTNode) node.getChild(0)).getText();
+      } else {
+        // node in 'alias.column' format
+        ASTNode colIdent = (ASTNode) node.getChild(1);
+        colname = colIdent.getText();
+      }
+      CubeMeasure measure = cubeql.getCube().getMeasureByName(colname);
       if (function != null && !function.isEmpty()) {
         // Get the cube measure object and check if the passed function is the default one set for this measure
-        String colname;
-        if (node.getToken().getType() == HiveParser.TOK_TABLE_OR_COL) {
-          colname = ((ASTNode) node.getChild(0)).getText();
-        } else {
-          // node in 'alias.column' format
-          ASTNode colIdent = (ASTNode) node.getChild(1);
-          colname = colIdent.getText();
-        }
-        CubeMeasure measure = cubeql.getCube().getMeasureByName(colname);
         return !function.equalsIgnoreCase(measure.getAggregate());
+      } else if (!aggregateResolverDisabled && measure.getAggregate() != null) {
+        // not inside any aggregate, but default aggregate exists
+        return false;
       }
       return true;
     }
 
     for (int i = 0; i < node.getChildCount(); i++) {
-      if (hasMeasuresNotInDefaultAggregates(cubeql, (ASTNode) node.getChild(i), function)) {
+      if (hasMeasuresNotInDefaultAggregates(cubeql, (ASTNode) node.getChild(i),
+          function, aggregateResolverDisabled)) {
         // Return on the first measure not inside its default aggregate
         return true;
       }
     }
+    return false;
+  }
+
+  private boolean hasMeasuresInDistinctClause(CubeQueryContext cubeql,
+      ASTNode node, boolean hasDistinct) {
+    if (node == null) {
+      return false;
+    }
+
+    int exprTokenType = node.getToken().getType();
+    boolean isDistinct = hasDistinct;
+    if (exprTokenType == HiveParser.TOK_FUNCTIONDI ||
+        exprTokenType == HiveParser.TOK_SELECTDI) {
+      isDistinct = true;
+    } else if (isMeasure(cubeql, node) && isDistinct) {
+      // Exit for the recursion
+      return true;
+    }
+
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (hasMeasuresInDistinctClause(cubeql, (ASTNode) node.getChild(i),
+          isDistinct)) {
+        // Return on the first measure in distinct clause
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasMeasures(CubeQueryContext cubeql,
+      ASTNode node) {
+    if (node == null) {
+      return false;
+    }
+
+    if (isMeasure(cubeql, node)) {
+      return true;
+    }
+
+    for (int i = 0; i < node.getChildCount(); i++) {
+      if (hasMeasures(cubeql, (ASTNode) node.getChild(i))) {
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -280,5 +323,20 @@ public class AggregateResolver implements ContextRewriter {
       + colname;
 
     return cubeql.isCubeMeasure(msrname);
+  }
+
+  static void updateAggregates(ASTNode root, CubeQueryContext cubeql) {
+    if (root == null) {
+      return;
+    }
+  
+    if (HQLParser.isAggregateAST(root)) {
+      cubeql.addAggregateExpr(HQLParser.getString(root).trim());
+    } else {
+      for (int i = 0; i < root.getChildCount(); i++) {
+        ASTNode child = (ASTNode) root.getChild(i);
+        updateAggregates(child, cubeql);
+      }
+    }
   }
 }
