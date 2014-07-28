@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
@@ -37,6 +38,9 @@ implements SettableHiveVarcharObjectInspector {
   public HiveVarchar getPrimitiveJavaObject(Object o) {
     if (o == null) {
       return null;
+    }
+    if (o instanceof String) {
+      return new HiveVarchar((String)o, getMaxLength());
     }
     HiveVarchar value = (HiveVarchar)o;
     if (BaseCharUtils.doesPrimitiveMatchTypeParams(
@@ -68,6 +72,9 @@ implements SettableHiveVarcharObjectInspector {
 
   @Override
   public Object set(Object o, HiveVarchar value) {
+    if (value == null) {
+      return null;
+    }
     if (BaseCharUtils.doesPrimitiveMatchTypeParams(
         value, (VarcharTypeInfo)typeInfo)) {
       return o = value;
@@ -79,6 +86,9 @@ implements SettableHiveVarcharObjectInspector {
 
   @Override
   public Object set(Object o, String value) {
+    if (value == null) {
+      return null;
+    }
     return o = new HiveVarchar(value, getMaxLength());
   }
 
