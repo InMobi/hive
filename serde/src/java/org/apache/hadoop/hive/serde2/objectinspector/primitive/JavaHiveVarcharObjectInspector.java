@@ -56,7 +56,13 @@ implements SettableHiveVarcharObjectInspector {
     if (o == null) {
       return null;
     }
-    return getWritableWithParams((HiveVarchar)o);
+    HiveVarchar var;
+    if (o instanceof String) {
+      var= new HiveVarchar((String)o, getMaxLength());
+    } else {
+      var = (HiveVarchar)o;
+    }
+    return getWritableWithParams(var);
   }
 
   private HiveVarchar getPrimitiveWithParams(HiveVarchar val) {
