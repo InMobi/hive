@@ -112,10 +112,11 @@ public class TestTimeRangeWriterWithQuery {
       th = e;
       e.printStackTrace();
     }
-    Assert.assertNotNull(th);
-    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
-        ErrorMsg.CANNOT_USE_TIMERANGE_WRITER.getErrorCode());
-
+    if (!CubeTestSetup.isZerothHour()) {
+      Assert.assertNotNull(th);
+      Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+          ErrorMsg.CANNOT_USE_TIMERANGE_WRITER.getErrorCode());
+    }
     // hourly partitions for two days
     conf.setBoolean(CubeQueryConfUtil.FAIL_QUERY_ON_PARTIAL_DATA, true);
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
