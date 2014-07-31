@@ -148,6 +148,14 @@ public class MetastoreUtil implements MetastoreConstants {
     return getColumnKeyPrefix(colName) + COST_SFX;
   }
 
+  public static String getCubeColDescriptionKey(String colName) {
+    return getColumnKeyPrefix(colName) + DESC_SFX;
+  }
+
+  public static String getCubeColDisplayKey(String colName) {
+    return getColumnKeyPrefix(colName) + DISPLAY_SFX;
+  }
+
   public static final String getExprColumnKey(String colName) {
     return getColumnKeyPrefix(colName) + EXPR_SFX;
   }

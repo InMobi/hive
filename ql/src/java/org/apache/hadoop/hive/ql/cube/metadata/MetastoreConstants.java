@@ -61,6 +61,8 @@ public interface MetastoreConstants {
   public static final String START_TIME_SFX = ".starttime";
   public static final String END_TIME_SFX = ".endtime";
   public static final String COST_SFX = ".cost";
+  public static final String DESC_SFX = ".description";
+  public static final String DISPLAY_SFX = ".displaystring";
 
   // measure constants
   public static final String MEASURE_KEY_PFX = "cube.measure.";

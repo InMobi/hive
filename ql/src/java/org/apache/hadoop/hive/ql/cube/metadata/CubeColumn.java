@@ -31,14 +31,19 @@ public abstract class CubeColumn implements Named {
   private final Date startTime;
   private final Date endTime;
   private final Double cost;
+  private final String description;
+  private final String displayString;
   static SimpleDateFormat columnTimeFormat = new SimpleDateFormat("yyyy-MM-dd-HH");
 
-  public CubeColumn(String name, Date startTime, Date endTime, Double cost) {
+  public CubeColumn(String name, String description, String displayString,
+      Date startTime, Date endTime, Double cost) {
     assert (name != null);
     this.name = name.toLowerCase();
     this.startTime = startTime;
     this.endTime = endTime;
     this.cost = cost;
+    this.description = description;
+    this.displayString = displayString;
   }
 
   private Date getDate(String propKey, Map<String, String> props) {
@@ -73,6 +78,8 @@ public abstract class CubeColumn implements Named {
         props);
     this.cost = getDouble(MetastoreUtil.getCubeColCostPropertyKey(name),
         props);
+    this.description = props.get(MetastoreUtil.getCubeColDescriptionKey(name));
+    this.displayString = props.get(MetastoreUtil.getCubeColDisplayKey(name));
   }
 
   public String getName() {
@@ -100,10 +107,32 @@ public abstract class CubeColumn implements Named {
     return cost;
   }
 
+  /**
+   * @return the description
+   */
+  public String getDescription() {
+    return description;
+  }
+
+  /**
+   * @return the displayString
+   */
+  public String getDisplayString() {
+    return displayString;
+  }
+
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append(name);
+    if (description != null) {
+      builder.append(":");
+      builder.append(description);
+    }
+    if (displayString != null) {
+      builder.append(":");
+      builder.append(displayString);
+    }
     if (startTime != null) {
       builder.append("#start:");
       builder.append(columnTimeFormat.format(startTime));
@@ -125,6 +154,12 @@ public abstract class CubeColumn implements Named {
     int result = 1;
     result = prime * result + ((getName() == null) ? 0 :
         getName().toLowerCase().hashCode());
+    result = prime * result + ((getDescription() == null) ? 0 :
+      getDescription().toLowerCase().hashCode());
+    result = prime * result + ((getDisplayString() == null) ? 0 :
+      getDisplayString().toLowerCase().hashCode());
+    result = prime * result + ((getName() == null) ? 0 :
+      getName().toLowerCase().hashCode());
     result = prime * result + ((getStartTime() == null) ? 0 :
       columnTimeFormat.format(getStartTime()).hashCode());
     result = prime * result + ((getEndTime() == null) ? 0 :
@@ -151,6 +186,22 @@ public abstract class CubeColumn implements Named {
         return false;
       }
     } else if (!this.getName().equalsIgnoreCase(other.getName())) {
+      return false;
+    }
+
+    if (this.getDescription() == null) {
+      if (other.getDescription() != null) {
+        return false;
+      }
+    } else if (!this.getDescription().equalsIgnoreCase(other.getDescription())) {
+      return false;
+    }
+
+    if (this.getDisplayString() == null) {
+      if (other.getDisplayString() != null) {
+        return false;
+      }
+    } else if (!this.getDisplayString().equals(other.getDisplayString())) {
       return false;
     }
 
@@ -188,6 +239,14 @@ public abstract class CubeColumn implements Named {
 
 
   public void addProperties(Map<String, String> props) {
+    if (description != null) {
+      props.put(MetastoreUtil.getCubeColDescriptionKey(getName()),
+          description);
+    }
+    if (displayString != null) {
+      props.put(MetastoreUtil.getCubeColDisplayKey(getName()),
+          displayString);
+    }
     if (startTime != null) {
       props.put(MetastoreUtil.getCubeColStartTimePropertyKey(getName()),
           columnTimeFormat.format(startTime));

@@ -480,75 +480,75 @@ public class CubeTestSetup {
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
         "first measure")));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr2", "float",
-        "second measure"),
+        "second measure"), "Measure2",
         null, "SUM", "RS"));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr3", "double",
-        "third measure"),
+        "third measure"), "Measure3",
         null, "MAX", null));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr4", "bigint",
-        "fourth measure"),
+        "fourth measure"), "Measure4",
         null, "COUNT", null));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("noAggrMsr", "bigint",
-        "measure without a default aggregate"),
+        "measure without a default aggregate"), "No aggregateMsr",
         null, null, null
         ));
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("newmeasure", "bigint",
-        "measure available  from now"), null, null, null, now, null, 100.0));
+        "measure available  from now"), "New measure", null, null, null, now, null, 100.0));
 
     cubeDimensions = new HashSet<CubeDimAttribute>();
     List<CubeDimAttribute> locationHierarchy = new ArrayList<CubeDimAttribute>();
     locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("zipcode",
-        "int", "zip"), new TableReference("zipdim", "code")));
+        "int", "zip"), "Zip refer", new TableReference("zipdim", "code")));
     locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("cityid",
-        "int", "city"), new TableReference("citydim", "id")));
+        "int", "city"), "City refer", new TableReference("citydim", "id")));
     locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("stateid",
-        "int", "state"), new TableReference("statedim", "id")));
+        "int", "state"), "State refer", new TableReference("statedim", "id")));
     locationHierarchy.add(new ReferencedDimAtrribute(new FieldSchema("countryid",
-        "int", "country"), new TableReference("countrydim", "id")));
+        "int", "country"), "Country refer", new TableReference("countrydim", "id")));
     List<String> regions = Arrays.asList("APAC", "EMEA", "USA");
     locationHierarchy.add(new InlineDimAttribute(new FieldSchema("regionname",
         "string", "region"), regions));
 
-    cubeDimensions.add(new HierarchicalDimAttribute("location", locationHierarchy));
+    cubeDimensions.add(new HierarchicalDimAttribute("location", "Location hierarchy", locationHierarchy));
     cubeDimensions.add(new BaseDimAttribute(new FieldSchema("dim1", "string",
         "basedim")));
     // Added for ambiguity test
     cubeDimensions.add(new BaseDimAttribute(new FieldSchema("ambigdim1", "string",
         "used in testColumnAmbiguity")));
     cubeDimensions.add(new ReferencedDimAtrribute(
-        new FieldSchema("dim2", "int", "ref dim"),
+        new FieldSchema("dim2", "int", "ref dim"), "Dim2 refer",
         new TableReference("testdim2", "id")));
 
     Set<ExprColumn> exprs = new HashSet<ExprColumn>(); 
     exprs.add(new ExprColumn(new FieldSchema("avgmsr", "double",
-        "avg measure"),
+        "avg measure"), "Avg Msr",
         "avg(msr1 + msr2)"));
     exprs.add(new ExprColumn(new FieldSchema("roundedmsr2", "double",
-        "rounded measure2"),
+        "rounded measure2"), "Rounded msr2",
         "round(msr2/1000)"));
     exprs.add(new ExprColumn(new FieldSchema("msr6", "bigint",
-        "sixth measure"),
+        "sixth measure"), "Measure6",
         "sum(msr2) + max(msr3)/ count(msr4)"));
     exprs.add(new ExprColumn(new FieldSchema("booleancut", "boolean",
-        "a boolean expression"),
+        "a boolean expression"), "Boolean cut",
         "dim1 != 'x' AND dim2 != 10 "));
     exprs.add(new ExprColumn(new FieldSchema("substrexpr", "string",
-        "a sub-string expression"),
+        "a sub-string expression"), "Substr expr",
         "substr(dim1, 3)"));
     exprs.add(new ExprColumn(new FieldSchema("indiasubstr", "boolean",
-        "nested sub string expression"),
+        "nested sub string expression"), "Nested expr",
         "substrexpr = 'INDIA'"));
     exprs.add(new ExprColumn(new FieldSchema("refexpr", "string",
-        "expression which facts and dimensions"),
+        "expression which facts and dimensions"), "Expr with cube and dim fields",
         "concat(dim1, \":\", citydim.name)"));
     exprs.add(new ExprColumn(new FieldSchema("nocolexpr", "string",
-        "expression which non existing colun"),
+        "expression which non existing colun"), "No col expr",
         "myfun(nonexist)"));
     exprs.add(new ExprColumn(new FieldSchema("newexpr", "string",
-        "expression which non existing colun"),
+        "expression which non existing colun"), "new measure expr",
         "myfun(newmeasure)"));
     exprs.add(new ExprColumn(new FieldSchema("cityAndState", "String",
-        "city and state together"),
+        "city and state together"), "City and State",
         "concat(citydim.name, \":\", statedim.name)"));
 
     Map<String, String> cubeProperties =
@@ -819,17 +819,17 @@ public class CubeTestSetup {
     cityAttrs.add(new BaseDimAttribute(new FieldSchema("ambigdim2", "string",
         "used in testColumnAmbiguity")));
     cityAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("stateid", "int", "state id"),
+        new FieldSchema("stateid", "int", "state id"), "State refer",
         new TableReference("statedim", "id")));
     cityAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("zipcode", "int", "zip code"),
+        new FieldSchema("zipcode", "int", "zip code"), "Zip refer",
         new TableReference("zipdim", "code")));
     Map<String, String> dimProps = new HashMap<String, String>();
     dimProps.put(MetastoreUtil.getDimTimedDimensionKey("citydim"),
         TestCubeMetastoreClient.getDatePartitionKey());
     Set<ExprColumn> exprs = new HashSet<ExprColumn>();
     exprs.add(new ExprColumn(new FieldSchema("CityAddress", "string",
-        "city with state and city and zip"),
+        "city with state and city and zip"), "City Address",
         "concat(citydim.name, \":\", statedim.name, \":\", countrydim.name, \":\", zipdim.code)"));
     Dimension cityDim = new Dimension("citydim", cityAttrs, exprs, dimProps, 0L);
     client.createDimension(cityDim);
@@ -881,7 +881,7 @@ public class CubeTestSetup {
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
         "name")));
     dimAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("testDim3id", "string", "f-key to testdim3"),
+        new FieldSchema("testDim3id", "string", "f-key to testdim3"), "Dim3 refer",
         new TableReference("testdim3", "id")));
     Map<String, String> dimProps = new HashMap<String, String>();
     dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
@@ -932,7 +932,7 @@ public class CubeTestSetup {
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
         "name")));
     dimAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("testDim4id", "string", "f-key to testdim4"),
+        new FieldSchema("testDim4id", "string", "f-key to testdim4"), "Dim4 refer",
         new TableReference("testdim4", "id")));
     Map<String, String> dimProps = new HashMap<String, String>();
     dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
@@ -1027,7 +1027,7 @@ public class CubeTestSetup {
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
         "name")));
     dimAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("cyleDim2Id", "string", "link to cyclic dim 2"),
+        new FieldSchema("cyleDim2Id", "string", "link to cyclic dim 2"), "cycle refer2",
         new TableReference("cycleDim2", "id")));
     Map<String, String> dimProps = new HashMap<String, String>();
     dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
@@ -1081,7 +1081,7 @@ public class CubeTestSetup {
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
         "name")));
     dimAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("cyleDim1Id", "string", "link to cyclic dim 1"),
+        new FieldSchema("cyleDim1Id", "string", "link to cyclic dim 1"), "Cycle refer1",
         new TableReference("cycleDim1", "id")));
     Map<String, String> dimProps = new HashMap<String, String>();
     dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
@@ -1218,7 +1218,7 @@ public class CubeTestSetup {
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("capital", "string",
         "field2")));
     dimAttrs.add(new ReferencedDimAtrribute(
-        new FieldSchema("countryid", "string", "link to country table"),
+        new FieldSchema("countryid", "string", "link to country table"), "Country refer",
         new TableReference("countrydim", "id")));
     Map<String, String> dimProps = new HashMap<String, String>();
     dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),

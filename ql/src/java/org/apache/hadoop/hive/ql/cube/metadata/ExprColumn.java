@@ -34,8 +34,9 @@ public class ExprColumn extends CubeColumn {
   private final String type;
   private ASTNode ast;
 
-  public ExprColumn(FieldSchema column, String expr) throws ParseException {
-    super(column.getName(), null, null, 0.0);
+  public ExprColumn(FieldSchema column, String displayString, String expr
+      ) throws ParseException {
+    super(column.getName(), column.getComment(), displayString, null, null, 0.0);
     this.expr = expr;
     this.type = column.getType();
     assert(getAst() != null);

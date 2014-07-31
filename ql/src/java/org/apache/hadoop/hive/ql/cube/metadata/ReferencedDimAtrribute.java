@@ -33,25 +33,25 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 public class ReferencedDimAtrribute extends BaseDimAttribute {
   private final List<TableReference> references = new ArrayList<TableReference>();
 
-  public ReferencedDimAtrribute(FieldSchema column, TableReference reference) {
-    this(column, reference, null, null, null);
+  public ReferencedDimAtrribute(FieldSchema column, String displayString, TableReference reference) {
+    this(column, displayString, reference, null, null, null);
   }
 
-  public ReferencedDimAtrribute(FieldSchema column, TableReference reference,
-      Date startTime, Date endTime, Double cost) {
-    super(column, startTime, endTime, cost);
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
+      TableReference reference, Date startTime, Date endTime, Double cost) {
+    super(column, displayString, startTime, endTime, cost);
     this.references.add(reference);
   }
 
-  public ReferencedDimAtrribute(FieldSchema column,
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
       Collection<TableReference> references) {
-    this(column, references, null, null, null);
+    this(column, displayString, references, null, null, null);
   }
 
-  public ReferencedDimAtrribute(FieldSchema column,
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
       Collection<TableReference> references, Date startTime, Date endTime,
       Double cost) {
-    super(column, startTime, endTime, cost);
+    super(column, displayString, startTime, endTime, cost);
     this.references.addAll(references);
   }
 
