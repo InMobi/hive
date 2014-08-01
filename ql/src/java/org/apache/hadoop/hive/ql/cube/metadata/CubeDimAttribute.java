@@ -26,12 +26,13 @@ import java.util.Map;
 
 public abstract class CubeDimAttribute extends CubeColumn {
 
-  public CubeDimAttribute(String name) {
-    this(name, null, null, null);
+  public CubeDimAttribute(String name, String description) {
+    this(name, description, null, null, null, null);
   }
 
-  public CubeDimAttribute(String name, Date startTime, Date endTime, Double cost) {
-    super(name, startTime, endTime, cost);
+  public CubeDimAttribute(String name, String description, String displayString,
+      Date startTime, Date endTime, Double cost) {
+    super(name, description, displayString, startTime, endTime, cost);
   }
 
   public CubeDimAttribute(String name, Map<String, String> props) {

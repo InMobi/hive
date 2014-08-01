@@ -31,8 +31,9 @@ import java.util.Map;
 public class HierarchicalDimAttribute extends CubeDimAttribute {
   private final List<CubeDimAttribute> hierarchy;
 
-  public HierarchicalDimAttribute(String name, List<CubeDimAttribute> hierarchy) {
-    super(name);
+  public HierarchicalDimAttribute(String name, String description,
+      List<CubeDimAttribute> hierarchy) {
+    super(name, description);
     this.hierarchy = hierarchy;
     assert (name != null);
     assert (hierarchy != null);

@@ -30,12 +30,12 @@ public class BaseDimAttribute extends CubeDimAttribute {
   private final String type;
 
   public BaseDimAttribute(FieldSchema column) {
-    this(column, null, null, null);
+    this(column, null, null, null, null);
   }
 
-  public BaseDimAttribute(FieldSchema column, Date startTime, Date endTime,
+  public BaseDimAttribute(FieldSchema column, String displayString, Date startTime, Date endTime,
       Double cost) {
-    super(column.getName(), startTime, endTime, cost);
+    super(column.getName(), column.getComment(), displayString, startTime, endTime, cost);
     this.type = column.getType();
     assert (type != null);
   }

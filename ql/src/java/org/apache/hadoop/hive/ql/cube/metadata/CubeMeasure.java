@@ -32,14 +32,9 @@ public abstract class CubeMeasure extends CubeColumn {
   private final String unit;
   private final FieldSchema column;
 
-  protected CubeMeasure(FieldSchema column, String formatString,
-      String aggregate, String unit) {
-    this(column, formatString, aggregate, unit, null, null, null);
-  }
-
-  protected CubeMeasure(FieldSchema column, String formatString,
+  protected CubeMeasure(FieldSchema column, String displayString, String formatString,
       String aggregate, String unit, Date startTime, Date endTime, Double cost){
-    super(column.getName(), startTime, endTime, cost);
+    super(column.getName(), column.getComment(), displayString, startTime, endTime, cost);
     this.column = column;
     assert (column != null);
     assert (column.getName() != null);

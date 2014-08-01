@@ -33,12 +33,13 @@ public class InlineDimAttribute extends BaseDimAttribute {
   private final List<String> values;
 
   public InlineDimAttribute(FieldSchema column, List<String> values) {
-    this(column, null, null, null, values);
+    this(column, null, null, null, null, values);
   }
 
-  public InlineDimAttribute(FieldSchema column, Date startTime, Date endTime,
+  public InlineDimAttribute(FieldSchema column, String displayString,
+      Date startTime, Date endTime,
       Double cost, List<String> values) {
-    super(column, startTime, endTime, cost);
+    super(column, displayString, startTime, endTime, cost);
     this.values = values;
   }
 
