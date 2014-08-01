@@ -23,16 +23,9 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getDbName;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.rewrite;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -105,65 +98,80 @@ public class TestJoinResolver {
     assertEquals(metastore.getDimension("testdim3"), dim4edge.getFromTable());
   }
 
+  private void searchPaths(AbstractCubeTable source,
+                           AbstractCubeTable target,
+                           SchemaGraph graph) {
+    SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(source, target, graph);
+
+    List<SchemaGraph.JoinPath> joinPaths = search.findAllPathsToTarget();
+
+    System.out.println("@@ " + source + " ==> " + target + " paths =");
+    int i = 0;
+    for (SchemaGraph.JoinPath jp : joinPaths) {
+      assertEquals(jp.getEdges().get(0).getToTable(), source);
+      assertEquals(jp.getEdges().get(jp.getEdges().size() - 1).getFromTable(), target);
+      Collections.reverse(jp.getEdges());
+      System.out.println(++i + " " + jp.getEdges());
+    }
+  }
+
   @Test
   public void testFindChain() throws Exception {
     SchemaGraph schemaGraph = new SchemaGraph(metastore);
     schemaGraph.buildSchemaGraph();
-    CubeInterface cube = metastore.getCube(CubeTestSetup.TEST_CUBE_NAME);
-    CubeInterface derivedCube = metastore.getCube(CubeTestSetup.DERIVED_CUBE_NAME);
-    printGraph(schemaGraph.getCubeGraph(cube));
+    schemaGraph.print();
 
-    Dimension testDim4 = metastore.getDimension("testdim4");
-    List<TableRelationship> chain = new ArrayList<TableRelationship>();
-    assertTrue(schemaGraph.findJoinChain(testDim4, (AbstractCubeTable)cube, chain));
-    System.out.println(chain);
+    // Search For all cubes and all dims to make sure that search terminates
+    for (CubeInterface cube : metastore.getAllCubes()) {
+      for (Dimension dim : metastore.getAllDimensions()) {
+        searchPaths(dim, (AbstractCubeTable) cube, schemaGraph);
+      }
+    }
 
-    chain.clear();
-    Dimension testDim2 = metastore.getDimension("testdim2");
-    assertTrue(schemaGraph.findJoinChain(testDim2, (AbstractCubeTable)derivedCube, chain));
-    System.out.println(chain);
-    assertEquals(1, chain.size());
+    for (Dimension dim : metastore.getAllDimensions()) {
+      for (Dimension otherDim : metastore.getAllDimensions()) {
+        if (otherDim != dim) {
+          searchPaths(dim, otherDim, schemaGraph);
+        }
+      }
+    }
 
-    chain.clear();
-    Dimension cityTable = metastore.getDimension("citydim");
-    assertTrue(schemaGraph.findJoinChain(cityTable, (AbstractCubeTable)cube, chain));
-    System.out.println("City -> cube chain: " + chain);
-    assertEquals(1, chain.size());
+    // Assert for testcube
+    Dimension zipDim = metastore.getDimension("zipdim");
+    Dimension cityDim = metastore.getDimension("citydim");
+    Dimension stateDim = metastore.getDimension("statedim");
+    Dimension countryDim = metastore.getDimension("countrydim");
+    CubeInterface testCube = metastore.getCube("testcube");
+    SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(zipDim, (AbstractCubeTable) testCube, schemaGraph);
 
-    chain.clear();
-    cityTable = metastore.getDimension("citydim");
-    assertFalse(schemaGraph.findJoinChain(cityTable, (AbstractCubeTable)derivedCube, chain));
-
-    // find chains between dimensions
-    chain.clear();
-    Dimension stateTable = metastore.getDimension("statedim");
-    assertTrue(schemaGraph.findJoinChain(stateTable, cityTable, chain));
-    System.out.println("Dim chain state -> city : " + chain);
-    assertEquals(1, chain.size());
-
-    chain.clear();
-    assertTrue(schemaGraph.findJoinChain(cityTable, stateTable, chain));
-    System.out.println("Dim chain city -> state: " + chain);
-    assertEquals(1, chain.size());
-
-    chain.clear();
-    Dimension dim2 = metastore.getDimension("testdim2");
-    assertTrue(schemaGraph.findJoinChain(testDim4, dim2, chain));
-    System.out.println("Dim chain testdim4 -> testdim2 : " + chain);
-    assertEquals(2, chain.size());
-
-    chain.clear();
-    assertTrue(schemaGraph.findJoinChain(dim2, testDim4, chain));
-    assertEquals(2, chain.size());
-    System.out.println("Dim chain testdim2 -> testdim4 : " + chain);
-
-    chain.clear();
-    boolean foundchain = schemaGraph.findJoinChain(testDim4, cityTable, chain);
-    System.out.println("Dim chain testdim4 -> city table: " + chain);
-    assertFalse(foundchain);
-    assertFalse(schemaGraph.findJoinChain(cityTable, testDim4, chain));
+    List<SchemaGraph.JoinPath> paths = search.findAllPathsToTarget();
+    assertEquals(4, paths.size());
+    validatePath(paths.get(0), zipDim, (AbstractCubeTable)testCube);
+    validatePath(paths.get(1), zipDim, cityDim, (AbstractCubeTable)testCube);
+    validatePath(paths.get(2), zipDim, cityDim, stateDim, (AbstractCubeTable)testCube);
+    validatePath(paths.get(3), zipDim, cityDim, stateDim, countryDim, (AbstractCubeTable)testCube);
   }
 
+  private void validatePath(SchemaGraph.JoinPath jp, AbstractCubeTable ... tables) {
+    assertTrue(!jp.getEdges().isEmpty());
+    Set<AbstractCubeTable> expected = new HashSet<AbstractCubeTable>(Arrays.asList(tables));
+    Set<AbstractCubeTable> actual = new HashSet<AbstractCubeTable>();
+    for (TableRelationship edge : jp.getEdges()) {
+      if (edge.getFromTable() != null) {
+        actual.add(edge.getFromTable());
+      }
+      if (edge.getToTable() != null) {
+        actual.add(edge.getToTable());
+      }
+    }
+
+    assertEquals("Edges: " + jp.getEdges().toString()
+      + " Expected Tables: " + Arrays.toString(tables)
+      + " Actual Tables: " + actual.toString(),
+      expected,
+      actual
+    );
+  }
   private void printGraph(Map<AbstractCubeTable, Set<TableRelationship>> graph) {
     System.out.println("--Graph-Nodes=" + graph.size());
     for (AbstractCubeTable tab : graph.keySet()) {
