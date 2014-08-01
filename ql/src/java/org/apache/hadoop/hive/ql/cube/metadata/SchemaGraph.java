@@ -66,7 +66,6 @@ public class SchemaGraph {
 
     @Override
     public boolean equals(Object obj) {
-      //TODO Make sure that edges a->b and b->a are equal
       if (!(obj instanceof TableRelationship)) {
         return false;
       }
@@ -82,6 +81,92 @@ public class SchemaGraph {
     @Override
     public int hashCode() {
       return toString().hashCode();
+    }
+  }
+
+  public static class JoinPath {
+    final List<TableRelationship> edges;
+
+    public JoinPath() {
+      edges = new ArrayList<TableRelationship>();
+    }
+
+    public JoinPath(JoinPath other) {
+      edges = new ArrayList<TableRelationship>(other.edges.size());
+      edges.addAll(other.edges);
+    }
+
+    public void addEdge(TableRelationship edge) {
+      edges.add(edge);
+    }
+
+    public boolean isEmpty() {
+      return edges.isEmpty();
+    }
+
+    public List<TableRelationship> getEdges() {
+      return edges;
+    }
+  }
+
+  public static class GraphSearch {
+    private final AbstractCubeTable source;
+    private final AbstractCubeTable target;
+    private final List<List<TableRelationship>> paths;
+    private final Map<AbstractCubeTable, Set<TableRelationship>> graph;
+
+    public GraphSearch(AbstractCubeTable source,
+                       AbstractCubeTable target,
+                       SchemaGraph graph) {
+      this.source = source;
+      this.target = target;
+      this.paths = new ArrayList<List<TableRelationship>>();
+
+      if (target instanceof CubeInterface) {
+        this.graph = graph.getCubeGraph((CubeInterface) target);
+      } else if (target instanceof Dimension) {
+        this.graph = graph.getDimOnlyGraph();
+      } else {
+        throw new IllegalArgumentException("Target neither cube nor dimension");
+      }
+    }
+
+    public List<JoinPath> findAllPathsToTarget() {
+      return findAllPathsToTarget(source, new JoinPath(), new HashSet<AbstractCubeTable>());
+    }
+
+    /**
+     * Let path till this node = p
+     * Paths at node adjacent to target - [edges leading to target]
+     * Path at a random node - [path till this node + p for each p in path(neighbors)]
+     */
+    List<JoinPath> findAllPathsToTarget(AbstractCubeTable source,
+                                               JoinPath joinPathTillSource,
+                                               Set<AbstractCubeTable> visited) {
+      List<JoinPath> joinPaths = new ArrayList<JoinPath>();
+      visited.add(source);
+
+      for (TableRelationship edge : graph.get(source)) {
+        if (visited.contains(edge.getFromTable())) {
+          continue;
+        }
+
+        JoinPath p = new JoinPath(joinPathTillSource);
+        p.addEdge(edge);
+
+        if (edge.getFromTable().equals(target)) {
+          // Got a direct path
+          joinPaths.add(p);
+        } else if (edge.getFromTable() instanceof Dimension) {
+          List<JoinPath> pathsFromNeighbor = findAllPathsToTarget(edge.getFromTable(), new JoinPath(p), visited);
+          for (JoinPath pn : pathsFromNeighbor) {
+            if (!pn.isEmpty())
+            joinPaths.add(pn);
+          }
+        }
+      }
+
+      return joinPaths;
     }
   }
 
@@ -208,7 +293,6 @@ public class SchemaGraph {
     outEdges.add(rel2);
 
   }
-
 
   // This returns the first path found between the dimTable and the target
   private boolean findJoinChain(Dimension dimTable, AbstractCubeTable target,
