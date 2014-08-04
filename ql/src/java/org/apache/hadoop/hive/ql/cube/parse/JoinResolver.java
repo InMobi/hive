@@ -32,15 +32,7 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABNAME;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABREF;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_UNIQUEJOIN;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -76,7 +68,8 @@ public class JoinResolver implements ContextRewriter {
    * Store join chain information resolved by join resolver
    */
   public static class AutoJoinContext {
-    private final Map<Dimension, List<TableRelationship>> joinChain;
+    private Map<Dimension, List<TableRelationship>> joinChain;
+    private final Map<Dimension, List<SchemaGraph.JoinPath>> allPaths;
     private final Map<AbstractCubeTable, String> partialJoinConditions;
     private final boolean partialJoinChains;
     private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
@@ -86,12 +79,14 @@ public class JoinResolver implements ContextRewriter {
     private String joinTypeCfg;
 
     public AutoJoinContext(Map<Dimension, List<TableRelationship>> joinChain,
+                           Map<Dimension, List<SchemaGraph.JoinPath>> allPaths,
         Map<AbstractCubeTable, String> partialJoinConditions,
         boolean partialJoinChains,
         Map<AbstractCubeTable, JoinType> tableJoinTypeMap,
         AbstractCubeTable autoJoinTarget, String joinTypeCfg,
         boolean joinsResolved) {
       this.joinChain = joinChain;
+      this.allPaths = allPaths;
       this.partialJoinConditions = partialJoinConditions;
       this.partialJoinChains = partialJoinChains;
       this.tableJoinTypeMap = tableJoinTypeMap;
@@ -102,6 +97,14 @@ public class JoinResolver implements ContextRewriter {
 
     public Map<Dimension, List<TableRelationship>> getJoinChain() {
       return joinChain;
+    }
+
+    private void setJoinChain(Map<Dimension, List<TableRelationship>> chain) {
+      this.joinChain = chain;
+    }
+
+    private void clearMergedJoinClause() {
+      mergedJoinClause = null;
     }
 
     public Map<AbstractCubeTable, String> getPartialJoinConditions() {
@@ -122,6 +125,7 @@ public class JoinResolver implements ContextRewriter {
       return fromString;
     }
 
+    // Some refactoring needed to account for multiple join paths
     public String getMergedJoinClause(
         Map<Dimension, CandidateDim> dimsToQuery,
         CubeQueryContext cubeql) {
@@ -264,6 +268,84 @@ public class JoinResolver implements ContextRewriter {
     public boolean isJoinsResolved() {
       return joinsResolved;
     }
+
+    // There can be multiple join paths between a dimension and the target. Set of all possible join clauses
+    // is the cartesian product of join paths of all dimensions
+    public Iterator<String> getAllPossibleJoinClauses(final Map<Dimension, CandidateDim> dimsToQuery,
+                                              final CubeQueryContext cubeql) {
+      // Number of paths in each path set
+      final int groupSizes[] = new int[allPaths.values().size()];
+      // Total number of elements in the cartesian product
+      int numSamples = 1;
+      // All path sets
+      final List<List<SchemaGraph.JoinPath>> pathSets = new ArrayList<List<SchemaGraph.JoinPath>>();
+      // Dimension corresponding to the path sets
+      final Dimension dimensions[] = new Dimension[groupSizes.length];
+
+      int i = 0;
+      for (Map.Entry<Dimension, List<SchemaGraph.JoinPath>> entry : allPaths.entrySet()) {
+        dimensions[i] = entry.getKey();
+        List<SchemaGraph.JoinPath> group = entry.getValue();
+        pathSets.add(group);
+        groupSizes[i] = group.size();
+        numSamples *= groupSizes[i];
+        i++;
+      }
+
+      final int selection[] = new int[groupSizes.length];
+      final int MAX_SAMPLE_COUNT = numSamples;
+
+      // Return a lazy iterator over all possible join chains
+      return new Iterator<String>() {
+        int sample = 0;
+        Map<Dimension, List<TableRelationship>> chain = new LinkedHashMap<Dimension, List<TableRelationship>>();
+
+        @Override
+        public boolean hasNext() {
+          return sample < MAX_SAMPLE_COUNT;
+        }
+
+        @Override
+        public String next() {
+          getNextSelection(selection, sample);
+
+          for (int i = 0; i < selection.length; i++) {
+            int selectedPath = selection[i];
+            List<TableRelationship> path = pathSets.get(i).get(selectedPath).getEdges();
+            chain.put(dimensions[i], path);
+          }
+
+          // Compute the merged join chain for this path
+          setJoinChain(chain);
+          String nextClause = getMergedJoinClause(dimsToQuery, cubeql);
+          clearMergedJoinClause();
+
+          sample++;
+          return nextClause;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException("Cannot remove elements!");
+        }
+
+        // Generate the next selection in the cartesian product of join paths
+        public void getNextSelection(int[] selection, int sample) {
+          // Populate next selection array
+          boolean changed = false;
+
+          for (int i = selection.length - 1; !changed && i >= 0; i--) {
+            if (selection[i] < groupSizes[i] - 1) {
+              selection[i]++;
+              changed = true;
+            } else {
+              // Roll over
+              selection[i] = 0;
+            }
+          }
+        }
+      };
+    }
   }
 
   static String getJoinTypeStr(JoinType joinType) {
@@ -391,9 +473,17 @@ public class JoinResolver implements ContextRewriter {
     SchemaGraph graph = getSchemaGraph();
     Map<Dimension, List<TableRelationship>> joinChain =
         new LinkedHashMap<Dimension, List<TableRelationship>>();
+
+    Map<Dimension, List<SchemaGraph.JoinPath>> multipleJoinPaths =
+      new LinkedHashMap<Dimension, List<SchemaGraph.JoinPath>>();
+
     // Resolve join path for each dimension accessed in the query
     boolean joinsResolved = false;
     for (Dimension joinee : dimTables) {
+      // Find all possible join paths
+      SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(joinee, target, graph);
+      multipleJoinPaths.put(joinee, search.findAllPathsToTarget());
+
       ArrayList<TableRelationship> chain = new ArrayList<TableRelationship>();
       if (graph.findJoinChain(joinee, target, chain)) {
         joinsResolved = true;
@@ -418,7 +508,7 @@ public class JoinResolver implements ContextRewriter {
           cubeql.addColumnsQueried(rel.getFromTable(), rel.getFromColumn());   
         }
       }
-      AutoJoinContext joinCtx = new AutoJoinContext(joinChain, partialJoinConditions,
+      AutoJoinContext joinCtx = new AutoJoinContext(joinChain, multipleJoinPaths, partialJoinConditions,
           partialJoinChain, tableJoinTypeMap, target,
           conf.get(CubeQueryConfUtil.JOIN_TYPE_KEY), joinsResolved);
       cubeql.setAutoJoinCtx(joinCtx);
