@@ -46,8 +46,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class CandidateTableResolver implements ContextRewriter {
 
-  private static Log LOG = LogFactory.getLog(
-      CandidateTableResolver.class.getName());
+  private static Log LOG = LogFactory.getLog(CandidateTableResolver.class.getName());
   private Map<AbstractCubeTable, Set<String>> cubeTabToCols;
   private boolean qlEnabledMultiTableSelect;
 
@@ -111,6 +110,7 @@ public class CandidateTableResolver implements ContextRewriter {
       Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
       for (Iterator<CandidateFact> i = cubeql.getCandidateFactTables().iterator();
           i.hasNext();) {
+        boolean isRemoved = false;
         CubeFactTable fact = i.next().fact;
         if (validFactTables != null) {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
@@ -137,23 +137,37 @@ public class CandidateTableResolver implements ContextRewriter {
                 cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
                     fact.getName(), CubeTableCause.COLUMN_NOT_VALID));
                 i.remove();
+                isRemoved = true;
                 break;
               }
             } else if(!factCols.contains(col.toLowerCase())) {
               LOG.info("Not considering fact table:" + fact +
                   " as column " + col + " is not available");
               cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
-                  fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));
+                fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));
+              isRemoved = true;
               i.remove();
               break;
             }
           }
         }
+
+        // Check if the candidate fact has at least one column in any of the join paths
+        if (!isRemoved && !filterJoinPathTables(cubeql, fact, factCols)) {
+          i.remove();
+          LOG.info("Not considering fact table:" + fact + " as it does not have columns in any of the join path");
+          cubeql.addFactPruningMsgs(fact,
+            new CandidateTablePruneCause(fact.getName(), CubeTableCause.NO_COLUMN_PART_OF_A_JOIN_PATH));
+        }
+
       }
       if (cubeql.getCandidateFactTables().size() == 0) {
         throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN,
             cubeColsQueried.toString());
       }
+
+      //
+
     }
   }
 
@@ -165,6 +179,8 @@ public class CandidateTableResolver implements ContextRewriter {
         for (Iterator<CandidateDim> i = cubeql.getCandidateDimTables().get(dim).iterator();
             i.hasNext();) {
           CubeDimensionTable dimtable = i.next().dimtable;
+          boolean isRemoved = false;
+
           Set<String> dimCols = cubeTabToCols.get(dimtable);
 
           for (String col : cubeql.getColumnsQueried(dim.getName())) {
@@ -174,10 +190,19 @@ public class CandidateTableResolver implements ContextRewriter {
               cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
                   dimtable.getName(), CubeTableCause.COLUMN_NOT_FOUND));
               i.remove();
+              isRemoved = true;
               break;
             }
           }
+
+          if (!isRemoved && !filterJoinPathTables(cubeql, dimtable, dimCols)) {
+            i.remove();
+            LOG.info("Not considering dimtable:" + dimtable +" as its columns are not part of any join path");
+            cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
+              dimtable.getName(), CubeTableCause.NO_COLUMN_PART_OF_A_JOIN_PATH));
+          }
         }
+
         if (cubeql.getCandidateDimTables().get(dim).size() == 0) {
           throw new SemanticException(ErrorMsg.NO_DIM_HAS_COLUMN,
               dim.getName(), cubeql.getColumnsQueried(dim.getName()).toString());
@@ -186,4 +211,25 @@ public class CandidateTableResolver implements ContextRewriter {
     }
   }
 
+
+  /**
+   * @return true if at least one of the columns of this table is present in any of the join paths
+   */
+  protected boolean filterJoinPathTables(CubeQueryContext context,
+                                         AbstractCubeTable table,
+                                         Set<String> columnsOfTable) {
+    JoinResolver.AutoJoinContext joinContext = context.getAutoJoinCtx();
+    if (joinContext == null) {
+      return true;
+    }
+
+    if (joinContext.getJoinPathColumnsOfTable(table) != null) {
+      for (String joinPathColumn : joinContext.getJoinPathColumnsOfTable(table)) {
+        if (columnsOfTable.contains(joinPathColumn)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 }

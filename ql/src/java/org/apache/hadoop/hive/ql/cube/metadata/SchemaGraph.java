@@ -86,14 +86,22 @@ public class SchemaGraph {
 
   public static class JoinPath {
     final List<TableRelationship> edges;
+    private Map<AbstractCubeTable, List<String>> columnsForTable = new HashMap<AbstractCubeTable, List<String>>();
 
     public JoinPath() {
       edges = new ArrayList<TableRelationship>();
+      initColumnsForTable();
     }
 
     public JoinPath(JoinPath other) {
-      edges = new ArrayList<TableRelationship>(other.edges.size());
-      edges.addAll(other.edges);
+      edges = new ArrayList<TableRelationship>(other.edges);
+      initColumnsForTable();
+    }
+
+    void initColumnsForTable() {
+      for (TableRelationship edge : edges) {
+        addColumnsForEdge(edge);
+      }
     }
 
     public void addEdge(TableRelationship edge) {
@@ -106,6 +114,27 @@ public class SchemaGraph {
 
     public List<TableRelationship> getEdges() {
       return edges;
+    }
+
+    private void addColumnsForEdge(TableRelationship edge) {
+      addColumn(edge.getFromTable(), edge.getFromColumn());
+      addColumn(edge.getToTable(), edge.getToColumn());
+    }
+
+    private void addColumn(AbstractCubeTable table, String column) {
+      if (table == null || column == null) {
+        return;
+      }
+      List<String> columns = columnsForTable.get(table);
+      if (columns == null) {
+        columns = new ArrayList<String>();
+        columnsForTable.put(table, columns);
+      }
+      columns.add(column);
+    }
+
+    public List<String> getColumnsForTable(AbstractCubeTable table) {
+      return columnsForTable.get(table);
     }
   }
 
@@ -137,8 +166,8 @@ public class SchemaGraph {
 
     /**
      * Let path till this node = p
-     * Paths at node adjacent to target - [edges leading to target]
-     * Path at a random node - [path till this node + p for each p in path(neighbors)]
+     * Paths at node adjacent to target = [edges leading to target]
+     * Path at a random node = [path till this node + p for each p in path(neighbors)]
      */
     List<JoinPath> findAllPathsToTarget(AbstractCubeTable source,
                                                JoinPath joinPathTillSource,

@@ -47,7 +47,8 @@ public class CandidateTablePruneCause {
     MORE_PARTITIONS,
     // cube table is an aggregated fact and queried column is not under default aggregate
     MISSING_DEFAULT_AGGREGATE,
-    NO_FACT_UPDATE_PERIODS_FOR_GIVEN_RANGE
+    NO_FACT_UPDATE_PERIODS_FOR_GIVEN_RANGE,
+    NO_COLUMN_PART_OF_A_JOIN_PATH
   }
   
   public enum SkipStorageCause {

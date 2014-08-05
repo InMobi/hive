@@ -39,6 +39,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
@@ -64,19 +65,53 @@ public class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
 
+  public static class JoinClause implements Comparable<JoinClause> {
+    private final String clause;
+    private final int cost;
+
+    public JoinClause(String clause, int cost) {
+      this.clause = clause;
+      this.cost = cost;
+    }
+
+    public String getClause() {
+      return clause;
+    }
+
+    public int getCost() {
+      return cost;
+    }
+
+    @Override
+    public int compareTo(JoinClause joinClause) {
+      return cost - joinClause.getCost();
+    }
+  }
   /**
    * Store join chain information resolved by join resolver
    */
   public static class AutoJoinContext {
     private Map<Dimension, List<TableRelationship>> joinChain;
+    // Map of a joined table to list of all possible paths from that table to the target
     private final Map<Dimension, List<SchemaGraph.JoinPath>> allPaths;
+    // User supplied partial join conditions
     private final Map<AbstractCubeTable, String> partialJoinConditions;
+    // True if the query contains user supplied partial join conditions
     private final boolean partialJoinChains;
+    // Map of joined table to the join type (if provided by user)
     private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
+
     private String mergedJoinClause;
+    // True if joins were resolved automatically
     private boolean joinsResolved;
+    // Target table for the auto join resolver
     private AbstractCubeTable autoJoinTarget;
+    // Configuration string to control join type
     private String joinTypeCfg;
+
+    // Map of a joined table to its columns which are part of any of the join paths. This is used
+    // in candidate table resolver
+    Map<AbstractCubeTable, List<String>> joinPathColumns = new HashMap<AbstractCubeTable, List<String>>();
 
     public AutoJoinContext(Map<Dimension, List<TableRelationship>> joinChain,
                            Map<Dimension, List<SchemaGraph.JoinPath>> allPaths,
@@ -87,12 +122,47 @@ public class JoinResolver implements ContextRewriter {
         boolean joinsResolved) {
       this.joinChain = joinChain;
       this.allPaths = allPaths;
+      initJoinPathColumns(allPaths);
       this.partialJoinConditions = partialJoinConditions;
       this.partialJoinChains = partialJoinChains;
       this.tableJoinTypeMap = tableJoinTypeMap;
       this.autoJoinTarget = autoJoinTarget;
       this.joinTypeCfg = joinTypeCfg;
       this.joinsResolved = joinsResolved;
+    }
+
+    // Populate map of tables to their columns which are present in any of the join paths
+    private void initJoinPathColumns(Map<Dimension, List<SchemaGraph.JoinPath>> allPaths) {
+      for (List<SchemaGraph.JoinPath> joinPaths : allPaths.values()) {
+        for (SchemaGraph.JoinPath path : joinPaths) {
+          for (TableRelationship edge : path.getEdges()) {
+            // Populate columns of the 'from' table
+            AbstractCubeTable fromTable = edge.getFromTable();
+            String fromColumn = edge.getFromColumn();
+            List<String> columnsOfFromTable = joinPathColumns.get(fromTable);
+            if (columnsOfFromTable == null) {
+              columnsOfFromTable = new ArrayList<String>();
+              joinPathColumns.put(fromTable, columnsOfFromTable);
+            }
+            columnsOfFromTable.add(fromColumn);
+
+            // Similarly populate for the 'to' table
+            AbstractCubeTable toTable = edge.getToTable();
+            String toColumn = edge.getToColumn();
+            List<String> columnsOfToTable = joinPathColumns.get(toTable);
+            if (columnsOfToTable == null) {
+              columnsOfToTable = new ArrayList<String>();
+              joinPathColumns.put(toTable, columnsOfToTable);
+            }
+            columnsOfToTable.add(toColumn);
+
+          }
+        }
+      }
+    }
+
+    public void removeJoinPathsOfTable(AbstractCubeTable table) {
+      allPaths.remove(table);
     }
 
     public Map<Dimension, List<TableRelationship>> getJoinChain() {
@@ -120,8 +190,18 @@ public class JoinResolver implements ContextRewriter {
         fromString = context.getDimsToQuery().get(autoJoinTarget).getStorageString(
             cubeql.getAliasForTabName(autoJoinTarget.getName()));
       }
-      fromString += getMergedJoinClause(context.getDimsToQuery(), cubeql);
-      
+
+      Iterator<JoinClause> itr = getJoinClausesForAllPaths(context.getDimsToQuery(), cubeql);
+      JoinClause minCostClause = null;
+
+      while (itr.hasNext()) {
+        JoinClause clause = itr.next();
+        if (minCostClause == null || minCostClause.getCost() > clause.getCost()) {
+          minCostClause = clause;
+        }
+      }
+
+      fromString += minCostClause.getClause();
       return fromString;
     }
 
@@ -269,10 +349,62 @@ public class JoinResolver implements ContextRewriter {
       return joinsResolved;
     }
 
-    // There can be multiple join paths between a dimension and the target. Set of all possible join clauses
-    // is the cartesian product of join paths of all dimensions
-    public Iterator<String> getAllPossibleJoinClauses(final Map<Dimension, CandidateDim> dimsToQuery,
+
+    public List<String> getJoinPathColumnsOfTable(AbstractCubeTable table) {
+      return joinPathColumns.get(table);
+    }
+
+    /** There can be multiple join paths between a dimension and the target. Set of all possible join clauses
+     * is the cartesian product of join paths of all dimensions
+     */
+    public Iterator<JoinClause> getJoinClausesForAllPaths(final Map<Dimension, CandidateDim> dimsToQuery,
                                               final CubeQueryContext cubeql) {
+
+      // Remove join paths which cannot be satisfied by the resolved candidate fact and dimension tables
+
+      Set<CubeQueryContext.CandidateFact> candidateFacts = cubeql.getCandidateFactTables();
+      if (!candidateFacts.isEmpty()) {
+        // At this point it is assumed that least fact resolver has been run
+        CubeQueryContext.CandidateFact candidateFact = candidateFacts.iterator().next();
+        Set<String> factColumns = candidateFact.fact.getAllFieldNames();
+
+        for (List<SchemaGraph.JoinPath> paths : allPaths.values()) {
+          for (int i = 0; i < paths.size(); i++) {
+            SchemaGraph.JoinPath jp = paths.get(i);
+            List<String> cubeCols = jp.getColumnsForTable((AbstractCubeTable) cubeql.getCube());
+            if (cubeCols != null && !factColumns.containsAll(cubeCols)) {
+              // This path requires some columns from the cube which are not present in the candidate fact
+              // Remove this path
+              paths.remove(i);
+              i--;
+            }
+          }
+        }
+      }
+
+      Map<Dimension, Set<CubeQueryContext.CandidateDim>> candidateDims = cubeql.getCandidateDimTables();
+      if (!candidateDims.isEmpty()) {
+        // At this point it is assumed that least dimension resolver has been run, so we expect only one CandidateDim
+        // for each Dimension
+        for (Dimension dimension : candidateDims.keySet()) {
+          CubeQueryContext.CandidateDim candidateDim = candidateDims.get(dimension).iterator().next();
+          Set<String> dimCols = candidateDim.dimtable.getAllFieldNames();
+
+          for (List<SchemaGraph.JoinPath> paths : allPaths.values()) {
+            for (int i = 0; i < paths.size(); i++) {
+              SchemaGraph.JoinPath jp = paths.get(i);
+              List<String> candidateDimCols = jp.getColumnsForTable(dimension);
+              if (candidateDimCols != null && !dimCols.containsAll(candidateDimCols)) {
+                // This path requires some columns from the dimension which are not present in the candidate dim
+                // Remove this path
+                paths.remove(i);
+                i--;
+              }
+            }
+          }
+        }
+      }
+
       // Number of paths in each path set
       final int groupSizes[] = new int[allPaths.values().size()];
       // Total number of elements in the cartesian product
@@ -296,7 +428,7 @@ public class JoinResolver implements ContextRewriter {
       final int MAX_SAMPLE_COUNT = numSamples;
 
       // Return a lazy iterator over all possible join chains
-      return new Iterator<String>() {
+      return new Iterator<JoinClause>() {
         int sample = 0;
         Map<Dimension, List<TableRelationship>> chain = new LinkedHashMap<Dimension, List<TableRelationship>>();
 
@@ -306,7 +438,7 @@ public class JoinResolver implements ContextRewriter {
         }
 
         @Override
-        public String next() {
+        public JoinClause next() {
           getNextSelection(selection, sample);
 
           for (int i = 0; i < selection.length; i++) {
@@ -317,11 +449,12 @@ public class JoinResolver implements ContextRewriter {
 
           // Compute the merged join chain for this path
           setJoinChain(chain);
-          String nextClause = getMergedJoinClause(dimsToQuery, cubeql);
+          String clause = getMergedJoinClause(dimsToQuery, cubeql);
           clearMergedJoinClause();
 
           sample++;
-          return nextClause;
+          // Cost of join = number of tables joined in the clause
+          return new JoinClause(clause, StringUtils.countMatches(clause, "join"));
         }
 
         @Override
