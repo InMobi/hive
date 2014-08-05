@@ -101,7 +101,6 @@ public class JoinResolver implements ContextRewriter {
     // Map of joined table to the join type (if provided by user)
     private final Map<AbstractCubeTable, JoinType> tableJoinTypeMap;
 
-    private String mergedJoinClause;
     // True if joins were resolved automatically
     private boolean joinsResolved;
     // Target table for the auto join resolver
@@ -173,9 +172,6 @@ public class JoinResolver implements ContextRewriter {
       this.joinChain = chain;
     }
 
-    private void clearMergedJoinClause() {
-      mergedJoinClause = null;
-    }
 
     public Map<AbstractCubeTable, String> getPartialJoinConditions() {
       return partialJoinConditions;
@@ -209,14 +205,6 @@ public class JoinResolver implements ContextRewriter {
     public String getMergedJoinClause(
         Map<Dimension, CandidateDim> dimsToQuery,
         CubeQueryContext cubeql) {
-      if (mergedJoinClause != null) {
-        return mergedJoinClause;
-      }
-
-      for (List<TableRelationship> chain : joinChain.values()) {
-        // Need to reverse the chain so that left most table in join comes first
-        Collections.reverse(chain);
-      }
 
       Set<String> clauses = new LinkedHashSet<String>();
       String joinTypeStr = "";
@@ -240,7 +228,8 @@ public class JoinResolver implements ContextRewriter {
           joinTypeStr = getJoinTypeStr(joinType);
         }
 
-        for (TableRelationship rel : chain) {
+        for (int i = chain.size() - 1; i >= 0; i--) {
+          TableRelationship rel = chain.get(i);
           StringBuilder clause = new StringBuilder(joinTypeStr)
           .append(" join ");
           // Add storage table name followed by alias
@@ -327,8 +316,7 @@ public class JoinResolver implements ContextRewriter {
           clauses.add(clause.toString());
         }
       }
-      mergedJoinClause = StringUtils.join(clauses, "");
-      return mergedJoinClause;
+      return StringUtils.join(clauses, "");
     }
 
     private String getStorageFilter(Map<Dimension, CandidateDim> dimsToQuery,
@@ -450,7 +438,6 @@ public class JoinResolver implements ContextRewriter {
           // Compute the merged join chain for this path
           setJoinChain(chain);
           String clause = getMergedJoinClause(dimsToQuery, cubeql);
-          clearMergedJoinClause();
 
           sample++;
           // Cost of join = number of tables joined in the clause
