@@ -108,10 +108,13 @@ public class CandidateTableResolver implements ContextRewriter {
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
         Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
       Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
+
+      // Remove fact tables based on columns in the query
       for (Iterator<CandidateFact> i = cubeql.getCandidateFactTables().iterator();
           i.hasNext();) {
         boolean isRemoved = false;
         CubeFactTable fact = i.next().fact;
+
         if (validFactTables != null) {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
             LOG.info("Not considering fact table:" + fact + " as it is" +
@@ -153,7 +156,7 @@ public class CandidateTableResolver implements ContextRewriter {
         }
 
         // Check if the candidate fact has at least one column in any of the join paths
-        if (!isRemoved && !filterJoinPathTables(cubeql, fact, factCols)) {
+        if (!isRemoved && !filterJoinPathTables(cubeql, (AbstractCubeTable) cubeql.getCube(), factCols, validFactCols)) {
           i.remove();
           LOG.info("Not considering fact table:" + fact + " as it does not have columns in any of the join paths");
           cubeql.addFactPruningMsgs(fact,
@@ -165,9 +168,6 @@ public class CandidateTableResolver implements ContextRewriter {
         throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN,
             cubeColsQueried.toString());
       }
-
-      //
-
     }
   }
 
@@ -183,19 +183,21 @@ public class CandidateTableResolver implements ContextRewriter {
 
           Set<String> dimCols = cubeTabToCols.get(dimtable);
 
-          for (String col : cubeql.getColumnsQueried(dim.getName())) {
-            if(!dimCols.contains(col.toLowerCase())) {
-              LOG.info("Not considering dimtable:" + dimtable +
+          if (cubeql.getColumnsQueried(dim.getName()) != null) {
+            for (String col : cubeql.getColumnsQueried(dim.getName())) {
+              if (!dimCols.contains(col.toLowerCase())) {
+                LOG.info("Not considering dimtable:" + dimtable +
                   " as column " + col + " is not available");
-              cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
+                cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
                   dimtable.getName(), CubeTableCause.COLUMN_NOT_FOUND));
-              i.remove();
-              isRemoved = true;
-              break;
+                i.remove();
+                isRemoved = true;
+                break;
+              }
             }
           }
 
-          if (!isRemoved && !filterJoinPathTables(cubeql, dimtable, dimCols)) {
+          if (!isRemoved && !filterJoinPathTables(cubeql, dim, dimCols, null)) {
             i.remove();
             LOG.info("Not considering dimtable:" + dimtable +" as its columns are not part of any join paths");
             cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
@@ -217,14 +219,22 @@ public class CandidateTableResolver implements ContextRewriter {
    */
   protected boolean filterJoinPathTables(CubeQueryContext context,
                                          AbstractCubeTable table,
-                                         Set<String> columnsOfTable) {
+                                         Set<String> columnsOfTable,
+                                         List<String> validColumns) {
     JoinResolver.AutoJoinContext joinContext = context.getAutoJoinCtx();
     if (joinContext == null) {
       return true;
     }
 
     if (joinContext.getJoinPathColumnsOfTable(table) != null) {
+      if (validColumns != null) {
+        if (!validColumns.containsAll(joinContext.getJoinPathColumnsOfTable(table))) {
+          return false;
+        }
+      }
+
       for (String joinPathColumn : joinContext.getJoinPathColumnsOfTable(table)) {
+        joinPathColumn = joinPathColumn.toLowerCase();
         if (columnsOfTable.contains(joinPathColumn)) {
           return true;
         }

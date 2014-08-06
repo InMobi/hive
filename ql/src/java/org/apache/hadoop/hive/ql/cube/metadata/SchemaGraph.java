@@ -84,8 +84,12 @@ public class SchemaGraph {
     }
   }
 
+  /**
+   * A list of table relationships that can be combined to get a join clause
+   */
   public static class JoinPath {
     final List<TableRelationship> edges;
+    // Store the map of a table against all columns of that table which are in the path
     private Map<AbstractCubeTable, List<String>> columnsForTable = new HashMap<AbstractCubeTable, List<String>>();
 
     public JoinPath() {
@@ -138,11 +142,16 @@ public class SchemaGraph {
     }
   }
 
+  /**
+   * Perform a search for join paths on the schema graph
+   */
   public static class GraphSearch {
     private final AbstractCubeTable source;
     private final AbstractCubeTable target;
     private final List<List<TableRelationship>> paths;
     private final Map<AbstractCubeTable, Set<TableRelationship>> graph;
+    // Used in tests to validate that all paths are searched
+    private boolean trimLongerPaths = true;
 
     public GraphSearch(AbstractCubeTable source,
                        AbstractCubeTable target,
@@ -161,10 +170,32 @@ public class SchemaGraph {
     }
 
     public List<JoinPath> findAllPathsToTarget() {
-      return findAllPathsToTarget(source, new JoinPath(), new HashSet<AbstractCubeTable>());
+      List<JoinPath> allPaths = findAllPathsToTarget(source, new JoinPath(), new HashSet<AbstractCubeTable>());
+      // Retain only the smallest paths
+      if (trimLongerPaths && allPaths != null && !allPaths.isEmpty()) {
+        JoinPath smallestPath = Collections.min(allPaths, new Comparator<JoinPath>() {
+          @Override
+          public int compare(JoinPath joinPath, JoinPath joinPath2) {
+            return joinPath.getEdges().size() - joinPath2.getEdges().size();
+          }
+        });
+
+        Iterator<JoinPath> itr = allPaths.iterator();
+        while (itr.hasNext()) {
+          if (itr.next().getEdges().size() > smallestPath.getEdges().size()) {
+            itr.remove();
+          }
+        }
+      }
+      return allPaths;
+    }
+
+    public void setTrimLongerPaths(boolean val) {
+      trimLongerPaths = val;
     }
 
     /**
+     * Recursive DFS to get all paths between source and target.
      * Let path till this node = p
      * Paths at node adjacent to target = [edges leading to target]
      * Path at a random node = [path till this node + p for each p in path(neighbors)]

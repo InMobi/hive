@@ -582,7 +582,7 @@ public class JoinResolver implements ContextRewriter {
     // Resolve join path for each dimension accessed in the query
     for (Dimension joinee : dimTables) {
       // Find all possible join paths
-      SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(joinee, target, graph, cubeql.getDimensions());
+      SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(joinee, target, graph);
       List<SchemaGraph.JoinPath> joinPaths = search.findAllPathsToTarget();
       if (joinPaths != null && !joinPaths.isEmpty()) {
         multipleJoinPaths.put(joinee, search.findAllPathsToTarget());

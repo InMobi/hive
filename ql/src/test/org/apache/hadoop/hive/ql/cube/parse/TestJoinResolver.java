@@ -102,7 +102,7 @@ public class TestJoinResolver {
                            AbstractCubeTable target,
                            SchemaGraph graph) {
     SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(source, target, graph);
-
+    search.setTrimLongerPaths(false);
     List<SchemaGraph.JoinPath> joinPaths = search.findAllPathsToTarget();
 
     System.out.println("@@ " + source + " ==> " + target + " paths =");
@@ -142,7 +142,9 @@ public class TestJoinResolver {
     Dimension stateDim = metastore.getDimension("statedim");
     Dimension countryDim = metastore.getDimension("countrydim");
     CubeInterface testCube = metastore.getCube("testcube");
+
     SchemaGraph.GraphSearch search = new SchemaGraph.GraphSearch(zipDim, (AbstractCubeTable) testCube, schemaGraph);
+    search.setTrimLongerPaths(false);
 
     List<SchemaGraph.JoinPath> paths = search.findAllPathsToTarget();
     assertEquals(4, paths.size());
