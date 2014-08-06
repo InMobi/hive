@@ -323,66 +323,6 @@ public class SchemaGraph {
 
   }
 
-  // This returns the first path found between the dimTable and the target
-  private boolean findJoinChain(Dimension dimTable, AbstractCubeTable target,
-                                Map<AbstractCubeTable, Set<TableRelationship>> graph,
-                                List<TableRelationship> chain,
-                                Set<AbstractCubeTable> visited)
-  {
-    // Mark node as visited
-    visited.add(dimTable);
-
-    Set<TableRelationship> edges = graph.get(dimTable);
-    if (edges == null || edges.isEmpty()) {
-      return false;
-    }
-    boolean foundPath = false;
-    for (TableRelationship edge : edges) {
-      if (visited.contains(edge.fromTable)) {
-        continue;
-      }
-
-      if (edge.fromTable.equals(target)) {
-        chain.add(edge);
-        // Search successful
-        foundPath = true;
-        break;
-      } else if (edge.fromTable instanceof Dimension) {
-        List<TableRelationship> tmpChain = new ArrayList<TableRelationship>();
-        if (findJoinChain((Dimension) edge.fromTable, target,
-          graph, tmpChain, visited)) {
-          // This dim eventually leads to the cube
-          chain.add(edge);
-          chain.addAll(tmpChain);
-          foundPath = true;
-          break;
-        }
-      } // else - this edge doesn't lead to the target, try next one
-    }
-
-    return foundPath;
-  }
-
-  /**
-   * Find if there is a join chain (path) between the given dimension table and the target table
-   * @param joinee
-   * @param target
-   * @param chain
-   * @return
-   */
-  public boolean findJoinChain(Dimension joinee, AbstractCubeTable target,
-                               List<TableRelationship> chain) {
-    if (target instanceof CubeInterface) {
-      return findJoinChain(joinee, target, cubeToGraph.get(target), chain,
-        new HashSet<AbstractCubeTable>());
-    } else if (target instanceof Dimension) {
-      return findJoinChain(joinee, target, dimOnlySubGraph, chain,
-        new HashSet<AbstractCubeTable>());
-    } else {
-      return false;
-    }
-  }
-
   public void print() {
     for (CubeInterface cube : cubeToGraph.keySet()) {
       Map<AbstractCubeTable, Set<TableRelationship>> graph = cubeToGraph.get(cube);

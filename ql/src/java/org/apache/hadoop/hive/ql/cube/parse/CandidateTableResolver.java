@@ -155,7 +155,7 @@ public class CandidateTableResolver implements ContextRewriter {
         // Check if the candidate fact has at least one column in any of the join paths
         if (!isRemoved && !filterJoinPathTables(cubeql, fact, factCols)) {
           i.remove();
-          LOG.info("Not considering fact table:" + fact + " as it does not have columns in any of the join path");
+          LOG.info("Not considering fact table:" + fact + " as it does not have columns in any of the join paths");
           cubeql.addFactPruningMsgs(fact,
             new CandidateTablePruneCause(fact.getName(), CubeTableCause.NO_COLUMN_PART_OF_A_JOIN_PATH));
         }
@@ -197,7 +197,7 @@ public class CandidateTableResolver implements ContextRewriter {
 
           if (!isRemoved && !filterJoinPathTables(cubeql, dimtable, dimCols)) {
             i.remove();
-            LOG.info("Not considering dimtable:" + dimtable +" as its columns are not part of any join path");
+            LOG.info("Not considering dimtable:" + dimtable +" as its columns are not part of any join paths");
             cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
               dimtable.getName(), CubeTableCause.NO_COLUMN_PART_OF_A_JOIN_PATH));
           }
