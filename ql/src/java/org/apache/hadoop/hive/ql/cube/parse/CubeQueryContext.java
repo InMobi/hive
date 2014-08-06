@@ -40,7 +40,13 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
-import org.apache.hadoop.hive.ql.cube.metadata.*;
+import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
+import org.apache.hadoop.hive.ql.cube.metadata.Cube;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.JoinCond;
@@ -911,5 +917,6 @@ public class CubeQueryContext {
       }
       return storageTable + " " + alias;
     }
+    
   }
 }
