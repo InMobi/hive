@@ -126,7 +126,7 @@ public class TimerangeResolver implements ContextRewriter {
           }
           continue;
         }
-        if (isColumnLifeInValid(column, range)) {
+        if (isColumnLifeInvalid(column, range)) {
           throw new SemanticException(ErrorMsg.NOT_AVAILABLE_IN_RANGE, col, 
             range.toString(),  (column.getStartTime() == null ? "" :
               " from:" + column.getStartTime()),
@@ -151,7 +151,7 @@ public class TimerangeResolver implements ContextRewriter {
     for (String col : joinColumns) {
       CubeColumn column = cubeql.getCube().getColumnByName(col);
       for (TimeRange range : cubeql.getTimeRanges()) {
-        if (isColumnLifeInValid(column, range)) {
+        if (isColumnLifeInvalid(column, range)) {
           // Remove join paths containing this column
           Map<Dimension, List<SchemaGraph.JoinPath>> allPaths = joinContext.getAllPaths();
 
@@ -179,7 +179,7 @@ public class TimerangeResolver implements ContextRewriter {
 
   }
 
-  private boolean isColumnLifeInValid(CubeColumn column, TimeRange range) {
+  private boolean isColumnLifeInvalid(CubeColumn column, TimeRange range) {
     return (column.getStartTime() != null &&
       column.getStartTime().after(range.getFromDate())) ||
       (column.getEndTime() != null &&
