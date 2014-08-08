@@ -140,6 +140,16 @@ public class SchemaGraph {
     public List<String> getColumnsForTable(AbstractCubeTable table) {
       return columnsForTable.get(table);
     }
+
+    public boolean containsColumnOfTable(String column, AbstractCubeTable table) {
+      for (TableRelationship edge : edges) {
+        if ((table.equals(edge.getFromTable()) && column.equals(edge.getFromColumn())) ||
+            table.equals(edge.getToTable()) && column.equals(edge.getToColumn())) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   /**
