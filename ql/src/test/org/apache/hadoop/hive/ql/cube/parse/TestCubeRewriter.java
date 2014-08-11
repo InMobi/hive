@@ -34,13 +34,15 @@ import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoMonthsRangeU
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twodaysBack;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.lang.time.DateUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.ErrorMsg;
-import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
-import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
+import org.apache.hadoop.hive.ql.cube.metadata.*;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
@@ -1331,4 +1333,50 @@ public class TestCubeRewriter {
         "C2_testfact"));
     compareQueries(expected, hqlQuery);
    }
+
+  @Test
+  public void testJoinPathColumnLifeValidation() throws Exception {
+    HiveConf testConf = new HiveConf(new HiveConf(conf, HiveConf.class));
+    testConf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
+    System.out.println("@@ Joins disabled? " + testConf.get(CubeQueryConfUtil.DISABLE_AUTO_JOINS));
+    // Set column life of dim2 column in testCube
+    CubeMetastoreClient client = CubeMetastoreClient.getInstance(testConf);
+    Cube cube = (Cube) client.getCube(cubeName);
+
+    ReferencedDimAtrribute col = (ReferencedDimAtrribute) cube.getColumnByName("dim2");
+    Assert.assertNotNull(col);
+
+    Date oneWeekBack = DateUtils.addDays(twodaysBack, -7);
+    Date twoWeekBack = DateUtils.addDays(twodaysBack, -14);
+
+    // Alter cube.dim2 with an invalid column life
+    ReferencedDimAtrribute newDim2 = new ReferencedDimAtrribute(new FieldSchema(col.getName(), "string", "invalid col"),
+      col.getDisplayString(),
+      new TableReference("testdim2", "id"),
+      twoWeekBack, oneWeekBack, // create column out of time range
+      col.getCost());
+    cube.alterDimension(newDim2);
+    client.alterCube(cubeName, cube);
+    System.out.println("@@Altered cube  New Col life " + twoWeekBack + " to " + oneWeekBack);
+
+    final String query = "SELECT testdim2.name, msr2 FROM testCube where " + twoDaysRange;
+    try {
+      CubeQueryRewriter rewriter = new CubeQueryRewriter(testConf);
+      CubeQueryContext context = rewriter.rewrite(query);
+      System.out.println("TestJoinPathTimeRange: " + context.toHQL());
+      Assert.fail("Expected query to fail because of invalid column life");
+    } catch (SemanticException exc) {
+      Assert.assertEquals(exc.getCanonicalErrorMsg(), ErrorMsg.NO_JOIN_PATH);
+    } finally {
+      // Add old column back
+      cube.alterDimension(col);
+      client.alterCube(cubeName, cube);
+    }
+
+    // Assert same query succeeds with valid column
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(testConf);
+    CubeQueryContext context = rewriter.rewrite(query);
+    String hql = context.toHQL();
+    Assert.assertNotNull(hql);
+  }
 }

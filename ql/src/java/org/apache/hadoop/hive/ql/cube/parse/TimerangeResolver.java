@@ -25,11 +25,17 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 
 import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeColumn;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
+import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
@@ -120,10 +126,7 @@ public class TimerangeResolver implements ContextRewriter {
           }
           continue;
         }
-        if ((column.getStartTime() != null &&
-            column.getStartTime().after(range.getFromDate())) ||
-            (column.getEndTime() != null &&
-            column.getEndTime().before(range.getToDate()))) {
+        if (isColumnLifeInvalid(column, range)) {
           throw new SemanticException(ErrorMsg.NOT_AVAILABLE_IN_RANGE, col, 
             range.toString(),  (column.getStartTime() == null ? "" :
               " from:" + column.getStartTime()),
@@ -132,5 +135,54 @@ public class TimerangeResolver implements ContextRewriter {
         }
       }
     }
+
+    // Remove join paths that have columns with invalid life span
+    JoinResolver.AutoJoinContext joinContext = cubeql.getAutoJoinCtx();
+    if (joinContext == null) {
+      return;
+    }
+    // Get cube columns which are part of join chain
+    List<String> joinColumns = joinContext.getJoinPathColumnsOfTable((AbstractCubeTable) cubeql.getCube());
+    if (joinColumns == null) {
+      return;
+    }
+
+    // Loop over all cube columns part of join paths
+    for (String col : joinColumns) {
+      CubeColumn column = cubeql.getCube().getColumnByName(col);
+      for (TimeRange range : cubeql.getTimeRanges()) {
+        if (isColumnLifeInvalid(column, range)) {
+          // Remove join paths containing this column
+          Map<Dimension, List<SchemaGraph.JoinPath>> allPaths = joinContext.getAllPaths();
+
+          for (Dimension dimension : allPaths.keySet()) {
+            List<SchemaGraph.JoinPath> joinPaths = allPaths.get(dimension);
+            Iterator<SchemaGraph.JoinPath> joinPathIterator = joinPaths.iterator();
+
+            while (joinPathIterator.hasNext()) {
+              SchemaGraph.JoinPath path = joinPathIterator.next();
+              if (path.containsColumnOfTable(col, (AbstractCubeTable) cubeql.getCube())) {
+                joinPathIterator.remove();
+                if (joinPaths.isEmpty()) {
+                  // This dimension doesn't have any paths left
+                  throw new SemanticException(ErrorMsg.NO_JOIN_PATH,
+                    "No valid join path available for dimension " + dimension
+                      + " which would satisfy time range " + range.getFromDate() + "-" + range.getToDate());
+                }
+              }
+            } // End loop to remove path
+
+          } // End loop for all paths
+        }
+      } // End time range loop
+    } // End column loop
+
+  }
+
+  private boolean isColumnLifeInvalid(CubeColumn column, TimeRange range) {
+    return (column.getStartTime() != null &&
+      column.getStartTime().after(range.getFromDate())) ||
+      (column.getEndTime() != null &&
+        column.getEndTime().before(range.getToDate()));
   }
 }

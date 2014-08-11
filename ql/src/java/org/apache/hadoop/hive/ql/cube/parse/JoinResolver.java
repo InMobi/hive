@@ -451,6 +451,10 @@ public class JoinResolver implements ContextRewriter {
         }
       };
     }
+
+    public Map<Dimension, List<SchemaGraph.JoinPath>> getAllPaths() {
+      return allPaths;
+    }
   }
 
   static String getJoinTypeStr(JoinType joinType) {
