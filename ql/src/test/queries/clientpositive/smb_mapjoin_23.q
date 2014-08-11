@@ -1,5 +1,6 @@
 drop table table_desc1;
 drop table table_desc2;
+drop table table_desc3;
 
 set hive.enforce.sorting = true;
 
