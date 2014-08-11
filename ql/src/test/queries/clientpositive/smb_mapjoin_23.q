@@ -15,7 +15,7 @@ set hive.optimize.bucketmapjoin = true;
 set hive.optimize.bucketmapjoin.sortedmerge = true;
 set hive.input.format = org.apache.hadoop.hive.ql.io.BucketizedHiveInputFormat;
 
--- columns are sorted by one key in first table, two keys in second table but in same sort order(1) for key. Hence SMB join should pass
+-- columns are sorted by one key in first table, two keys in second table but in same sort order(DESC) for key. Hence SMB join should pass
 
 explain
 select /*+ mapjoin(b) */ count(*) from table_desc1 a join table_desc2 b
