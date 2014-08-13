@@ -454,7 +454,7 @@ public class CubeQueryContext {
 
   private String getStorageStringWithAlias(CandidateFact fact,
       Map<Dimension, CandidateDim> dimsToQuery, String alias) {
-    if (cubeTbls.get(alias) instanceof Cube) {
+    if (cubeTbls.get(alias) instanceof CubeInterface) {
       return fact.getStorageString(alias);
     } else {
       return dimsToQuery.get(cubeTbls.get(alias)).getStorageString(alias);

@@ -232,7 +232,23 @@ public class TestCubeRewriter {
           getWhereForDailyAndHourly2days(CubeTestSetup.DERIVED_CUBE_NAME, "c1_summary2"));
     compareQueries(expected, hqlQuery);
 
+    // Test that explicit join query passes with join resolver disabled
     conf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, true);
+    List<String> joinWhereConds = new ArrayList<String>();
+    joinWhereConds.add(StorageUtil.getWherePartClause("dt",
+      "testdim2", StorageConstants.getPartitionsForLatest()));
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
+    hqlQuery = rewrite(driver, "cube select" +
+      " testdim2.name, SUM(msr2) from derivedCube " +
+      " inner join testdim2 on derivedCube.dim2 = testdim2.id " +
+      "where " + twoDaysRange);
+    expected = getExpectedQuery(CubeTestSetup.DERIVED_CUBE_NAME,
+      "select testdim2.name, sum(derivedCube.msr2) FROM ",
+      " inner JOIN " + getDbName() + "c1_testdim2tbl testdim2 ON derivedCube.dim2 = " +
+        " testdim2.id ", null, "group by (testdim2.name)", joinWhereConds,
+      getWhereForDailyAndHourly2days(CubeTestSetup.DERIVED_CUBE_NAME, "c1_summary2"));
+    compareQueries(expected, hqlQuery);
+
     driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
   }
 
