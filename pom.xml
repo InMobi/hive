@@ -111,7 +111,6 @@
     <hadoop-20.version>0.20.2</hadoop-20.version>
     <hadoop-20S.version>1.2.1</hadoop-20S.version>
     <hadoop-23.version>2.3.0</hadoop-23.version>
-      <hadoop-0.20.2-cdh3u5.version>0.20.2-cdh3u5</hadoop-0.20.2-cdh3u5.version>
     <hbase.hadoop1.version>0.96.0-hadoop1</hbase.hadoop1.version>
     <hbase.hadoop2.version>0.96.0-hadoop2</hbase.hadoop2.version>
     <!-- httpcomponents are not always in version sync -->
@@ -174,7 +173,7 @@
        <snapshots>
          <enabled>true</enabled>
        </snapshots>
-     </repository>   
+     </repository>
     <repository>
       <id>datanucleus</id>
       <name>datanucleus maven repository</name>
