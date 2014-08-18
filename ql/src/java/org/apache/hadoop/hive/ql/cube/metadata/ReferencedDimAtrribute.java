@@ -30,28 +30,28 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-public class ReferencedDimension extends BaseDimension {
+public class ReferencedDimAtrribute extends BaseDimAttribute {
   private final List<TableReference> references = new ArrayList<TableReference>();
 
-  public ReferencedDimension(FieldSchema column, TableReference reference) {
-    this(column, reference, null, null, null);
+  public ReferencedDimAtrribute(FieldSchema column, String displayString, TableReference reference) {
+    this(column, displayString, reference, null, null, null);
   }
 
-  public ReferencedDimension(FieldSchema column, TableReference reference,
-      Date startTime, Date endTime, Double cost) {
-    super(column, startTime, endTime, cost);
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
+      TableReference reference, Date startTime, Date endTime, Double cost) {
+    super(column, displayString, startTime, endTime, cost);
     this.references.add(reference);
   }
 
-  public ReferencedDimension(FieldSchema column,
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
       Collection<TableReference> references) {
-    this(column, references, null, null, null);
+    this(column, displayString, references, null, null, null);
   }
 
-  public ReferencedDimension(FieldSchema column,
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
       Collection<TableReference> references, Date startTime, Date endTime,
       Double cost) {
-    super(column, startTime, endTime, cost);
+    super(column, displayString, startTime, endTime, cost);
     this.references.addAll(references);
   }
 
@@ -80,7 +80,7 @@ public class ReferencedDimension extends BaseDimension {
    * @param name
    * @param props
    */
-  public ReferencedDimension(String name, Map<String, String> props) {
+  public ReferencedDimAtrribute(String name, Map<String, String> props) {
     super(name, props);
     String refListStr = props.get(MetastoreUtil.getDimensionSrcReferenceKey(
         getName()));
@@ -104,7 +104,7 @@ public class ReferencedDimension extends BaseDimension {
     if (!super.equals(obj)) {
       return false;
     }
-    ReferencedDimension other = (ReferencedDimension) obj;
+    ReferencedDimAtrribute other = (ReferencedDimAtrribute) obj;
     if (this.getReferences() == null) {
       if (other.getReferences() != null) {
         return false;

@@ -26,46 +26,51 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
-public final class ExprMeasure extends CubeMeasure {
-  private final String expr;
+public class BaseDimAttribute extends CubeDimAttribute {
+  private final String type;
 
-  public ExprMeasure(FieldSchema column, String expr, String formatString,
-      String aggregate, String unit) {
-    this(column, expr, formatString, aggregate, unit, null, null, null);
+  public BaseDimAttribute(FieldSchema column) {
+    this(column, null, null, null, null);
   }
 
-  public ExprMeasure(FieldSchema column, String expr, String formatString,
-      String aggregate, String unit, Date startTime, Date endTime, Double cost) {
-    super(column, formatString, aggregate, unit, startTime, endTime, cost);
-    this.expr = expr;
-    assert (expr != null);
+  public BaseDimAttribute(FieldSchema column, String displayString, Date startTime, Date endTime,
+      Double cost) {
+    super(column.getName(), column.getComment(), displayString, startTime, endTime, cost);
+    this.type = column.getType();
+    assert (type != null);
   }
 
-  public ExprMeasure(FieldSchema column, String expr) {
-    this(column, expr, null, null, null);
-  }
-
-  public ExprMeasure(String name, Map<String, String> props) {
-    super(name, props);
-    this.expr = props.get(MetastoreUtil.getMeasureExprPropertyKey(getName()));
-  }
-
-  public String getExpr() {
-    return expr;
+  public String getType() {
+    return type;
   }
 
   @Override
   public void addProperties(Map<String, String> props) {
     super.addProperties(props);
-    props.put(MetastoreUtil.getMeasureExprPropertyKey(getName()), expr);
+    props.put(MetastoreUtil.getDimTypePropertyKey(getName()), type);
+  }
+
+  /**
+   * This is used only for serializing
+   *
+   * @param name
+   * @param props
+   */
+  public BaseDimAttribute(String name, Map<String, String> props) {
+    super(name, props);
+    this.type = getDimType(name, props);
+  }
+
+  public static String getDimType(String name, Map<String, String> props) {
+    return props.get(MetastoreUtil.getDimTypePropertyKey(name));
   }
 
   @Override
   public int hashCode() {
     final int prime = 31;
     int result = super.hashCode();
-    result = prime * result + ((getExpr() == null) ? 0 :
-        getExpr().toLowerCase().hashCode());
+    result = prime * result + ((getType() == null) ? 0 :
+        getType().toLowerCase().hashCode());
     return result;
   }
 
@@ -74,12 +79,12 @@ public final class ExprMeasure extends CubeMeasure {
     if (!super.equals(obj)) {
       return false;
     }
-    ExprMeasure other = (ExprMeasure) obj;
-    if (this.getExpr() == null) {
-      if (other.getExpr() != null) {
+    BaseDimAttribute other = (BaseDimAttribute) obj;
+    if (this.getType() == null) {
+      if (other.getType() != null) {
         return false;
       }
-    } else if (!this.getExpr().equalsIgnoreCase(other.getExpr())) {
+    } else if (!this.getType().equalsIgnoreCase(other.getType())) {
       return false;
     }
     return true;
@@ -87,8 +92,7 @@ public final class ExprMeasure extends CubeMeasure {
 
   @Override
   public String toString() {
-    String str = super.toString();
-    str += "expr:" + expr;
+    String str = super.toString() + ":" + getType();
     return str;
   }
 }

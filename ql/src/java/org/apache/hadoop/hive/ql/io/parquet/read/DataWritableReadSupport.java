@@ -18,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.io.IOConstants;
 import org.apache.hadoop.hive.ql.io.parquet.convert.DataWritableRecordConverter;
@@ -46,6 +48,7 @@ public class DataWritableReadSupport extends ReadSupport<ArrayWritable> {
 
   private static final String TABLE_SCHEMA = "table_schema";
   public static final String HIVE_SCHEMA_KEY = "HIVE_TABLE_SCHEMA";
+  protected static final Log LOG = LogFactory.getLog(DataWritableReadSupport.class);
 
   /**
    * From a string which columns names (including hive column), return a list
@@ -93,7 +96,9 @@ public class DataWritableReadSupport extends ReadSupport<ArrayWritable> {
 
       final List<Type> typeListWanted = new ArrayList<Type>();
       for (final Integer idx : indexColumnsWanted) {
-        typeListWanted.add(tableSchema.getType(listColumns.get(idx)));
+        if(idx < listColumns.size()) {
+          typeListWanted.add(tableSchema.getType(listColumns.get(idx)));
+        }
       }
       requestedSchemaByUser = new MessageType(fileSchema.getName(), typeListWanted);
 

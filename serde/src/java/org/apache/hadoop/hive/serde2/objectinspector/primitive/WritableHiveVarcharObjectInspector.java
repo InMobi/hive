@@ -97,14 +97,18 @@ implements SettableHiveVarcharObjectInspector {
   @Override
   public Object set(Object o, HiveVarchar value) {
     HiveVarcharWritable writable = (HiveVarcharWritable)o;
-    writable.set(value, getMaxLength());
+    if (value != null) {
+      writable.set(value, getMaxLength());
+    }
     return o;
   }
 
   @Override
   public Object set(Object o, String value) {
     HiveVarcharWritable writable = (HiveVarcharWritable)o;
-    writable.set(value, getMaxLength());
+    if (value != null) {
+      writable.set(value, getMaxLength());
+    }
     return o;
   }
 

@@ -22,6 +22,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,9 +32,16 @@ import java.util.Set;
 import junit.framework.Assert;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
+import org.junit.Before;
 import org.junit.Test;
 
 public class TestStorageUtil {
+
+  @Before
+  public void setup() {
+    CubeTestSetup.init();
+  }
 
   @Test
   public void testMinimalAnsweringTables() {
@@ -69,9 +77,9 @@ public class TestStorageUtil {
     // {s1,s2,s3}, {s3}, {s3} -> {s3}
     List<FactPartition> answeringParts =
         new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s123));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s3));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s3));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY, null, null, s123));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null, s3));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s3));
     Map<String, Set<FactPartition>> result = new HashMap<String, Set<FactPartition>>();
     boolean mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -79,16 +87,16 @@ public class TestStorageUtil {
     Assert.assertEquals("S3", result.keySet().iterator().next());
     Set<FactPartition> coveredParts = result.get("S3");
     Assert.assertEquals(3, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts, "month"));
-    Assert.assertTrue(contains(coveredParts, "day"));
-    Assert.assertTrue(contains(coveredParts, "hour"));
+    Assert.assertTrue(contains(coveredParts, CubeTestSetup.twoMonthsBack));
+    Assert.assertTrue(contains(coveredParts, CubeTestSetup.twodaysBack));
+    Assert.assertTrue(contains(coveredParts, CubeTestSetup.now));
     Assert.assertTrue(mts);
 
     // {s1,s2,s3}, {s4}, {s5} - > {s1,s4,s5} or {s2,s4,s5} or {s3,s4,s5}
     answeringParts = new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s123));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s4));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s5));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY,  null, null, s123));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack, UpdatePeriod.DAILY, null, null, s4));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s5));
     result = new HashMap<String, Set<FactPartition>>();
     mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -99,10 +107,10 @@ public class TestStorageUtil {
         result.keySet().contains("S2") || result.keySet().contains("S3"));
     coveredParts = result.get("S4");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"day"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
     coveredParts = result.get("S5");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"hour"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
     coveredParts = result.get("S1");
     if (coveredParts == null) {
       coveredParts = result.get("S2");
@@ -111,14 +119,14 @@ public class TestStorageUtil {
       coveredParts = result.get("S3");
     }
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"month"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
     Assert.assertTrue(mts);
 
     // {s1}, {s2}, {s3} -> {s1,s2,s3}
     answeringParts = new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s1));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s2));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s3));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY,  null, null, s1));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null, s2));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s3));
     result = new HashMap<String, Set<FactPartition>>();
     mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -128,20 +136,20 @@ public class TestStorageUtil {
     Assert.assertTrue(result.keySet().contains("S3"));
     coveredParts = result.get("S1");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"month"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
     coveredParts = result.get("S2");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"day"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
     coveredParts = result.get("S3");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"hour"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
     Assert.assertTrue(mts);
 
     // {s1, s2}, {s2, s3}, {s4} -> {s2,s4}
     answeringParts = new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s23));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s4));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY,  null, null, s12));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null, s23));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s4));
     result = new HashMap<String, Set<FactPartition>>();
     mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -150,18 +158,18 @@ public class TestStorageUtil {
     Assert.assertTrue(result.keySet().contains("S4"));
     coveredParts = result.get("S2");
     Assert.assertEquals(2, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"month"));
-    Assert.assertTrue(contains(coveredParts,"day"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
     coveredParts = result.get("S4");
     Assert.assertEquals(1, coveredParts.size());
-    Assert.assertTrue(contains(coveredParts,"hour"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
     Assert.assertTrue(mts);
 
     // {s1, s2}, {s2, s4}, {s4} -> {s1,s4} or {s2,s4}
     answeringParts = new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s24));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s4));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY,  null, null, s12));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null, s24));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s4));
     result = new HashMap<String, Set<FactPartition>>();
     mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -172,33 +180,33 @@ public class TestStorageUtil {
     if (coveredParts == null) {
       coveredParts = result.get("S2");
       Assert.assertTrue(coveredParts.size() >= 1);
-      Assert.assertTrue(contains(coveredParts,"month"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
       if (coveredParts.size() == 2) {
-        Assert.assertTrue(contains(coveredParts,"day"));
+        Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
         Assert.assertEquals(1, result.get("S4").size());
       }
       coveredParts = result.get("S4");
       Assert.assertTrue(coveredParts.size() >= 1);
-      Assert.assertTrue(contains(coveredParts,"hour"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
       if (coveredParts.size() == 2) {
-        Assert.assertTrue(contains(coveredParts,"day"));
+        Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
         Assert.assertEquals(1, result.get("S2").size());
       }
     } else {
       Assert.assertEquals(1, coveredParts.size());
-      Assert.assertTrue(contains(coveredParts,"month"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
       coveredParts = result.get("S4");
       Assert.assertTrue(coveredParts.size() >= 1);
-      Assert.assertTrue(contains(coveredParts,"hour"));
-      Assert.assertTrue(contains(coveredParts,"day"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
     }
     Assert.assertFalse(mts);
 
     // {s1, s2}, {s2, s3}, {s3,s4} -> {s2,s3}
     answeringParts = new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s23));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s34));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY,  null, null, s12));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null, s23));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s34));
     result = new HashMap<String, Set<FactPartition>>();
     mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -207,25 +215,25 @@ public class TestStorageUtil {
     Assert.assertTrue(result.keySet().contains("S3"));
     coveredParts = result.get("S2");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(contains(coveredParts,"month"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(contains(coveredParts,"day"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
       Assert.assertEquals(1, result.get("S3").size());
     }
     coveredParts = result.get("S3");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(contains(coveredParts,"hour"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(contains(coveredParts,"day"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
       Assert.assertEquals(1, result.get("S2").size());
     }
     Assert.assertFalse(mts);
 
     // {s1, s2}, {s2}, {s1} -> {s1,s2}
     answeringParts = new ArrayList<FactPartition>();
-    answeringParts.add(new FactPartition("dt", "month", null, null, s12));
-    answeringParts.add(new FactPartition("dt", "day", null, null, s2));
-    answeringParts.add(new FactPartition("dt", "hour", null, null, s1));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twoMonthsBack, UpdatePeriod.MONTHLY,  null, null, s12));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.twodaysBack,UpdatePeriod.DAILY, null, null, s2));
+    answeringParts.add(new FactPartition("dt", CubeTestSetup.now, UpdatePeriod.HOURLY, null, null, s1));
     result = new HashMap<String, Set<FactPartition>>();
     mts = StorageUtil.getMinimalAnsweringTables(answeringParts, result);
     System.out.println("results:" + result);
@@ -234,24 +242,24 @@ public class TestStorageUtil {
     Assert.assertTrue(result.keySet().contains("S2"));
     coveredParts = result.get("S2");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(contains(coveredParts,"day"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.twodaysBack));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(contains(coveredParts,"month"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
       Assert.assertEquals(1, result.get("S1").size());
     }
     coveredParts = result.get("S1");
     Assert.assertTrue(coveredParts.size() >= 1);
-    Assert.assertTrue(contains(coveredParts,"hour"));
+    Assert.assertTrue(contains(coveredParts,CubeTestSetup.now));
     if (coveredParts.size() == 2) {
-      Assert.assertTrue(contains(coveredParts,"month"));
+      Assert.assertTrue(contains(coveredParts,CubeTestSetup.twoMonthsBack));
       Assert.assertEquals(1, result.get("S2").size());
     }
     Assert.assertFalse(mts);
   }
 
-  private boolean contains(Set<FactPartition> parts, String partSpec) {
+  private boolean contains(Set<FactPartition> parts, Date partSpec) {
     for (FactPartition part : parts) {
-      if (part.partSpec.equals(partSpec)) {
+      if (part.getPartSpec().equals(partSpec)) {
         return true;
       }
     }

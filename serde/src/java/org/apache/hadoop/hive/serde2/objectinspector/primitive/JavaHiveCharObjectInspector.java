@@ -18,6 +18,7 @@
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
 import org.apache.hadoop.hive.common.type.HiveChar;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
 import org.apache.hadoop.hive.serde2.typeinfo.BaseCharUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
@@ -37,6 +38,9 @@ public class JavaHiveCharObjectInspector extends AbstractPrimitiveJavaObjectInsp
     if (o == null) {
       return null;
     }
+    if (o instanceof String) {
+      return new HiveChar((String)o, getMaxLength());
+    }
     HiveChar value = (HiveChar) o;
     if (BaseCharUtils.doesPrimitiveMatchTypeParams(value, (CharTypeInfo) typeInfo)) {
       return value;
@@ -49,7 +53,13 @@ public class JavaHiveCharObjectInspector extends AbstractPrimitiveJavaObjectInsp
     if (o == null) {
       return null;
     }
-    return getWritableWithParams((HiveChar) o);
+    HiveChar var;
+    if (o instanceof String) {
+      var= new HiveChar((String)o, getMaxLength());
+    } else {
+      var = (HiveChar)o;
+    }
+    return getWritableWithParams(var);
   }
 
   private HiveChar getPrimitiveWithParams(HiveChar val) {
@@ -64,12 +74,18 @@ public class JavaHiveCharObjectInspector extends AbstractPrimitiveJavaObjectInsp
   }
 
   public Object set(Object o, HiveChar value) {
+    if (value == null) {
+      return null;
+    }
     HiveChar setValue = (HiveChar) o;
     setValue.setValue(value, getMaxLength());
     return setValue;
   }
 
   public Object set(Object o, String value) {
+    if (value == null) {
+      return null;
+    }
     HiveChar setValue = (HiveChar) o;
     setValue.setValue(value, getMaxLength());
     return setValue;

@@ -20,47 +20,45 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  *
 */
 
-
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
-public class Cube extends AbstractCubeTable implements CubeInterface {
+public class Cube extends AbstractBaseTable implements CubeInterface {
   private final Set<CubeMeasure> measures;
-  private final Set<CubeDimension> dimensions;
-  private static final List<FieldSchema> columns = new ArrayList<FieldSchema>();
+  private final Set<CubeDimAttribute> dimensions;
   private final Map<String, CubeMeasure> measureMap;
-  private final Map<String, CubeDimension> dimMap;
-
-  static {
-    columns.add(new FieldSchema("dummy", "string", "dummy column"));
-  }
+  private final Map<String, CubeDimAttribute> dimMap;
 
   public Cube(String name, Set<CubeMeasure> measures,
-      Set<CubeDimension> dimensions) {
+      Set<CubeDimAttribute> dimensions) {
     this(name, measures, dimensions, new HashMap<String, String>());
   }
 
   public Cube(String name, Set<CubeMeasure> measures,
-      Set<CubeDimension> dimensions, Map<String, String> properties) {
+      Set<CubeDimAttribute> dimensions, Map<String, String> properties) {
     this(name, measures, dimensions, properties, 0L);
   }
 
   public Cube(String name, Set<CubeMeasure> measures,
-      Set<CubeDimension> dimensions, Map<String, String> properties,
+      Set<CubeDimAttribute> dimensions, Map<String, String> properties,
       double weight) {
-    super(name, columns, properties, weight);
+    this(name, measures, dimensions, null, properties, weight);
+  }
+
+  public Cube(String name, Set<CubeMeasure> measures,
+      Set<CubeDimAttribute> dimensions, Set<ExprColumn> expressions,
+      Map<String, String> properties,
+      double weight) {
+    super(name, expressions, properties, weight);
     this.measures = measures;
     this.dimensions = dimensions;
 
@@ -69,13 +67,14 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
       measureMap.put(m.getName().toLowerCase(), m);
     }
 
-    dimMap = new HashMap<String, CubeDimension>();
-    for (CubeDimension dim : dimensions) {
+    dimMap = new HashMap<String, CubeDimAttribute>();
+    for (CubeDimAttribute dim : dimensions) {
       dimMap.put(dim.getName().toLowerCase(), dim);
     }
 
     addProperties();
   }
+
   public Cube(Table tbl) {
     super(tbl);
     this.measures = getMeasures(getName(), getProperties());
@@ -85,16 +84,16 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
       measureMap.put(m.getName().toLowerCase(), m);
     }
 
-    dimMap = new HashMap<String, CubeDimension>();
-    for (CubeDimension dim : dimensions) {
+    dimMap = new HashMap<String, CubeDimAttribute>();
+    for (CubeDimAttribute dim : dimensions) {
       addAllDimsToMap(dim);
     }
   }
 
-  private void addAllDimsToMap(CubeDimension dim) {
+  private void addAllDimsToMap(CubeDimAttribute dim) {
     dimMap.put(dim.getName().toLowerCase(), dim);
-    if (dim instanceof HierarchicalDimension) {
-      for (CubeDimension d : ((HierarchicalDimension)dim).getHierarchy()) {
+    if (dim instanceof HierarchicalDimAttribute) {
+      for (CubeDimAttribute d : ((HierarchicalDimAttribute)dim).getHierarchy()) {
         addAllDimsToMap(d);
       }
     }
@@ -103,29 +102,23 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
     return measures;
   }
 
-  public Set<CubeDimension> getDimensions() {
+  public Set<CubeDimAttribute> getDimAttributes() {
     return dimensions;
   }
 
   public Set<String> getTimedDimensions() {
     String str = getProperties().get(
         MetastoreUtil.getCubeTimedDimensionListKey(getName()));
+    Set<String> timedDimensions = new HashSet<String>();
     if (str != null) {
-      Set<String> timedDimensions = new HashSet<String>();
       timedDimensions.addAll(Arrays.asList(StringUtils.split(str, ',')));
-      return timedDimensions;
     }
-    return null;
+    return timedDimensions;
   }
 
   @Override
   public CubeTableType getTableType() {
     return CubeTableType.CUBE;
-  }
-
-  @Override
-  public Set<String> getStorages() {
-    return null;
   }
 
   @Override
@@ -147,8 +140,8 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   }
 
   private static void setDimensionProperties(Map<String, String> props,
-                                             Set<CubeDimension> dimensions) {
-    for (CubeDimension dimension : dimensions) {
+                                             Set<CubeDimAttribute> dimensions) {
+    for (CubeDimAttribute dimension : dimensions) {
       dimension.addProperties(props);
     }
   }
@@ -176,20 +169,20 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
     return measures;
   }
 
-  public static Set<CubeDimension> getDimensions(String name,
+  public static Set<CubeDimAttribute> getDimensions(String name,
       Map<String, String> props) {
-    Set<CubeDimension> dimensions = new HashSet<CubeDimension>();
+    Set<CubeDimAttribute> dimensions = new HashSet<CubeDimAttribute>();
     String dimStr = props.get(MetastoreUtil.getCubeDimensionListKey(name));
     String[] names = dimStr.split(",");
     for (String dimName : names) {
       String className = props.get(MetastoreUtil.getDimensionClassPropertyKey(
           dimName));
-      CubeDimension dim;
+      CubeDimAttribute dim;
       try {
         Class<?> clazz = Class.forName(className);
         Constructor<?> constructor;
         constructor = clazz.getConstructor(String.class, Map.class);
-        dim = (CubeDimension) constructor.newInstance(new Object[]
+        dim = (CubeDimAttribute) constructor.newInstance(new Object[]
             {dimName, props});
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid dimension", e);
@@ -212,17 +205,17 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
     } else if (!this.getMeasures().equals(other.getMeasures())) {
       return false;
     }
-    if (this.getDimensions() == null) {
-      if (other.getDimensions() != null) {
+    if (this.getDimAttributes() == null) {
+      if (other.getDimAttributes() != null) {
         return false;
       }
-    } else if (!this.getDimensions().equals(other.getDimensions())) {
+    } else if (!this.getDimAttributes().equals(other.getDimAttributes())) {
       return false;
     }
     return true;
   }
 
-  public CubeDimension getDimensionByName(String dimension) {
+  public CubeDimAttribute getDimAttributeByName(String dimension) {
     return dimMap.get(dimension == null ? dimension : dimension.toLowerCase());
   }
 
@@ -231,9 +224,12 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   }
 
   public CubeColumn getColumnByName(String column) {
-    CubeColumn cubeCol = (CubeColumn)getMeasureByName(column);
+    CubeColumn cubeCol = (CubeColumn)super.getExpressionByName(column);
     if (cubeCol == null) {
-      cubeCol = (CubeColumn)getDimensionByName(column);
+      cubeCol = (CubeColumn)getMeasureByName(column);
+      if (cubeCol == null) {
+        cubeCol = (CubeColumn)getDimAttributeByName(column);
+      }
     }
     return cubeCol;
   }
@@ -269,15 +265,15 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
    * @param dimension
    * @throws HiveException
    */
-  public void alterDimension(CubeDimension dimension) throws HiveException {
+  public void alterDimension(CubeDimAttribute dimension) throws HiveException {
     if (dimension == null) {
       throw new NullPointerException("Cannot add null dimension");
     }
 
     // Replace dimension if already existing
     if (dimMap.containsKey(dimension.getName().toLowerCase())) {
-      dimensions.remove(getDimensionByName(dimension.getName()));
-      LOG.info("Replacing dimension " + getDimensionByName(dimension.getName())
+      dimensions.remove(getDimAttributeByName(dimension.getName()));
+      LOG.info("Replacing dimension " + getDimAttributeByName(dimension.getName())
         + " with " + dimension);
     }
 
@@ -295,8 +291,8 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
    */
   public void removeDimension(String dimName) {
     if (dimMap.containsKey(dimName.toLowerCase())) {
-      LOG.info("Removing dimension " + getDimensionByName(dimName));
-      dimensions.remove(getDimensionByName(dimName));
+      LOG.info("Removing dimension " + getDimAttributeByName(dimName));
+      dimensions.remove(getDimAttributeByName(dimName));
       dimMap.remove(dimName.toLowerCase());
       getProperties().put(MetastoreUtil.getCubeDimensionListKey(getName()),
           MetastoreUtil.getNamedStr(dimensions));
@@ -378,9 +374,9 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
   }
 
   @Override
-  public Set<String> getDimensionNames() {
+  public Set<String> getDimAttributeNames() {
     Set<String> dimNames = new HashSet<String>();
-    for (CubeDimension f : getDimensions()) {
+    for (CubeDimAttribute f : getDimAttributes()) {
       MetastoreUtil.addColumnNames(f, dimNames);
     }
     return dimNames;
@@ -393,5 +389,14 @@ public class Cube extends AbstractCubeTable implements CubeInterface {
       return Boolean.parseBoolean(canbeQueried);
     }
     return true;
+  }
+
+  @Override
+  public Set<String> getAllFieldNames() {
+    Set<String> fieldNames = super.getAllFieldNames();
+    fieldNames.addAll(getMeasureNames());
+    fieldNames.addAll(getDimAttributeNames());
+    fieldNames.addAll(getTimedDimensions());
+    return fieldNames;
   }
 }

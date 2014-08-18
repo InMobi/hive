@@ -1,4 +1,4 @@
-package org.apache.hadoop.hive.ql.cube.metadata;
+package org.apache.hadoop.hive.ql.cube.parse;
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -20,11 +20,27 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  *
 */
 
+import java.util.Iterator;
+import java.util.Set;
 
-public enum CubeTableType {
-  CUBE,
-  DIMENSION,
-  FACT,
-  DIM_TABLE,
-  STORAGE
+public class ORTimeRangeWriter implements TimeRangeWriter {
+
+  @Override
+  public String getTimeRangeWhereClause(String tableName,
+      Set<FactPartition> rangeParts) {
+    if (rangeParts.size() == 0) {
+      return "";
+    }
+    StringBuilder partStr = new StringBuilder();
+    Iterator<FactPartition> it = rangeParts.iterator();
+    while (it.hasNext()) {
+      partStr.append("(");
+      partStr.append(it.next().getFormattedFilter(tableName));
+      partStr.append(")");
+      if (it.hasNext()) {
+        partStr.append(" OR ");
+      }
+    }
+    return partStr.toString();
+  }
 }

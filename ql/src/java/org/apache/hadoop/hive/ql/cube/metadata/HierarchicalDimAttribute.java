@@ -28,17 +28,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class HierarchicalDimension extends CubeDimension {
-  private final List<CubeDimension> hierarchy;
+public class HierarchicalDimAttribute extends CubeDimAttribute {
+  private final List<CubeDimAttribute> hierarchy;
 
-  public HierarchicalDimension(String name, List<CubeDimension> hierarchy) {
-    super(name);
+  public HierarchicalDimAttribute(String name, String description,
+      List<CubeDimAttribute> hierarchy) {
+    super(name, description);
     this.hierarchy = hierarchy;
     assert (name != null);
     assert (hierarchy != null);
   }
 
-  public List<CubeDimension> getHierarchy() {
+  public List<CubeDimAttribute> getHierarchy() {
     return hierarchy;
   }
 
@@ -46,23 +47,23 @@ public class HierarchicalDimension extends CubeDimension {
   public void addProperties(Map<String, String> props) {
     super.addProperties(props);
     for (int i = 0; i < hierarchy.size(); i++) {
-      CubeDimension dim = hierarchy.get(i);
+      CubeDimAttribute dim = hierarchy.get(i);
       props.put(MetastoreUtil.getHierachyElementKeyName(getName(), i),
           getHierarchyElement(dim));
       dim.addProperties(props);
     }
   }
 
-  public static String getHierarchyElement(CubeDimension dim) {
+  public static String getHierarchyElement(CubeDimAttribute dim) {
     return dim.getName() + "," + dim.getClass().getCanonicalName();
   }
 
-  public HierarchicalDimension(String name, Map<String, String> props) {
+  public HierarchicalDimAttribute(String name, Map<String, String> props) {
     super(name, props);
     this.hierarchy = getHiearachy(name, props);
   }
 
-  public static List<CubeDimension> getHiearachy(String name,
+  public static List<CubeDimAttribute> getHiearachy(String name,
       Map<String, String> props) {
     Map<Integer, String> hierarchyElements = new HashMap<Integer, String>();
     for (String param : props.keySet()) {
@@ -71,19 +72,19 @@ public class HierarchicalDimension extends CubeDimension {
             props.get(param));
       }
     }
-    List<CubeDimension> hierarchy = new ArrayList<CubeDimension>(
+    List<CubeDimAttribute> hierarchy = new ArrayList<CubeDimAttribute>(
         hierarchyElements.size());
     for (int i = 0; i < hierarchyElements.size(); i++) {
       String hierarchyElement = hierarchyElements.get(i);
       String[] elements = hierarchyElement.split(",");
       String dimName = elements[0];
       String className = elements[1];
-      CubeDimension dim;
+      CubeDimAttribute dim;
       try {
         Class<?> clazz = Class.forName(className);
         Constructor<?> constructor;
         constructor = clazz.getConstructor(String.class, Map.class);
-        dim = (CubeDimension) constructor.newInstance(new Object[]
+        dim = (CubeDimAttribute) constructor.newInstance(new Object[]
         {dimName, props});
       } catch (ClassNotFoundException e) {
         throw new IllegalArgumentException("Invalid Dimension", e);
@@ -119,7 +120,7 @@ public class HierarchicalDimension extends CubeDimension {
     if (!super.equals(obj)) {
       return false;
     }
-    HierarchicalDimension other = (HierarchicalDimension) obj;
+    HierarchicalDimAttribute other = (HierarchicalDimAttribute) obj;
     if (this.getHierarchy() == null) {
       if (other.getHierarchy() != null) {
         return false;

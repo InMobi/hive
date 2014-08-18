@@ -26,6 +26,9 @@ public interface MetastoreConstants {
   public static final String CUBE_TABLE_PFX = "cube.table.";
   public static final String WEIGHT_KEY_SFX = ".weight";
 
+  public static final String BASE_KEY_PFX = "base.";
+  public static final String EXPRESSIONS_LIST_SFX = ".expressions.list";
+
   // Cube constants
   public static final String CUBE_KEY_PFX = "cube.";
   public static final String MEASURES_LIST_SFX = ".measures.list";
@@ -34,6 +37,11 @@ public interface MetastoreConstants {
   public static final String PARENT_CUBE_SFX = ".parent.cube";
   public static final String CUBE_CAN_BE_QUERIED = "cube.can.be.queried";
 
+  // Uber dimension constants
+  public static final String DIMENSION_PFX = "dimension.";
+  public static final String ATTRIBUTES_LIST_SFX = ".attributes.list";
+  public static final String TIMED_DIMENSION_SFX = ".timed.dimension";
+
   // fact constants
   public static final String FACT_KEY_PFX = "cube.fact.";
   public static final String UPDATE_PERIOD_SFX = ".updateperiods";
@@ -41,12 +49,20 @@ public interface MetastoreConstants {
   public static final String VALID_COLUMNS_SFX = ".valid.columns";
   public static final String FACT_AGGREGATED_PROPERTY = "cube.fact.is.aggregated";
 
+  // dim table constants
+  public static final String DIM_TBL_PFX = "dimtble.";
+  public static final String DUMP_PERIOD_SFX = ".dumpperiod";
+  public static final String STORAGE_LIST_SFX = ".storages";
+  public static final String DIM_NAME_SFX = ".dim.name";
+
   // column constants
   public static final String COL_PFX = "cube.col.";
   public static final String TYPE_SFX = ".type";
   public static final String START_TIME_SFX = ".starttime";
   public static final String END_TIME_SFX = ".endtime";
   public static final String COST_SFX = ".cost";
+  public static final String DESC_SFX = ".description";
+  public static final String DISPLAY_SFX = ".displaystring";
 
   // measure constants
   public static final String MEASURE_KEY_PFX = "cube.measure.";
@@ -63,10 +79,7 @@ public interface MetastoreConstants {
   public static final String INLINE_VALUES_SFX = ".inline.values";
   public static final String HIERARCHY_SFX = ".hierarchy.";
   public static final String CLASS_SFX = ".class";
-  public static final String DUMP_PERIOD_SFX = ".dumpperiod";
-  public static final String STORAGE_LIST_SFX = ".storages";
   public static final String METASTORE_ENABLE_CACHING = "cube.metastore.enable.cache";
-  public static final String TIMED_DIMENSION = "cube.dimensiontable.timed.dimension";
 
   // storage constants
   public static final String STORAGE_ENTITY_PFX = "storage.";

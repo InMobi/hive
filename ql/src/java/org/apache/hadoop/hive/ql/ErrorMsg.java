@@ -407,7 +407,7 @@ public enum ErrorMsg {
 
   // Cube query semantic analysis errors, starting from 15000 //
   CREATE_NOT_ALLOWED(15000, "Create table/view is not allowed in cube query"),
-  MORE_THAN_ONE_CUBE(15001, "More than one cube accessed in query"),
+  MORE_THAN_ONE_CUBE(15001, "More than one cube accessed in query : {0} and {1}", true),
   NEITHER_CUBE_NOR_DIMENSION(15002, "Neither cube nor dimensions accessed in the query"),
   NO_TIMERANGE_FILTER(15003, "No timerange filter specified"),
   NOT_A_TIMED_DIMENSION(15004, "{0} is not timed dimension", true),
@@ -429,10 +429,13 @@ public enum ErrorMsg {
   FROM_AFTER_TO(15020, "From date: {0} is after to date: {1}", true),
   NO_JOIN_PATH(15021, "No join path from {0} to {1}", true),
   JOIN_TARGET_NOT_CUBE_TABLE(15022, "Join target table {0} is neither dimension nor cube", true),
-  NO_FACT_HAS_COLUMN(15023, "No fact table has the queried column"),
+  NO_FACT_HAS_COLUMN(15023, "No fact table has the queried columns : {0}", true),
   NO_CANDIDATE_DIM_STORAGE_TABLES(15024, "No candidate dimension storage tables for dimension because {0}", true),
   CUBE_NOT_QUERYABLE(15025, "Cube {0} cannot be queried", true),
-  
+  NO_DIM_HAS_COLUMN(15026, "No dimension table has the queried columns for {0}, columns: {1}", true),
+  NO_CANDIDATE_DIM_AVAILABLE(15027, "No candidate dimension table available for {0} to answer the query, because {1}", true),
+  CANNOT_USE_TIMERANGE_WRITER(15028, "Configured timerange writer cannot be used. Reason {0}", true),
+
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),
   SCRIPT_IO_ERROR(20001, "An error occurred while reading or writing to your custom script. "

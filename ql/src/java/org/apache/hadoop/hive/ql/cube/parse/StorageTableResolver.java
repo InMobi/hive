@@ -20,8 +20,8 @@ package org.apache.hadoop.hive.ql.cube.parse;
  *
 */
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -41,21 +41,22 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMetastoreClient;
 import org.apache.hadoop.hive.ql.cube.metadata.MetastoreUtil;
 import org.apache.hadoop.hive.ql.cube.metadata.StorageConstants;
+import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipStorageCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipUpdatePeriodCause;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.hadoop.util.ReflectionUtils;
 
 public class StorageTableResolver implements ContextRewriter {
   private static Log LOG = LogFactory.getLog(
@@ -70,15 +71,12 @@ public class StorageTableResolver implements ContextRewriter {
   private final Map<CubeFactTable, Map<UpdatePeriod, Set<String>>>
   validStorageMap =
   new HashMap<CubeFactTable, Map<UpdatePeriod, Set<String>>>();
-  private final Map<CubeDimensionTable, List<String>> dimStorageMap =
-      new HashMap<CubeDimensionTable, List<String>>();
-  private final Map<String, String> dimStorageTableToWhereClause =
-      new HashMap<String, String>();
   private String processTimePartCol = null;
   private final UpdatePeriod maxInterval;
   private final boolean populateNonExistingParts;
   private final Map<String, List<String>> nonExistingPartitions = new HashMap<String, List<String>>();
-  private CubeQueryContext cubeql;
+  private TimeRangeWriter rangeWriter;
+  private DateFormat partWhereClauseFormat = null;
 
   public StorageTableResolver(Configuration conf) {
     this.conf = conf;
@@ -102,6 +100,14 @@ public class StorageTableResolver implements ContextRewriter {
       this.maxInterval = UpdatePeriod.valueOf(maxIntervalStr);
     } else {
       this.maxInterval = null;
+    }
+    rangeWriter = ReflectionUtils.newInstance(
+    conf.getClass(CubeQueryConfUtil.TIME_RANGE_WRITER_CLASS,
+        CubeQueryConfUtil.DEFAULT_TIME_RANGE_WRITER, TimeRangeWriter.class),
+        this.conf);
+    String formatStr = conf.get(CubeQueryConfUtil.PART_WHERE_CLAUSE_DATE_FORMAT);
+    if (formatStr != null) {
+      partWhereClauseFormat = new SimpleDateFormat(formatStr);
     }
   }
 
@@ -127,7 +133,6 @@ public class StorageTableResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
-    this.cubeql = cubeql;
     client = cubeql.getMetastoreClient();
 
     if (!cubeql.getCandidateFactTables().isEmpty()) {
@@ -138,112 +143,102 @@ public class StorageTableResolver implements ContextRewriter {
     }
     // resolve dimension tables
     resolveDimStorageTablesAndPartitions(cubeql);
-    cubeql.setDimStorageMap(dimStorageMap);
-
-    // set storage to whereclause
-    cubeql.setStorageTableToWhereClause(dimStorageTableToWhereClause);
     cubeql.setNonexistingParts(nonExistingPartitions);
   }
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)
       throws SemanticException {
-    Set<CubeDimensionTable> dimsToResolve = new HashSet<CubeDimensionTable>(cubeql.getDimensionTables());
-    dimsToResolve.addAll(cubeql.getAutoJoinDimensions());
-    dimsToResolve.addAll(cubeql.getDimensionTables());
-    for (CubeDimensionTable dim : dimsToResolve) {
-      boolean foundPart = false;
-      Map<String, SkipStorageCause> skipStorageCauses = 
-          new HashMap<String, SkipStorageCause>();
-      for (String storage : dim.getStorages()) {
-        if (isStorageSupported(storage)) {
-          String tableName = MetastoreUtil.getDimStorageTableName(
-              dim.getName(), storage).toLowerCase();
-          try {
-            if (!client.tableExists(tableName)) {
-              LOG.info("Not considering the dim storage table:" + tableName
-                  + ", as it does not exist");
-              skipStorageCauses.put(tableName, SkipStorageCause.TABLE_NOT_EXIST);
-              continue;
-            }
-          } catch (HiveException e) {
-            throw new SemanticException(e);
-          }
-          if (validDimTables != null && !validDimTables.contains(tableName)) {
-            LOG.info("Not considering the dim storage table:" + tableName
-                + " as it is not a valid dim storage");
-            skipStorageCauses.put(tableName, SkipStorageCause.INVALID);
-            continue;
-          }
-          List<String> storageTables = dimStorageMap.get(dim);
-          if (storageTables == null) {
-            storageTables = new ArrayList<String>();
-            dimStorageMap.put(dim, storageTables);
-          }
-          
-          if (dim.hasStorageSnapshots(storage)) {
-            // check if partition exists
-            int numParts;
-            try {
-              numParts = client.getNumPartitionsByFilter(
-                  tableName, getDimFilter(
-                      dim.getTimedDimension(), StorageConstants.LATEST_PARTITION_VALUE));
-            } catch (Exception e) {
-              e.printStackTrace();
-              throw new SemanticException("Could not check if partition exists on " + dim, e);
-            }
-            if (numParts > 0) {
-              LOG.info("Adding existing partition" + StorageConstants.LATEST_PARTITION_VALUE);
-              foundPart = true;
-            } else {
-              LOG.info("Partition " + StorageConstants.LATEST_PARTITION_VALUE
-                  + " does not exist on " + tableName);
-            }
-            if (!failOnPartialData || (failOnPartialData && numParts > 0)) {
-              storageTables.add(tableName);
-              dimStorageTableToWhereClause.put(tableName,
-                  StorageUtil.getWherePartClause(dim.getTimedDimension(),
-                      cubeql.getAliasForTabName(dim.getName()),
-                      StorageConstants.getPartitionsForLatest()));
-            } else {
-              LOG.info("Not considering the dim storage table:" + tableName
-                 + " as no dim partition exists");
-              skipStorageCauses.put(tableName, SkipStorageCause.NO_PARTITIONS);
-            }
-          } else {
-            storageTables.add(tableName);
-            foundPart = true;
-          }
-        } else {
-          LOG.info("Storage:" + storage + " is not supported");
-          skipStorageCauses.put(storage, SkipStorageCause.UNSUPPORTED);
+    for (Dimension dim : cubeql.getDimensions()) {
+      Set<CandidateDim> dimTables = cubeql.getCandidateDimTables().get(dim);
+      for (Iterator<CandidateDim> i = dimTables.iterator(); i.hasNext();) {
+        CandidateDim candidate = i.next();
+        CubeDimensionTable dimtable = candidate.dimtable;
+        if (dimtable.getStorages().isEmpty()) {
+          cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
+              dimtable.getName(), CubeTableCause.MISSING_STORAGES));
+          i.remove();
+          continue;
         }
-      }
-      if (dimStorageMap.get(dim) == null || dimStorageMap.get(dim).isEmpty()) {
-        String reason = "";
-        CandidateTablePruneCause cause = new CandidateTablePruneCause(
-            dim.getName(), skipStorageCauses);
-        ByteArrayOutputStream out = null;
-        try {
-          ObjectMapper mapper = new ObjectMapper();
-          out = new ByteArrayOutputStream();
-          mapper.writeValue(out, cause);
-          reason = out.toString("UTF-8");
-        } catch (Exception e) {
-          throw new SemanticException("Error writing non dim storage causes", e);
-        } finally {
-          if (out != null) {
+        Set<String> storageTables = new HashSet<String>();
+        Map<String, String> whereClauses = new HashMap<String, String>();
+        boolean foundPart = false;
+        Map<String, SkipStorageCause> skipStorageCauses = 
+            new HashMap<String, SkipStorageCause>();
+        for (String storage : dimtable.getStorages()) {
+          if (isStorageSupported(storage)) {
+            String tableName = MetastoreUtil.getDimStorageTableName(
+                dimtable.getName(), storage).toLowerCase();
             try {
-              out.close();
-            } catch (IOException e) {
+              if (!client.tableExists(tableName)) {
+                LOG.info("Not considering dim storage table:" + tableName
+                    + ", as it does not exist");
+                skipStorageCauses.put(tableName, SkipStorageCause.TABLE_NOT_EXIST);
+                continue;
+              }
+            } catch (HiveException e) {
               throw new SemanticException(e);
             }
+            if (validDimTables != null && !validDimTables.contains(tableName)) {
+              LOG.info("Not considering dim storage table:" + tableName
+                  + " as it is not a valid dim storage");
+              skipStorageCauses.put(tableName, SkipStorageCause.INVALID);
+              continue;
+            }
+
+            if (dimtable.hasStorageSnapshots(storage)) {
+              // check if partition exists
+              int numParts;
+              try {
+                numParts = client.getNumPartitionsByFilter(
+                    tableName, getDimFilter(
+                        dim.getTimedDimension(), StorageConstants.LATEST_PARTITION_VALUE));
+              } catch (Exception e) {
+                e.printStackTrace();
+                throw new SemanticException("Could not check if partition exists on " + dim, e);
+              }
+              if (numParts > 0) {
+                LOG.info("Adding existing partition" + StorageConstants.LATEST_PARTITION_VALUE);
+                foundPart = true;
+              } else {
+                LOG.info("Partition " + StorageConstants.LATEST_PARTITION_VALUE
+                    + " does not exist on " + tableName);
+              }
+              if (!failOnPartialData || (failOnPartialData && numParts > 0)) {
+                storageTables.add(tableName);
+                String whereClause = StorageUtil.getWherePartClause(dim.getTimedDimension(),
+                    cubeql.getAliasForTabName(dim.getName()),
+                    StorageConstants.getPartitionsForLatest());
+                whereClauses.put(tableName, whereClause);
+              } else {
+                LOG.info("Not considering dim storage table:" + tableName
+                    + " as no dim partitions exist");
+                skipStorageCauses.put(tableName, SkipStorageCause.NO_PARTITIONS);
+              }
+            } else {
+              storageTables.add(tableName);
+              foundPart = true;
+            }
+          } else {
+            LOG.info("Storage:" + storage + " is not supported");
+            skipStorageCauses.put(storage, SkipStorageCause.UNSUPPORTED);
           }
         }
-        throw new SemanticException(ErrorMsg.NO_CANDIDATE_DIM_STORAGE_TABLES,
-            reason);        
-      }
-      if (!foundPart) {
-        addNonExistingParts(dim.getName(), StorageConstants.getPartitionsForLatest());
+        if (!foundPart) {
+          addNonExistingParts(dim.getName(), StorageConstants.getPartitionsForLatest());
+        }
+        if (storageTables.isEmpty()) {
+          LOG.info("Not considering dim table:" + dimtable
+              + " as no candidate storage tables eixst");
+          CandidateTablePruneCause cause =  new CandidateTablePruneCause(
+              dimtable.getName(), CubeTableCause.NO_CANDIDATE_STORAGES);
+          cause.setStorageCauses(skipStorageCauses);
+          cubeql.addDimPruningMsgs(dim, dimtable, cause);
+          i.remove();
+          continue;
+        }
+        // pick the first storage table
+        candidate.storageTable = storageTables.iterator().next();
+        candidate.whereClause = whereClauses.get(candidate.storageTable);
       }
     }
   }
@@ -335,7 +330,7 @@ public class StorageTableResolver implements ContextRewriter {
         }
       }
       if (storageTableMap.isEmpty()) {
-        LOG.info("Not considering the fact table:" + fact + " as it does not" +
+        LOG.info("Not considering fact table:" + fact + " as it does not" +
             " have any storage tables");
         CandidateTablePruneCause cause = new CandidateTablePruneCause(fact.getName(),
             CubeTableCause.NO_CANDIDATE_STORAGES);
@@ -374,22 +369,26 @@ public class StorageTableResolver implements ContextRewriter {
       List<FactPartition> answeringParts = new ArrayList<FactPartition>();
       Map<String, SkipStorageCause> skipStorageCauses = new HashMap<String, SkipStorageCause>();
       List<String> nonExistingParts = new ArrayList<String>();
+      boolean noPartsForRange = false;
       for (TimeRange range : cubeql.getTimeRanges()) {
         Set<FactPartition> rangeParts = getPartitions(cfact.fact, range,
             skipStorageCauses, nonExistingParts);
         if (rangeParts == null || rangeParts.isEmpty()) {
+          LOG.info("No partitions for range:" + range);
+          noPartsForRange = true;
           continue;
         }
         cfact.numQueriedParts += rangeParts.size();
         answeringParts.addAll(rangeParts);
-        cfact.rangeToWhereClause.put(range, StorageUtil.getWherePartClause(
+        cfact.rangeToWhereClause.put(range, rangeWriter.getTimeRangeWhereClause(
             cubeql.getAliasForTabName(cubeql.getCube().getName()), rangeParts));
       }
       if (!nonExistingParts.isEmpty()) {
         addNonExistingParts(cfact.fact.getName(), nonExistingParts);        
       }
-      if (cfact.numQueriedParts == 0 || (failOnPartialData && !nonExistingParts.isEmpty())) {
-        LOG.info("Not considering the fact table:" + cfact.fact + " as it could"
+      if (cfact.numQueriedParts == 0 || (failOnPartialData &&
+          (noPartsForRange || !nonExistingParts.isEmpty()))) {
+        LOG.info("Not considering fact table:" + cfact.fact + " as it could"
             + " not find partition for given ranges: " + cubeql.getTimeRanges());
         if (!skipStorageCauses.isEmpty()) {
           CandidateTablePruneCause cause = new CandidateTablePruneCause(
@@ -414,6 +413,17 @@ public class StorageTableResolver implements ContextRewriter {
           new LinkedHashMap<String, Set<FactPartition>>();
       boolean enabledMultiTableSelect = StorageUtil.getMinimalAnsweringTables(
           answeringParts, minimalStorageTables);
+      if (minimalStorageTables.isEmpty()) {
+        LOG.info("Not considering fact table:" + cfact + " as it does not" +
+            " have any storage tables");
+        CandidateTablePruneCause cause = new CandidateTablePruneCause(
+            cfact.fact.getName(),
+            CubeTableCause.NO_CANDIDATE_STORAGES);
+        cause.setStorageCauses(skipStorageCauses);
+        cubeql.addFactPruningMsgs(cfact.fact, cause);
+        i.remove();
+        continue;
+      }
       Set<String> storageTables = new LinkedHashSet<String>();
       storageTables.addAll(minimalStorageTables.keySet());
       cfact.storageTables = storageTables;
@@ -488,7 +498,7 @@ public class StorageTableResolver implements ContextRewriter {
         continue;
       }
       if (containingPart != null) {
-        if (!client.partColExists(storageTableName, containingPart.partCol)) {
+        if (!client.partColExists(storageTableName, containingPart.getPartCol())) {
           LOG.info(partCol + " does not exist in" + storageTableName);
           skipStorageCauses.put(storageTableName, SkipStorageCause.PART_COL_DOES_NOT_EXIST);
           it.remove();
@@ -518,16 +528,16 @@ public class StorageTableResolver implements ContextRewriter {
       cal.add(interval.calendarField(), 1);
       boolean foundPart = false;
       FactPartition part = new FactPartition(partCol,
-          interval.format().format(dt), interval, containingPart);
+          dt, interval, containingPart, partWhereClauseFormat);
       Map<String, List<Partition>> metaParts = new HashMap<String, List<Partition>>();
       for (String storageTableName : storageTbls) {
         int numParts;
         if (leastInterval) {
           numParts = client.getNumPartitionsByFilter(
-              storageTableName, part.getFilter(null));
+              storageTableName, part.getFilter());
         } else {
           List<Partition> sParts = client.getPartitionsByFilter(
-              storageTableName, part.getFilter(null));
+              storageTableName, part.getFilter());
           metaParts.put(storageTableName, sParts);
           numParts = sParts.size();
         }
@@ -537,7 +547,7 @@ public class StorageTableResolver implements ContextRewriter {
             partitions.add(part);
             foundPart = true;
           }
-          part.storageTables.add(storageTableName);
+          part.getStorageTables().add(storageTableName);
         } else {
           LOG.info("Partition " + part + " does not exist on " + storageTableName);
         }
@@ -556,9 +566,9 @@ public class StorageTableResolver implements ContextRewriter {
                 partitions.add(part);
                 foundPart = true;
                 // add all storage tables as the answering tables
-                part.storageTables.addAll(storageTbls);
+                part.getStorageTables().addAll(storageTbls);
               }
-              nonExistingParts.add(part.partSpec);
+              nonExistingParts.add(part.getPartString());
             } else {
               LOG.info("No finer granual partitions exist for" + part);
               return false;

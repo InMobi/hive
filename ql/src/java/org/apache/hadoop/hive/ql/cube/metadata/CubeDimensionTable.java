@@ -20,67 +20,45 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  *
 */
 
-
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public final class CubeDimensionTable extends AbstractCubeTable {
-  private final Map<String, List<TableReference>> dimensionReferences = new HashMap<String, List<TableReference>>();
+  private String dimName; // dimension name the dimtabe belongs to
   private final Map<String, UpdatePeriod> snapshotDumpPeriods = new HashMap<String, UpdatePeriod>();
 
-  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight, Map<String, UpdatePeriod> snapshotDumpPeriods) {
-    this(dimName, columns, weight, snapshotDumpPeriods,
-        new HashMap<String, List<TableReference>>(), new HashMap<String, String>());
-  }
-
-  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
-      double weight, Set<String> storages) {
-    this(dimName, columns, weight, getSnapshotDumpPeriods(storages),
-        new HashMap<String, List<TableReference>>(), new HashMap<String, String>());
-  }
-
-  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
-      double weight, Map<String, UpdatePeriod> snapshotDumpPeriods,
-      Map<String, List<TableReference>> dimensionReferences) {
-    this(dimName, columns, weight, snapshotDumpPeriods, dimensionReferences,
+    this(dimName, dimTblName, columns, weight, snapshotDumpPeriods,
         new HashMap<String, String>());
   }
 
-  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
-      double weight, Set<String> storages,
-      Map<String, List<TableReference>> dimensionReferences) {
-    this(dimName, columns, weight, getSnapshotDumpPeriods(storages),
-        dimensionReferences, new HashMap<String, String>());
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
+      double weight, Set<String> storages) {
+    this(dimName, dimTblName, columns, weight, getSnapshotDumpPeriods(storages),
+         new HashMap<String, String>());
   }
 
-  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight, Set<String> storages,
-      Map<String, List<TableReference>> dimensionReferences,
       Map<String, String> properties) {
-    this(dimName, columns, weight, getSnapshotDumpPeriods(storages),
-        dimensionReferences, properties);
+    this(dimName, dimTblName, columns, weight, getSnapshotDumpPeriods(storages),
+         properties);
   }
 
-  public CubeDimensionTable(String dimName, List<FieldSchema> columns,
+  public CubeDimensionTable(String dimName, String dimTblName, List<FieldSchema> columns,
       double weight,
       Map<String, UpdatePeriod> snapshotDumpPeriods,
-      Map<String, List<TableReference>> dimensionReferences,
       Map<String, String> properties) {
-    super(dimName, columns, properties, weight);
-    if (dimensionReferences != null) {
-      this.dimensionReferences.putAll(dimensionReferences);
-    }
+    super(dimTblName, columns, properties, weight);
+    this.dimName = dimName;
     if (snapshotDumpPeriods != null) {
       this.snapshotDumpPeriods.putAll(snapshotDumpPeriods);
     }
@@ -99,10 +77,7 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   public CubeDimensionTable(Table tbl) {
     super(tbl);
-    Map<String, List<TableReference>> dimRefs = getDimensionReferences(getProperties());
-    if (dimRefs != null) {
-      this.dimensionReferences.putAll(dimRefs);
-    }
+    this.dimName = getDimName(getName(), getProperties());
     Map<String, UpdatePeriod> dumpPeriods = getDumpPeriods(getName(), getProperties());
     if (dumpPeriods != null) {
       this.snapshotDumpPeriods.putAll(dumpPeriods);
@@ -111,22 +86,22 @@ public final class CubeDimensionTable extends AbstractCubeTable {
 
   @Override
   public CubeTableType getTableType() {
-    return CubeTableType.DIMENSION;
+    return CubeTableType.DIM_TABLE;
   }
 
   @Override
   protected void addProperties() {
     super.addProperties();
-    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+    setDimName(getProperties(), getName(), dimName);
     setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
-  }
-
-  public Map<String, List<TableReference>> getDimensionReferences() {
-    return dimensionReferences;
   }
 
   public Map<String, UpdatePeriod> getSnapshotDumpPeriods() {
     return snapshotDumpPeriods;
+  }
+
+  public String getDimName() {
+    return dimName;
   }
 
   private static void setSnapshotPeriods(String name, Map<String, String> props,
@@ -144,38 +119,12 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
   }
 
-  private static void setDimensionReferenceProperties(Map<String, String> props,
-                                                     Map<String, List<TableReference>> dimensionReferences) {
-    if (dimensionReferences != null) {
-      for (Map.Entry<String, List<TableReference>> entry : dimensionReferences.entrySet()) {
-        props.put(MetastoreUtil.getDimensionSrcReferenceKey(entry.getKey()),
-            MetastoreUtil.getDimensionDestReference(entry.getValue()));
-      }
-    }
+  private static void setDimName(Map<String, String> props, String dimTblName, String dimName) {
+    props.put(MetastoreUtil.getDimNameKey(dimTblName), dimName);
   }
 
-  private static Map<String, List<TableReference>> getDimensionReferences(
-      Map<String, String> params) {
-    Map<String, List<TableReference>> dimensionReferences =
-        new HashMap<String, List<TableReference>>();
-    for (String param : params.keySet()) {
-      if (param.startsWith(MetastoreConstants.DIM_KEY_PFX)) {
-        String key = param.replace(MetastoreConstants.DIM_KEY_PFX, "");
-        String toks[] = key.split("\\.+");
-        String dimName = toks[0];
-        String value = params.get(MetastoreUtil.getDimensionSrcReferenceKey(dimName));
-
-        if (value != null) {
-          String refDims[] = StringUtils.split(value, ",");
-          List<TableReference> references = new ArrayList<TableReference>(refDims.length);
-          for (String refDim : refDims) {
-            references.add(new TableReference(refDim));
-          }
-          dimensionReferences.put(dimName, references);
-        }
-      }
-    }
-    return dimensionReferences;
+  static String getDimName(String dimTblName, Map<String, String> props) {
+    return props.get(MetastoreUtil.getDimNameKey(dimTblName));
   }
 
   private static Map<String, UpdatePeriod> getDumpPeriods(String name,
@@ -206,13 +155,13 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     }
     CubeDimensionTable other = (CubeDimensionTable) obj;
 
-    if (this.getDimensionReferences() == null) {
-      if (other.getDimensionReferences() != null) {
+    if (this.getDimName() == null) {
+      if (other.getDimName() != null) {
         return false;
       }
     } else {
-      if (!this.getDimensionReferences().equals(
-          other.getDimensionReferences())) {
+      if (!this.getDimName().equals(
+          other.getDimName())) {
         return false;
       }
     }
@@ -239,54 +188,13 @@ public final class CubeDimensionTable extends AbstractCubeTable {
   }
 
   /**
-   * Add a table reference to dimension column
-   *
-   * @param referenceName The column name
-   * @param reference The new reference
-   *
-   * @throws HiveException
+   * Alter the dimension name that the table belongs to
+   * 
+   * @param newDimName
    */
-  public void addDimensionReference(String referenceName,
-      TableReference reference) throws HiveException {
-    List<TableReference> refs = dimensionReferences.get(referenceName);
-    if (refs != null) {
-      Iterator<TableReference> itr = refs.iterator();
-      while (itr.hasNext()) {
-        TableReference existing = itr.next();
-        if (existing.equals(reference)) {
-          itr.remove();
-        }
-      }
-    } else {
-      refs = new ArrayList<TableReference>(1);
-      dimensionReferences.put(referenceName, refs);
-    }
-    refs.add(reference);
-    setDimensionReferenceProperties(getProperties(), dimensionReferences);
-  }
-
-  /**
-   * Add or Alter the references of a dimension column
-   *
-   * @param referenceName The column name
-   * @param reference The new reference
-   *
-   * @throws HiveException
-   */
-  public void alterDimensionReferences(String referenceName,
-      List<TableReference> references) throws HiveException {
-    dimensionReferences.put(referenceName, references);
-    setDimensionReferenceProperties(getProperties(), dimensionReferences);
-  }
-
-  /**
-   * Remove all the dimension references of specified dimension column
-   *
-   * @param referenceName
-   */
-  public void removeDimensionRefernces(String referenceName) {
-    dimensionReferences.remove(referenceName);
-    setDimensionReferenceProperties(getProperties(), dimensionReferences);
+  public void alterUberDim(String newDimName) {
+    this.dimName = newDimName;
+    setDimName(getProperties(), getName(), this.dimName);
   }
 
   /**
@@ -325,12 +233,4 @@ public final class CubeDimensionTable extends AbstractCubeTable {
     snapshotDumpPeriods.remove(storage);
     setSnapshotPeriods(getName(), getProperties(), snapshotDumpPeriods);
   }
-
-  /**
-   * @return the timedDimension
-   */
-  public String getTimedDimension() {
-    return getProperties().get(MetastoreConstants.TIMED_DIMENSION);
-  }
-
 }

@@ -65,10 +65,12 @@ public class CubeMetastoreClient {
 
   // map from table name to Table
   private final Map<String, Table> allHiveTables = new HashMap<String, Table>();
+  // map from dimension name to Dimension
+  private final Map<String, Dimension> allDims = new HashMap<String, Dimension>();
   // map from cube name to Cube
   private final Map<String, CubeInterface> allCubes = new HashMap<String, CubeInterface>();
-  // map from dim name to CubeDimensionTable
-  private final Map<String, CubeDimensionTable> allDims = new HashMap<String, CubeDimensionTable>();
+  // map from dimtable name to CubeDimensionTable
+  private final Map<String, CubeDimensionTable> allDimTables = new HashMap<String, CubeDimensionTable>();
   // map from fact name to fact table
   private final Map<String, CubeFactTable> allFactTables = new HashMap<String, CubeFactTable>();
   // map from storage name to storage
@@ -161,7 +163,7 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public void createCube(String name, Set<CubeMeasure> measures,
-      Set<CubeDimension> dimensions) throws HiveException {
+      Set<CubeDimAttribute> dimensions) throws HiveException {
     Cube cube = new Cube(name, measures, dimensions);
     createCube(cube);
   }
@@ -176,10 +178,54 @@ public class CubeMetastoreClient {
    * @throws HiveException
    */
   public void createCube(String name, Set<CubeMeasure> measures,
-      Set<CubeDimension> dimensions, Map<String, String> properties)
+      Set<CubeDimAttribute> dimensions, Map<String, String> properties)
           throws HiveException {
     Cube cube = new Cube(name, measures, dimensions, properties);
     createCube(cube);
+  }
+
+  /**
+   * Create cube defined by measures, dimensions and properties
+   *
+   * @param name Name of the cube
+   * @param measures Measures of the cube
+   * @param dimensions Dimensions of the cube
+   * @param properties Properties of the cube
+   * @throws HiveException
+   */
+  public void createCube(String name, Set<CubeMeasure> measures,
+      Set<CubeDimAttribute> dimensions, Set<ExprColumn> expressions,
+      Map<String, String> properties)
+          throws HiveException {
+    Cube cube = new Cube(name, measures, dimensions, expressions, properties, 0L);
+    createCube(cube);
+  }
+
+  /**
+   * Create dimension defined by attributes and properties
+   *
+   * @param name Name of the dimension
+   * @param attributes Attributes of the dimension
+   * @param properties Properties of the dimension
+   * @param weight Weight of the dimension
+   * 
+   * @throws HiveException
+   */
+  public void createDimension(String name, 
+      Set<CubeDimAttribute> attributes, Map<String, String> properties, double weight)
+          throws HiveException {
+    Dimension dim = new Dimension(name, attributes, properties, weight);
+    createDimension(dim);
+  }
+
+  /**
+   * Create dimension in metastore defined by {@link Dimension} object
+   *
+   * @param dim the {@link Dimension} object.
+   * @throws HiveException
+   */
+  public void createDimension(Dimension dim) throws HiveException {
+    createCubeHiveTable(dim);
   }
 
   /**
@@ -227,7 +273,8 @@ public class CubeMetastoreClient {
   /**
    * Create a cube dimension table
    *
-   * @param dimName dimensions name
+   * @param dimName The dimension name to which the dim-table belongs to
+   * @param dimTblName dimension table name
    * @param columns Columns of the dimension table
    * @param weight Weight of the dimension table
    * @param dimensionReferences References to other dimensions
@@ -237,21 +284,21 @@ public class CubeMetastoreClient {
    *
    * @throws HiveException
    */
-  public void createCubeDimensionTable(String dimName,
+  public void createCubeDimensionTable(String dimName, String dimTblName,
       List<FieldSchema> columns, double weight,
-      Map<String, List<TableReference>> dimensionReferences,
       Set<String> storageNames, Map<String, String> properties,
       Map<String, StorageTableDesc> storageTableDescs)
           throws HiveException {
-    CubeDimensionTable dimTable = new CubeDimensionTable(dimName, columns,
-        weight, storageNames, dimensionReferences, properties);
+    CubeDimensionTable dimTable = new CubeDimensionTable(dimName, dimTblName,
+        columns, weight, storageNames, properties);
     createCubeTable(dimTable, storageTableDescs);
   }
 
   /**
    * Create a cube dimension table
    *
-   * @param dimName dimensions name
+   * @param dimName The dimension name to which the dim-table belongs to
+   * @param dimTblName dimension table name
    * @param columns Columns of the dimension table
    * @param weight Weight of the dimension table
    * @param dimensionReferences References to other dimensions
@@ -261,15 +308,14 @@ public class CubeMetastoreClient {
    * @param storageTableDescs Map of storage to its storage table description
    * @throws HiveException
    */
-  public void createCubeDimensionTable(String dimName,
+  public void createCubeDimensionTable(String dimName, String dimTblName,
       List<FieldSchema> columns, double weight,
-      Map<String, List<TableReference>> dimensionReferences,
       Map<String, UpdatePeriod> dumpPeriods,
       Map<String, String> properties,
       Map<String, StorageTableDesc> storageTableDescs)
           throws HiveException {
-    CubeDimensionTable dimTable = new CubeDimensionTable(dimName, columns,
-        weight, dumpPeriods, dimensionReferences, properties);
+    CubeDimensionTable dimTable = new CubeDimensionTable(dimName, dimTblName, columns,
+        weight, dumpPeriods, properties);
     createCubeTable(dimTable, storageTableDescs);
   }
 
@@ -626,12 +672,12 @@ public class CubeMetastoreClient {
     }
   }
 
-  boolean dimPartitionExists(String dimName,
+  boolean dimPartitionExists(String dimTblName,
       String storageName, Map<String, Date> partitionTimestamps) throws HiveException {
     String storageTableName = MetastoreUtil.getDimStorageTableName(
-        dimName, storageName);
+        dimTblName, storageName);
     return partitionExists(storageTableName,
-        getDimensionTable(dimName).getSnapshotDumpPeriods().get(storageName),
+        getDimensionTable(dimTblName).getSnapshotDumpPeriods().get(storageName),
         partitionTimestamps);
   }
 
@@ -737,7 +783,7 @@ public class CubeMetastoreClient {
   boolean isDimensionTable(Table tbl) throws HiveException {
     String tableType = tbl.getParameters().get(
         MetastoreConstants.TABLE_TYPE_KEY);
-    return CubeTableType.DIMENSION.name().equals(tableType);
+    return CubeTableType.DIM_TABLE.name().equals(tableType);
   }
 
   /**
@@ -753,6 +799,19 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Is the table name passed a dimension?
+   *
+   * @param tableName table name
+   * @return true if it is dimension, false otherwise
+   * 
+   * @throws HiveException
+   */
+  public boolean isDimension(String tableName) throws HiveException {
+    Table tbl = getTable(tableName);
+    return isDimension(tbl);
+  }
+
+  /**
    * Is the hive table a cube table?
    *
    * @param tbl
@@ -763,6 +822,19 @@ public class CubeMetastoreClient {
     String tableType = tbl.getParameters().get(
         MetastoreConstants.TABLE_TYPE_KEY);
     return CubeTableType.CUBE.name().equals(tableType);
+  }
+
+  /**
+   * Is the hive table a dimension?
+   *
+   * @param tbl
+   * @return
+   * @throws HiveException
+   */
+  boolean isDimension(Table tbl) throws HiveException {
+    String tableType = tbl.getParameters().get(
+        MetastoreConstants.TABLE_TYPE_KEY);
+    return CubeTableType.DIMENSION.name().equals(tableType);
   }
 
   /**
@@ -822,13 +894,13 @@ public class CubeMetastoreClient {
    */
   public CubeDimensionTable getDimensionTable(String tableName)
       throws HiveException {
-    CubeDimensionTable dimTable = allDims.get(tableName.toLowerCase());
+    CubeDimensionTable dimTable = allDimTables.get(tableName.toLowerCase());
     if (dimTable == null) {
       Table tbl = getTable(tableName);
       if (isDimensionTable(tbl)) {
         dimTable = getDimensionTable(tbl);
         if (enableCaching) {
-          allDims.put(tableName.toLowerCase(), dimTable);
+          allDimTables.put(tableName.toLowerCase(), dimTable);
         }
       }
     }
@@ -893,6 +965,27 @@ public class CubeMetastoreClient {
    * @return Returns cube is table name passed is a cube, null otherwise
    * @throws HiveException
    */
+  public Dimension getDimension(String tableName) throws HiveException {
+    Dimension dim = allDims.get(tableName.toLowerCase());
+    if (dim == null) {
+      Table tbl = getTable(tableName);
+      if (isDimension(tbl)) {
+        dim = getDimension(tbl);
+        if (enableCaching) {
+          allDims.put(tableName.toLowerCase(), dim);
+        }
+      }
+    }
+    return dim;
+  }
+
+  /**
+   * Get {@link Cube} object corresponding to the name
+   *
+   * @param tableName The cube name
+   * @return Returns cube is table name passed is a cube, null otherwise
+   * @throws HiveException
+   */
   public CubeFactTable getCubeFact(String tableName) throws HiveException {
     CubeFactTable fact = allFactTables.get(tableName.toLowerCase());
     if (fact == null) {
@@ -912,6 +1005,10 @@ public class CubeMetastoreClient {
     } else {
       return new Cube(tbl);
     }
+  }
+
+  private Dimension getDimension(Table tbl) {
+    return new Dimension(tbl);
   }
 
   /**
@@ -983,6 +1080,28 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Get all cubes in metastore
+   *
+   * @return List of Cube objects
+   * @throws HiveException
+   */
+  public List<Dimension> getAllDimensions()
+      throws HiveException {
+    List<Dimension> dims = new ArrayList<Dimension>();
+    try {
+      for (String table : getAllHiveTableNames()) {
+        Dimension dim = getDimension(table);
+        if (dim != null) {
+          dims.add(dim);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return dims;
+  }
+
+  /**
    * Get all facts in metastore
    *
    * @return List of Cube Fact Table objects
@@ -1033,6 +1152,28 @@ public class CubeMetastoreClient {
     } else {
       return getAllFactTables(((DerivedCube)cube).getParent());
     }
+  }
+
+  /**
+   * Get all dimension tables of the dimension.
+   *
+   * @param dim Dimension object
+   *
+   * @return List of fact tables
+   * @throws HiveException
+   */
+  public List<CubeDimensionTable> getAllDimensionTables(Dimension dim) throws HiveException {
+    List<CubeDimensionTable> dimTables = new ArrayList<CubeDimensionTable>();
+    try {
+      for (CubeDimensionTable dimTbl : getAllDimensionTables()) {
+        if (dimTbl.getDimName().equalsIgnoreCase(dim.getName().toLowerCase())) {
+          dimTables.add(dimTbl);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
+    }
+    return dimTables;
   }
 
   public List<String> getPartColNames(String tableName)
@@ -1125,6 +1266,28 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Alter dimension specified by the dimension name to new definition
+   *
+   * @param dimName The cube name to be altered
+   * @param cube The new dimension definition
+   * 
+   * @throws HiveException
+   * @throws InvalidOperationException
+   */
+  public void alterDimension(String dimName, Dimension newDim)
+      throws HiveException {
+    Table tbl = getTable(dimName);
+    if (isDimension(tbl)) {
+      alterCubeTable(dimName, tbl, (AbstractCubeTable)newDim);
+      if (enableCaching) {
+        allDims.put(dimName, getDimension(refreshTable(dimName)));
+      }
+    } else {
+      throw new HiveException(dimName + " is not a dimension");
+    }
+  }
+
+  /**
    * Alter storage specified by the name to new definition
    *
    * @param storageName The storage name to be altered
@@ -1176,6 +1339,21 @@ public class CubeMetastoreClient {
   }
 
   /**
+   * Drop a dimension
+   *
+   * @param cubeName
+   * @throws HiveException
+   */
+  public void dropDimension(String dimName) throws HiveException {
+    if (isDimension(dimName)) {
+      allDims.remove(dimName.toLowerCase());
+      dropHiveTable(dimName);
+    } else {
+      throw new HiveException(dimName + " is not a dimension");
+    }
+  }
+
+  /**
    * Drop a fact with cascade flag
    *
    * @param factName
@@ -1218,40 +1396,40 @@ public class CubeMetastoreClient {
   /**
    * Drop a storage from dimension
    *
-   * @param dimName
+   * @param dimTblName
    * @param storage
    * @throws HiveException
    */
-  public void dropStorageFromDim(String dimName, String storage)
+  public void dropStorageFromDim(String dimTblName, String storage)
       throws HiveException {
-    CubeDimensionTable cdt = getDimensionTable(dimName);
+    CubeDimensionTable cdt = getDimensionTable(dimTblName);
     cdt.dropStorage(storage);
-    dropHiveTable(MetastoreUtil.getDimStorageTableName(dimName, storage));
-    alterCubeTable(dimName, getTable(dimName), cdt);
-    updateDimCache(dimName);
+    dropHiveTable(MetastoreUtil.getDimStorageTableName(dimTblName, storage));
+    alterCubeTable(dimTblName, getTable(dimTblName), cdt);
+    updateDimCache(dimTblName);
   }
 
   /**
-   * Drop the dimension
+   * Drop the dimension table
    *
-   * @param dimName
+   * @param dimTblName
    * @param cascade If true, will drop all the dimension storages
    *
    * @throws HiveException
    */
-  public void dropDimension(String dimName, boolean cascade)
+  public void dropDimensionTable(String dimTblName, boolean cascade)
       throws HiveException {
-    if (isDimensionTable(dimName)) {
-      CubeDimensionTable dim = getDimensionTable(dimName);
+    if (isDimensionTable(dimTblName)) {
+      CubeDimensionTable dim = getDimensionTable(dimTblName);
       Set<String> dimStorages = new HashSet<String>();
       dimStorages.addAll(dim.getStorages());
       for(String storage : dimStorages) {
-        dropStorageFromDim(dimName, storage);
+        dropStorageFromDim(dimTblName, storage);
       }
-      dropHiveTable(dimName);
-      allDims.remove(dimName.toLowerCase());
+      dropHiveTable(dimTblName);
+      allDimTables.remove(dimTblName.toLowerCase());
     } else {
-      throw new HiveException(dimName + " is not a dimension table");
+      throw new HiveException(dimTblName + " is not a dimension table");
     }
   }
 
@@ -1291,10 +1469,10 @@ public class CubeMetastoreClient {
     }
   }
 
-  private void updateDimCache(String dimName) throws HiveException {
+  private void updateDimCache(String dimTblName) throws HiveException {
     if (enableCaching) {
-      allDims.put(dimName,
-          getDimensionTable(refreshTable(dimName)));
+      allDimTables.put(dimTblName,
+          getDimensionTable(refreshTable(dimTblName)));
     }
   }
   /**

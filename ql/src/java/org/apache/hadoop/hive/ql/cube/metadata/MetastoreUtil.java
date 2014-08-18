@@ -21,7 +21,6 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 */
 
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -56,9 +55,40 @@ public class MetastoreUtil implements MetastoreConstants {
     return STORAGE_ENTITY_PFX + storageName.toLowerCase();
   }
 
+  // //////////////////////////
+  // Dimension properties ///
+  // /////////////////////////
+  public static final String getDimPrefix(String dimName) {
+    return DIMENSION_PFX + dimName.toLowerCase();
+  }
+
+  public static final String getDimAttributeListKey(String dimName) {
+    return getDimPrefix(dimName) + ATTRIBUTES_LIST_SFX;
+  }
+
+  public static final String getDimTimedDimensionKey(String dimName) {
+    return getDimPrefix(dimName) + TIMED_DIMENSION_SFX;
+  }
+
   // ///////////////////////
-  // Dimension properties//
+  // Dimension attribute properties//
   // ///////////////////////
+  public static String getDimensionKeyPrefix(String dimName) {
+    return DIM_KEY_PFX + dimName.toLowerCase();
+  }
+
+  public static final String getDimensionClassPropertyKey(String dimName) {
+    return getDimensionKeyPrefix(dimName) + CLASS_SFX;
+  }
+
+  public static String getInlineDimensionSizeKey(String name) {
+    return getDimensionKeyPrefix(name) + INLINE_SIZE_SFX;
+  }
+
+  public static String getInlineDimensionValuesKey(String name) {
+    return getDimensionKeyPrefix(name) + INLINE_VALUES_SFX;
+  }
+
   public static final String getDimTypePropertyKey(String dimName) {
     return getDimensionKeyPrefix(dimName) + TYPE_SFX;
   }
@@ -118,33 +148,42 @@ public class MetastoreUtil implements MetastoreConstants {
     return getColumnKeyPrefix(colName) + COST_SFX;
   }
 
+  public static String getCubeColDescriptionKey(String colName) {
+    return getColumnKeyPrefix(colName) + DESC_SFX;
+  }
+
+  public static String getCubeColDisplayKey(String colName) {
+    return getColumnKeyPrefix(colName) + DISPLAY_SFX;
+  }
+
+  public static final String getExprColumnKey(String colName) {
+    return getColumnKeyPrefix(colName) + EXPR_SFX;
+  }
+
+  public static final String getExprTypePropertyKey(String colName) {
+    return getColumnKeyPrefix(colName) + TYPE_SFX;
+  }
+
   //////////////////////////
-  // Dimension properties //
+  // Dimension table properties //
   //////////////////////////
-  public static String getInlineDimensionSizeKey(String name) {
-    return getDimensionKeyPrefix(name) + INLINE_SIZE_SFX;
+  public static String getDimensionTablePrefix(String dimTblName) {
+    return DIM_TBL_PFX + dimTblName.toLowerCase();
   }
 
-  public static String getInlineDimensionValuesKey(String name) {
-    return getDimensionKeyPrefix(name) + INLINE_VALUES_SFX;
-  }
-
-  public static String getDimensionKeyPrefix(String dimName) {
-    return DIM_KEY_PFX + dimName.toLowerCase();
-  }
-
-  public static String getDimensionDumpPeriodKey(String name, String storage) {
-    return getDimensionKeyPrefix(name) + "." + storage.toLowerCase() +
+  public static String getDimensionDumpPeriodKey(String dimTblName, String storage) {
+    return getDimensionTablePrefix(dimTblName) + "." + storage.toLowerCase() +
         DUMP_PERIOD_SFX;
   }
 
-  public static String getDimensionStorageListKey(String name) {
-    return getDimensionKeyPrefix(name) + STORAGE_LIST_SFX;
+  public static String getDimensionStorageListKey(String dimTblName) {
+    return getDimensionTablePrefix(dimTblName) + STORAGE_LIST_SFX;
   }
 
-  public static final String getDimensionClassPropertyKey(String dimName) {
-    return getDimensionKeyPrefix(dimName) + CLASS_SFX;
+  public static String getDimNameKey(String dimTblName) {
+    return getDimensionTablePrefix(dimTblName) + DIM_NAME_SFX;
   }
+
 
   // //////////////////////////
   // Measure properties ///
@@ -173,13 +212,17 @@ public class MetastoreUtil implements MetastoreConstants {
     return getMeasurePrefix(measureName) + AGGR_SFX;
   }
 
-  public static final String getMeasureExprPropertyKey(String measureName) {
-    return getMeasurePrefix(measureName) + EXPR_SFX;
+  public static final String getExpressionListKey(String name) {
+    return getBasePrefix(name) + EXPRESSIONS_LIST_SFX;
   }
 
   // //////////////////////////
   // Cube properties ///
   // /////////////////////////
+  public static final String getBasePrefix(String base) {
+    return BASE_KEY_PFX + base.toLowerCase();
+  }
+
   public static final String getCubePrefix(String cubeName) {
     return CUBE_KEY_PFX + cubeName.toLowerCase();
   }
@@ -291,10 +334,10 @@ public class MetastoreUtil implements MetastoreConstants {
     return columns;
   }
 
-  public static void addColumnNames(CubeDimension dim, Set<String> cols) {
-    if (dim instanceof HierarchicalDimension) {
-      HierarchicalDimension h = (HierarchicalDimension) dim;
-      for (CubeDimension d : h.getHierarchy()) {
+  public static void addColumnNames(CubeDimAttribute dim, Set<String> cols) {
+    if (dim instanceof HierarchicalDimAttribute) {
+      HierarchicalDimAttribute h = (HierarchicalDimAttribute) dim;
+      for (CubeDimAttribute d : h.getHierarchy()) {
         addColumnNames(d, cols);
       }
     } else {

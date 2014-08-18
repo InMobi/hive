@@ -20,12 +20,11 @@ package org.apache.hadoop.hive.ql.cube.parse;
  *
 */
 
+import java.util.Set;
 
-public enum CubeQueryExpr {
-  SELECT,
-  WHERE,
-  GROUPBY,
-  HAVING,
-  ORDERBY,
-  JOIN
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+
+public interface TimeRangeWriter {
+  public String getTimeRangeWhereClause(
+      String tableName, Set<FactPartition> parts) throws SemanticException;
 }
