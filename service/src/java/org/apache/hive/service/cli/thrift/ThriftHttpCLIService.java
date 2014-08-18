@@ -44,6 +44,7 @@ public class ThriftHttpCLIService extends ThriftCLIService {
     super(cliService, "ThriftHttpCLIService");
   }
 
+
   @Override
   public void run() {
     try {
