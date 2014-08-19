@@ -2261,7 +2261,9 @@
   <name>hive.server2.authentication.ldap.security.protocol</name>
   <value></value>
   <description>
-    example: ssl
+    Its value is a string determined by the service provider (e.g. "ssl").
+    If this property is unspecified, the behaviour is determined by the service provider.
+    It's value will be directly passed as "java.naming.security.protocol"
   </description>
 </property>
 
