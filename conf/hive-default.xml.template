@@ -2258,6 +2258,14 @@
 </property>
 
 <property>
+  <name>hive.server2.authentication.ldap.security.protocol</name>
+  <value></value>
+  <description>
+    example: ssl
+  </description>
+</property>
+
+<property>
   <name>hive.server2.authentication.ldap.baseDN</name>
   <value></value>
   <description>
