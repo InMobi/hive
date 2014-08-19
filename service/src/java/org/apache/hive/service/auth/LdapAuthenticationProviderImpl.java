@@ -32,12 +32,14 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
   private final String ldapURL;
   private final String baseDN;
   private final String ldapDomain;
+  private final String securityProtocol;
 
   LdapAuthenticationProviderImpl () {
     HiveConf conf = new HiveConf();
     this.ldapURL = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_URL);
     this.baseDN = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_BASEDN);
     this.ldapDomain = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_DOMAIN);
+    this.securityProtocol = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_SECURITY_PROTOCOL);
   }
 
   @Override
@@ -64,6 +66,9 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
     env.put(Context.SECURITY_AUTHENTICATION, "simple");
     env.put(Context.SECURITY_PRINCIPAL, bindDN);
     env.put(Context.SECURITY_CREDENTIALS, password);
+    if(securityProtocol != null){
+      env.put(Context.SECURITY_PROTOCOL, securityProtocol);
+    }
 
     try {
       // Create initial context

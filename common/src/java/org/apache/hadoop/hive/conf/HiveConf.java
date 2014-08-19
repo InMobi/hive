@@ -920,6 +920,7 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_PLAIN_LDAP_URL("hive.server2.authentication.ldap.url", null),
     HIVE_SERVER2_PLAIN_LDAP_BASEDN("hive.server2.authentication.ldap.baseDN", null),
     HIVE_SERVER2_PLAIN_LDAP_DOMAIN("hive.server2.authentication.ldap.Domain", null),
+    HIVE_SERVER2_PLAIN_LDAP_SECURITY_PROTOCOL("hive.server2.authentication.ldap.security.protocol", null),
     HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS("hive.server2.custom.authentication.class", null),
     // List of the underlying pam services that should be used when auth type is PAM
     // A file with the same name must exist in /etc/pam.d

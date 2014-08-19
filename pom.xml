@@ -173,7 +173,7 @@
        <snapshots>
          <enabled>true</enabled>
        </snapshots>
-     </repository>   
+     </repository>
     <repository>
       <id>datanucleus</id>
       <name>datanucleus maven repository</name>
