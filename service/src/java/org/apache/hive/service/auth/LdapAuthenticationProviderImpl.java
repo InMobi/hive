@@ -34,8 +34,7 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
   private final String ldapDomain;
   private final String securityProtocol;
 
-  LdapAuthenticationProviderImpl () {
-    HiveConf conf = new HiveConf();
+  LdapAuthenticationProviderImpl(HiveConf conf) {
     this.ldapURL = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_URL);
     this.baseDN = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_BASEDN);
     this.ldapDomain = conf.getVar(HiveConf.ConfVars.HIVE_SERVER2_PLAIN_LDAP_DOMAIN);
