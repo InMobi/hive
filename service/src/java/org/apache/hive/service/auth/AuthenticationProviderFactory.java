@@ -18,6 +18,7 @@
 package org.apache.hive.service.auth;
 
 import javax.security.sasl.AuthenticationException;
+import org.apache.hadoop.hive.conf.HiveConf;
 
 public class AuthenticationProviderFactory {
 
@@ -50,22 +51,26 @@ public class AuthenticationProviderFactory {
   private AuthenticationProviderFactory () {
   }
 
-  public static PasswdAuthenticationProvider getAuthenticationProvider(AuthMethods authMethod)
+  public static PasswdAuthenticationProvider getAuthenticationProvider(AuthMethods authMethod, HiveConf conf)
       throws AuthenticationException {
     if (authMethod.equals(AuthMethods.LDAP)) {
-      return new LdapAuthenticationProviderImpl();
+      return new LdapAuthenticationProviderImpl(conf);
     }
     else if (authMethod.equals(AuthMethods.PAM)) {
-      return new PamAuthenticationProviderImpl();
+      return new PamAuthenticationProviderImpl(conf);
     }
     else if (authMethod.equals(AuthMethods.CUSTOM)) {
-      return new CustomAuthenticationProviderImpl();
+      return new CustomAuthenticationProviderImpl(conf);
     }
     else if (authMethod.equals(AuthMethods.NONE)) {
-      return new AnonymousAuthenticationProviderImpl();
+      return new AnonymousAuthenticationProviderImpl(conf);
     }
     else {
       throw new AuthenticationException("Unsupported authentication method");
     }
+  }
+  public static PasswdAuthenticationProvider getAuthenticationProvider(AuthMethods authMethod)
+    throws AuthenticationException {
+    return getAuthenticationProvider(authMethod, new HiveConf());
   }
 }

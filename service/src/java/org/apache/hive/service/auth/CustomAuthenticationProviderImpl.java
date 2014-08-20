@@ -29,8 +29,7 @@ public class CustomAuthenticationProviderImpl
   PasswdAuthenticationProvider customProvider;
 
   @SuppressWarnings("unchecked")
-  CustomAuthenticationProviderImpl () {
-    HiveConf conf = new HiveConf();
+  CustomAuthenticationProviderImpl(HiveConf conf) {
     this.customHandlerClass = (Class<? extends PasswdAuthenticationProvider>)
         conf.getClass(
             HiveConf.ConfVars.HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname,

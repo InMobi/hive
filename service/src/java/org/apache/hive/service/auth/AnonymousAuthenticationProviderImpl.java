@@ -18,9 +18,15 @@
 
 package org.apache.hive.service.auth;
 
+import org.apache.hadoop.hive.conf.HiveConf;
+
 import javax.security.sasl.AuthenticationException;
 
 public class AnonymousAuthenticationProviderImpl implements PasswdAuthenticationProvider {
+
+  public AnonymousAuthenticationProviderImpl(HiveConf conf) {
+
+  }
 
   @Override
   public void Authenticate(String user, String password) throws AuthenticationException {
