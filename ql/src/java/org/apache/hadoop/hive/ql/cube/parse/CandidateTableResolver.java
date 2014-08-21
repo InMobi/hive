@@ -113,7 +113,8 @@ public class CandidateTableResolver implements ContextRewriter {
       for (Iterator<CandidateFact> i = cubeql.getCandidateFactTables().iterator();
           i.hasNext();) {
         boolean isRemoved = false;
-        CubeFactTable fact = i.next().fact;
+        CandidateFact cfact = i.next();
+        CubeFactTable fact = cfact.fact;
 
         if (validFactTables != null) {
           if (!validFactTables.contains(fact.getName().toLowerCase())) {
@@ -135,6 +136,11 @@ public class CandidateTableResolver implements ContextRewriter {
           if (!cubeql.getCube().getTimedDimensions().contains(col.toLowerCase())) {
             if (validFactCols != null) {
               if (!validFactCols.contains(col.toLowerCase())) {
+                if (cubeql.getDenormCtx().getReferencedCols().containsKey(col)) {
+                  // available as referenced col
+                  // check if the reference source is reachable?
+                  cubeql.getDenormCtx().addRefUsage(cfact, col);
+                } else {
                 LOG.info("Not considering fact table:" + fact +
                     " as column " + col + " is not valid");
                 cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
@@ -142,8 +148,14 @@ public class CandidateTableResolver implements ContextRewriter {
                 i.remove();
                 isRemoved = true;
                 break;
+                }
               }
             } else if(!factCols.contains(col.toLowerCase())) {
+              if (cubeql.getDenormCtx().getReferencedCols().containsKey(col)) {
+                // available as referenced col
+                // check if the reference source is reachable?
+                cubeql.getDenormCtx().addRefUsage(cfact, col);
+              } else {
               LOG.info("Not considering fact table:" + fact +
                   " as column " + col + " is not available");
               cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
@@ -151,6 +163,7 @@ public class CandidateTableResolver implements ContextRewriter {
               isRemoved = true;
               i.remove();
               break;
+              }
             }
           }
         }

@@ -28,6 +28,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -36,6 +37,10 @@ import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeColumn;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
+import org.apache.hadoop.hive.ql.cube.metadata.TableReference;
+import org.apache.hadoop.hive.ql.cube.parse.DenormalizationResolver.DenormalizationContext;
+import org.apache.hadoop.hive.ql.cube.parse.DenormalizationResolver.ReferencedQueriedColumn;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
@@ -134,6 +139,35 @@ public class TimerangeResolver implements ContextRewriter {
               " upto:" + column.getEndTime()));
         }
       }
+    }
+
+    // Look at referenced columns through denormalization resolver
+    // and do column life validation
+    try {
+      Map<String, Set<ReferencedQueriedColumn>> refCols = cubeql.getDenormCtx().getReferencedCols();
+      for (String col : refCols.keySet()) {
+        Iterator<ReferencedQueriedColumn> refColIter = refCols.get(col).iterator();
+        while (refColIter.hasNext()) {
+          ReferencedQueriedColumn refCol = refColIter.next();
+          for (TableReference tblRef : refCol.col.getReferences()) {
+            CubeColumn ref = cubeql.getMetastoreClient().getDimension(
+                tblRef.getDestTable()).getColumnByName(tblRef.getDestColumn());
+            boolean isValid = true;
+            for (TimeRange range : cubeql.getTimeRanges()) {
+              if (!isColumnLifeInvalid(ref, range)) {
+                isValid = false;
+                refColIter.remove();
+                break;
+              }
+            }
+            if (!isValid) {
+              break;
+            }
+          }
+        }
+      }
+    } catch (HiveException e) {
+      throw new SemanticException(e);
     }
 
     // Remove join paths that have columns with invalid life span

@@ -113,6 +113,7 @@ public class CubeQueryContext {
   private ASTNode groupByAST;
   private CubeMetastoreClient client;
   private JoinResolver.AutoJoinContext autoJoinCtx;
+  private DenormalizationResolver.DenormalizationContext deNormCtx;
   private Map<CubeFactTable, List<CandidateTablePruneCause>> factPruningMsgs = 
       new HashMap<CubeFactTable, List<CandidateTablePruneCause>>();
   private Map<Dimension, Map<CubeDimensionTable, List<CandidateTablePruneCause>>> dimPruningMsgs = 
@@ -217,6 +218,10 @@ public class CubeQueryContext {
     } catch (HiveException e) {
       throw new SemanticException(e);
     }
+  }
+
+  public AbstractCubeTable getCubeTableForAlias(String alias) {
+    return cubeTbls.get(alias);
   }
 
   private String getClause() {
@@ -835,6 +840,14 @@ public class CubeQueryContext {
 
   public JoinResolver.AutoJoinContext getAutoJoinCtx() {
     return autoJoinCtx;
+  }
+
+  public void setDenormCtx(DenormalizationResolver.DenormalizationContext deNormCtx) {
+    this.deNormCtx = deNormCtx;
+  }
+
+  public DenormalizationResolver.DenormalizationContext getDenormCtx() {
+    return this.deNormCtx;
   }
 
   /**
