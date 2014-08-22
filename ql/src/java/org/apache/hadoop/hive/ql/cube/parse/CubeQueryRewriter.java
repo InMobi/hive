@@ -96,7 +96,7 @@ public class CubeQueryRewriter {
       command = command.replace("\n", "");
     }
     ParseDriver pd = new ParseDriver();
-    ASTNode tree = pd.parse(command, null);
+    ASTNode tree = pd.parse(command, ctx, false);
     tree = ParseUtils.findRootNonNullToken(tree);
     return rewrite(tree);
   }
