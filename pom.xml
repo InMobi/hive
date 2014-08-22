@@ -57,7 +57,6 @@
     <module>shims</module>
     <module>testutils</module>
     <module>packaging</module>
-    <module>itests</module>
   </modules>
 
   <properties>
