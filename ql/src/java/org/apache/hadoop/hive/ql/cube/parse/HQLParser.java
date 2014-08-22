@@ -65,6 +65,7 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ISNULL;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_LOCAL_DIR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ORDERBY;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECT;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELECTDI;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABSORTCOLNAMEASC;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABSORTCOLNAMEDESC;
@@ -80,6 +81,8 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.antlr.runtime.tree.Tree;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -96,7 +99,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 
 public class HQLParser {
-
+  public static final Pattern P_WSPACE = Pattern.compile("\\s+");
   public static interface ASTNodeVisitor {
     public void visit(TreeNode node) throws SemanticException;
   }
@@ -357,6 +360,11 @@ public class HQLParser {
         buf.append(" true ");
       } else if (KW_FALSE == rootType) {
         buf.append(" false ");
+      } else if (Identifier == rootType &&
+        TOK_SELEXPR == ((ASTNode)root.getParent()).getToken().getType()
+        && P_WSPACE.matcher(rootText).find()) {
+        // If column alias contains spaces, enclose in back quotes
+        buf.append(" as `").append(rootText).append("` ");
       } else {
         buf.append(" ").append(rootText == null ? "" : rootText.toLowerCase()).append(" ");
       }
