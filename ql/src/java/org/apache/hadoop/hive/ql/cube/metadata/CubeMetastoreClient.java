@@ -1197,11 +1197,11 @@ public class CubeMetastoreClient {
     return false;
   }
 
-  public SchemaGraph getSchemaGraph() throws HiveException {
-    if (schemaGraph == null) {
-      schemaGraph = new SchemaGraph(this);
-      schemaGraph.buildSchemaGraph();
-    }
+  public void setSchemaGraph(SchemaGraph schemaGraph) {
+    this.schemaGraph = schemaGraph;
+  }
+
+  public SchemaGraph getSchemaGraph() {
     return schemaGraph;
   }
 

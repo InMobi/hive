@@ -39,6 +39,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
@@ -482,6 +483,10 @@ public class JoinResolver implements ContextRewriter {
   }
 
   private CubeMetastoreClient getMetastoreClient() throws HiveException {
+    if (metastore == null) {
+      metastore = CubeMetastoreClient.getInstance(new HiveConf(this.getClass()));
+    }
+
     return metastore;
   }
 
@@ -499,7 +504,6 @@ public class JoinResolver implements ContextRewriter {
 
   public void resolveJoins(CubeQueryContext cubeql) throws HiveException {
     QB cubeQB = cubeql.getQB();
-    this.metastore = cubeql.getMetastoreClient();
     boolean joinResolverDisabled = conf.getBoolean(
         CubeQueryConfUtil.DISABLE_AUTO_JOINS, CubeQueryConfUtil.DEFAULT_DISABLE_AUTO_JOINS);
     if (joinResolverDisabled) {
@@ -511,6 +515,15 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
+  protected SchemaGraph getSchemaGraph() throws HiveException {
+    SchemaGraph graph = getMetastoreClient().getSchemaGraph();
+    if (graph == null) {
+      graph = new SchemaGraph(getMetastoreClient());
+      graph.buildSchemaGraph();
+      getMetastoreClient().setSchemaGraph(graph);
+    }
+    return graph;
+  }
   /**
    * Resolve joins automatically for the given query.
    * @param cubeql
@@ -566,7 +579,7 @@ public class JoinResolver implements ContextRewriter {
       return;
     }
 
-    SchemaGraph graph = getMetastoreClient().getSchemaGraph();
+    SchemaGraph graph = getSchemaGraph();
     Map<Dimension, List<SchemaGraph.JoinPath>> multipleJoinPaths =
       new LinkedHashMap<Dimension, List<SchemaGraph.JoinPath>>();
 
