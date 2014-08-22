@@ -252,4 +252,15 @@ public class TestHQLParser {
     String expected = " table1  tab1  table  tab2 (( tab1 . id ) = ( tab2 . id ))";
     Assert.assertEquals(expected, HQLParser.getString(temp));
   }
+
+  @Test
+  public void testAliasWithSpaces() throws Exception {
+    String query = "select id as `an id` from sample_dim";
+    try {
+      ASTNode tree = HQLParser.parseHQL(query);
+    } catch (NullPointerException exc) {
+      exc.printStackTrace();
+      Assert.fail("should not have thrown npe");
+    }
+  }
 }

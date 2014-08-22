@@ -70,6 +70,7 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABSORTCOLNAMEASC;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABSORTCOLNAMEDESC;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TAB;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -81,6 +82,8 @@ import java.util.Queue;
 import java.util.Set;
 
 import org.antlr.runtime.tree.Tree;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
@@ -166,7 +169,12 @@ public class HQLParser {
 
   public static ASTNode parseHQL(String query) throws ParseException {
     ParseDriver driver = new ParseDriver();
-    ASTNode tree = driver.parse(query);
+    ASTNode tree = null;
+    try {
+      tree = driver.parse(query, new Context(new HiveConf()));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     tree = ParseUtils.findRootNonNullToken(tree);
     //printAST(tree);
     return tree;
