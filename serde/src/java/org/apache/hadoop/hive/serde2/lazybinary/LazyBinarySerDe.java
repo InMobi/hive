@@ -47,6 +47,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.Pr
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
@@ -596,11 +597,47 @@ public class LazyBinarySerDe extends AbstractSerDe {
       }
       return warnedOnceNullMapKey;
     }
+    case UNION: {
+        int byteSizeStart = 0;
+        int unionStart = 0;
+        if (!skipLengthPrefix) {
+          // 1/ reserve spaces for the byte size of the union
+          // which is a integer and takes four bytes
+          byteSizeStart = byteStream.getCount();
+          byteStream.write((byte) 0);
+          byteStream.write((byte) 0);
+          byteStream.write((byte) 0);
+          byteStream.write((byte) 0);
+          unionStart = byteStream.getCount();
+        }
+        // 2/ serialize the union
+        warnedOnceNullMapKey = serializeUnion(byteStream, obj, (UnionObjectInspector) objInspector,
+                                              warnedOnceNullMapKey);
+
+        if (!skipLengthPrefix) {
+          // 3/ update the byte size of the struct
+          int unionEnd = byteStream.getCount();
+          int unionSize = unionEnd - unionStart;
+          byte[] bytes = byteStream.getData();
+          bytes[byteSizeStart] = (byte) (unionSize >> 24);
+          bytes[byteSizeStart + 1] = (byte) (unionSize >> 16);
+          bytes[byteSizeStart + 2] = (byte) (unionSize >> 8);
+          bytes[byteSizeStart + 3] = (byte) (unionSize);
+        }
+        return warnedOnceNullMapKey;
+      }
     default: {
       throw new RuntimeException("Unrecognized type: "
           + objInspector.getCategory());
     }
     }
+  }
+
+  private static boolean serializeUnion(Output byteStream, Object obj,
+                         UnionObjectInspector uoi, boolean warnedOnceNullMapKey) throws SerDeException {
+    byte tag = uoi.getTag(obj);
+    byteStream.write(tag);
+    return serialize(byteStream, uoi.getField(obj), uoi.getObjectInspectors().get(tag), false, warnedOnceNullMapKey);
   }
 
   /**
