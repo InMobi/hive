@@ -106,6 +106,4 @@ shift
 HADOOP_OPTS="$HADOOP_OPTS -Dhadoop.security.logger=${HADOOP_SECURITY_LOGGER:-INFO,NullAppender}"
 
 export CLASSPATH=$CLASSPATH
-echo "classpath = " . $CLASSPATH;
-echo "running = " . "$JAVA" . "$JAVA_HEAP_MAX $HADOOP_OPTS $CLASS" . "$@"
-exec "$JAVA" -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 -Dhive.root.logger=INFO,console $JAVA_HEAP_MAX $HADOOP_OPTS $CLASS "$@"
+exec "$JAVA" $JAVA_HEAP_MAX $HADOOP_OPTS $CLASS "$@"
