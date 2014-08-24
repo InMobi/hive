@@ -74,6 +74,7 @@ public class ThriftUnionObjectInspector extends ReflectionStructObjectInspector 
   @Override
   protected void init(Class<?> objectClass,
                       ObjectInspectorFactory.ObjectInspectorOptions options) {
+     verifyObjectClassType(objectClass);
      this.objectClass = objectClass;
      final Field fieldMetaData;
 
@@ -85,7 +86,6 @@ public class ThriftUnionObjectInspector extends ReflectionStructObjectInspector 
         throw new RuntimeException("Unable to find field metadata for thrift union field " , e);
       }
 
-      this.fields = new ArrayList<StructField>();
       try {
         final Map<? extends TFieldIdEnum, FieldMetaData> fieldMap = (Map<? extends TFieldIdEnum, FieldMetaData>) fieldMetaData.get(null);
         this.ois = new ArrayList<ObjectInspector>();
