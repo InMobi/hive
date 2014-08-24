@@ -129,9 +129,8 @@ public final class CreateSequenceFile {
       hash.put("key_" + i, "value_" + i);
       Map<String, Map<String, Map<String,PropValueUnion>>> unionMap = new HashMap<String, Map<String, Map<String,PropValueUnion>>>();
       Map<String, Map<String, PropValueUnion>> erMap = new HashMap<String, Map<String, PropValueUnion>>();
-
-
       Map<String, PropValueUnion> attrMap = new HashMap<String, PropValueUnion>();
+
       erMap.put("erVal" + i, attrMap);
       attrMap.put("value_" + i, PropValueUnion.doubleValue(1.0));
       unionMap.put("key_" + i,  erMap);
@@ -143,7 +142,7 @@ public final class CreateSequenceFile {
       writer.append(key, value);
     }
 
-//    // Add an all-null record
+    // Add an all-null record
     Complex complex = new Complex(0, null, null, null, null, null, null, null, null, null);
     Writable value = serializer.serialize(complex);
     writer.append(key, value);
