@@ -177,6 +177,7 @@ public class JoinResolver implements ContextRewriter {
 
       while (itr.hasNext()) {
         JoinClause clause = itr.next();
+        LOG.info("JoinClause " + clause.getClause() + " cost=" + clause.getCost());
         if (minCostClause == null || minCostClause.getCost() > clause.getCost()) {
           minCostClause = clause;
         }
