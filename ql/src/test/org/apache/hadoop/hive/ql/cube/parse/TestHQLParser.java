@@ -252,4 +252,43 @@ public class TestHQLParser {
     String expected = " table1  tab1  table  tab2 (( tab1 . id ) = ( tab2 . id ))";
     Assert.assertEquals(expected, HQLParser.getString(temp));
   }
+
+  @Test
+  public void testAliasWithSpaces() throws Exception {
+    String query = "select id as `an id` from sample_dim";
+    try {
+      ASTNode tree = HQLParser.parseHQL(query);
+    } catch (NullPointerException exc) {
+      exc.printStackTrace();
+      Assert.fail("should not have thrown npe");
+    }
+  }
+
+  @Test
+  public void testAllColumns() throws Exception {
+    String query = "select * from tab";
+    ASTNode select = HQLParser.findNodeByPath(HQLParser.parseHQL(query), TOK_INSERT, TOK_SELECT);
+    String selectStr = HQLParser.getString(select);
+    System.out.println(selectStr);
+    Assert.assertEquals(" * ", selectStr);
+    query = "select tab.*, tab2.a, tab2.b from tab";
+    ASTNode ast = HQLParser.parseHQL(query);
+    select = HQLParser.findNodeByPath(ast, TOK_INSERT, TOK_SELECT);
+    selectStr = HQLParser.getString(select);
+    System.out.println(selectStr);
+    Assert.assertEquals(" tab . * , ( tab2 . a ), ( tab2 . b )", selectStr);
+    query = "select count(*) from tab";
+    ast = HQLParser.parseHQL(query);
+    select = HQLParser.findNodeByPath(ast, TOK_INSERT, TOK_SELECT);
+    selectStr = HQLParser.getString(select);
+    System.out.println(selectStr);
+    Assert.assertEquals(" count (*) ", selectStr);
+    query = "select count(tab.*) from tab";
+    ast = HQLParser.parseHQL(query);
+    select = HQLParser.findNodeByPath(ast, TOK_INSERT, TOK_SELECT);
+    selectStr = HQLParser.getString(select);
+    System.out.println(selectStr);
+    Assert.assertEquals("count( tab . * )", selectStr);
+  }
+
 }

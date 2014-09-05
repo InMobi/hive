@@ -1395,4 +1395,22 @@ public class TestCubeRewriter {
     String hql = context.toHQL();
     Assert.assertNotNull(hql);
   }
+
+  @Test
+  public void testCubeQueryWithSpaceInAlias() throws Exception {
+    String query = "SELECT sum(msr2) as `a measure` from testCube where " + twoDaysRange;
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(conf);
+    try {
+      HQLParser.printAST(HQLParser.parseHQL(query));
+      CubeQueryContext ctx = rewriter.rewrite(query);
+      String hql = ctx.toHQL();
+      Assert.assertNotNull(hql);
+      // test that quotes are preserved
+      Assert.assertTrue(hql.contains("`a measure`"));
+      System.out.println("@@ hql: " + hql);
+    } catch (NullPointerException npe) {
+      npe.printStackTrace();
+      Assert.fail("Not expecting null pointer exception");
+    }
+  }
 }

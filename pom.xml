@@ -22,7 +22,7 @@
   </parent>
   <groupId>org.apache.hive</groupId>
   <artifactId>hive</artifactId>
-  <version>0.13.1-inm-SNAPSHOT</version>
+  <version>0.13.2-inm-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Hive</name>
@@ -35,6 +35,7 @@
     <connection>scm:git:git://github.com/InMobi/hive</connection>
     <url>https://github.com/InMobi/hive</url>
     <developerConnection>scm:git:git@github.com:InMobi/hive.git</developerConnection>
+    <tag>hive-0.13.1-inm</tag>
   </scm>
 
 
@@ -136,8 +137,7 @@
     <mockito-all.version>1.9.5</mockito-all.version>
     <mina.version>2.0.0-M5</mina.version>
     <!--netty is not a direct dependency but due to a change
-        in artifact name and given that zookeeper < 3.5 requires netty < 3.6.0 we force hadoops version
-      -->
+        in artifact name and given that zookeeper < 3.5 requires netty < 3.6.0 we force hadoops version -->
     <netty.version>3.4.0.Final</netty.version>
     <parquet.version>1.3.2</parquet.version>
     <pig.version>0.12.0</pig.version>
