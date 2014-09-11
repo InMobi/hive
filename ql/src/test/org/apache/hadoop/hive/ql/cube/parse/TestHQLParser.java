@@ -271,18 +271,21 @@ public class TestHQLParser {
     String selectStr = HQLParser.getString(select);
     System.out.println(selectStr);
     Assert.assertEquals(" * ", selectStr);
+
     query = "select tab.*, tab2.a, tab2.b from tab";
     ASTNode ast = HQLParser.parseHQL(query);
     select = HQLParser.findNodeByPath(ast, TOK_INSERT, TOK_SELECT);
     selectStr = HQLParser.getString(select);
     System.out.println(selectStr);
     Assert.assertEquals(" tab . * , ( tab2 . a ), ( tab2 . b )", selectStr);
+
     query = "select count(*) from tab";
     ast = HQLParser.parseHQL(query);
     select = HQLParser.findNodeByPath(ast, TOK_INSERT, TOK_SELECT);
     selectStr = HQLParser.getString(select);
     System.out.println(selectStr);
-    Assert.assertEquals(" count (*) ", selectStr);
+    Assert.assertEquals(" count(*) ", selectStr);
+
     query = "select count(tab.*) from tab";
     ast = HQLParser.parseHQL(query);
     select = HQLParser.findNodeByPath(ast, TOK_INSERT, TOK_SELECT);

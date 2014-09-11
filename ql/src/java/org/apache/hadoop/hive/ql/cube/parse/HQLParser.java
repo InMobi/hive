@@ -367,6 +367,10 @@ public class HQLParser {
         && P_WSPACE.matcher(rootText).find()) {
         // If column alias contains spaces, enclose in back quotes
         buf.append(" as `").append(rootText).append("` ");
+      } else if (Identifier == rootType &&
+        TOK_FUNCTIONSTAR == ((ASTNode)root.getParent()).getToken().getType()) {
+        // count(*) or count(someTab.*): Don't append space after the identifier
+        buf.append(" ").append(rootText == null ? "" : rootText.toLowerCase());
       } else {
         buf.append(" ").append(rootText == null ? "" : rootText.toLowerCase()).append(" ");
       }
