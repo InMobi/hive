@@ -844,6 +844,38 @@ public class CubeQueryContext {
     return hqlContext;
   }
 
+  public boolean shouldReplaceTimeDimWithPart() {
+    return getHiveConf().getBoolean(CubeQueryConfUtil.REPLACE_TIMEDIM_WITH_PART_COL,
+      CubeQueryConfUtil.DEFAULT_REPLACE_TIMEDIM_WITH_PART_COL);
+  }
+
+  public String getPartitionColumnOfTimeDim(String timeDimName) {
+    if (!hasCubeInQuery()) {
+      return timeDimName;
+    }
+
+    AbstractCubeTable cube = (AbstractCubeTable) getCube();
+    String partCol = cube.getProperties().get(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + timeDimName);
+    return StringUtils.isNotBlank(partCol) ? partCol : timeDimName;
+  }
+
+  public String getTimeDimOfPartitionColumn(String partCol) {
+    if (!hasCubeInQuery()) {
+      return partCol;
+    }
+
+    AbstractCubeTable cube = (AbstractCubeTable) getCube();
+    Map<String, String> properties = cube.getProperties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (entry.getKey().startsWith(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX )
+        && entry.getValue().equalsIgnoreCase(partCol)) {
+        String timeDim = entry.getKey().replace(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX , "");
+        return timeDim;
+      }
+    }
+    return partCol;
+  }
+
   static interface CandidateTable {
     public String getStorageString(String alias);
   }

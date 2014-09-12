@@ -84,10 +84,14 @@ public class FactPartition implements Comparable<FactPartition> {
   }
 
   public String getFormattedFilter(String tableName) {
+    return getFormattedFilter(partCol, tableName);
+  }
+
+  public String getFormattedFilter(String partCol, String tableName) {
     StringBuilder builder = new StringBuilder();
     if (containingPart != null) {
-        builder.append(containingPart.getFormattedFilter(tableName));
-        builder.append(" AND ");
+      builder.append(containingPart.getFormattedFilter(tableName));
+      builder.append(" AND ");
     }
     if (tableName != null) {
       builder.append(tableName);

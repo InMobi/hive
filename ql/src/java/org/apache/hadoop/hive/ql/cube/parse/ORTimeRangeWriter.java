@@ -26,7 +26,7 @@ import java.util.Set;
 public class ORTimeRangeWriter implements TimeRangeWriter {
 
   @Override
-  public String getTimeRangeWhereClause(String tableName,
+  public String getTimeRangeWhereClause(CubeQueryContext cubeQueryContext, String tableName,
       Set<FactPartition> rangeParts) {
     if (rangeParts.size() == 0) {
       return "";
@@ -34,8 +34,11 @@ public class ORTimeRangeWriter implements TimeRangeWriter {
     StringBuilder partStr = new StringBuilder();
     Iterator<FactPartition> it = rangeParts.iterator();
     while (it.hasNext()) {
+      FactPartition factPartition = it.next();
       partStr.append("(");
-      partStr.append(it.next().getFormattedFilter(tableName));
+
+      String partFilter = TimeRangeUtils.getTimeRangePartitionFilter(factPartition, cubeQueryContext, tableName);
+      partStr.append(partFilter);
       partStr.append(")");
       if (it.hasNext()) {
         partStr.append(" OR ");

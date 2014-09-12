@@ -87,6 +87,11 @@ public class TimerangeResolver implements ContextRewriter {
     builder.astNode(timenode);
 
     String timeDimName = PlanUtils.stripQuotes(timenode.getChild(1).getText());
+
+    // Replace timeDimName with column which is used for partitioning. Assume the same column
+    // is used as a partition column in all storages of the fact
+    timeDimName = cubeql.getPartitionColumnOfTimeDim(timeDimName);
+
     if (cubeql.getCube().getTimedDimensions().contains(timeDimName)) {
       builder.partitionColumn(timeDimName);
     } else {
