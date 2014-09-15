@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.hive.ql.cube.parse.CubeQueryConfUtil;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
@@ -398,5 +399,22 @@ public class Cube extends AbstractBaseTable implements CubeInterface {
     fieldNames.addAll(getDimAttributeNames());
     fieldNames.addAll(getTimedDimensions());
     return fieldNames;
+  }
+
+  public String getPartitionColumnOfTimeDim(String timeDimName) {
+    String partCol = getProperties().get(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + timeDimName);
+    return StringUtils.isNotBlank(partCol) ? partCol : timeDimName;
+  }
+
+  public String getTimeDimOfPartitionColumn(String partCol) {
+    Map<String, String> properties = getProperties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (entry.getKey().startsWith(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX )
+        && entry.getValue().equalsIgnoreCase(partCol)) {
+        String timeDim = entry.getKey().replace(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX , "");
+        return timeDim;
+      }
+    }
+    return partCol;
   }
 }

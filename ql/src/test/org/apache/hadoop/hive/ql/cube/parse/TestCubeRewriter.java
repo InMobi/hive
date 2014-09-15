@@ -1413,4 +1413,40 @@ public class TestCubeRewriter {
       Assert.fail("Not expecting null pointer exception");
     }
   }
+
+  @Test
+  public void testTimeDimensionAndPartCol() throws Exception {
+    // Test if time dimension is replaced with partition column
+    // Disabling conf should not replace the time dimension
+
+    String query = "SELECT test_time_dim, msr2 FROM testCube where "
+      + "time_range_in('test_time_dim', '" + CubeTestSetup.getDateUptoHours(
+      twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
+
+    HiveConf hconf = new HiveConf(conf, TestCubeRewriter.class);
+    hconf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1,C2,C3,C4");
+    hconf.setBoolean(CubeQueryConfUtil.REPLACE_TIMEDIM_WITH_PART_COL, true);
+
+    CubeQueryRewriter rewriter = new CubeQueryRewriter(hconf);
+    CubeQueryContext context = rewriter.rewrite(query);
+    String hql = context.toHQL();
+    System.out.println("@@" + hql);
+    Assert.assertTrue(hql.contains("testcube.ttd") && hql.contains("test_time_dim"));
+
+    Assert.assertTrue(context.shouldReplaceTimeDimWithPart());
+
+    String partCol = context.getPartitionColumnOfTimeDim("test_time_dim");
+    Assert.assertEquals("ttd", partCol);
+
+    String timeDimCol = context.getTimeDimOfPartitionColumn("ttd");
+    Assert.assertEquals("test_time_dim".toLowerCase(), timeDimCol);
+
+    // Rewrite with setting disabled
+    hconf.setBoolean(CubeQueryConfUtil.REPLACE_TIMEDIM_WITH_PART_COL, false);
+    rewriter = new CubeQueryRewriter(hconf);
+    context = rewriter.rewrite(query);
+    hql = context.toHQL();
+    System.out.println("@@2 " + hql);
+    Assert.assertTrue(!hql.contains("testcube.ttd") && hql.contains("test_time_dim"));
+  }
 }
