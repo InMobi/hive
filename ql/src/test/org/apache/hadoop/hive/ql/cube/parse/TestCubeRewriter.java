@@ -1413,4 +1413,5 @@ public class TestCubeRewriter {
       Assert.fail("Not expecting null pointer exception");
     }
   }
+
 }

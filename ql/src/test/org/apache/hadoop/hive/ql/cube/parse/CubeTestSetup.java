@@ -519,6 +519,17 @@ public class CubeTestSetup {
         new FieldSchema("dim2", "int", "ref dim"), "Dim2 refer",
         new TableReference("testdim2", "id")));
 
+    // denormalized reference
+    cubeDimensions.add(new ReferencedDimAtrribute(
+        new FieldSchema("dim2big1", "bigint", "ref dim"), "Dim2 refer",
+        new TableReference("testdim2", "bigid1")));
+    cubeDimensions.add(new ReferencedDimAtrribute(
+        new FieldSchema("dim2big2", "bigint", "ref dim"), "Dim2 refer",
+        new TableReference("testdim2", "bigid2")));
+    cubeDimensions.add(new ReferencedDimAtrribute(
+        new FieldSchema("dim2bignew", "bigint", "ref dim"), "Dim2 refer",
+        new TableReference("testdim2", "bigidnew"), now, null, null));
+
     Set<ExprColumn> exprs = new HashSet<ExprColumn>(); 
     exprs.add(new ExprColumn(new FieldSchema("avgmsr", "double",
         "avg measure"), "Avg Msr",
@@ -822,6 +833,9 @@ public class CubeTestSetup {
         new FieldSchema("stateid", "int", "state id"), "State refer",
         new TableReference("statedim", "id")));
     cityAttrs.add(new ReferencedDimAtrribute(
+        new FieldSchema("statename", "string", "state name"), "State name",
+        new TableReference("statedim", "name")));
+    cityAttrs.add(new ReferencedDimAtrribute(
         new FieldSchema("zipcode", "int", "zip code"), "Zip refer",
         new TableReference("zipdim", "code")));
     Map<String, String> dimProps = new HashMap<String, String>();
@@ -878,6 +892,12 @@ public class CubeTestSetup {
     Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
         "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("bigid1", "bigint",
+        "big id")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("bigid2", "bigint",
+        "big id")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("bigidnew", "bigint",
+        "big id")));
     dimAttrs.add(new BaseDimAttribute(new FieldSchema("name", "string",
         "name")));
     dimAttrs.add(new ReferencedDimAtrribute(
@@ -917,6 +937,27 @@ public class CubeTestSetup {
     storageTables.put(c2, s2);
 
     client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
+
+    // create table2
+    dimTblName = "testDim2Tbl2";
+    dimColumns = new ArrayList<FieldSchema>();
+    dimColumns.add(new FieldSchema("id", "int", "code"));
+    dimColumns.add(new FieldSchema("bigid1", "int", "code"));
+    dimColumns.add(new FieldSchema("name", "string", "field1"));
+
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 10L,
+         dumpPeriods, dimProps, storageTables);
+
+    // create table2
+    dimTblName = "testDim2Tbl3";
+    dimColumns = new ArrayList<FieldSchema>();
+    dimColumns.add(new FieldSchema("id", "int", "code"));
+    dimColumns.add(new FieldSchema("bigid1", "int", "code"));
+    dimColumns.add(new FieldSchema("name", "string", "field1"));
+    dimColumns.add(new FieldSchema("testDim3id", "string", "f-key to testdim3"));
+
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 20L,
          dumpPeriods, dimProps, storageTables);
   }
 
@@ -1305,14 +1346,13 @@ public class CubeTestSetup {
     // add dimensions of the cube
     factColumns.add(new FieldSchema("dim1","string", "dim1"));
     factColumns.add(new FieldSchema("dim2","string", "dim2"));
+    factColumns.add(new FieldSchema("dim2big","string", "dim2"));
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
     factColumns.add(new FieldSchema("cityid","int", "city id"));
     Set<UpdatePeriod> updates  = new HashSet<UpdatePeriod>();
     updates.add(UpdatePeriod.MINUTELY);
     updates.add(UpdatePeriod.HOURLY);
     updates.add(UpdatePeriod.DAILY);
-    Map<String, Set<UpdatePeriod>> storageUpdatePeriods =
-        new HashMap<String, Set<UpdatePeriod>>();
 
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
@@ -1338,6 +1378,8 @@ public class CubeTestSetup {
     s2.setPartCols(partCols2);
     s2.setTimePartCols(timePartCols2);
 
+    Map<String, Set<UpdatePeriod>> storageUpdatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
     storageUpdatePeriods.put(c1, updates);
     storageUpdatePeriods.put(c2, updates);
 
@@ -1375,6 +1417,23 @@ public class CubeTestSetup {
         storageUpdatePeriods, 30L, properties);
     client.createCubeTable(fact3, storageTables);
     createPIEParts(client, fact3, c2);
+
+    // create summary4 only on c2
+    storageUpdatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    storageUpdatePeriods.put(c2, updates);
+
+    storageTables = new HashMap<String, StorageTableDesc>();
+    storageTables.put(c2, s2);
+    factName = "summary4";
+    properties = new HashMap<String, String>();
+    validColumns = commonCols.toString() + ",dim1,dim2big1,dim2big2";
+    properties.put(MetastoreUtil.getValidColumnsKey(factName),
+        validColumns);
+    CubeFactTable fact4 = new CubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+        storageUpdatePeriods, 15L, properties);
+    client.createCubeTable(fact4, storageTables);
+    createPIEParts(client, fact4, c2);
   }
 
   private void createPIEParts(CubeMetastoreClient client, CubeFactTable fact,
