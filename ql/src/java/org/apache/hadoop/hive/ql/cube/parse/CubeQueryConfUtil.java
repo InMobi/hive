@@ -36,6 +36,7 @@ public class CubeQueryConfUtil {
   public static final String VALID_PFX = "cube.query.valid.";
   public static final String VALID_FACT_PFX = "cube.query.valid." +
       "fact.";
+  public static final String TIMEDIM_TO_PART_MAPPING_PFX = "cube.query.timedim.partition.";
 
   public static final String VALID_STORAGE_DIM_TABLES = "cube.query.valid." +
       "dim.storgaetables";
@@ -59,11 +60,14 @@ public class CubeQueryConfUtil {
   public static final String ENABLE_SELECT_TO_GROUPBY =
       "cube.query.promote.select.togroupby";
 
+  public static final String REPLACE_TIMEDIM_WITH_PART_COL =
+    "cube.query.replace.timedim";
   public static final boolean DEFAULT_MULTI_TABLE_SELECT = true;
   public static final int DEFAULT_LOOK_AHEAD_PT_PARTS = 1;
   public static final boolean DEFAULT_ENABLE_GROUP_BY_TO_SELECT = false;
   public static final boolean DEFAULT_ENABLE_SELECT_TO_GROUPBY = false;
   public static final boolean DEFAULT_ADD_NON_EXISTING_PARTITIONS = false;
+  public static final boolean DEFAULT_REPLACE_TIMEDIM_WITH_PART_COL = false;
 
   public static String getLookAheadPTPartsKey(UpdatePeriod interval) {
     return LOOK_AHEAD_PT_PARTS_PFX + interval.name().toLowerCase();

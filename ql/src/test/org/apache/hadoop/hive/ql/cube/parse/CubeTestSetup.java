@@ -68,6 +68,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.TextInputFormat;
 
 /*
@@ -114,6 +115,7 @@ public class CubeTestSetup {
   private static String c1 = "C1";
   private static String c2 = "C2";
   private static String c3 = "C3";
+  private static String c4 = "C4";
 
   public static void init () {
     if (inited) {
@@ -565,7 +567,9 @@ public class CubeTestSetup {
     Map<String, String> cubeProperties =
         new HashMap<String, String>();
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
-        TEST_CUBE_NAME), "dt,pt,it,et");
+        TEST_CUBE_NAME), "dt,pt,it,et,test_time_dim");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "test_time_dim", "ttd");
+
     client.createCube(TEST_CUBE_NAME, cubeMeasures, cubeDimensions, exprs, cubeProperties);
     
     Set<String> measures = new HashSet<String>();
@@ -603,22 +607,36 @@ public class CubeTestSetup {
     updates.add(UpdatePeriod.MONTHLY);
     updates.add(UpdatePeriod.QUARTERLY);
     updates.add(UpdatePeriod.YEARLY);
+
     ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
     List<String> timePartCols = new ArrayList<String>();
     partCols.add(TestCubeMetastoreClient.getDatePartition());
     timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
+
     StorageTableDesc s1 = new StorageTableDesc();
     s1.setInputFormat(TextInputFormat.class.getCanonicalName());
     s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
     s1.setPartCols(partCols);
     s1.setTimePartCols(timePartCols);
 
+    StorageTableDesc s2 = new StorageTableDesc();
+    s2.setInputFormat(TextInputFormat.class.getCanonicalName());
+    s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    ArrayList<FieldSchema> s2PartCols = new ArrayList<FieldSchema>();
+    s2PartCols.add(new FieldSchema("ttd",
+      serdeConstants.STRING_TYPE_NAME,
+      "test date partition"));
+    s2.setPartCols(s2PartCols);
+    s2.setTimePartCols(Arrays.asList("ttd"));
+
     storageAggregatePeriods.put(c1, updates);
     storageAggregatePeriods.put(c2, updates);
     storageAggregatePeriods.put(c3, updates);
+    storageAggregatePeriods.put(c4, updates);
 
     Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
     storageTables.put(c1, s1);
+    storageTables.put(c4, s2);
     storageTables.put(c2, s1);
     storageTables.put(c3, s1);
     // create cube fact
@@ -1294,36 +1312,42 @@ public class CubeTestSetup {
   }
 
   public void createSources(HiveConf conf, String dbName) throws Exception {
-    CubeMetastoreClient client =  CubeMetastoreClient.getInstance(conf);
-    Database database = new Database();
-    database.setName(dbName);
-    Hive.get(conf).createDatabase(database);
-    client.setCurrentDatabase(dbName);
-    client.createStorage(new HDFSStorage(c1));
-    client.createStorage(new HDFSStorage(c2));
-    client.createStorage(new HDFSStorage(c3));
-    createCube(client);
-    createCubeFact(client);
-    // commenting this as the week date format throws IllegalPatternException
-    //createCubeFactWeekly(client);
-    createCubeFactOnlyHourly(client);
-    createCubeFactOnlyHourlyRaw(client);
+    try {
+      CubeMetastoreClient client = CubeMetastoreClient.getInstance(conf);
+      Database database = new Database();
+      database.setName(dbName);
+      Hive.get(conf).createDatabase(database);
+      client.setCurrentDatabase(dbName);
+      client.createStorage(new HDFSStorage(c1));
+      client.createStorage(new HDFSStorage(c2));
+      client.createStorage(new HDFSStorage(c3));
+      client.createStorage(new HDFSStorage(c4));
+      createCube(client);
+      createCubeFact(client);
+      // commenting this as the week date format throws IllegalPatternException
+      //createCubeFactWeekly(client);
+      createCubeFactOnlyHourly(client);
+      createCubeFactOnlyHourlyRaw(client);
 
-    createCityTbale(client);
-    // For join resolver test
-    createTestDim2(client);
-    createTestDim3(client);
-    createTestDim4(client);
+      createCityTbale(client);
+      // For join resolver test
+      createTestDim2(client);
+      createTestDim3(client);
+      createTestDim4(client);
 
-    // For join resolver cyclic links in dimension tables
-    createCyclicDim1(client);
-    createCyclicDim2(client);
+      // For join resolver cyclic links in dimension tables
+      createCyclicDim1(client);
+      createCyclicDim2(client);
 
-    createCubeFactMonthly(client);
-    createZiptable(client);
-    createCountryTable(client);
-    createStateTable(client);
-    createCubeFactsWithValidColumns(client);
+      createCubeFactMonthly(client);
+      createZiptable(client);
+      createCountryTable(client);
+      createStateTable(client);
+      createCubeFactsWithValidColumns(client);
+    } catch (Exception exc) {
+      exc.printStackTrace();
+      throw exc;
+    }
   }
 
   public void dropSources(HiveConf conf) throws Exception {

@@ -30,7 +30,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 public class BetweenTimeRangeWriter implements TimeRangeWriter {
 
   @Override
-  public String getTimeRangeWhereClause(String tableName,
+  public String getTimeRangeWhereClause(CubeQueryContext cubeQueryContext, String tableName,
       Set<FactPartition> rangeParts) throws SemanticException {
     if (rangeParts.size() == 0) {
       return "";
@@ -38,7 +38,9 @@ public class BetweenTimeRangeWriter implements TimeRangeWriter {
     StringBuilder partStr = new StringBuilder();
     if (rangeParts.size() == 1) {
       partStr.append("(");
-      partStr.append(rangeParts.iterator().next().getFormattedFilter(tableName));
+      String partFilter = TimeRangeUtils.getTimeRangePartitionFilter(
+        rangeParts.iterator().next(), cubeQueryContext, tableName);
+      partStr.append(partFilter);
       partStr.append(")");
     } else {
       TreeSet<FactPartition> parts = new TreeSet<FactPartition>();
@@ -68,8 +70,14 @@ public class BetweenTimeRangeWriter implements TimeRangeWriter {
       
       FactPartition start = parts.first();
       FactPartition end = parts.last();
+
+      String partCol = start.getPartCol();
+      if (cubeQueryContext != null && !cubeQueryContext.shouldReplaceTimeDimWithPart()) {
+        partCol = cubeQueryContext.getTimeDimOfPartitionColumn(partCol);
+      }
+
       partStr.append(" (").append(tableName).append(".")
-             .append(start.getPartCol())
+             .append(partCol)
              .append(" BETWEEN ")
              .append(start.getFormattedPartSpec())
              .append(" AND ")
