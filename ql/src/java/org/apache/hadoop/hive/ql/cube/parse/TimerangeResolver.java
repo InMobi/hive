@@ -167,7 +167,7 @@ public class TimerangeResolver implements ContextRewriter {
       return;
     }
     // Get cube columns which are part of join chain
-    List<String> joinColumns = joinContext.getAllJoinPathColumnsOfTable((AbstractCubeTable) cubeql.getCube());
+    Set<String> joinColumns = joinContext.getAllJoinPathColumnsOfTable((AbstractCubeTable) cubeql.getCube());
     if (joinColumns == null || joinColumns.isEmpty()) {
       return;
     }
