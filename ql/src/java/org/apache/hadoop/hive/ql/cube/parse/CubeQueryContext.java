@@ -949,6 +949,7 @@ public class CubeQueryContext {
   static class CandidateFact implements CandidateTable {
     final CubeFactTable fact;
     Set<String> storageTables;
+    // flag to know if querying multiple storage tables is enabled for this fact
     boolean enabledMultiTableSelect;
     int numQueriedParts = 0;
     final Map<TimeRange, String> rangeToWhereClause = new HashMap<TimeRange, String>();
