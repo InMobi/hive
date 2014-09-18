@@ -207,9 +207,8 @@ public class CandidateTableResolver implements ContextRewriter {
           if (!cubeql.getCube().getTimedDimensions().contains(col.toLowerCase())) {
             if (validFactCols != null) {
               if (!validFactCols.contains(col.toLowerCase())) {
-                if (cubeql.getDenormCtx().addRefUsage(cfact, col, cubeql.getCube().getName())) {
-                  // available as referenced col
-                } else {
+                // check if it available as reference, if not remove the candidate
+                if (!cubeql.getDenormCtx().addRefUsage(cfact, col, cubeql.getCube().getName())) {
                   LOG.info("Not considering fact table:" + fact +
                       " as column " + col + " is not valid");
                   cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
@@ -219,9 +218,8 @@ public class CandidateTableResolver implements ContextRewriter {
                 }
               }
             } else if(!factCols.contains(col.toLowerCase())) {
-              if (cubeql.getDenormCtx().addRefUsage(cfact, col, cubeql.getCube().getName())) {
-                // available as referenced col
-              } else {
+              // check if it available as reference, if not remove the candidate
+              if (!cubeql.getDenormCtx().addRefUsage(cfact, col, cubeql.getCube().getName())) {
                 LOG.info("Not considering fact table:" + fact +
                     " as column " + col + " is not available");
                 cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
@@ -398,9 +396,8 @@ public class CandidateTableResolver implements ContextRewriter {
           if (cubeql.getColumnsQueried(dim.getName()) != null) {
             for (String col : cubeql.getColumnsQueried(dim.getName())) {
               if (!dimCols.contains(col.toLowerCase())) {
+                // check if it available as reference, if not remove the candidate
                 if (cubeql.getDenormCtx().addRefUsage(cdim, col, dim.getName())) {
-                  // available as referenced col
-                } else {
                   LOG.info("Not considering dimtable:" + dimtable +
                       " as column " + col + " is not available");
                   cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(
