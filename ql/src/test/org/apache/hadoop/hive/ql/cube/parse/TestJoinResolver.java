@@ -181,7 +181,7 @@ public class TestJoinResolver {
     }
   }
 
-  private String getAutoResolvedFromString(CubeQueryContext query) {
+  private String getAutoResolvedFromString(CubeQueryContext query) throws SemanticException {
     if (query.getAutoJoinCtx() != null) {
       return query.getAutoJoinCtx().getFromString(query.getHqlContext(), query);
     }

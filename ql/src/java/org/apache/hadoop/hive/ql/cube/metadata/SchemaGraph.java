@@ -94,15 +94,17 @@ public class SchemaGraph {
 
     public JoinPath() {
       edges = new ArrayList<TableRelationship>();
-      initColumnsForTable();
     }
 
     public JoinPath(JoinPath other) {
       edges = new ArrayList<TableRelationship>(other.edges);
-      initColumnsForTable();
     }
 
-    void initColumnsForTable() {
+    public void initColumnsForTable() {
+      if (!columnsForTable.isEmpty()) {
+        // already inited
+        return;
+      }
       for (TableRelationship edge : edges) {
         addColumnsForEdge(edge);
       }
@@ -139,6 +141,10 @@ public class SchemaGraph {
 
     public List<String> getColumnsForTable(AbstractCubeTable table) {
       return columnsForTable.get(table);
+    }
+
+    public Set<AbstractCubeTable> getAllTables() {
+      return columnsForTable.keySet(); 
     }
 
     public boolean containsColumnOfTable(String column, AbstractCubeTable table) {
