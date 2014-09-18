@@ -213,6 +213,7 @@ public class TestDenormalizationResolver {
 
   @Test
   public void testDimensionQuery() throws Exception {
+    driver = new CubeQueryRewriter(new HiveConf(conf, HiveConf.class));
     String hqlQuery = rewrite(driver, "select citydim.name, citydim.statename from" +
         " citydim");
 

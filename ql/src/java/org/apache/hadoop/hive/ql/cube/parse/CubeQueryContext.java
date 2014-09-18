@@ -202,6 +202,10 @@ public class CubeQueryContext {
     }
   }
 
+  // Holds the context of optional dimension
+  // A dimension is optional if it is not queried directly by the user, but is 
+  // required by a candidate table to get a denormalized field from reference
+  // or required in a join chain
   static class OptionalDimCtx {
     OptionalDimCtx() {
     }
@@ -218,7 +222,7 @@ public class CubeQueryContext {
       tblName = alias;
     }
     try {
-      LOG.info("Adding optional table:" + alias);
+      LOG.info("Adding optional dimension:" + alias);
       if (client.isDimension(tblName)) {
         Dimension dim;
         if (cubeTbls.containsKey(alias)) {

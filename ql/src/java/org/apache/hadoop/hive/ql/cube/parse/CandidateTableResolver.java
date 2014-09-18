@@ -343,6 +343,11 @@ public class CandidateTableResolver implements ContextRewriter {
     }
   }
 
+  /**
+   * This method checks if the source columns(resolved through automatic join resolver)
+   * for reaching the references are available in candidate tables that want to
+   * use references
+   */
   private void checkForSourceReachabilityForDenormCandidates(CubeQueryContext cubeql) {
     if (cubeql.getOptionalDimensionMap().isEmpty()) {
       return;
@@ -397,7 +402,7 @@ public class CandidateTableResolver implements ContextRewriter {
             for (String col : cubeql.getColumnsQueried(dim.getName())) {
               if (!dimCols.contains(col.toLowerCase())) {
                 // check if it available as reference, if not remove the candidate
-                if (cubeql.getDenormCtx().addRefUsage(cdim, col, dim.getName())) {
+                if (!cubeql.getDenormCtx().addRefUsage(cdim, col, dim.getName())) {
                   LOG.info("Not considering dimtable:" + dimtable +
                       " as column " + col + " is not available");
                   cubeql.addDimPruningMsgs(dim, dimtable, new CandidateTablePruneCause(

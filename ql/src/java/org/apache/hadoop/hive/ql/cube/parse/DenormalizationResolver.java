@@ -48,6 +48,14 @@ import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * This class resolves all the reference columns that are queried.
+ * 
+ * Keeps track of the context that if any candidate needs to use columns through
+ * tables referenced and replaces the columns from referenced tables in all the 
+ * ASTs
+ *
+ */
 public class DenormalizationResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(DenormalizationResolver.class);
