@@ -48,7 +48,9 @@ public class CandidateTablePruneCause {
     // cube table is an aggregated fact and queried column is not under default aggregate
     MISSING_DEFAULT_AGGREGATE,
     NO_FACT_UPDATE_PERIODS_FOR_GIVEN_RANGE,
-    NO_COLUMN_PART_OF_A_JOIN_PATH
+    NO_COLUMN_PART_OF_A_JOIN_PATH,
+    // candidate table tries to get denormalized field from dimension and the referred dimension is invalid. 
+    INVALID_DENORM_TABLE
   }
   
   public enum SkipStorageCause {

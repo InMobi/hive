@@ -148,8 +148,13 @@ public class StorageTableResolver implements ContextRewriter {
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)
       throws SemanticException {
-    for (Dimension dim : cubeql.getDimensions()) {
+    Set<Dimension> allDims = new HashSet<Dimension>(cubeql.getDimensions());
+    allDims.addAll(cubeql.getOptionalDimensions());
+    for (Dimension dim : allDims) {
       Set<CandidateDim> dimTables = cubeql.getCandidateDimTables().get(dim);
+      if (dimTables == null || dimTables.isEmpty()) {
+        continue;
+      }
       for (Iterator<CandidateDim> i = dimTables.iterator(); i.hasNext();) {
         CandidateDim candidate = i.next();
         CubeDimensionTable dimtable = candidate.dimtable;

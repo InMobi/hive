@@ -73,6 +73,9 @@ public class CubeQueryContext {
   protected Set<Dimension> dimensions =
       new HashSet<Dimension>();
 
+  // would be added through join chains and de-normalized resolver
+  protected Map<Dimension, OptionalDimCtx> optionalDimensions =
+      new HashMap<Dimension, OptionalDimCtx>();
 
   // Alias to table object mapping of tables accessed in this query
   private final Map<String, AbstractCubeTable> cubeTbls =
@@ -95,11 +98,6 @@ public class CubeQueryContext {
       new HashMap<Dimension, Set<CandidateDim>>();
 
   // query trees
-  private String whereTree;
-  private String havingTree;
-  private String orderByTree;
-  private String selectTree;
-  private String groupByTree;
   private ASTNode havingAST;
   private ASTNode selectAST;
   private ASTNode whereAST;
@@ -107,6 +105,7 @@ public class CubeQueryContext {
   private ASTNode groupByAST;
   private CubeMetastoreClient client;
   private JoinResolver.AutoJoinContext autoJoinCtx;
+  private DenormalizationResolver.DenormalizationContext deNormCtx;
   private Map<CubeFactTable, List<CandidateTablePruneCause>> factPruningMsgs = 
       new HashMap<CubeFactTable, List<CandidateTablePruneCause>>();
   private Map<Dimension, Map<CubeDimensionTable, List<CandidateTablePruneCause>>> dimPruningMsgs = 
@@ -125,29 +124,19 @@ public class CubeQueryContext {
       throw new SemanticException(e);
     }
     if (qb.getParseInfo().getWhrForClause(clauseName) != null) {
-      this.whereTree = HQLParser.getString(
-          qb.getParseInfo().getWhrForClause(clauseName));
       this.whereAST = qb.getParseInfo().getWhrForClause(clauseName);
     }
     if (qb.getParseInfo().getHavingForClause(clauseName) != null) {
-      this.havingTree = HQLParser.getString(qb.getParseInfo().getHavingForClause(
-          clauseName));
       this.havingAST = qb.getParseInfo().getHavingForClause(
           clauseName);
     }
     if (qb.getParseInfo().getOrderByForClause(clauseName) != null) {
-      this.orderByTree = HQLParser.getString(qb.getParseInfo()
-          .getOrderByForClause(clauseName));
       this.orderByAST = qb.getParseInfo().getOrderByForClause(clauseName);
     }
     if (qb.getParseInfo().getGroupByForClause(clauseName) != null) {
-      this.groupByTree = HQLParser.getString(qb.getParseInfo()
-          .getGroupByForClause(clauseName));
       this.groupByAST = qb.getParseInfo().getGroupByForClause(clauseName);
     }
     if (qb.getParseInfo().getSelForClause(clauseName) != null) {
-      this.selectTree = HQLParser.getString(qb.getParseInfo().getSelForClause(
-          clauseName));
       this.selectAST = qb.getParseInfo().getSelForClause(
           clauseName);
     }
@@ -211,6 +200,57 @@ public class CubeQueryContext {
     } catch (HiveException e) {
       throw new SemanticException(e);
     }
+  }
+
+  // Holds the context of optional dimension
+  // A dimension is optional if it is not queried directly by the user, but is 
+  // required by a candidate table to get a denormalized field from reference
+  // or required in a join chain
+  static class OptionalDimCtx {
+    OptionalDimCtx() {
+    }
+    Set<String> colQueried = new HashSet<String>();
+    Set<CandidateTable> requiredForCandidates = new HashSet<CandidateTable>();
+    boolean isRequiredInJoinChain = false;
+  }
+
+  public void addOptionalDimTable(String alias, String col,
+      CandidateTable candidate, boolean isRequiredInJoin) throws SemanticException {
+    alias = alias.toLowerCase();
+    String tblName = qb.getTabNameForAlias(alias);
+    if (tblName == null) {
+      tblName = alias;
+    }
+    try {
+      LOG.info("Adding optional dimension:" + alias);
+      if (client.isDimension(tblName)) {
+        Dimension dim;
+        if (cubeTbls.containsKey(alias)) {
+          dim = (Dimension)cubeTbls.get(alias);
+        } else {
+          dim = client.getDimension(tblName);
+          cubeTbls.put(alias, dim);
+        }
+        OptionalDimCtx optDim = optionalDimensions.get(dim);
+        if (optDim == null) {
+          optDim = new OptionalDimCtx();
+          optionalDimensions.put(dim, optDim);
+        }
+        if (col != null && candidate != null) {
+          optDim.colQueried.add(col);
+          optDim.requiredForCandidates.add(candidate);
+        }
+        if (!optDim.isRequiredInJoinChain) {
+          optDim.isRequiredInJoinChain = isRequiredInJoin;
+        }
+      }
+    } catch (HiveException e) {
+      throw new SemanticException(e);
+    }
+  }
+
+  public AbstractCubeTable getCubeTableForAlias(String alias) {
+    return cubeTbls.get(alias);
   }
 
   private String getClause() {
@@ -415,19 +455,28 @@ public class CubeQueryContext {
   }
 
   public String getSelectTree() {
-    return selectTree;
+    return HQLParser.getString(selectAST);
   }
 
   public String getWhereTree() {
-    return whereTree;
+    if (whereAST != null) {
+      return HQLParser.getString(whereAST);
+    }
+    return null;
   }
 
   public String getGroupByTree() {
-    return groupByTree;
+    if (groupByAST != null) {
+      return HQLParser.getString(groupByAST);
+    }
+    return null;
   }
 
   public String getHavingTree() {
-    return havingTree;
+    if (havingAST != null) {
+      return HQLParser.getString(havingAST);
+    }
+    return null;
   }
 
   public ASTNode getJoinTree() {
@@ -439,7 +488,10 @@ public class CubeQueryContext {
   }
 
   public String getOrderByTree() {
-    return orderByTree;
+    if (orderByAST != null) {
+      return HQLParser.getString(orderByAST);
+    }
+    return null;
   }
 
   public Integer getLimitValue() {
@@ -558,20 +610,19 @@ public class CubeQueryContext {
     return conf.get(CubeQueryConfUtil.NON_EXISTING_PARTITIONS);
   }
 
-  private Map<Dimension, CandidateDim> pickCandidateDimsToQuery()
+  private Map<Dimension, CandidateDim> pickCandidateDimsToQuery(Set<Dimension> dimensions)
       throws SemanticException {
-    Map<Dimension, CandidateDim> dimsToQuery = null;
+    Map<Dimension, CandidateDim> dimsToQuery = new HashMap<Dimension, CandidateDim>();
     if (!dimensions.isEmpty()) {
-      dimsToQuery = new HashMap<Dimension, CandidateDim>();
       for (Dimension dim : dimensions) {
-        if (candidateDims.get(dim).size() > 0) {
+        if (candidateDims.get(dim) != null && candidateDims.get(dim).size() > 0) {
           CandidateDim cdim = candidateDims.get(dim).iterator().next();
           LOG.info("Available candidate dims are:" + candidateDims.get(dim) +
               ", picking up " + cdim.dimtable  + " for querying");
           dimsToQuery.put(dim, cdim);
         } else {
           String reason = "";
-          if (!dimPruningMsgs.get(dim).isEmpty()) {
+          if (dimPruningMsgs.get(dim) != null && !dimPruningMsgs.get(dim).isEmpty()) {
             ByteArrayOutputStream out = null;
             try {
               ObjectMapper mapper = new ObjectMapper();
@@ -579,7 +630,7 @@ public class CubeQueryContext {
               mapper.writeValue(out, dimPruningMsgs.get(dim).values());
               reason = out.toString("UTF-8");
             } catch (Exception e) {
-              throw new SemanticException("Error writing non existing parts", e);
+              throw new SemanticException("Error writing dim pruning messages", e);
             } finally {
               if (out != null) {
                 try {
@@ -615,7 +666,7 @@ public class CubeQueryContext {
             mapper.writeValue(out, factPruningMsgs.values());
             reason = out.toString("UTF-8");
           } catch (Exception e) {
-            throw new SemanticException("Error writing non existing parts", e);
+            throw new SemanticException("Error writing fact pruning messages", e);
           } finally {
             if (out != null) {
               try {
@@ -646,7 +697,27 @@ public class CubeQueryContext {
 
   private HQLContext hqlContext;
   public String toHQL() throws SemanticException {
-    hqlContext = new HQLContext(pickCandidateFactToQuery(), pickCandidateDimsToQuery(), this);
+    CandidateFact cfact = pickCandidateFactToQuery();
+    Map<Dimension, CandidateDim> dimsToQuery = pickCandidateDimsToQuery(dimensions);
+    Set<Dimension> denormTables = deNormCtx.rewriteDenormctx(cfact, dimsToQuery);
+    LOG.info("Adding denormTables " + denormTables + " to pick candidates");
+    if (dimsToQuery == null) {
+      dimsToQuery = pickCandidateDimsToQuery(denormTables);
+    } else {
+      dimsToQuery.putAll(pickCandidateDimsToQuery(denormTables));
+    }
+    if (autoJoinCtx != null) {
+      // add optional dims from Join resolver
+      Set<Dimension> joiningTables = autoJoinCtx.pickOptionalTables(cfact, dimsToQuery, this);
+      LOG.info("Adding joiningTables " + joiningTables + " to pick candidates");
+      if (dimsToQuery == null) {
+        dimsToQuery = pickCandidateDimsToQuery(joiningTables);
+      } else {
+        dimsToQuery.putAll(pickCandidateDimsToQuery(joiningTables));
+      }
+    }
+    LOG.info("Picked Fact:" + cfact + " dimsToQuery:" + dimsToQuery);
+    hqlContext = new HQLContext(cfact, dimsToQuery, this);
     return hqlContext.toHQL();
   }
 
@@ -683,26 +754,6 @@ public class CubeQueryContext {
       tblAliasToColumns.put(alias.toLowerCase(), cols);
     }
     cols.add(column);
-  }
-
-  public void setSelectTree(String selectTree) {
-    this.selectTree = selectTree;
-  }
-
-  public void setWhereTree(String whereTree) {
-    this.whereTree = whereTree;
-  }
-
-  public void setHavingTree(String havingTree) {
-    this.havingTree = havingTree;
-  }
-
-  public void setGroupByTree(String groupByTree) {
-    this.groupByTree = groupByTree;
-  }
-
-  public void setOrderByTree(String orderByTree) {
-    this.orderByTree = orderByTree;
   }
 
   public boolean isCubeMeasure(String col) {
@@ -783,6 +834,10 @@ public class CubeQueryContext {
     return groupByAST;
   }
 
+  public void setGroupByAST(ASTNode ast) {
+    this.groupByAST = ast;
+  }
+
   public AbstractCubeTable getQueriedTable(String alias) {
     if (cube != null && cube.getName().equalsIgnoreCase(qb.getTabNameForAlias((alias)))) {
       return (AbstractCubeTable)cube;
@@ -831,6 +886,22 @@ public class CubeQueryContext {
     return autoJoinCtx;
   }
 
+  public void setDenormCtx(DenormalizationResolver.DenormalizationContext deNormCtx) {
+    this.deNormCtx = deNormCtx;
+  }
+
+  public DenormalizationResolver.DenormalizationContext getDenormCtx() {
+    return this.deNormCtx;
+  }
+
+  public Set<Dimension> getOptionalDimensions() {
+    return optionalDimensions.keySet();
+  }
+
+  public Map<Dimension, OptionalDimCtx> getOptionalDimensionMap() {
+    return optionalDimensions;
+  }
+
   /**
    * @return the hqlContext
    */
@@ -871,16 +942,23 @@ public class CubeQueryContext {
 
   static interface CandidateTable {
     public String getStorageString(String alias);
+    public AbstractCubeTable getTable();
+    public AbstractCubeTable getBaseTable();
+    public String getName();
   }
   static class CandidateFact implements CandidateTable {
     final CubeFactTable fact;
     Set<String> storageTables;
+    // flag to know if querying multiple storage tables is enabled for this fact
     boolean enabledMultiTableSelect;
     int numQueriedParts = 0;
     final Map<TimeRange, String> rangeToWhereClause = new HashMap<TimeRange, String>();
     private boolean dbResolved = false;
-    CandidateFact(CubeFactTable fact) {
+    private CubeInterface baseTable;
+
+    CandidateFact(CubeFactTable fact, CubeInterface cube) {
       this.fact = fact;
+      this.baseTable = cube;
     }
 
     @Override
@@ -905,6 +983,45 @@ public class CubeQueryContext {
       return StringUtils.join(storageTables, ",") + " " + alias;
 
     }
+
+    @Override
+    public AbstractCubeTable getBaseTable() {
+      return (AbstractCubeTable)baseTable;
+    }
+
+    @Override
+    public CubeFactTable getTable() {
+      return fact;
+    }
+
+    @Override
+    public String getName() {
+      return fact.getName();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!super.equals(obj)) {
+        return false;
+      }
+      CandidateFact other = (CandidateFact) obj;
+
+      if (this.getTable() == null) {
+        if (other.getTable() != null) {
+          return false;
+        }
+      }
+      return true;
+    }
+    
+    @Override
+    public int hashCode() {
+      final int prime = 31;
+      int result = super.hashCode();
+      result = prime * result + ((getTable() == null) ? 0 :
+        getTable().getName().toLowerCase().hashCode());
+      return result;
+    }
   }
 
   static class CandidateDim implements CandidateTable {
@@ -913,6 +1030,7 @@ public class CubeQueryContext {
     String whereClause;
     private boolean dbResolved = false;
     private boolean whereClauseAdded = false;
+    private Dimension baseTable;
 
     public boolean isWhereClauseAdded() {
       return whereClauseAdded;
@@ -922,8 +1040,9 @@ public class CubeQueryContext {
       this.whereClauseAdded = true;
     }
 
-    CandidateDim(CubeDimensionTable dim) {
-      this.dimtable = dim;
+    CandidateDim(CubeDimensionTable dimtable, Dimension dim) {
+      this.dimtable = dimtable;
+      this.baseTable = dim;
     }
 
     @Override
@@ -942,6 +1061,44 @@ public class CubeQueryContext {
       }
       return storageTable + " " + alias;
     }
-    
+
+    @Override
+    public Dimension getBaseTable() {
+      return baseTable;
+    }
+
+    @Override
+    public CubeDimensionTable getTable() {
+      return dimtable;
+    }
+
+    @Override
+    public String getName() {
+      return dimtable.getName();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (!super.equals(obj)) {
+        return false;
+      }
+      CandidateDim other = (CandidateDim) obj;
+
+      if (this.getTable() == null) {
+        if (other.getTable() != null) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      final int prime = 31;
+      int result = super.hashCode();
+      result = prime * result + ((getTable() == null) ? 0 :
+        getTable().getName().toLowerCase().hashCode());
+      return result;
+    }
   }
 }

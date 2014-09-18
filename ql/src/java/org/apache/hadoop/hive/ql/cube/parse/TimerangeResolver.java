@@ -28,19 +28,24 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeColumn;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.SchemaGraph;
+import org.apache.hadoop.hive.ql.cube.parse.DenormalizationResolver.ReferencedQueriedColumn;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 
 public class TimerangeResolver implements ContextRewriter {
+  private static Log LOG = LogFactory.getLog(TimerangeResolver.class.getName());
 
   public TimerangeResolver(Configuration conf) {
   }
@@ -139,14 +144,31 @@ public class TimerangeResolver implements ContextRewriter {
       }
     }
 
+    // Look at referenced columns through denormalization resolver
+    // and do column life validation
+    Map<String, Set<ReferencedQueriedColumn>> refCols = cubeql.getDenormCtx().getReferencedCols();
+    for (String col : refCols.keySet()) {
+      Iterator<ReferencedQueriedColumn> refColIter = refCols.get(col).iterator();
+      while (refColIter.hasNext()) {
+        ReferencedQueriedColumn refCol = refColIter.next();
+        for (TimeRange range : cubeql.getTimeRanges()) {
+          if (isColumnLifeInvalid(refCol.col, range)) {
+            LOG.debug("The refernced column:" + refCol.col.getName() + " is not in the range queried");
+            refColIter.remove();
+            break;
+          }
+        }
+      }
+    }
+
     // Remove join paths that have columns with invalid life span
     JoinResolver.AutoJoinContext joinContext = cubeql.getAutoJoinCtx();
     if (joinContext == null) {
       return;
     }
     // Get cube columns which are part of join chain
-    List<String> joinColumns = joinContext.getJoinPathColumnsOfTable((AbstractCubeTable) cubeql.getCube());
-    if (joinColumns == null) {
+    Set<String> joinColumns = joinContext.getAllJoinPathColumnsOfTable((AbstractCubeTable) cubeql.getCube());
+    if (joinColumns == null || joinColumns.isEmpty()) {
       return;
     }
 
@@ -155,6 +177,7 @@ public class TimerangeResolver implements ContextRewriter {
       CubeColumn column = cubeql.getCube().getColumnByName(col);
       for (TimeRange range : cubeql.getTimeRanges()) {
         if (isColumnLifeInvalid(column, range)) {
+          LOG.info("Timerange queried is not in column life for "+ column + ", Removing join paths containing the column");
           // Remove join paths containing this column
           Map<Dimension, List<SchemaGraph.JoinPath>> allPaths = joinContext.getAllPaths();
 

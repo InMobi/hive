@@ -105,13 +105,9 @@ public class AggregateResolver implements ContextRewriter {
       return;
     }
 
-    String rewritSelect = resolveClause(cubeql, cubeql.getSelectAST());
-    cubeql.setSelectTree(rewritSelect);
+    resolveClause(cubeql, cubeql.getSelectAST());
 
-    String rewritHaving = resolveClause(cubeql, cubeql.getHavingAST());
-    if (StringUtils.isNotBlank(rewritHaving)) {
-      cubeql.setHavingTree(rewritHaving);
-    }
+    resolveClause(cubeql, cubeql.getHavingAST());
   }
 
   // We need to traverse the clause looking for eligible measures which can be wrapped inside aggregates

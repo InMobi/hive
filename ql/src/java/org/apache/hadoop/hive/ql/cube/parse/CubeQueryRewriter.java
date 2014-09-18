@@ -61,12 +61,18 @@ public class CubeQueryRewriter {
     rewriters.add(new ColumnResolver(conf));
     // Rewrite base trees (groupby, having, orderby, limit) using aliases
     rewriters.add(new AliasReplacer(conf));
+    DenormalizationResolver denormResolver = new DenormalizationResolver(conf);
+    CandidateTableResolver candidateTblResolver = new CandidateTableResolver(conf);
+    // De-normalized columns resolved
+    rewriters.add(denormResolver);
+    // Resolve candidate fact tables and dimension tables for columns queried
+    rewriters.add(candidateTblResolver);
     // Resolve joins and generate base join tree
     rewriters.add(new JoinResolver(conf));
     // resolve time ranges and do col life validation
     rewriters.add(new TimerangeResolver(conf));
-    // Resolve candidate fact tables and dimension tables
-    rewriters.add(new CandidateTableResolver(conf));
+    // Resolve candidate fact tables and dimension tables for columns included in join and denorm resolvers
+    rewriters.add(candidateTblResolver);
     // Resolve aggregations and generate base select tree
     rewriters.add(new AggregateResolver(conf));
     rewriters.add(new GroupbyResolver(conf));
@@ -75,6 +81,8 @@ public class CubeQueryRewriter {
     }
     // Resolve storage partitions and table names
     rewriters.add(new StorageTableResolver(conf));
+    // Check for candidate tables using de-normalized columns
+    rewriters.add(denormResolver);
     rewriters.add(new LeastPartitionResolver(conf));
     if (!lightFactFirst) {
       rewriters.add(new LightestFactResolver(conf));
