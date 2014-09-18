@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -83,6 +84,7 @@ import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Partitioner;
 import org.apache.hadoop.mapred.RunningJob;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Appender;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
@@ -415,9 +417,22 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
 
       Utilities.createTmpDirs(job, mWork);
       Utilities.createTmpDirs(job, rWork);
-
       // Finally SUBMIT the JOB!
-      rj = jc.submitJob(job);
+      final JobConf finalJobConf = job;
+      final String runAsUser = driverContext.getCtx().getConf().get(ConfVars.HIVEQUERYRUNASUSER.varname);
+      if(runAsUser == null || runAsUser.length() == 0) {
+        rj = new JobClient(finalJobConf).submitJob(finalJobConf);
+      }
+      else {
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(runAsUser);
+        rj = ugi.doAs(new PrivilegedExceptionAction<RunningJob>() {
+          @Override
+          public RunningJob run() throws Exception {
+            finalJobConf.setUser(runAsUser);
+            return new JobClient(finalJobConf).submitJob(finalJobConf);
+          }
+        });
+      }
       this.jobID = rj.getJobID();
       // replace it back
       if (pwd != null) {
