@@ -119,6 +119,9 @@ public class DenormalizationResolver implements ContextRewriter {
       refCols.add(refer);
     }
 
+    //When candidate table does not have the field, this method checks 
+    //if the field can be reached through reference,
+    //if yes adds the ref usage and returns to true, if not returns false.
     boolean addRefUsage(CandidateTable table, String col, String srcTbl)
         throws SemanticException {
       // available as referenced col

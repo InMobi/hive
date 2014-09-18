@@ -429,7 +429,6 @@ public class CandidateTableResolver implements ContextRewriter {
       return true;
     }
     Collection<String> tblCols = getAllColumns(table.getTable());
-    LOG.warn("columns for table:" +table + tblCols);
     for (String column : colSet) {
       if (tblCols.contains(column)) {
         return true;
