@@ -1,3 +1,4 @@
+DROP TABLE dest1;
 CREATE TABLE dest1(a array<int>, b array<string>, c map<string,string>, d int, e string)
 ROW FORMAT DELIMITED
 FIELDS TERMINATED BY '1'
@@ -27,4 +28,19 @@ DROP TABLE dest1;
 CREATE TABLE dest1(a map<string,string>) ROW FORMAT DELIMITED FIELDS TERMINATED BY '1' ESCAPED BY '\\';
 INSERT OVERWRITE TABLE dest1 SELECT src_thrift.mstringstring FROM src_thrift DISTRIBUTE BY 1;
 SELECT * from dest1 ORDER BY 1 ASC;
+
+DROP TABLE dest2;
+DROP TABLE dest3;
+
+CREATE TABLE dest2(a map<string,map<string,map<string,uniontype<int, bigint, string, double, boolean, array<string>, map<string,string>>>>>)  ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe' STORED AS SEQUENCEFILE;
+INSERT OVERWRITE TABLE dest2 SELECT src_thrift.attributes FROM src_thrift;
+SELECT a from dest2 limit 10;
+
+CREATE TABLE dest3(
+unionfield1 uniontype<int, bigint, string, double, boolean, array<string>, map<string,string>>,
+unionfield2 uniontype<int, bigint, string, double, boolean, array<string>, map<string,string>>,
+unionfield3 uniontype<int, bigint, string, double, boolean, array<string>, map<string,string>>
+) ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe' STORED AS SEQUENCEFILE;
+INSERT OVERWRITE TABLE dest3 SELECT src_thrift.unionField1,src_thrift.unionField2,src_thrift.unionField3 from src_thrift;
+SELECT unionfield1,unionField2 from dest3 limit 10;
 
