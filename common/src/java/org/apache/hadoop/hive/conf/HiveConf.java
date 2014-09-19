@@ -411,8 +411,6 @@ public class HiveConf extends Configuration {
 
     // id of the mapred plan being executed (multiple per query)
     HIVEPLANID("hive.query.planid", ""),
-
-    HIVEQUERYRUNASUSER("hive.query.run.as.user", null),
         // max jobname length
     HIVEJOBNAMELENGTH("hive.jobname.length", 50),
 
