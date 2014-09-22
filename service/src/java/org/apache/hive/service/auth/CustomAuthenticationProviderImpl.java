@@ -32,12 +32,16 @@ public class CustomAuthenticationProviderImpl
   PasswdAuthenticationProvider customProvider;
 
   @SuppressWarnings("unchecked")
-  CustomAuthenticationProviderImpl(HiveConf conf) throws ReflectiveOperationException {
+  CustomAuthenticationProviderImpl(HiveConf conf) throws AuthenticationException {
     this.customHandlerClass = (Class<? extends PasswdAuthenticationProvider>)
         conf.getClass(
             HiveConf.ConfVars.HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname,
             PasswdAuthenticationProvider.class);
-    this.customProvider = customHandlerClass.getConstructor(HiveConf.class).newInstance(conf);
+    try {
+      this.customProvider = customHandlerClass.getConstructor(HiveConf.class).newInstance(conf);
+    } catch (ReflectiveOperationException e) {
+      throw new AuthenticationException("Can't instantiate custom authentication provider class", e);
+    }
   }
 
   @Override
