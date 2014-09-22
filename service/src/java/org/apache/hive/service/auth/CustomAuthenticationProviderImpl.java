@@ -37,10 +37,16 @@ public class CustomAuthenticationProviderImpl
         conf.getClass(
             HiveConf.ConfVars.HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname,
             PasswdAuthenticationProvider.class);
+    // Try initializing the class with non-default and default constructors
     try {
       this.customProvider = customHandlerClass.getConstructor(HiveConf.class).newInstance(conf);
     } catch (ReflectiveOperationException e) {
-      throw new AuthenticationException("Can't instantiate custom authentication provider class", e);
+      try {
+        this.customProvider = customHandlerClass.getConstructor().newInstance();
+      } catch (ReflectiveOperationException e1) {
+        throw new AuthenticationException("Can't instantiate custom authentication provider class. Either provide a " +
+          "constructor with HiveConf as argument or a default constructor.", e);
+      }
     }
   }
 
