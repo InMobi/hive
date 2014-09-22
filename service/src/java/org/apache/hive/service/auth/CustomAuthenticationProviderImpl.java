@@ -22,6 +22,9 @@ import javax.security.sasl.AuthenticationException;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.util.ReflectionUtils;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 public class CustomAuthenticationProviderImpl
   implements PasswdAuthenticationProvider {
 
@@ -29,13 +32,12 @@ public class CustomAuthenticationProviderImpl
   PasswdAuthenticationProvider customProvider;
 
   @SuppressWarnings("unchecked")
-  CustomAuthenticationProviderImpl(HiveConf conf) {
+  CustomAuthenticationProviderImpl(HiveConf conf) throws ReflectiveOperationException {
     this.customHandlerClass = (Class<? extends PasswdAuthenticationProvider>)
         conf.getClass(
             HiveConf.ConfVars.HIVE_SERVER2_CUSTOM_AUTHENTICATION_CLASS.varname,
             PasswdAuthenticationProvider.class);
-    this.customProvider =
-        ReflectionUtils.newInstance(this.customHandlerClass, conf);
+    this.customProvider = customHandlerClass.getConstructor(HiveConf.class).newInstance(conf);
   }
 
   @Override
