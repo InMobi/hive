@@ -56,9 +56,11 @@ import static org.apache.hadoop.hive.ql.parse.HiveParser.PLUS;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.STAR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.StringLiteral;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TILDE;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ALLCOLREF;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_DIR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONDI;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_GROUPBY;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ISNOTNULL;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ISNULL;
@@ -365,10 +367,29 @@ public class HQLParser {
         && P_WSPACE.matcher(rootText).find()) {
         // If column alias contains spaces, enclose in back quotes
         buf.append(" as `").append(rootText).append("` ");
+      } else if (Identifier == rootType &&
+        TOK_FUNCTIONSTAR == ((ASTNode)root.getParent()).getToken().getType()) {
+        // count(*) or count(someTab.*): Don't append space after the identifier
+        buf.append(" ").append(rootText == null ? "" : rootText.toLowerCase());
       } else {
         buf.append(" ").append(rootText == null ? "" : rootText.toLowerCase()).append(" ");
       }
 
+    } else if (TOK_ALLCOLREF == rootType) {
+      if (root.getChildCount() > 0) {
+        for (int i = 0; i < root.getChildCount(); i++) {
+          toInfixString((ASTNode) root.getChild(i), buf);
+        }
+        buf.append(".");
+      }
+      buf.append(" * ");
+    } else if (TOK_FUNCTIONSTAR == rootType) {
+      if (root.getChildCount() > 0) {
+        for (int i = 0; i < root.getChildCount(); i++) {
+          toInfixString((ASTNode) root.getChild(i), buf);
+        }
+      }
+      buf.append("(*) ");
     } else if (UNARY_OPERATORS.contains(Integer.valueOf(rootType))) {
       if (KW_NOT == rootType) {
         // Check if this is actually NOT IN

@@ -46,3 +46,8 @@ struct Complex {
   9: PropValueUnion unionField2;
   10: PropValueUnion unionField3;
 }
+
+struct SetIntString {
+  1: set<IntString> sIntString;
+  2: string aString;
+}

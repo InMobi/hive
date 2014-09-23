@@ -29,6 +29,11 @@ CREATE TABLE dest1(a map<string,string>) ROW FORMAT DELIMITED FIELDS TERMINATED 
 INSERT OVERWRITE TABLE dest1 SELECT src_thrift.mstringstring FROM src_thrift DISTRIBUTE BY 1;
 SELECT * from dest1 ORDER BY 1 ASC;
 
+CREATE TABLE destBin(a UNIONTYPE<int, double, array<string>, struct<col1:int,col2:string>>) ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe' STORED AS SEQUENCEFILE;
+INSERT OVERWRITE TABLE destBin SELECT create_union( CASE WHEN key < 100 THEN 0 WHEN key < 200 THEN 1 WHEN key < 300 THEN 2 WHEN key < 400 THEN 3 ELSE 0 END, key, 2.0, array("one","two"), struct(5,"five")) FROM srcbucket2;
+SELECT * from destBin ORDER BY a;
+DROP TABLE destBin;
+
 DROP TABLE dest2;
 DROP TABLE dest3;
 
@@ -42,5 +47,4 @@ unionfield2 uniontype<int, bigint, string, double, boolean, array<string>, map<s
 unionfield3 uniontype<int, bigint, string, double, boolean, array<string>, map<string,string>>
 ) ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe' STORED AS SEQUENCEFILE;
 INSERT OVERWRITE TABLE dest3 SELECT src_thrift.unionField1,src_thrift.unionField2,src_thrift.unionField3 from src_thrift;
-SELECT unionfield1,unionField2 from dest3 limit 10;
-
+SELECT unionfield1,unionField2,unionField3 from dest3 limit 10;

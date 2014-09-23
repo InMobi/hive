@@ -68,38 +68,18 @@ public class AliasReplacer implements ContextRewriter {
 
     ASTNode selectAST = cubeql.getSelectAST();
     replaceAliases(selectAST, 0, colToTableAlias);
-    String rewritSelect = HQLParser.getString(selectAST);
-    if (StringUtils.isNotBlank(rewritSelect)) {
-      cubeql.setSelectTree(rewritSelect);
-    }
 
     ASTNode havingAST = cubeql.getHavingAST();
     replaceAliases(havingAST, 0, colToTableAlias);
-    String rewritHaving = HQLParser.getString(havingAST);
-    if (StringUtils.isNotBlank(rewritHaving)) {
-      cubeql.setHavingTree(rewritHaving);
-    }
 
     ASTNode orderByAST = cubeql.getOrderByAST();
     replaceAliases(orderByAST, 0, colToTableAlias);
-    String rewritOrderby = HQLParser.getString(orderByAST);
-    if (StringUtils.isNotBlank(rewritOrderby)) {
-      cubeql.setOrderByTree(rewritOrderby);
-    }
 
     ASTNode groupByAST = cubeql.getGroupByAST();
     replaceAliases(groupByAST, 0, colToTableAlias);
-    String rewritGroupby = HQLParser.getString(groupByAST);
-    if (StringUtils.isNotBlank(rewritGroupby)) {
-      cubeql.setGroupByTree(rewritGroupby);
-    }
 
     ASTNode whereAST = cubeql.getWhereAST();
     replaceAliases(whereAST, 0, colToTableAlias);
-    String rewritWhere = HQLParser.getString(whereAST);
-    if (StringUtils.isNotBlank(rewritWhere)) {
-      cubeql.setWhereTree(rewritWhere);
-    }
 
     ASTNode joinAST = cubeql.getJoinTree();
     replaceAliases(joinAST, 0, colToTableAlias);

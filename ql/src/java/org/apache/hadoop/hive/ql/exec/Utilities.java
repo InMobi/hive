@@ -102,6 +102,7 @@ import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.HiveInterruptCallback;
 import org.apache.hadoop.hive.common.HiveInterruptUtils;
 import org.apache.hadoop.hive.common.HiveStatsUtils;
+import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -1967,6 +1968,7 @@ public final class Utilities {
       URL oneurl = (new File(onestr)).toURL();
       newPath.remove(oneurl);
     }
+    JavaUtils.closeClassLoader(loader);
 
     loader = new URLClassLoader(newPath.toArray(new URL[0]));
     curThread.setContextClassLoader(loader);
@@ -3416,5 +3418,38 @@ public final class Utilities {
       conf.unset("fs.permissions.umask-mode");
     }
     return retval;
+  }
+
+  /**
+   * Convert path to qualified path.
+   *
+   * @param conf
+   *          Hive configuration.
+   * @param path
+   *          Path to convert.
+   * @return Qualified path
+   */
+  public static String getQualifiedPath(HiveConf conf, Path path) throws HiveException {
+    FileSystem fs;
+    if (path == null) {
+      return null;
+    }
+
+    try {
+      fs = path.getFileSystem(conf);
+      return fs.makeQualified(path).toString();
+    }
+    catch (IOException e) {
+      throw new HiveException(e);
+    }
+  }
+
+  /**
+   * Checks if current hive script was executed with non-default namenode
+   *
+   * @return True/False
+   */
+  public static boolean isDefaultNameNode(HiveConf conf) {
+    return !conf.getChangedProperties().containsKey(HiveConf.ConfVars.HADOOPFS.varname);
   }
 }

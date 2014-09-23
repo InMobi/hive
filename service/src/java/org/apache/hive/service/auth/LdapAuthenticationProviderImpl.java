@@ -44,7 +44,12 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
   @Override
   public void Authenticate(String user, String  password)
       throws AuthenticationException {
-
+    if(user == null || user.length() == 0) {
+      throw new AuthenticationException("Username cannot be blank");
+    }
+    if(password == null || password.length() == 0) {
+      throw new AuthenticationException("Password cannot be blank");
+    }
     Hashtable<String, Object> env = new Hashtable<String, Object>();
     env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
     env.put(Context.PROVIDER_URL, ldapURL);
@@ -52,7 +57,9 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
     //  If the domain is supplied, then append it. LDAP providers like Active Directory
     // use a fully qualified user name like foo@bar.com.
     if (ldapDomain != null) {
-      user  = user + "@" + ldapDomain;
+      if(!user.contains("@")) {
+        user  = user + "@" + ldapDomain;
+      }
     }
 
     // setup the security principal
@@ -68,7 +75,6 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
     if(securityProtocol != null){
       env.put(Context.SECURITY_PROTOCOL, securityProtocol);
     }
-
     try {
       // Create initial context
       DirContext ctx = new InitialDirContext(env);
@@ -78,5 +84,4 @@ public class LdapAuthenticationProviderImpl implements PasswdAuthenticationProvi
     }
   return;
   }
-
 }

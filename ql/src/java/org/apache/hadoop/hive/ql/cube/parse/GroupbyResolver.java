@@ -24,16 +24,22 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_GROUPBY;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import org.antlr.runtime.CommonToken;
+import org.antlr.runtime.tree.Tree;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
+import org.apache.hadoop.hive.ql.parse.ParseDriver;
+import org.apache.hadoop.hive.ql.parse.ParseException;
+import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class GroupbyResolver implements ContextRewriter {
@@ -50,7 +56,7 @@ public class GroupbyResolver implements ContextRewriter {
   }
 
   private void promoteSelect(CubeQueryContext cubeql, List<String> selectExprs,
-      List<String> groupByExprs) {
+      List<String> groupByExprs) throws SemanticException {
     if (!selectPromotionEnabled) {
       return;
     }
@@ -61,7 +67,6 @@ public class GroupbyResolver implements ContextRewriter {
       return;
     }
 
-    String groupByTree = cubeql.getGroupByTree();
     // each selected column, if it is not a cube measure, and does not have
     // aggregation on the column, then it is added to group by columns.
     if (cubeql.hasAggregates()) {
@@ -70,24 +75,31 @@ public class GroupbyResolver implements ContextRewriter {
         if (!groupByExprs.contains(expr)) {
           if (!cubeql.isAggregateExpr(expr)) {
             String groupbyExpr = expr;
-            if (groupByTree != null) {
-              groupByTree += ", ";
-              groupByTree += groupbyExpr;
+            ASTNode exprAST;
+            try {
+              exprAST = getExprAst(groupbyExpr);
+            } catch (ParseException e) {
+              throw new SemanticException(e);
+            }
+            ASTNode groupbyAST = cubeql.getGroupByAST();
+            if (groupbyAST != null) {
+              // groupby ast exists, add the expression to AST
+              groupbyAST.addChild(exprAST);
+              exprAST.setParent(groupbyAST);
             } else {
-              groupByTree = new String();
-              groupByTree += groupbyExpr;
+              // no group by ast exist, create one
+              ASTNode newAST = new ASTNode(new CommonToken(TOK_GROUPBY));
+              newAST.addChild(exprAST);
+              cubeql.setGroupByAST(newAST);
             }
           }
         }
       }
     }
-    if (groupByTree != null) {
-      cubeql.setGroupByTree(groupByTree);
-    }
   }
 
   private void promoteGroupby(CubeQueryContext cubeql, List<String> selectExprs,
-      List<String> groupByExprs) {
+      List<String> groupByExprs) throws SemanticException {
     if (!groupbyPromotionEnabled) {
       return;
     }
@@ -100,14 +112,40 @@ public class GroupbyResolver implements ContextRewriter {
       }
     }
 
-    String selectTree = cubeql.getSelectTree();
-
+    int index = 0;
     for (String expr : groupByExprs) {
       if (!contains(cubeql, selectExprs, expr)) {
-        selectTree = expr + ", " + selectTree;
+        ASTNode exprAST;
+        try {
+          exprAST = getExprAst(expr);
+        } catch (ParseException e) {
+          throw new SemanticException(e);
+        }
+        addChildAtIndex(index, cubeql.getSelectAST(), exprAST);
+        index++;
       }
     }
-    cubeql.setSelectTree(selectTree);
+  }
+
+  private void addChildAtIndex(int index, ASTNode parent, ASTNode child) {
+    // add the last child
+    int count = parent.getChildCount();
+    Tree lastchild = parent.getChild(count-1);
+    parent.addChild(lastchild);
+
+    // move all the children from last upto index
+    for (int i = count-2; i >= index; i--) {
+      Tree child_i = parent.getChild(i);
+      parent.setChild(i+1, child_i);
+    }
+    parent.setChild(index, child);
+    child.setParent(parent);
+  }
+
+  private ASTNode getExprAst(String expr) throws ParseException {
+    ParseDriver driver = new ParseDriver();
+    ASTNode tree = driver.parseExpression(expr);
+    return ParseUtils.findRootNonNullToken(tree);
   }
 
   @Override
@@ -155,7 +193,7 @@ public class GroupbyResolver implements ContextRewriter {
     List<String> list = new ArrayList<String>();
 
     if (node == null) {
-      return null;
+      return list;
     }
 
     for (int i = 0; i < node.getChildCount(); i++) {
