@@ -132,6 +132,7 @@ public class TestCubeRewriter {
   private CubeQueryContext rewrittenQuery;
   private String rewrite(CubeQueryRewriter driver, String query)
     throws SemanticException, ParseException {
+    System.out.println("User query:" + query);
     rewrittenQuery = driver.rewrite(query);
     return rewrittenQuery.toHQL();
   }

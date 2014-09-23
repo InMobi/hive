@@ -185,6 +185,12 @@ public class HQLParser {
     return tree;
   }
 
+  public static ASTNode parseExpr(String expr) throws ParseException {
+    ParseDriver driver = new ParseDriver();
+    ASTNode tree = driver.parseExpression(expr);
+    return ParseUtils.findRootNonNullToken(tree);
+  }
+
   public static void printAST(ASTNode node) {
     try {
       printAST(getHiveTokenMapping(), node, 0, 0);

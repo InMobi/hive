@@ -37,9 +37,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
-import org.apache.hadoop.hive.ql.parse.ParseDriver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
-import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class GroupbyResolver implements ContextRewriter {
@@ -77,7 +75,7 @@ public class GroupbyResolver implements ContextRewriter {
             String groupbyExpr = expr;
             ASTNode exprAST;
             try {
-              exprAST = getExprAst(groupbyExpr);
+              exprAST = HQLParser.parseExpr(groupbyExpr);
             } catch (ParseException e) {
               throw new SemanticException(e);
             }
@@ -117,7 +115,7 @@ public class GroupbyResolver implements ContextRewriter {
       if (!contains(cubeql, selectExprs, expr)) {
         ASTNode exprAST;
         try {
-          exprAST = getExprAst(expr);
+          exprAST = HQLParser.parseExpr(expr);
         } catch (ParseException e) {
           throw new SemanticException(e);
         }
@@ -140,12 +138,6 @@ public class GroupbyResolver implements ContextRewriter {
     }
     parent.setChild(index, child);
     child.setParent(parent);
-  }
-
-  private ASTNode getExprAst(String expr) throws ParseException {
-    ParseDriver driver = new ParseDriver();
-    ASTNode tree = driver.parseExpression(expr);
-    return ParseUtils.findRootNonNullToken(tree);
   }
 
   @Override

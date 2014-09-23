@@ -110,6 +110,10 @@ public class MetastoreUtil implements MetastoreConstants {
     return getDimensionKeyPrefix(dimName) + DIM_REFERS_SFX;
   }
 
+  public static String getDimUseAsJoinKey(String dimName) {
+    return getDimensionKeyPrefix(dimName) + IS_JOIN_KEY_SFX;
+  }
+
   public static final String getDimensionDestReference(String tableName,
       String columnName) {
     return tableName.toLowerCase() + TABLE_COLUMN_SEPERATOR

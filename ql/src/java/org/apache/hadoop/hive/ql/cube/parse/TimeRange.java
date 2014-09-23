@@ -33,6 +33,8 @@ public class TimeRange {
   private Date toDate;
   private Date fromDate;
   private ASTNode astNode;
+  private ASTNode parent;
+  private int childIndex;
 
   public static class TimeRangeBuilder {
     private final TimeRange range;
@@ -61,6 +63,16 @@ public class TimeRange {
       return this;
     }
 
+    public TimeRangeBuilder parent(ASTNode parent) {
+      range.parent = parent;
+      return this;
+    }
+
+    public TimeRangeBuilder childIndex(int childIndex) {
+      range.childIndex = childIndex;
+      return this;
+    }
+
     public TimeRange build() {
       return range;
     }
@@ -84,6 +96,18 @@ public class TimeRange {
 
   public Date getToDate() {
     return toDate;
+  }
+
+  public ASTNode getASTNode() {
+    return astNode;
+  }
+
+  public ASTNode getParent() {
+    return parent;
+  }
+
+  public int getChildIndex() {
+    return childIndex;
   }
 
   public void validate() throws SemanticException {

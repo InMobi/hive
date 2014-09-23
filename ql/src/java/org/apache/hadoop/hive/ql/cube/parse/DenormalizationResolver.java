@@ -23,9 +23,11 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,10 +68,13 @@ public class DenormalizationResolver implements ContextRewriter {
   public static class ReferencedQueriedColumn {
     ReferencedDimAtrribute col;
     AbstractCubeTable srcTable;
+    List<TableReference> references;
 
     ReferencedQueriedColumn(ReferencedDimAtrribute col, AbstractCubeTable srcTable) {
       this.col = col;
       this.srcTable = srcTable;
+      references = new ArrayList<TableReference>();
+      references.addAll(col.getReferences());
     }
     public String toString() {
       return srcTable + ":" + col;
@@ -204,8 +209,17 @@ public class DenormalizationResolver implements ContextRewriter {
     private void pickColumnsForTable(String tbl) {
       if (tableToRefCols.containsKey(tbl)) {
         for (ReferencedQueriedColumn refered : tableToRefCols.get(tbl)) {
+          Iterator<TableReference> iter = refered.references.iterator();
+          while (iter.hasNext()) {
+            // remove unreachable references
+            TableReference reference = iter.next();
+            if (!cubeql.getAutoJoinCtx().isReachableDim(
+                (Dimension)cubeql.getCubeTableForAlias(reference.getDestTable()))) {
+              iter.remove();
+            }
+          }
           PickedReference picked = new PickedReference(
-              refered.col.getReferences().get(0), 
+              refered.references.iterator().next(), 
               cubeql.getAliasForTabName(refered.srcTable.getName()));
           addPickedReference(refered.col.getName(), picked);
           pickedRefs.add(picked);

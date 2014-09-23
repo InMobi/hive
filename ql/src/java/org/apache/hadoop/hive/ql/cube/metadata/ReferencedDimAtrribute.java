@@ -32,6 +32,9 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 public class ReferencedDimAtrribute extends BaseDimAttribute {
   private final List<TableReference> references = new ArrayList<TableReference>();
+  // boolean whether to say the key is only a denormalized variable kept or can
+  // be used in join resolution as well
+  private Boolean isJoinKey = true;
 
   public ReferencedDimAtrribute(FieldSchema column, String displayString, TableReference reference) {
     this(column, displayString, reference, null, null, null);
@@ -39,8 +42,14 @@ public class ReferencedDimAtrribute extends BaseDimAttribute {
 
   public ReferencedDimAtrribute(FieldSchema column, String displayString,
       TableReference reference, Date startTime, Date endTime, Double cost) {
+    this(column, displayString, reference, startTime, endTime, cost, true);
+  }
+
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
+      TableReference reference, Date startTime, Date endTime, Double cost, boolean isJoinKey) {
     super(column, displayString, startTime, endTime, cost);
     this.references.add(reference);
+    this.isJoinKey = isJoinKey;
   }
 
   public ReferencedDimAtrribute(FieldSchema column, String displayString,
@@ -51,8 +60,15 @@ public class ReferencedDimAtrribute extends BaseDimAttribute {
   public ReferencedDimAtrribute(FieldSchema column, String displayString,
       Collection<TableReference> references, Date startTime, Date endTime,
       Double cost) {
+    this(column, displayString, references, startTime, endTime, cost, true);
+  }
+
+  public ReferencedDimAtrribute(FieldSchema column, String displayString,
+      Collection<TableReference> references, Date startTime, Date endTime,
+      Double cost, boolean isJoinKey) {
     super(column, displayString, startTime, endTime, cost);
     this.references.addAll(references);
+    this.isJoinKey = isJoinKey;
   }
 
   public void addReference(TableReference reference) {
@@ -67,11 +83,16 @@ public class ReferencedDimAtrribute extends BaseDimAttribute {
     return references.remove(ref);
   }
 
+  public boolean useAsJoinKey() {
+    return isJoinKey;
+  }
+
   @Override
   public void addProperties(Map<String, String> props) {
     super.addProperties(props);
     props.put(MetastoreUtil.getDimensionSrcReferenceKey(getName()),
         MetastoreUtil.getDimensionDestReference(references));
+    props.put(MetastoreUtil.getDimUseAsJoinKey(getName()), isJoinKey.toString());
   }
 
   /**
@@ -87,6 +108,10 @@ public class ReferencedDimAtrribute extends BaseDimAttribute {
     String refListDims[] = StringUtils.split(refListStr, ",");
     for (String refDimRaw : refListDims) {
       references.add(new TableReference(refDimRaw));
+    }
+    String isJoinKeyStr = props.get(MetastoreUtil.getDimUseAsJoinKey(name));
+    if (isJoinKeyStr != null) {
+      isJoinKey = Boolean.parseBoolean(isJoinKeyStr);
     }
   }
 

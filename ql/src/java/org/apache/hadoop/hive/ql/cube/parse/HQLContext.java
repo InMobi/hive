@@ -11,6 +11,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
 import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
+import org.apache.hadoop.hive.ql.parse.ASTNode;
+import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class HQLContext {
@@ -29,7 +31,7 @@ public class HQLContext {
 
   public String toHQL() throws SemanticException {
     String fromString = getFromString();
-    String whereString = genWhereClauseWithPartitions();
+    String whereString = genWhereClauseWithDimPartitions();
     String qfmt = getQueryFormat(whereString);
     Object[] queryTreeStrings = getQueryTreeStrings(fromString, whereString);
     if (LOG.isDebugEnabled()) {
@@ -70,34 +72,32 @@ public class HQLContext {
     return qstrs.toArray(new String[0]);
   }
 
-  private String genWhereClauseWithPartitions() {
-    String originalWhere = query.getWhereTree();
-    StringBuilder whereBuf = new StringBuilder();
-
+  static void addRangeClauses(CubeQueryContext query, CandidateFact fact) throws SemanticException {
     if (fact != null) {
       // resolve timerange positions and replace it by corresponding where clause
-      String restOfTheWhere = new String(originalWhere);
       for (TimeRange range : query.getTimeRanges()) {
-        int timeRangeBegin = restOfTheWhere.indexOf(CubeQueryContext.TIME_RANGE_FUNC);
-        int timeRangeEnd = restOfTheWhere.indexOf(')', timeRangeBegin) + 1;
-
-        whereBuf.append(restOfTheWhere.substring(0, timeRangeBegin));
         String rangeWhere = fact.rangeToWhereClause.get(range);
         if (!StringUtils.isBlank(rangeWhere)) {
-          whereBuf.append("(");
-          whereBuf.append(rangeWhere);
-          whereBuf.append(")");
+          ASTNode rangeAST;
+          try {
+            rangeAST = HQLParser.parseExpr(rangeWhere);
+          } catch (ParseException e) {
+            throw new SemanticException(e);
+          }
+          rangeAST.setParent(range.getParent());
+          range.getParent().setChild(range.getChildIndex(), rangeAST);
         }
-        restOfTheWhere = restOfTheWhere.substring(timeRangeEnd);
       }
-      whereBuf.append(restOfTheWhere);
+    }
+  }
 
+  private String genWhereClauseWithDimPartitions() {
+    String originalWhere = query.getWhereTree();
+    StringBuilder whereBuf;
+    if (originalWhere != null) {
+      whereBuf = new StringBuilder(originalWhere);
     } else {
-      if (originalWhere != null) {
-        whereBuf = new StringBuilder(originalWhere);
-      } else {
-        whereBuf = new StringBuilder();
-      }
+      whereBuf = new StringBuilder();
     }
 
     // add where clause for all dimensions
