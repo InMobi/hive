@@ -28,6 +28,8 @@ import java.lang.reflect.InvocationTargetException;
 public class CustomAuthenticationProviderImpl
   implements PasswdAuthenticationProvider {
 
+  private static final String REFLECTION_ERROR_MESSAGE = "Can't instantiate custom authentication provider class. " +
+    "Either provide a constructor with HiveConf as argument or a default constructor.";
   Class<? extends PasswdAuthenticationProvider> customHandlerClass;
   PasswdAuthenticationProvider customProvider;
 
@@ -43,9 +45,16 @@ public class CustomAuthenticationProviderImpl
     } catch (ReflectiveOperationException e) {
       try {
         this.customProvider = customHandlerClass.getConstructor().newInstance();
-      } catch (ReflectiveOperationException e1) {
-        throw new AuthenticationException("Can't instantiate custom authentication provider class. Either provide a " +
-          "constructor with HiveConf as argument or a default constructor.", e);
+        // in java6, these four extend directly from Exception. So have to handle separately. In java7,
+        // the common subclass is ReflectiveOperationException
+      } catch (InvocationTargetException e1) {
+        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
+      } catch (NoSuchMethodException e1) {
+        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
+      } catch (InstantiationException e1) {
+        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
+      } catch (IllegalAccessException e1) {
+        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
       }
     }
   }
