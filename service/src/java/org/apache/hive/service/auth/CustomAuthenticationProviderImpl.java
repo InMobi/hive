@@ -20,16 +20,12 @@ package org.apache.hive.service.auth;
 import javax.security.sasl.AuthenticationException;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.util.ReflectionUtils;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 public class CustomAuthenticationProviderImpl
   implements PasswdAuthenticationProvider {
 
-  private static final String REFLECTION_ERROR_MESSAGE = "Can't instantiate custom authentication provider class. " +
-    "Either provide a constructor with HiveConf as argument or a default constructor.";
   Class<? extends PasswdAuthenticationProvider> customHandlerClass;
   PasswdAuthenticationProvider customProvider;
 
@@ -42,20 +38,19 @@ public class CustomAuthenticationProviderImpl
     // Try initializing the class with non-default and default constructors
     try {
       this.customProvider = customHandlerClass.getConstructor(HiveConf.class).newInstance(conf);
-    } catch (ReflectiveOperationException e) {
+    } catch (NoSuchMethodException e) {
       try {
         this.customProvider = customHandlerClass.getConstructor().newInstance();
         // in java6, these four extend directly from Exception. So have to handle separately. In java7,
         // the common subclass is ReflectiveOperationException
-      } catch (InvocationTargetException e1) {
-        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
       } catch (NoSuchMethodException e1) {
-        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
-      } catch (InstantiationException e1) {
-        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
-      } catch (IllegalAccessException e1) {
-        throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
+        throw new AuthenticationException("Can't instantiate custom authentication provider class. " +
+          "Either provide a constructor with HiveConf as argument or a default constructor.", e);
+      } catch (Exception e1) {
+        throw new AuthenticationException(e.getMessage(), e);
       }
+    } catch (Exception e) {
+      throw new AuthenticationException(e.getMessage(), e);
     }
   }
 
