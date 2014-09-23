@@ -46,18 +46,10 @@ public class CustomAuthenticationProviderImpl
       } catch (NoSuchMethodException e1) {
         throw new AuthenticationException("Can't instantiate custom authentication provider class. " +
           "Either provide a constructor with HiveConf as argument or a default constructor.", e);
-      } catch (InvocationTargetException e1) {
-        throw new AuthenticationException(e.getMessage(), e);
-      } catch (InstantiationException e1) {
-        throw new AuthenticationException("Could not instantiate Custom Auth class with Default Constructor");
-      } catch (IllegalAccessException e1) {
+      } catch (Exception e1) {
         throw new AuthenticationException(e.getMessage(), e);
       }
-    } catch (InvocationTargetException e) {
-      throw new AuthenticationException(e.getMessage(), e);
-    } catch (InstantiationException e) {
-      throw new AuthenticationException("Could not instantiate Custom Auth class with HiveConf Argument.");
-    } catch (IllegalAccessException e) {
+    } catch (Exception e) {
       throw new AuthenticationException(e.getMessage(), e);
     }
   }
