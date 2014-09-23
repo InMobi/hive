@@ -45,7 +45,9 @@ public class DateUtil {
    * NOW (+-) <NUM>UNIT
    * or Hardcoded dates in DD-MM-YYYY hh:mm:ss,sss
    */
-  public static final String RELATIVE = "(now){1}";
+  public static final String UNIT = "year|month|week|day|hour|minute|second";
+  public static final String GRANULARITY = "\\.(" + UNIT + ")";
+  public static final String RELATIVE = "(now){1}(" +  GRANULARITY +  "){0,1}";
   public static final Pattern P_RELATIVE = Pattern.compile(RELATIVE,
       Pattern.CASE_INSENSITIVE);
 
@@ -58,7 +60,6 @@ public class DateUtil {
   public static final String QUANTITY = "\\d+";
   public static final Pattern P_QUANTITY = Pattern.compile(QUANTITY);
 
-  public static final String UNIT = "year|month|week|day|hour|minute|second";
   public static final Pattern P_UNIT = Pattern.compile(UNIT,
       Pattern.CASE_INSENSITIVE);
 
@@ -121,21 +122,58 @@ public class DateUtil {
     }
   }
 
-  private static Date resolveRelativeDate(String str, Date now)
+  public static Date resolveRelativeDate(String str, Date now)
       throws SemanticException {
     if (StringUtils.isBlank(str)) {
       throw new SemanticException(ErrorMsg.NULL_DATE_VALUE);
     }
-    // Get rid of whitespace
-    String raw = str.replaceAll(WSPACE, "").replaceAll(RELATIVE, "");
 
-    if (raw.isEmpty()) { // String is just "now"
-      return now;
+    // Resolve NOW with proper granularity
+    Calendar calendar = Calendar.getInstance();
+    calendar.setTime(now);
+
+    str = str.toLowerCase();
+    Matcher relativeMatcher = P_RELATIVE.matcher(str);
+    if (relativeMatcher.find()) {
+      String nowWithGranularity = relativeMatcher.group();
+      nowWithGranularity = nowWithGranularity.replaceAll("now", "");
+      nowWithGranularity = nowWithGranularity.replaceAll("\\.", "");
+
+      Matcher granularityMatcher = P_UNIT.matcher(nowWithGranularity);
+      if (granularityMatcher.find()) {
+        String unit = granularityMatcher.group().toLowerCase();
+        if ("year".equals(unit)) {
+          calendar = DateUtils.truncate(calendar, Calendar.YEAR);
+        } else if ("month".equals(unit)) {
+          calendar = DateUtils.truncate(calendar, Calendar.MONTH);
+        } else if ("week".equals(unit)) {
+          calendar.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
+          calendar = DateUtils.truncate(calendar, Calendar.DAY_OF_MONTH);
+        } else if ("day".equals(unit)) {
+          calendar = DateUtils.truncate(calendar, Calendar.DAY_OF_MONTH);
+        } else if ("hour".equals(unit)) {
+          calendar = DateUtils.truncate(calendar, Calendar.HOUR_OF_DAY);
+        } else if ("minute".equals(unit)) {
+          calendar = DateUtils.truncate(calendar, Calendar.MINUTE);
+        } else if ("second".equals(unit)) {
+          calendar = DateUtils.truncate(calendar, Calendar.SECOND);
+        } else {
+          throw new SemanticException(ErrorMsg.INVALID_TIME_UNIT, unit);
+        }
+      }
     }
 
+    // Get rid of 'now' part and whitespace
+    String raw = str.replaceAll(GRANULARITY, "").replace(WSPACE, "");
+
+    if (raw.isEmpty()) { // String is just "now" with granularity
+      return calendar.getTime();
+    }
+
+    // Get the relative diff part to get eventual date based on now.
     Matcher qtyMatcher = P_QUANTITY.matcher(raw);
     int qty = 1;
-    if (qtyMatcher.find() && true) {
+    if (qtyMatcher.find()) {
       qty = Integer.parseInt(qtyMatcher.group());
     }
 
@@ -148,9 +186,6 @@ public class DateUtil {
     }
 
     Matcher unitMatcher = P_UNIT.matcher(raw);
-    Calendar calendar = Calendar.getInstance();
-    calendar.setTime(now);
-
     if (unitMatcher.find()) {
       String unit = unitMatcher.group().toLowerCase();
       if ("year".equals(unit)) {
@@ -168,7 +203,7 @@ public class DateUtil {
       } else if ("second".equals(unit)) {
         calendar.add(Calendar.SECOND, qty);
       } else {
-        throw new SemanticException(ErrorMsg.INVALID_TIME_UNIT);
+        throw new SemanticException(ErrorMsg.INVALID_TIME_UNIT, unit);
       }
     }
 
