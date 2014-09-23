@@ -62,11 +62,6 @@ public class CustomAuthenticationProviderImpl
     }
   }
 
-  public static boolean isReflectiveException(Exception e) {
-    return e instanceof InvocationTargetException || e instanceof NoSuchMethodException ||
-      e instanceof InstantiationException || e instanceof IllegalAccessException;
-  }
-
   @Override
   public void Authenticate(String user, String  password)
       throws AuthenticationException {
