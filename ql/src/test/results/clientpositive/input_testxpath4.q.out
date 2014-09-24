@@ -22,7 +22,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src_thrift
-            Statistics: Num rows: 0 Data size: 1606 Basic stats: PARTIAL Column stats: NONE
+            Statistics: Num rows: 0 Data size: 3070 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: ((mstringstring['key_9'] is not null and lintstring.myint is not null) and lintstring is not null) (type: boolean)
               Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
@@ -92,7 +92,7 @@ STAGE PLANS:
       Map Operator Tree:
           TableScan
             alias: src_thrift
-            Statistics: Num rows: 0 Data size: 1606 Basic stats: PARTIAL Column stats: NONE
+            Statistics: Num rows: 0 Data size: 3070 Basic stats: PARTIAL Column stats: NONE
             Filter Operator
               predicate: ((mstringstring['key_9'] is not null and lintstring.myint is not null) and lintstring is not null) (type: boolean)
               Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
