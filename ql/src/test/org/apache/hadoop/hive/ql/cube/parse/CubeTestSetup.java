@@ -581,6 +581,10 @@ public class CubeTestSetup {
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
         TEST_CUBE_NAME), "dt,pt,it,et,test_time_dim");
     cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "test_time_dim", "ttd");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "dt", "dt");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "it", "it");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "et", "et");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "pt", "pt");
 
     client.createCube(TEST_CUBE_NAME, cubeMeasures, cubeDimensions, exprs, cubeProperties);
     

@@ -226,6 +226,9 @@ public class SchemaGraph {
       List<JoinPath> joinPaths = new ArrayList<JoinPath>();
       visited.add(source);
 
+      if (graph.get(source) == null) {
+        return joinPaths;
+      }
       for (TableRelationship edge : graph.get(source)) {
         if (visited.contains(edge.getFromTable())) {
           continue;

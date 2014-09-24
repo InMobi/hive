@@ -90,7 +90,7 @@ public class TestCubeRewriter {
     SemanticException th = null;
     try {
       rewrite(driver, "select SUM(msr2) from testCube where" +
-        " time_range_in('dt', 'NOW - 2DAYS', 'NOW')");
+        " time_range_in(dt, 'NOW - 2DAYS', 'NOW')");
     } catch (SemanticException e) {
       th = e;
       e.printStackTrace();
@@ -1132,7 +1132,7 @@ public class TestCubeRewriter {
 
   @Test
   public void testFactsWithTimedDimension() throws Exception {
-    String twoDaysITRange = "time_range_in('it', '" +
+    String twoDaysITRange = "time_range_in(it, '" +
       CubeTestSetup.getDateUptoHours(
       twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
@@ -1164,9 +1164,10 @@ public class TestCubeRewriter {
     compareQueries(expected, hqlQuery);
   }
 
-  @Test
+  //Disabling this as querying on part column directly is not allowed as of now.
+  //@Test
   public void testCubeQueryTimedDimensionFilter() throws Exception {
-    String twoDaysITRange = "time_range_in('it', '" +
+    String twoDaysITRange = "time_range_in(it, '" +
       CubeTestSetup.getDateUptoHours(
       twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
@@ -1204,7 +1205,7 @@ public class TestCubeRewriter {
     expecteddtRangeWhere2, "c2_testfact");
     compareQueries(expected, hqlQuery);
 
-    String twoDaysPTRange = "time_range_in('pt', '" +
+    String twoDaysPTRange = "time_range_in(pt, '" +
         CubeTestSetup.getDateUptoHours(
         twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
     hqlQuery = rewrite(driver, "select dim1, max(msr3)," +
@@ -1223,7 +1224,7 @@ public class TestCubeRewriter {
 
   @Test
   public void testFactsWithTimedDimensionWithProcessTimeCol() throws Exception {
-    String twoDaysITRange = "time_range_in('it', '" +
+    String twoDaysITRange = "time_range_in(it, '" +
       CubeTestSetup.getDateUptoHours(
       twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
@@ -1421,10 +1422,11 @@ public class TestCubeRewriter {
     // Disabling conf should not replace the time dimension
 
     String query = "SELECT test_time_dim, msr2 FROM testCube where "
-      + "time_range_in('test_time_dim', '" + CubeTestSetup.getDateUptoHours(
+      + "time_range_in(test_time_dim, '" + CubeTestSetup.getDateUptoHours(
       twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
 
     HiveConf hconf = new HiveConf(conf, TestCubeRewriter.class);
+    hconf.setBoolean(CubeQueryConfUtil.DISABLE_AUTO_JOINS, false);
     hconf.set(CubeQueryConfUtil.DRIVER_SUPPORTED_STORAGES, "C1,C2,C3,C4");
     hconf.setBoolean(CubeQueryConfUtil.REPLACE_TIMEDIM_WITH_PART_COL, true);
 
@@ -1432,7 +1434,7 @@ public class TestCubeRewriter {
     CubeQueryContext context = rewriter.rewrite(query);
     String hql = context.toHQL();
     System.out.println("@@" + hql);
-    Assert.assertTrue(hql.contains("testcube.ttd") && hql.contains("test_time_dim"));
+    Assert.assertTrue(hql.contains("ttd") && hql.contains("full_hour"));
 
     Assert.assertTrue(context.shouldReplaceTimeDimWithPart());
 
@@ -1448,6 +1450,6 @@ public class TestCubeRewriter {
     context = rewriter.rewrite(query);
     hql = context.toHQL();
     System.out.println("@@2 " + hql);
-    Assert.assertTrue(!hql.contains("testcube.ttd") && hql.contains("test_time_dim"));
+    Assert.assertTrue(!hql.contains("ttd") && hql.contains("full_hour"));
   }
 }

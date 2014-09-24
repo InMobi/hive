@@ -277,7 +277,8 @@ public class CandidateTableResolver implements ContextRewriter {
 
           // go over the referenced columns accessed in the query and find out which tables
           // can participate
-          if (!checkForColumnExists(cdim, cubeql.getOptionalDimensionMap().get(dim).colQueried)) {
+          if (cubeql.getOptionalDimensionMap().get(dim) != null &&
+              !checkForColumnExists(cdim, cubeql.getOptionalDimensionMap().get(dim).colQueried)) {
             i.remove();
             LOG.info("Not considering optional dimtable:" + dimtable +" as its denorm fields do not exist." +
                 " Denorm fields:" + cubeql.getOptionalDimensionMap().get(dim).colQueried);

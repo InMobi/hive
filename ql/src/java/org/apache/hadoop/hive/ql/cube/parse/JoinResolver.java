@@ -206,7 +206,7 @@ public class JoinResolver implements ContextRewriter {
         }
       }
 
-      if (minCostClause == null) {
+      if (minCostClause == null || StringUtils.isBlank(minCostClause.getClause())) {
         throw new SemanticException(ErrorMsg.NO_JOIN_PATH,
             context.getDimsToQuery().keySet().toString(), autoJoinTarget.getName());
       }
