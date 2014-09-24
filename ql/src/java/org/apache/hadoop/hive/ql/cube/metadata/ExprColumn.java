@@ -24,6 +24,7 @@ package org.apache.hadoop.hive.ql.cube.metadata;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.cube.parse.HQLParser;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.ParseDriver;
 import org.apache.hadoop.hive.ql.parse.ParseException;
@@ -116,10 +117,7 @@ public class ExprColumn extends CubeColumn {
    */
   public ASTNode getAst() throws ParseException {
     if (ast == null) {
-      ParseDriver driver = new ParseDriver();
-      ASTNode tree = driver.parseExpression(expr);
-      tree = ParseUtils.findRootNonNullToken(tree);
-      this.ast = tree;
+      this.ast = HQLParser.parseExpr(expr);
     }
     return ast;
   }

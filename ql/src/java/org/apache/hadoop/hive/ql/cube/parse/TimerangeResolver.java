@@ -21,8 +21,10 @@ package org.apache.hadoop.hive.ql.cube.parse;
 */
 
 
+import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
 
 import java.util.Date;
 import java.util.Iterator;
@@ -67,31 +69,46 @@ public class TimerangeResolver implements ContextRewriter {
     if (cubeql.getWhereAST() == null || cubeql.getWhereAST().getChildCount() < 1) {
       throw new SemanticException(ErrorMsg.NO_TIMERANGE_FILTER);
     }
-    searchTimeRanges(cubeql.getWhereAST(), cubeql);
+    searchTimeRanges(cubeql.getWhereAST(), cubeql, null, 0);
   }
 
-  private void searchTimeRanges(ASTNode root, CubeQueryContext cubeql) throws SemanticException {
+  private void searchTimeRanges(ASTNode root, CubeQueryContext cubeql, ASTNode parent, int childIndex) throws SemanticException {
     if (root == null) {
       return;
     } else if (root.getToken().getType() == TOK_FUNCTION) {
       ASTNode fname = HQLParser.findNodeByPath(root, Identifier);
       if (fname != null && CubeQueryContext.TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
-        processTimeRangeFunction(cubeql, root, null);
+        processTimeRangeFunction(cubeql, root, parent, childIndex);
       }
     } else {
       for (int i = 0; i < root.getChildCount(); i++) {
         ASTNode child = (ASTNode) root.getChild(i);
-        searchTimeRanges(child, cubeql);
+        searchTimeRanges(child, cubeql, root, i);
       }
     }
   }
 
+  private String getColumnName(ASTNode node) {
+    String column = null;
+    if (node.getToken().getType() == DOT) {
+      ASTNode colIdent = (ASTNode) node.getChild(1);
+      column = colIdent.getText().toLowerCase();
+     } else if (node.getToken().getType() == TOK_TABLE_OR_COL) {
+      // Take child ident.totext
+      ASTNode ident = (ASTNode) node.getChild(0);
+      column = ident.getText().toLowerCase();
+    }
+    return column;
+  }
+
   private void processTimeRangeFunction(CubeQueryContext cubeql,
-      ASTNode timenode, TimeRange parent) throws SemanticException {
+      ASTNode timenode, ASTNode parent, int childIndex) throws SemanticException {
     TimeRange.TimeRangeBuilder builder = TimeRange.getBuilder();
     builder.astNode(timenode);
+    builder.parent(parent);
+    builder.childIndex(childIndex);
 
-    String timeDimName = PlanUtils.stripQuotes(timenode.getChild(1).getText());
+    String timeDimName = getColumnName((ASTNode)timenode.getChild(1));
 
     if (!cubeql.getCube().getTimedDimensions().contains(timeDimName)) {
       throw new SemanticException(ErrorMsg.NOT_A_TIMED_DIMENSION, timeDimName);

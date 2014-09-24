@@ -143,15 +143,15 @@ public class CubeTestSetup {
     before4daysEnd = cal.getTime();
     cal.add(Calendar.DAY_OF_MONTH, -2);
     before4daysStart = cal.getTime();
-    twoDaysRangeBefore4days = "time_range_in('dt', '" +
+    twoDaysRangeBefore4days = "time_range_in(dt, '" +
         CubeTestSetup.getDateUptoHours(before4daysStart) + "','" +
         CubeTestSetup.getDateUptoHours(before4daysEnd) + "')";
 
-    twoDaysRange = "time_range_in('dt', '" + getDateUptoHours(
+    twoDaysRange = "time_range_in(dt, '" + getDateUptoHours(
         twodaysBack) + "','" + getDateUptoHours(now) + "')";
-    twoMonthsRangeUptoMonth = "time_range_in('dt', '" +
+    twoMonthsRangeUptoMonth = "time_range_in(dt, '" +
         getDateUptoMonth(twoMonthsBack) + "','" + getDateUptoMonth(now) + "')";
-    twoMonthsRangeUptoHours = "time_range_in('dt', '" +
+    twoMonthsRangeUptoHours = "time_range_in(dt, '" +
         getDateUptoHours(twoMonthsBack) + "','" + getDateUptoHours(now) + "')";
     inited = true;
   }
@@ -531,6 +531,18 @@ public class CubeTestSetup {
     cubeDimensions.add(new ReferencedDimAtrribute(
         new FieldSchema("dim2bignew", "bigint", "ref dim"), "Dim2 refer",
         new TableReference("testdim2", "bigidnew"), now, null, null));
+    cubeDimensions.add(new ReferencedDimAtrribute(
+        new FieldSchema("test_time_dim_hour_id", "int", "ref dim"), "Timedim reference",
+        new TableReference("hourdim", "id"), null, null, null));
+    cubeDimensions.add(new ReferencedDimAtrribute(
+        new FieldSchema("test_time_dim_day_id", "int", "ref dim"), "Timedim reference",
+        new TableReference("daydim", "id"), null, null, null));
+    List<TableReference> references = new ArrayList<TableReference>();
+    references.add(new TableReference("daydim", "full_date"));
+    references.add(new TableReference("hourdim", "full_hour"));
+    cubeDimensions.add(new ReferencedDimAtrribute(
+        new FieldSchema("test_time_dim", "date", "ref dim"), "Timedim full date",
+        references, null, null, null, false));
 
     Set<ExprColumn> exprs = new HashSet<ExprColumn>(); 
     exprs.add(new ExprColumn(new FieldSchema("avgmsr", "double",
@@ -569,6 +581,10 @@ public class CubeTestSetup {
     cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
         TEST_CUBE_NAME), "dt,pt,it,et,test_time_dim");
     cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "test_time_dim", "ttd");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "dt", "dt");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "it", "it");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "et", "et");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "pt", "pt");
 
     client.createCube(TEST_CUBE_NAME, cubeMeasures, cubeDimensions, exprs, cubeProperties);
     
@@ -595,6 +611,7 @@ public class CubeTestSetup {
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
     factColumns.add(new FieldSchema("cityid","int", "city id"));
     factColumns.add(new FieldSchema("stateid","int", "city id"));
+    factColumns.add(new FieldSchema("test_time_dim_hour_id","int", "time id"));
     factColumns.add(new FieldSchema("ambigdim1", "string", "used in" +
         " testColumnAmbiguity"));
 
@@ -642,6 +659,34 @@ public class CubeTestSetup {
     // create cube fact
     client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 0L, null, storageTables);
+    
+    CubeFactTable fact = client.getFactTable(factName);
+    // Add all hourly partitions for two days
+    Calendar cal = Calendar.getInstance();
+    cal.setTime(twodaysBack);
+    Date temp = cal.getTime();
+    while (!(temp.after(now))) {
+      Map<String, Date> timeParts = new HashMap<String, Date>();
+      timeParts.put("ttd", temp);
+      StoragePartitionDesc sPartSpec = new StoragePartitionDesc(fact.getName(),
+          timeParts, null, UpdatePeriod.HOURLY);
+      client.addPartition(sPartSpec, c4);
+      cal.add(Calendar.HOUR_OF_DAY, 1);
+      temp = cal.getTime();
+    }
+
+    // Add all hourly partitions for twoDaysRangeBefore4days
+    cal.setTime(before4daysStart);
+    temp = cal.getTime();
+    while (!(temp.after(before4daysEnd))) {
+      Map<String, Date> timeParts = new HashMap<String, Date>();
+      timeParts.put("ttd", temp);
+      StoragePartitionDesc sPartSpec = new StoragePartitionDesc(fact.getName(),
+          timeParts, null, UpdatePeriod.HOURLY);
+      client.addPartition(sPartSpec, c4);
+      cal.add(Calendar.HOUR_OF_DAY, 1);
+      temp = cal.getTime();
+    }
   }
 
   private void createCubeFactWeekly(CubeMetastoreClient client) throws HiveException {
@@ -690,6 +735,7 @@ public class CubeTestSetup {
     // add dimensions of the cube
     factColumns.add(new FieldSchema("zipcode","int", "zip"));
     factColumns.add(new FieldSchema("cityid","int", "city id"));
+    factColumns.add(new FieldSchema("test_time_dim_day_id","int", "time id"));
 
     Map<String, Set<UpdatePeriod>> storageAggregatePeriods =
         new HashMap<String, Set<UpdatePeriod>>();
@@ -979,7 +1025,76 @@ public class CubeTestSetup {
          dumpPeriods, dimProps, storageTables);
   }
 
+  private void createTimeDims(CubeMetastoreClient client)
+      throws HiveException {
+    String dimName = "dayDim";
+    Set<CubeDimAttribute> dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("full_date", "string",
+        "full date")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("calendar_quarter", "int",
+        "quarter id")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("day_number_of_year", "int",
+        "day number in year")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("is_weekend", "boolean",
+        "is weekend?")));
+    Map<String, String> dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    Dimension testDim = new Dimension(dimName, dimAttrs, dimProps, 0L);
+    client.createDimension(testDim);
 
+    String dimTblName = "dayDimTbl";
+    List<FieldSchema>  dimColumns = new ArrayList<FieldSchema>();
+    dimColumns.add(new FieldSchema("id", "int", "code"));
+    dimColumns.add(new FieldSchema("full_date", "string", "field1"));
+
+    Map<String, UpdatePeriod> dumpPeriods = new HashMap<String, UpdatePeriod>();
+    ArrayList<FieldSchema> partCols = new ArrayList<FieldSchema>();
+    List<String> timePartCols = new ArrayList<String>();
+    partCols.add(TestCubeMetastoreClient.getDatePartition());
+    timePartCols.add(TestCubeMetastoreClient.getDatePartitionKey());
+    StorageTableDesc s1 = new StorageTableDesc();
+    s1.setInputFormat(TextInputFormat.class.getCanonicalName());
+    s1.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    s1.setPartCols(partCols);
+    s1.setTimePartCols(timePartCols);
+    dumpPeriods.put(c3, UpdatePeriod.HOURLY);
+
+    StorageTableDesc s2 = new StorageTableDesc();
+    s2.setInputFormat(TextInputFormat.class.getCanonicalName());
+    s2.setOutputFormat(HiveIgnoreKeyTextOutputFormat.class.getCanonicalName());
+    dumpPeriods.put(c4, null);
+
+    Map<String, StorageTableDesc> storageTables = new HashMap<String, StorageTableDesc>();
+    storageTables.put(c3, s1);
+    storageTables.put(c4, s2);
+
+    client.createCubeDimensionTable(dimName, dimTblName, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
+
+    String dimName2 = "hourDim";
+    dimAttrs = new HashSet<CubeDimAttribute>();
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("id", "int",
+        "code")));
+    dimAttrs.add(new BaseDimAttribute(new FieldSchema("full_hour", "string",
+        "full date")));
+    dimProps = new HashMap<String, String>();
+    dimProps.put(MetastoreUtil.getDimTimedDimensionKey(dimName2),
+        TestCubeMetastoreClient.getDatePartitionKey());
+    testDim = new Dimension(dimName2, dimAttrs, dimProps, 0L);
+    client.createDimension(testDim);
+
+    String dimTblName2 = "hourDimTbl";
+    dimColumns = new ArrayList<FieldSchema>();
+    dimColumns.add(new FieldSchema("id", "int", "code"));
+    dimColumns.add(new FieldSchema("full_hour", "string", "field1"));
+
+    client.createCubeDimensionTable(dimName2, dimTblName2, dimColumns, 0L,
+         dumpPeriods, dimProps, storageTables);
+
+  }
 
   private void createTestDim3(CubeMetastoreClient client)
       throws HiveException {
@@ -1334,6 +1449,7 @@ public class CubeTestSetup {
       createTestDim2(client);
       createTestDim3(client);
       createTestDim4(client);
+      createTimeDims(client);
 
       // For join resolver cyclic links in dimension tables
       createCyclicDim1(client);

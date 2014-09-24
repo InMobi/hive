@@ -78,11 +78,11 @@ public class BetweenTimeRangeWriter implements TimeRangeWriter {
 
       partStr.append(" (").append(tableName).append(".")
              .append(partCol)
-             .append(" BETWEEN ")
+             .append(" BETWEEN '")
              .append(start.getFormattedPartSpec())
-             .append(" AND ")
+             .append("' AND '")
              .append(end.getFormattedPartSpec())
-             .append(") ");
+             .append("') ");
     }
     return partStr.toString();
   }

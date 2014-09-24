@@ -156,6 +156,10 @@ public class SchemaGraph {
       }
       return false;
     }
+
+    public String toString() {
+      return edges.toString();
+    }
   }
 
   /**
@@ -222,6 +226,9 @@ public class SchemaGraph {
       List<JoinPath> joinPaths = new ArrayList<JoinPath>();
       visited.add(source);
 
+      if (graph.get(source) == null) {
+        return joinPaths;
+      }
       for (TableRelationship edge : graph.get(source)) {
         if (visited.contains(edge.getFromTable())) {
           continue;
@@ -307,10 +314,12 @@ public class SchemaGraph {
     // find out all dimensions which link to other dimension tables
     for (CubeDimAttribute dim : allAttrs) {
       if (dim instanceof ReferencedDimAtrribute) {
-        refDimensions.add(dim);
+        if (((ReferencedDimAtrribute)dim).useAsJoinKey()) {
+          refDimensions.add(dim);
+        }
       } else if (dim instanceof HierarchicalDimAttribute) {
         for (CubeDimAttribute hdim : ((HierarchicalDimAttribute)dim).getHierarchy()) {
-          if (hdim instanceof ReferencedDimAtrribute) {
+          if (hdim instanceof ReferencedDimAtrribute && ((ReferencedDimAtrribute)hdim).useAsJoinKey()) {
             refDimensions.add(hdim);
           }
         }

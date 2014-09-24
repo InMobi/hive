@@ -82,7 +82,7 @@ public class TestTimeRangeExtractor {
 
   @Test
   public void testTimeRangeValidation() throws Exception {
-    String timeRange2 = " time_range_in('dt', '" + dateNow + "','" + dateTwoDaysBack + "')";
+    String timeRange2 = " time_range_in(dt, '" + dateNow + "','" + dateTwoDaysBack + "')";
     try {
       // this should throw exception because from date is after to date
       CubeQueryContext rewrittenQuery = driver.rewrite("SELECT cityid, testCube.msr2 from" +
@@ -97,7 +97,7 @@ public class TestTimeRangeExtractor {
   @Test
   public void testNoNPE() throws Exception {
     // GRILL-38 NPE in extracting time range
-    String timeRange = " time_range_in('dt', '" + dateTwoDaysBack + "','" + dateNow + "')";
+    String timeRange = " time_range_in(dt, '" + dateTwoDaysBack + "','" + dateNow + "')";
     String q1 = "SELECT cityid, testCube.msr2 from testCube where " + timeRange + " AND cityid IS NULL";
     rewrite(driver, q1);
     q1 = "SELECT cityid, testCube.msr2 from testCube where cityid IS NULL AND " + timeRange;
@@ -107,7 +107,7 @@ public class TestTimeRangeExtractor {
   @Test
   public void testTimeRangeASTPosition() throws Exception {
     // check that time range can be any child of AND
-    String timeRange = " time_range_in('dt', '" + dateTwoDaysBack + "','" + dateNow + "')";
+    String timeRange = " time_range_in(dt, '" + dateTwoDaysBack + "','" + dateNow + "')";
     String q1 = "SELECT cityid, testCube.msr2 from testCube where " + timeRange + " AND cityid=1";
     CubeQueryContext cubeql = driver.rewrite(q1);
     String hql = cubeql.toHQL();
@@ -116,7 +116,7 @@ public class TestTimeRangeExtractor {
   @Test
   public void testPartitionColNameExtract() throws Exception  {
     String q2 = "SELECT cityid, testCube.msr3 from testCube where cityid=1 AND " +
-      " time_range_in('dt', '" + dateTwoDaysBack + "','" + dateNow + "')";
+      " time_range_in(dt, '" + dateTwoDaysBack + "','" + dateNow + "')";
     CubeQueryContext cubeql = driver.rewrite(q2);
     String hql = cubeql.toHQL();
     // Check that column name in time range is extracted properly
@@ -134,10 +134,10 @@ public class TestTimeRangeExtractor {
     String dateNow = getDateUptoHours(now);
     // time range within time range
     String q3 = "SELECT cityid, testCube.msr3 FROM testCube where cityid=1 AND"
-      + "  (time_range_in('dt', '" + dateTwoDaysBack
+      + "  (time_range_in(dt, '" + dateTwoDaysBack
       + "','" +dateNow+ "')  "
       // Time range as sibling of the first time range
-      + " OR " + " time_range_in('dt', '" + dateTwoDaysBack + "', '" +  dateNow + "'))";
+      + " OR " + " time_range_in(dt, '" + dateTwoDaysBack + "', '" +  dateNow + "'))";
     CubeQueryContext cubeql = driver.rewrite(q3);
     String hql = cubeql.toHQL();
 

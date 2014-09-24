@@ -74,6 +74,7 @@ public interface MetastoreConstants {
   // dimension constants
   public static final String DIM_KEY_PFX = "cube.dimension.";
   public static final String DIM_REFERS_SFX = ".refers";
+  public static final String IS_JOIN_KEY_SFX = ".isjoinkey";
   public static final String TABLE_COLUMN_SEPERATOR = ".";
   public static final String INLINE_SIZE_SFX = ".inline.size";
   public static final String INLINE_VALUES_SFX = ".inline.values";

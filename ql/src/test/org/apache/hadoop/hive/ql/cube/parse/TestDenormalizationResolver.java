@@ -82,7 +82,7 @@ public class TestDenormalizationResolver {
   @Test
   public void testDenormsAsDirectFields() throws SemanticException, ParseException {
     // denorm fields directly available
-    String twoDaysITRange = "time_range_in('it', '" +
+    String twoDaysITRange = "time_range_in(it, '" +
         CubeTestSetup.getDateUptoHours(
             twodaysBack) + "','" + CubeTestSetup.getDateUptoHours(now) + "')";
     String hqlQuery = rewrite(driver, "select dim2big1, max(msr3)," +

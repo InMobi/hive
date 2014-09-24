@@ -67,7 +67,7 @@ public class CubeQueryConfUtil {
   public static final boolean DEFAULT_ENABLE_GROUP_BY_TO_SELECT = false;
   public static final boolean DEFAULT_ENABLE_SELECT_TO_GROUPBY = false;
   public static final boolean DEFAULT_ADD_NON_EXISTING_PARTITIONS = false;
-  public static final boolean DEFAULT_REPLACE_TIMEDIM_WITH_PART_COL = false;
+  public static final boolean DEFAULT_REPLACE_TIMEDIM_WITH_PART_COL = true;
 
   public static String getLookAheadPTPartsKey(UpdatePeriod interval) {
     return LOOK_AHEAD_PT_PARTS_PFX + interval.name().toLowerCase();

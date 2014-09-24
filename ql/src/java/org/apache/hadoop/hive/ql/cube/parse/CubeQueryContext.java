@@ -465,6 +465,11 @@ public class CubeQueryContext {
     return null;
   }
 
+  // Will be set after the Fact is picked and time ranges replaced
+  public void setWhereAST(ASTNode ast) {
+    this.whereAST = ast;
+  }
+
   public String getGroupByTree() {
     if (groupByAST != null) {
       return HQLParser.getString(groupByAST);
@@ -699,6 +704,15 @@ public class CubeQueryContext {
   public String toHQL() throws SemanticException {
     CandidateFact cfact = pickCandidateFactToQuery();
     Map<Dimension, CandidateDim> dimsToQuery = pickCandidateDimsToQuery(dimensions);
+    if (autoJoinCtx != null) {
+      // prune join paths for picked fact and dimensions
+      autoJoinCtx.pruneAllPaths(cfact, dimsToQuery);
+    }
+
+    // add range where clause
+    HQLContext.addRangeClauses(this, cfact);
+
+    // pick denorm tables for the picked fact and dimensions
     Set<Dimension> denormTables = deNormCtx.rewriteDenormctx(cfact, dimsToQuery);
     LOG.info("Adding denormTables " + denormTables + " to pick candidates");
     if (dimsToQuery == null) {

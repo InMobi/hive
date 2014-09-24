@@ -23,6 +23,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.DOT;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_ALLCOLREF;
+import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTION;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_FUNCTIONSTAR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_TABLE_OR_COL;
@@ -64,7 +65,7 @@ public class ColumnResolver implements ContextRewriter {
       }
     }
     getColsForTree(cubeql, cubeql.getSelectAST());
-    getColsForTree(cubeql, cubeql.getWhereAST());
+    getColsForWhereTree(cubeql);
     getColsForTree(cubeql, cubeql.getJoinTree());
     getColsForTree(cubeql, cubeql.getGroupByAST());
     getColsForTree(cubeql, cubeql.getHavingAST());
@@ -131,5 +132,55 @@ public class ColumnResolver implements ContextRewriter {
         }
       }
     });
+  }
+
+  private void getColsForWhereTree(final CubeQueryContext cubeql) throws SemanticException {
+    if (cubeql.getWhereAST() == null) {
+      return;
+    }
+    addColumns(cubeql, cubeql.getWhereAST(), null);
+  }
+
+  private static void addColumns(final CubeQueryContext cubeql, ASTNode node, ASTNode parent) {
+    if (node.getToken().getType() == TOK_TABLE_OR_COL
+        && (parent != null && parent.getToken().getType() != DOT)) {
+      // Take child ident.totext
+      ASTNode ident = (ASTNode) node.getChild(0);
+      String column = ident.getText().toLowerCase();
+      if (cubeql.getExprToAliasMap().values().contains(column)) {
+        // column is an existing alias
+        return;
+      }
+      cubeql.addColumnsQueried(CubeQueryContext.DEFAULT_TABLE, column);
+    } else if (node.getToken().getType() == DOT) {
+      // This is for the case where column name is prefixed by table name
+      // or table alias
+      // For example 'select fact.id, dim2.id ...'
+      // Right child is the column name, left child.ident is table name
+      ASTNode tabident = HQLParser.findNodeByPath(node, TOK_TABLE_OR_COL,
+          Identifier);
+      ASTNode colIdent = (ASTNode) node.getChild(1);
+
+      String column = colIdent.getText().toLowerCase();
+      String table = tabident.getText().toLowerCase();
+
+      cubeql.addColumnsQueried(table, column);
+    } else if (node.getToken().getType() == TOK_FUNCTION) {
+      ASTNode fname = HQLParser.findNodeByPath(node, Identifier);
+      if (fname != null && CubeQueryContext.TIME_RANGE_FUNC.equalsIgnoreCase(fname.getText())) {
+        if (!cubeql.shouldReplaceTimeDimWithPart()) {
+          // Skip columns in timerange clause if replace timedimension with part column is on 
+          addColumns(cubeql, (ASTNode)node.getChild(1), node);
+        }
+      } else {
+        for (int i = 0; i < node.getChildCount(); i++) {
+          addColumns(cubeql, (ASTNode)node.getChild(i), node);
+        }
+      }
+    } else {
+      for (int i = 0; i < node.getChildCount(); i++) {
+        addColumns(cubeql, (ASTNode)node.getChild(i), node);
+      }
+    }
   }
 }

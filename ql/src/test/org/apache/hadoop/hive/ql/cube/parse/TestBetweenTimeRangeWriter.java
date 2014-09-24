@@ -62,7 +62,7 @@ public class TestBetweenTimeRangeWriter extends TestTimeRangeWriter {
   public static String getBetweenClause(String alias, String colName, Date start, Date end, DateFormat format) {
     String first = format.format(start);
     String last = format.format(end);
-    return " (" + alias + "." + colName + " BETWEEN " + first + " AND " + last + ") ";
+    return " (" + alias + "." + colName + " BETWEEN '" + first + "' AND '" + last + "') ";
   }
 
   @Override
