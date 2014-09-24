@@ -182,7 +182,7 @@ public class JoinResolver implements ContextRewriter {
 
     public String getFromString(HQLContext context, CubeQueryContext cubeql) throws SemanticException {
       String fromString = "";
-      LOG.info("All paths dump:" + cubeql.getAutoJoinCtx().getAllPaths());
+      LOG.debug("All paths dump:" + cubeql.getAutoJoinCtx().getAllPaths());
       if (autoJoinTarget instanceof CubeInterface) {
         fromString = context.getFactToQuery().getStorageString(
             cubeql.getAliasForTabName(autoJoinTarget.getName()));
