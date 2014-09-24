@@ -20,7 +20,8 @@ package org.apache.hive.service.auth;
 import javax.security.sasl.AuthenticationException;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.util.ReflectionUtils;
+
+import java.lang.reflect.InvocationTargetException;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -42,11 +43,16 @@ public class CustomAuthenticationProviderImpl
     // Try initializing the class with non-default and default constructors
     try {
       this.customProvider = customHandlerClass.getConstructor(HiveConf.class).newInstance(conf);
+<<<<<<< HEAD
     } catch (ReflectiveOperationException e) {
+=======
+    } catch (NoSuchMethodException e) {
+>>>>>>> 73258b7607df660e8690ce5662e37e004d6d22e6
       try {
         this.customProvider = customHandlerClass.getConstructor().newInstance();
         // in java6, these four extend directly from Exception. So have to handle separately. In java7,
         // the common subclass is ReflectiveOperationException
+<<<<<<< HEAD
       } catch (InvocationTargetException e1) {
         throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
       } catch (NoSuchMethodException e1) {
@@ -56,6 +62,16 @@ public class CustomAuthenticationProviderImpl
       } catch (IllegalAccessException e1) {
         throw new AuthenticationException(REFLECTION_ERROR_MESSAGE, e);
       }
+=======
+      } catch (NoSuchMethodException e1) {
+        throw new AuthenticationException("Can't instantiate custom authentication provider class. " +
+          "Either provide a constructor with HiveConf as argument or a default constructor.", e);
+      } catch (Exception e1) {
+        throw new AuthenticationException(e.getMessage(), e);
+      }
+    } catch (Exception e) {
+      throw new AuthenticationException(e.getMessage(), e);
+>>>>>>> 73258b7607df660e8690ce5662e37e004d6d22e6
     }
   }
 

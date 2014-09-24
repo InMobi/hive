@@ -51,3 +51,8 @@ struct SetIntString {
   1: set<IntString> sIntString;
   2: string aString;
 }
+
+struct SetIntString {
+  1: set<IntString> sIntString;
+  2: string aString;
+}
