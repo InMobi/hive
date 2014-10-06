@@ -18,13 +18,15 @@ package org.apache.hadoop.hive.ql.cube.parse;
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
 
 import static org.apache.hadoop.hive.ql.parse.HiveParser.Identifier;
 import static org.apache.hadoop.hive.ql.parse.HiveParser.TOK_SELEXPR;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,7 +35,10 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
+import org.apache.hadoop.hive.ql.cube.metadata.CubeInterface;
+import org.apache.hadoop.hive.ql.cube.metadata.DerivedCube;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -50,6 +55,7 @@ public class AliasReplacer implements ContextRewriter {
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
     colToTableAlias = new HashMap<String, String>();
     extractTabAliasForCol(cubeql);
+    doFieldValidation(cubeql);
 
     // Rewrite the all the columns in the query with table alias prefixed.
     // If col1 of table tab1 is accessed, it would be changed as tab1.col1.
@@ -89,6 +95,53 @@ public class AliasReplacer implements ContextRewriter {
     AggregateResolver.updateAggregates(havingAST, cubeql);
     // Update alias map as well
     updateAliasMap(selectAST, cubeql);
+
+  }
+
+  private void doFieldValidation(CubeQueryContext cubeql) throws SemanticException {
+    if (cubeql.getCube() != null && !cubeql.getCube().allFieldsQueriable()) {
+      // do queried field validation
+      CubeInterface cube = cubeql.getCube();
+      List<DerivedCube> dcubes;
+      try {
+        dcubes = cubeql.getMetastoreClient().getAllDerivedQueryableCubes(cube);
+      } catch (HiveException e) {
+        throw new SemanticException(e);
+      }
+      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cube.getName());
+      System.out.println("tblAliasColumnDump:" + cubeql.getTblAlaisToColumns());
+      System.out.println("columns queried:" + cubeColsQueried);
+      Set<String> queriedDimAttrs = new HashSet<String>();
+      Set<String> queriedMsrs = new HashSet<String>();
+      for (String col : cubeColsQueried) {
+        if (cube.getMeasureNames().contains(col)) {
+          queriedMsrs.add(col);
+        } else if (cube.getDimAttributeNames().contains(col)) {
+          queriedDimAttrs.add(col);
+        }
+      }
+      // do validation
+      // Find atleast one derived cube which contains all the dimensions queried.
+      boolean derivedCubeFound = false;
+      for (DerivedCube dcube : dcubes) {
+        if (dcube.getDimAttributeNames().containsAll(queriedDimAttrs)) {
+          // remove all the measures that are covered
+          queriedMsrs.removeAll(dcube.getMeasureNames()); 
+          derivedCubeFound = true;
+        }
+      }
+      if (!derivedCubeFound) {
+        throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedDimAttrs.toString());
+      }
+      if (!queriedMsrs.isEmpty()) {
+        if (!queriedDimAttrs.isEmpty()) {
+          throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE,
+              queriedDimAttrs.toString() + " and " + queriedMsrs.toString());
+        } else {
+          throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedMsrs.toString());
+        }
+      }
+    }
   }
 
   private void extractTabAliasForCol(CubeQueryContext cubeql) throws SemanticException {
@@ -191,10 +244,10 @@ public class AliasReplacer implements ContextRewriter {
     }
 
     if (root.getToken().getType() == TOK_SELEXPR) {
-        ASTNode alias = HQLParser.findNodeByPath(root, Identifier);
-        if (alias != null) {
-          cubeql.addExprToAlias(root, alias);
-        }
+      ASTNode alias = HQLParser.findNodeByPath(root, Identifier);
+      if (alias != null) {
+        cubeql.addExprToAlias(root, alias);
+      }
     } else {
       for (int i = 0; i < root.getChildCount(); i++) {
         updateAliasMap((ASTNode)root.getChild(i), cubeql);

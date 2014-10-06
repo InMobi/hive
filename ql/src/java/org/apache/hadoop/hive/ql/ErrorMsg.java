@@ -431,7 +431,7 @@ public enum ErrorMsg {
   JOIN_TARGET_NOT_CUBE_TABLE(15022, "Join target table {0} is neither dimension nor cube", true),
   NO_FACT_HAS_COLUMN(15023, "No fact table has the queried columns : {0}", true),
   NO_CANDIDATE_DIM_STORAGE_TABLES(15024, "No candidate dimension storage tables for dimension because {0}", true),
-  CUBE_NOT_QUERYABLE(15025, "Cube {0} cannot be queried", true),
+  FIELDS_NOT_QUERYABLE(15025, "Fields {0} cannot be queried together", true),
   NO_DIM_HAS_COLUMN(15026, "No dimension table has the queried columns for {0}, columns: {1}", true),
   NO_CANDIDATE_DIM_AVAILABLE(15027, "No candidate dimension table available for {0} to answer the query, because {1}", true),
   CANNOT_USE_TIMERANGE_WRITER(15028, "Configured timerange writer cannot be used. Reason {0}", true),

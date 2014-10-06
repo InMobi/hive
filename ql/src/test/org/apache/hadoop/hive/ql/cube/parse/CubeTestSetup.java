@@ -44,6 +44,7 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.cube.metadata.BaseDimAttribute;
 import org.apache.hadoop.hive.ql.cube.metadata.ColumnMeasure;
+import org.apache.hadoop.hive.ql.cube.metadata.Cube;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeDimAttribute;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeFactTable;
 import org.apache.hadoop.hive.ql.cube.metadata.CubeMeasure;
@@ -101,6 +102,11 @@ public class CubeTestSetup {
   private Set<CubeDimAttribute> cubeDimensions;
   public static final String TEST_CUBE_NAME= "testCube";
   public static final String DERIVED_CUBE_NAME= "derivedCube";
+  public static final String BASE_CUBE_NAME= "baseCube";
+  public static final String DERIVED_CUBE_NAME1= "der1";
+  public static final String DERIVED_CUBE_NAME2= "der2";
+  public static final String DERIVED_CUBE_NAME3= "der3";
+  public static final String DERIVED_CUBE_NAME4= "der4";
   public static Date now;
   public static Date twodaysBack;
   public static Date oneDayBack;
@@ -477,6 +483,7 @@ public class CubeTestSetup {
     return expected.toString();
   }
 
+  Set<ExprColumn> exprs;
   private void createCube(CubeMetastoreClient client) throws HiveException, ParseException {
     cubeMeasures = new HashSet<CubeMeasure>();
     cubeMeasures.add(new ColumnMeasure(new FieldSchema("msr1", "int",
@@ -544,7 +551,7 @@ public class CubeTestSetup {
         new FieldSchema("test_time_dim", "date", "ref dim"), "Timedim full date",
         references, null, null, null, false));
 
-    Set<ExprColumn> exprs = new HashSet<ExprColumn>(); 
+    exprs = new HashSet<ExprColumn>(); 
     exprs.add(new ExprColumn(new FieldSchema("avgmsr", "double",
         "avg measure"), "Avg Msr",
         "avg(msr1 + msr2)"));
@@ -599,8 +606,57 @@ public class CubeTestSetup {
         dimensions, new HashMap<String, String>(), 0L);
   }
 
+  private void createBaseAndDerivedCubes(CubeMetastoreClient client) throws HiveException, ParseException {
+    Map<String, String> cubeProperties =
+        new HashMap<String, String>();
+    cubeProperties.put(MetastoreUtil.getCubeTimedDimensionListKey(
+        BASE_CUBE_NAME), "dt,pt,it,et,test_time_dim");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "test_time_dim", "ttd");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "dt", "dt");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "it", "it");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "et", "et");
+    cubeProperties.put(CubeQueryConfUtil.TIMEDIM_TO_PART_MAPPING_PFX + "pt", "pt");
+    cubeProperties.put(MetastoreConstants.CUBE_ALL_FIELDS_QUERIABLE, "false");
+    client.createCube(BASE_CUBE_NAME, cubeMeasures, cubeDimensions, exprs, cubeProperties);
+    
+    Map<String, String> derivedProperties =
+        new HashMap<String, String>();
+    derivedProperties.put(MetastoreConstants.CUBE_ALL_FIELDS_QUERIABLE, "true");
+    Set<String> measures = new HashSet<String>();
+    measures.add("msr1");
+    Set<String> dimensions = new HashSet<String>();
+    dimensions.add("dim1");
+    client.createDerivedCube(BASE_CUBE_NAME, DERIVED_CUBE_NAME1, measures,
+        dimensions, derivedProperties, 0L);
+
+    measures = new HashSet<String>();
+    measures.add("msr2");
+    dimensions = new HashSet<String>();
+    dimensions.add("dim1");
+    dimensions.add("dim2");
+    client.createDerivedCube(BASE_CUBE_NAME, DERIVED_CUBE_NAME2, measures,
+        dimensions, derivedProperties, 10L);
+    measures = new HashSet<String>();
+    measures.add("msr3");
+    dimensions = new HashSet<String>();
+    dimensions.add("dim1");
+    dimensions.add("location");
+    client.createDerivedCube(BASE_CUBE_NAME, DERIVED_CUBE_NAME3, measures,
+        dimensions, derivedProperties, 20L);
+/*    measures = new HashSet<String>();
+    measures.add("msr3");
+    dimensions = new HashSet<String>();
+    dimensions.add("dim1");
+    dimensions.add("dim2big");
+    dimensions.add("test_time_dim_hour_id");
+    dimensions.add("test_time_dim_day_id");
+    client.createDerivedCube(BASE_CUBE_NAME, DERIVED_CUBE_NAME4, measures,
+        dimensions, derivedProperties, 30L);*/
+  }
+
   private void createCubeFact(CubeMetastoreClient client) throws HiveException {
     String factName = "testFact";
+    String factName2 = "testFact_BASE";
     List<FieldSchema> factColumns = new ArrayList<FieldSchema>(
         cubeMeasures.size());
     for (CubeMeasure measure : cubeMeasures) {
@@ -658,6 +714,8 @@ public class CubeTestSetup {
     storageTables.put(c3, s1);
     // create cube fact
     client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+        storageAggregatePeriods, 0L, null, storageTables);
+    client.createCubeFactTable(BASE_CUBE_NAME, factName2, factColumns,
         storageAggregatePeriods, 0L, null, storageTables);
     
     CubeFactTable fact = client.getFactTable(factName);
@@ -726,6 +784,7 @@ public class CubeTestSetup {
   private void createCubeFactOnlyHourly(CubeMetastoreClient client)
       throws HiveException {
     String factName = "testFact2";
+    String factName2 = "testFact2_BASE";
     List<FieldSchema> factColumns = new ArrayList<FieldSchema>(
         cubeMeasures.size());
     for (CubeMeasure measure : cubeMeasures) {
@@ -759,6 +818,8 @@ public class CubeTestSetup {
     // create cube fact
     client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 10L, null, storageTables);
+    client.createCubeFactTable(BASE_CUBE_NAME, factName2, factColumns,
+        storageAggregatePeriods, 0L, null, storageTables);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
     Calendar cal = Calendar.getInstance();
@@ -791,6 +852,7 @@ public class CubeTestSetup {
   private void createCubeFactOnlyHourlyRaw(CubeMetastoreClient client)
       throws HiveException {
     String factName = "testFact2_raw";
+    String factName2 = "testFact2_raw_BASE";
     List<FieldSchema> factColumns = new ArrayList<FieldSchema>(
         cubeMeasures.size());
     for (CubeMeasure measure : cubeMeasures) {
@@ -828,6 +890,8 @@ public class CubeTestSetup {
     properties.put(MetastoreConstants.FACT_AGGREGATED_PROPERTY, "false");
 
     client.createCubeFactTable(TEST_CUBE_NAME, factName, factColumns,
+        storageAggregatePeriods, 100L, properties, storageTables);
+    client.createCubeFactTable(BASE_CUBE_NAME, factName2, factColumns,
         storageAggregatePeriods, 100L, properties, storageTables);
     CubeFactTable fact2 = client.getFactTable(factName);
     // Add all hourly partitions for two days
@@ -1438,6 +1502,7 @@ public class CubeTestSetup {
       client.createStorage(new HDFSStorage(c3));
       client.createStorage(new HDFSStorage(c4));
       createCube(client);
+      createBaseAndDerivedCubes(client);
       createCubeFact(client);
       // commenting this as the week date format throws IllegalPatternException
       //createCubeFactWeekly(client);

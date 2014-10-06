@@ -239,7 +239,7 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
   }
 
   @Override
-  public boolean canBeQueried() {
+  public boolean allFieldsQueriable() {
     return true;
   }
 

@@ -18,7 +18,7 @@ package org.apache.hadoop.hive.ql.cube.metadata;
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
 
 import java.text.ParseException;
@@ -1138,20 +1138,66 @@ public class CubeMetastoreClient {
    */
   public List<CubeFactTable> getAllFactTables(CubeInterface cube) throws HiveException {
     if (cube instanceof Cube) {
-    List<CubeFactTable> cubeFacts = new ArrayList<CubeFactTable>();
+      List<CubeFactTable> cubeFacts = new ArrayList<CubeFactTable>();
+      try {
+        for (CubeFactTable fact : getAllFacts()) {
+          if (fact.getCubeName().equalsIgnoreCase(((Cube)cube).getName().toLowerCase())) {
+            cubeFacts.add(fact);
+          }
+        }
+      } catch (HiveException e) {
+        throw new HiveException("Could not get all tables", e);
+      }
+      return cubeFacts;
+    } else {
+      return getAllFactTables(((DerivedCube)cube).getParent());
+    }
+  }
+
+  /**
+   * Get all derived cubes of the cube.
+   *
+   * @param cube Cube object
+   *
+   * @return List of DerivedCube objects
+   * @throws HiveException
+   */
+  public List<DerivedCube> getAllDerivedCubes(CubeInterface cube) throws HiveException {
+    List<DerivedCube> dcubes = new ArrayList<DerivedCube>();
     try {
-      for (CubeFactTable fact : getAllFacts()) {
-        if (fact.getCubeName().equalsIgnoreCase(((Cube)cube).getName().toLowerCase())) {
-          cubeFacts.add(fact);
+      for (CubeInterface cb : getAllCubes()) {
+        if (cb.isDerivedCube() && ((DerivedCube)cb).getParent().getName().equalsIgnoreCase(cube.getName())) {
+          dcubes.add((DerivedCube)cb);
         }
       }
     } catch (HiveException e) {
       throw new HiveException("Could not get all tables", e);
     }
-    return cubeFacts;
-    } else {
-      return getAllFactTables(((DerivedCube)cube).getParent());
+    return dcubes;
+  }
+
+  /**
+   * Get all derived cubes of the cube, that have all fields queryable together
+   *
+   * @param cube Cube object
+   *
+   * @return List of DerivedCube objects
+   * @throws HiveException
+   */
+  public List<DerivedCube> getAllDerivedQueryableCubes(CubeInterface cube) throws HiveException {
+    List<DerivedCube> dcubes = new ArrayList<DerivedCube>();
+    try {
+      for (CubeInterface cb : getAllCubes()) {
+        if (cb.isDerivedCube() &&
+            ((DerivedCube)cb).getParent().getName().equalsIgnoreCase(cube.getName()) &&
+            cb.allFieldsQueriable()) {
+          dcubes.add((DerivedCube)cb);
+        }
+      }
+    } catch (HiveException e) {
+      throw new HiveException("Could not get all tables", e);
     }
+    return dcubes;
   }
 
   /**
