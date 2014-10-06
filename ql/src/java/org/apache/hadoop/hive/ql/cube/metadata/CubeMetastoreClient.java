@@ -1030,7 +1030,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all dimension tables", e);
     }
     return dimTables;
   }
@@ -1052,7 +1052,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all storages", e);
     }
     return storages;
   }
@@ -1074,7 +1074,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all cubes", e);
     }
     return cubes;
   }
@@ -1096,7 +1096,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all dimensions", e);
     }
     return dims;
   }
@@ -1119,7 +1119,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all fact tables", e);
     }
     return facts;
   }
@@ -1141,12 +1141,12 @@ public class CubeMetastoreClient {
       List<CubeFactTable> cubeFacts = new ArrayList<CubeFactTable>();
       try {
         for (CubeFactTable fact : getAllFacts()) {
-          if (fact.getCubeName().equalsIgnoreCase(((Cube)cube).getName().toLowerCase())) {
+          if (fact.getCubeName().equalsIgnoreCase(((Cube)cube).getName())) {
             cubeFacts.add(fact);
           }
         }
       } catch (HiveException e) {
-        throw new HiveException("Could not get all tables", e);
+        throw new HiveException("Could not get all fact tables of " + cube, e);
       }
       return cubeFacts;
     } else {
@@ -1171,7 +1171,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all derived cubes of " + cube, e);
     }
     return dcubes;
   }
@@ -1195,7 +1195,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all derived queryable cubes of " + cube, e);
     }
     return dcubes;
   }
@@ -1217,7 +1217,7 @@ public class CubeMetastoreClient {
         }
       }
     } catch (HiveException e) {
-      throw new HiveException("Could not get all tables", e);
+      throw new HiveException("Could not get all dimension tables of " + dim, e);
     }
     return dimTables;
   }
