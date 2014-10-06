@@ -97,6 +97,19 @@ public class TestBaseCubeQueries {
     Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
         ErrorMsg.FIELDS_NOT_QUERYABLE.getErrorCode());
     Assert.assertTrue(th.getMessage().contains("dim2") && th.getMessage().contains("cityid"));
+
+    th = null;
+    try {
+      rewrite(driver, "select newmeasure from basecube" +
+          " where " + twoDaysRange);
+    } catch (SemanticException e) {
+      th = e;
+      e.printStackTrace();
+    }
+    Assert.assertNotNull(th);
+    Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
+        ErrorMsg.FIELDS_NOT_QUERYABLE.getErrorCode());
+    Assert.assertTrue(th.getMessage().contains("newmeasure"));
   }
 
   @Test
