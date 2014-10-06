@@ -109,8 +109,6 @@ public class AliasReplacer implements ContextRewriter {
         throw new SemanticException(e);
       }
       Set<String> cubeColsQueried = cubeql.getColumnsQueried(cube.getName());
-      System.out.println("tblAliasColumnDump:" + cubeql.getTblAlaisToColumns());
-      System.out.println("columns queried:" + cubeColsQueried);
       Set<String> queriedDimAttrs = new HashSet<String>();
       Set<String> queriedMsrs = new HashSet<String>();
       for (String col : cubeColsQueried) {

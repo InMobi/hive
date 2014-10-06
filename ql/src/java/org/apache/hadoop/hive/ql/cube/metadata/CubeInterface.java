@@ -132,9 +132,8 @@ public interface CubeInterface extends Named {
   /**
    * Whether all the fields of cube can be queried. 
    *
-   * If false, the fields can queried through derived cubes. If query is issued
-   * on this cube, query will rewritten by picking appropriate fields from derived
-   * cubes. 
+   * If false, the fields can queried through derived cubes. Users can look at 
+   * derived cube fields to know which all fields can be queried together.
    *
    * If true, all the fields can be directly queried.
    *
