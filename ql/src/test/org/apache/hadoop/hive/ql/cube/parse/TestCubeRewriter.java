@@ -1452,4 +1452,21 @@ public class TestCubeRewriter {
     System.out.println("@@2 " + hql);
     Assert.assertTrue(!hql.contains("ttd") && hql.contains("full_hour"));
   }
+
+  @Test
+  public void testAliasNameSameAsColumnName() throws Exception {
+    String query = "SELECT msr2 as msr2 from testCube WHERE " + twoDaysRange;
+    HQLParser.printAST(HQLParser.parseHQL(query));
+    HiveConf hiveConf = new HiveConf(conf, TestCubeRewriter.class);
+    try {
+      CubeQueryRewriter rewriter = new CubeQueryRewriter(hiveConf);
+      CubeQueryContext ctx = rewriter.rewrite(query);
+      String hql = ctx.toHQL();
+      Assert.assertNotNull(hql);
+      System.out.println("@@HQL " + hql);
+    } catch (NullPointerException npe) {
+      Assert.fail(npe.getMessage());
+      npe.printStackTrace();
+    }
+  }
 }

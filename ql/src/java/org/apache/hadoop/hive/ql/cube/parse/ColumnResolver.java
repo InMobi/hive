@@ -104,7 +104,7 @@ public class ColumnResolver implements ContextRewriter {
           // Take child ident.totext
           ASTNode ident = (ASTNode) node.getChild(0);
           String column = ident.getText().toLowerCase();
-          if (cubeql.getExprToAliasMap().values().contains(column)) {
+          if (cubeql.getExprToAliasMap().values().contains(column) && parent.getToken().getType() != TOK_SELEXPR) {
             // column is an existing alias
             return;
           }
