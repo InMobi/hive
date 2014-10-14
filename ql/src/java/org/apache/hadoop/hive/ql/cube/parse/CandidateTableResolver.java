@@ -22,7 +22,9 @@ package org.apache.hadoop.hive.ql.cube.parse;
  */
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -94,6 +96,7 @@ public class CandidateTableResolver implements ContextRewriter {
       // check for joined columns and denorm columns on refered tables
       resolveCandidateFactTablesForJoins(cubeql);
       resolveCandidateDimTablesForJoinsAndDenorms(cubeql);
+      cubeql.pruneCandidateFactSet(CubeTableCause.INVALID_DENORM_TABLE);
       checkForQueriedColumns = true;
     }
   }
@@ -183,7 +186,9 @@ public class CandidateTableResolver implements ContextRewriter {
           cubeql.getCube().getName()));
       List<String> validFactTables = StringUtils.isBlank(str) ? null :
         Arrays.asList(StringUtils.split(str.toLowerCase(), ","));
-      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
+      //Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
+      Set<String> queriedDimAttrs = cubeql.getQueriedDimAttrs();
+      Set<String> queriedMsrs = cubeql.getQueriedMsrs();
 
       // Remove fact tables based on columns in the query
       for (Iterator<CandidateFact> i = cubeql.getCandidateFactTables().iterator();
@@ -204,23 +209,13 @@ public class CandidateTableResolver implements ContextRewriter {
 
         // go over the columns accessed in the query and find out which tables
         // can answer the query
-        Set<String> factCols = cubeTabToCols.get(fact);
-        List<String> validFactCols = fact.getValidColumns();
+        // the candidate facts should have all the dimensions queried and atleast 
+        // one measure
+        Collection<String> factCols = getAllColumns(fact);
+        LOG.info("Looking for queriedDimAttrs:" + queriedDimAttrs + " in fact" + fact + "fact columns:" + factCols);
 
-        for (String col : cubeColsQueried) {
-          if (validFactCols != null) {
-            if (!validFactCols.contains(col.toLowerCase())) {
-              // check if it available as reference, if not remove the candidate
-              if (!cubeql.getDenormCtx().addRefUsage(cfact, col, cubeql.getCube().getName())) {
-                LOG.info("Not considering fact table:" + fact +
-                    " as column " + col + " is not valid");
-                cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
-                    fact.getName(), CubeTableCause.COLUMN_NOT_VALID));
-                i.remove();
-                break;
-              }
-            }
-          } else if(!factCols.contains(col.toLowerCase())) {
+        for (String col : queriedDimAttrs) {
+           if(!factCols.contains(col.toLowerCase())) {
             // check if it available as reference, if not remove the candidate
             if (!cubeql.getDenormCtx().addRefUsage(cfact, col, cubeql.getCube().getName())) {
               LOG.info("Not considering fact table:" + fact +
@@ -232,12 +227,65 @@ public class CandidateTableResolver implements ContextRewriter {
             }
           }
         }
+        
+        // check if the candidate fact has atleast one measure queried
+        if (!checkForColumnExists(cfact, queriedMsrs)) {
+          LOG.info("Not considering fact table:" + fact +
+              " as columns " + queriedMsrs + " is not available");
+          cubeql.addFactPruningMsgs(fact, new CandidateTablePruneCause(
+              fact.getName(), CubeTableCause.COLUMN_NOT_FOUND));
+          i.remove();          
+        }
       }
+      // Find out candidate fact table sets which contain all the measures queried
+      List<CandidateFact> cfacts = new ArrayList<CandidateFact>(cubeql.getCandidateFactTables());
+      Set<Set<CandidateFact>> cfactset = findCoveringSets(cfacts, queriedMsrs);
+      LOG.info("Measure covering fact sets :" + cfactset);
+      if (cfactset.isEmpty()) {
+        throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN,
+            queriedMsrs.toString());
+      }
+      cubeql.getCandidateFactSets().addAll(cfactset);
+      cubeql.pruneCandidateFactWithCandidateSet(CubeTableCause.COLUMN_NOT_FOUND);
+
       if (cubeql.getCandidateFactTables().size() == 0) {
         throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN,
-            cubeColsQueried.toString());
+            queriedDimAttrs.toString());
       }
     }
+  }
+
+  static Set<Set<CandidateFact>> findCoveringSets(List<CandidateFact> cfacts, Set<String> msrs) {
+    Set<Set<CandidateFact>> cfactset = new HashSet<Set<CandidateFact>>();
+    for (Iterator<CandidateFact> i = cfacts.iterator();
+        i.hasNext();) {
+      CandidateFact cfact = i.next();
+      i.remove();
+      if (getAllColumns(cfact.fact).containsAll(msrs)) {
+        LOG.info("Fact " + cfact + " contains all measures" + msrs);
+        Set<CandidateFact> one = new HashSet<CandidateFact>();
+        one.add(cfact);
+        cfactset.add(one);
+      } else {
+        // find the remaining measures in other facts
+        Set<String> remainingMsrs = new HashSet<String>(msrs);
+        remainingMsrs.removeAll(getAllColumns(cfact.fact));
+        LOG.info("Fact " + cfact + " does not contain " + remainingMsrs);
+        Set<Set<CandidateFact>> coveringSets = findCoveringSets(cfacts, remainingMsrs);
+        if (!coveringSets.isEmpty()) {
+          for (Set<CandidateFact> set : coveringSets) {
+//          for (Iterator<Set<CandidateFact>> setIter =
+//              coveringSets.iterator(); setIter.hasNext();) {
+            //Set<CandidateFact> set = setIter.next();
+            set.add(cfact);
+            cfactset.add(set);
+          }
+        } else {
+          LOG.info("Couldnt find any set containing remaining measures:" + remainingMsrs);
+        }
+      }
+    }
+    return cfactset;
   }
 
   private void resolveCandidateDimTablesForJoinsAndDenorms(CubeQueryContext cubeql) throws SemanticException {
@@ -451,6 +499,7 @@ public class CandidateTableResolver implements ContextRewriter {
     }
   }
 
+  // The candidate table contains atleast one column in the colSet
   public static boolean checkForColumnExists(CandidateTable table,
       Collection<String> colSet) {
     if (colSet == null || colSet.isEmpty()) {

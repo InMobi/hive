@@ -32,6 +32,8 @@ import java.util.Set;
 
 import org.antlr.runtime.CommonToken;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.cube.metadata.AbstractCubeTable;
@@ -44,6 +46,8 @@ import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class AliasReplacer implements ContextRewriter {
+
+  private static Log LOG = LogFactory.getLog(AliasReplacer.class.getName());
 
   // Mapping of a qualified column name to its table alias
   private Map<String, String> colToTableAlias;
@@ -99,16 +103,9 @@ public class AliasReplacer implements ContextRewriter {
   }
 
   private void doFieldValidation(CubeQueryContext cubeql) throws SemanticException {
-    if (cubeql.getCube() != null && !cubeql.getCube().allFieldsQueriable()) {
-      // do queried field validation
-      CubeInterface cube = cubeql.getCube();
-      List<DerivedCube> dcubes;
-      try {
-        dcubes = cubeql.getMetastoreClient().getAllDerivedQueryableCubes(cube);
-      } catch (HiveException e) {
-        throw new SemanticException(e);
-      }
-      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cube.getName());
+    CubeInterface cube = cubeql.getCube();
+    if (cube != null) {
+      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
       Set<String> queriedDimAttrs = new HashSet<String>();
       Set<String> queriedMsrs = new HashSet<String>();
       for (String col : cubeColsQueried) {
@@ -118,25 +115,36 @@ public class AliasReplacer implements ContextRewriter {
           queriedDimAttrs.add(col);
         }
       }
-      // do validation
-      // Find atleast one derived cube which contains all the dimensions queried.
-      boolean derivedCubeFound = false;
-      for (DerivedCube dcube : dcubes) {
-        if (dcube.getDimAttributeNames().containsAll(queriedDimAttrs)) {
-          // remove all the measures that are covered
-          queriedMsrs.removeAll(dcube.getMeasureNames()); 
-          derivedCubeFound = true;
+      cubeql.addQueriedDimAttrs(queriedDimAttrs);
+      cubeql.addQueriedMsrs(queriedMsrs);
+      if (!cubeql.getCube().allFieldsQueriable()) {
+        // do queried field validation
+        List<DerivedCube> dcubes;
+        try {
+          dcubes = cubeql.getMetastoreClient().getAllDerivedQueryableCubes(cube);
+        } catch (HiveException e) {
+          throw new SemanticException(e);
         }
-      }
-      if (!derivedCubeFound) {
-        throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedDimAttrs.toString());
-      }
-      if (!queriedMsrs.isEmpty()) {
-        if (!queriedDimAttrs.isEmpty()) {
-          throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE,
-              queriedDimAttrs.toString() + " and " + queriedMsrs.toString());
-        } else {
-          throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedMsrs.toString());
+        // do validation
+        // Find atleast one derived cube which contains all the dimensions queried.
+        boolean derivedCubeFound = false;
+        for (DerivedCube dcube : dcubes) {
+          if (dcube.getDimAttributeNames().containsAll(queriedDimAttrs)) {
+            // remove all the measures that are covered
+            queriedMsrs.removeAll(dcube.getMeasureNames()); 
+            derivedCubeFound = true;
+          }
+        }
+        if (!derivedCubeFound) {
+          throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedDimAttrs.toString());
+        }
+        if (!queriedMsrs.isEmpty()) {
+          if (!queriedDimAttrs.isEmpty()) {
+            throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE,
+                queriedDimAttrs.toString() + " and " + queriedMsrs.toString());
+          } else {
+            throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedMsrs.toString());
+          }
         }
       }
     }

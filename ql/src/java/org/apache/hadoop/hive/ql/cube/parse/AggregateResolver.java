@@ -101,6 +101,8 @@ public class AggregateResolver implements ContextRewriter {
       LOG.info("Query has non default aggregates, no aggregate resolution will be done");
     }
 
+    cubeql.pruneCandidateFactSet();
+
     if (nonDefaultAggregates || aggregateResolverDisabled) {
       return;
     }

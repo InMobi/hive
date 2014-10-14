@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -42,7 +43,7 @@ public class LightestFactResolver implements ContextRewriter {
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
-    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
+    /*if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
         .isEmpty()) {
       Map<CandidateFact, Double> factWeightMap =
           new HashMap<CandidateFact, Double>();
@@ -66,6 +67,38 @@ public class LightestFactResolver implements ContextRewriter {
           i.remove();
         }
       }
+    }*/
+    if (cubeql.getCube() != null && !cubeql.getCandidateFactSets()
+        .isEmpty()) {
+      Map<Set<CandidateFact>, Double> factWeightMap =
+          new HashMap<Set<CandidateFact>, Double>();
+
+      for (Set<CandidateFact> facts : cubeql.getCandidateFactSets()) {
+        factWeightMap.put(facts, getWeitgh(facts));
+      }
+
+      double minWeight = Collections.min(factWeightMap.values());
+
+      for (Iterator<Set<CandidateFact>> i =
+          cubeql.getCandidateFactSets().iterator(); i.hasNext();) {
+        Set<CandidateFact> facts = i.next();
+        if (factWeightMap.get(facts) > minWeight) {
+          LOG.info("Not considering facts:" + facts +
+              " from candidate fact tables as it has more fact weight:"
+              + factWeightMap.get(facts) + " minimum:"
+              + minWeight);
+          i.remove();
+        }
+      }
+      cubeql.pruneCandidateFactWithCandidateSet(CubeTableCause.MORE_WEIGHT);
     }
+  }
+
+  private Double getWeitgh(Set<CandidateFact> set) {
+    Double weight = 0.0;
+    for (CandidateFact f :set) {
+      weight += f.fact.weight();
+    }
+    return weight;
   }
 }

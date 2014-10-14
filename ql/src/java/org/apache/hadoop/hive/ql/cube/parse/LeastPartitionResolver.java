@@ -18,10 +18,13 @@ package org.apache.hadoop.hive.ql.cube.parse;
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
@@ -41,7 +44,32 @@ public class LeastPartitionResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
-    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables().isEmpty())
+    if (cubeql.getCube() != null && !cubeql.getCandidateFactSets()
+        .isEmpty()) {
+      Map<Set<CandidateFact>, Integer> factPartCount =
+          new HashMap<Set<CandidateFact>, Integer>();
+
+      for (Set<CandidateFact> facts : cubeql.getCandidateFactSets()) {
+        factPartCount.put(facts, getPartCount(facts));
+      }
+
+      double minPartitions = Collections.min(factPartCount.values());
+
+      for (Iterator<Set<CandidateFact>> i =
+          cubeql.getCandidateFactSets().iterator(); i.hasNext();) {
+        Set<CandidateFact> facts = i.next();
+        if (factPartCount.get(facts) > minPartitions) {
+          LOG.info("Not considering facts:" + facts +
+              " from candidate fact tables as it requires more partitions to" +
+              " be queried:" + factPartCount.get(facts) + " minimum:"
+              + minPartitions);
+          i.remove();
+        }
+      }
+      cubeql.pruneCandidateFactWithCandidateSet(CubeTableCause.MORE_PARTITIONS);
+    }
+
+    /*    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables().isEmpty())
     {
       int minPartitions = getMinPartitions(cubeql.getCandidateFactTables());
 
@@ -58,18 +86,15 @@ public class LeastPartitionResolver implements ContextRewriter {
           i.remove();
         }
       }
-    }
+    }*/
   }
 
-  int getMinPartitions(Set<CandidateFact> candidateFacts) {
-    Iterator<CandidateFact> it = candidateFacts.iterator();
-    int min = it.next().numQueriedParts;
-    while (it.hasNext()) {
-      CandidateFact fact = it.next();
-      if (fact.numQueriedParts < min) {
-        min = fact.numQueriedParts;
-      }
+  private int getPartCount(Set<CandidateFact> set) {
+    int parts = 0;
+    for (CandidateFact f :set) {
+      parts += f.numQueriedParts;
     }
-    return min;
+    return parts;
   }
+
 }

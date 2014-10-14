@@ -144,6 +144,7 @@ public class StorageTableResolver implements ContextRewriter {
     // resolve dimension tables
     resolveDimStorageTablesAndPartitions(cubeql);
     cubeql.setNonexistingParts(nonExistingPartitions);
+    cubeql.pruneCandidateFactSet(CubeTableCause.NO_CANDIDATE_STORAGES);
   }
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)

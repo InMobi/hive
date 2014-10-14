@@ -134,6 +134,12 @@ public class JoinResolver implements ContextRewriter {
 
     // Populate map of tables to their columns which are present in any of the join paths
     private void initJoinPathColumns() {
+      for (List<SchemaGraph.JoinPath> paths : allPaths.values()) {
+        for (int i = 0; i < paths.size(); i++) {
+          SchemaGraph.JoinPath jp = paths.get(i);
+          jp.initColumnsForTable();
+        }
+      }
       for (Map.Entry<Dimension, List<SchemaGraph.JoinPath>> joinPathEntry : allPaths.entrySet()) {
         List<SchemaGraph.JoinPath> joinPaths = joinPathEntry.getValue();
           Map<AbstractCubeTable, List<String>> dimReachablePaths = 
@@ -371,15 +377,9 @@ public class JoinResolver implements ContextRewriter {
       return joinPathColumns;
     }
 
-    public void pruneAllPaths(final CandidateFact cfact, final Map<Dimension, CandidateDim> dimsToQuery) {
-      for (List<SchemaGraph.JoinPath> paths : allPaths.values()) {
-        for (int i = 0; i < paths.size(); i++) {
-          SchemaGraph.JoinPath jp = paths.get(i);
-          jp.initColumnsForTable();
-        }
-      }
+    public void pruneAllPaths(final Set<CandidateFact> cfacts, final Map<Dimension, CandidateDim> dimsToQuery) {
       // Remove join paths which cannot be satisfied by the resolved candidate fact and dimension tables
-      if (cfact != null) {
+      if (cfacts != null) {
         Collection<String> factColumns = CandidateTableResolver.getAllColumns(cfact.fact);
 
         for (List<SchemaGraph.JoinPath> paths : allPaths.values()) {
@@ -396,6 +396,18 @@ public class JoinResolver implements ContextRewriter {
           }
         }
       }
+      Iterator<Map.Entry<Dimension, List<SchemaGraph.JoinPath>>> iter = allPaths.entrySet().iterator();
+      while (iter.hasNext()) {
+        Map.Entry<Dimension, List<SchemaGraph.JoinPath>> entry = iter.next();
+        if (entry.getValue().isEmpty()) {
+          iter.remove();
+        }
+      }
+      pruneAllPaths(dimsToQuery);
+    }
+
+    public void pruneAllPaths(final Map<Dimension, CandidateDim> dimsToQuery) {
+      // Remove join paths which cannot be satisfied by the resolved dimension tables
       if (dimsToQuery != null && !dimsToQuery.isEmpty()) {
         for (CandidateDim candidateDim : dimsToQuery.values()) {
           Set<String> dimCols = candidateDim.dimtable.getAllFieldNames();
@@ -503,9 +515,9 @@ public class JoinResolver implements ContextRewriter {
       };
     }
 
-    public Set<Dimension> pickOptionalTables(final CandidateFact cfact,
+    public Set<Dimension> pickOptionalTables(
         final Map<Dimension, CandidateDim> dimsToQuery, CubeQueryContext cubeql) {
-      pruneAllPaths(cfact, dimsToQuery);
+      pruneAllPaths(dimsToQuery);
 
       Set<Dimension> joiningOptionalTables = new HashSet<Dimension>();
       for (List<SchemaGraph.JoinPath> paths : allPaths.values()) {

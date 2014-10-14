@@ -21,6 +21,7 @@ package org.apache.hadoop.hive.ql.cube.parse;
  */
 
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getExpectedQuery;
+import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForDailyAndHourly2days;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.getWhereForHourly2days;
 import static org.apache.hadoop.hive.ql.cube.parse.CubeTestSetup.twoDaysRange;
 
@@ -119,7 +120,7 @@ public class TestBaseCubeQueries {
     System.out.println("HQL:" + hqlQuery);
     String expected = getExpectedQuery(cubeName,
         "select basecube.dim1, SUM(basecube.msr1) FROM ", null, " group by basecube.dim1",
-        getWhereForHourly2days(cubeName, "C1_testfact2_raw_base"));
+        getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
     hqlQuery = rewrite(driver, "select dim1, SUM(msr1), msr2 from basecube" +
@@ -127,7 +128,7 @@ public class TestBaseCubeQueries {
     expected = getExpectedQuery(cubeName,
         "select basecube.dim1, SUM(basecube.msr1), basecube.msr2 FROM ", null,
         " group by basecube.dim1",
-        getWhereForHourly2days(cubeName, "C1_testfact2_raw_base"));
+        getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
     System.out.println("HQL:" + hqlQuery);
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
@@ -136,7 +137,7 @@ public class TestBaseCubeQueries {
     expected = getExpectedQuery(cubeName,
         "select basecube.dim1, round(sum(basecube.msr2)/1000) FROM ", null,
         " group by basecube.dim1",
-        getWhereForHourly2days(cubeName, "C1_testfact2_raw_base"));
+        getWhereForDailyAndHourly2days(cubeName, "C1_testFact1_BASE"));
     System.out.println("HQL:" + hqlQuery);
     TestCubeRewriter.compareQueries(expected, hqlQuery);
 
@@ -147,7 +148,25 @@ public class TestBaseCubeQueries {
             " sum(basecube.msr2) FROM ", null,
             " and substr(basecube.dim1, 3) != 'XYZ' " +
                 "group by basecube.dim1 != 'x' AND basecube.dim2 != 10",
-                getWhereForHourly2days(cubeName, "C1_testfact2_raw_base"));
+                getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
+    System.out.println("HQL:" + hqlQuery);
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select dim1, msr12 from basecube" +
+        " where " + twoDaysRange);
+    expected = getExpectedQuery(cubeName,
+        "select basecube.dim1, sum(basecube.msr12) FROM ", null,
+        " group by basecube.dim1",
+        getWhereForDailyAndHourly2days(cubeName, "C1_testFact2_BASE"));
+    System.out.println("HQL:" + hqlQuery);
+    TestCubeRewriter.compareQueries(expected, hqlQuery);
+
+    hqlQuery = rewrite(driver, "select dim1, roundedmsr2, msr12 from basecube" +
+        " where " + twoDaysRange);
+    expected = getExpectedQuery(cubeName,
+        "select basecube.dim1, round(sum(basecube.msr2)/1000) FROM ", null,
+        " group by basecube.dim1",
+        getWhereForHourly2days(cubeName, "C1_testFact1_BASE"));
     System.out.println("HQL:" + hqlQuery);
     TestCubeRewriter.compareQueries(expected, hqlQuery);
   }

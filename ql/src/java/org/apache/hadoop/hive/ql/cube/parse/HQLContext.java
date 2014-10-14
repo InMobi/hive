@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -20,12 +21,12 @@ public class HQLContext {
   public static Log LOG = LogFactory.getLog(HQLContext.class.getName());
 
   private Map<Dimension, CandidateDim> dimsToQuery;
-  private CandidateFact fact;
+  private Set<CandidateFact> facts;
   private CubeQueryContext query;
 
-  HQLContext(CandidateFact fact, Map<Dimension, CandidateDim> dimsToQuery, CubeQueryContext query) {
+  HQLContext(Set<CandidateFact> facts, Map<Dimension, CandidateDim> dimsToQuery, CubeQueryContext query) {
     this.query = query;
-    this.fact = fact;
+    this.facts = facts;
     this.dimsToQuery = dimsToQuery;
   }
 
@@ -45,8 +46,8 @@ public class HQLContext {
     return dimsToQuery;
   }
 
-  public CandidateFact getFactToQuery() {
-    return fact;
+  public Set<CandidateFact> getFactsToQuery() {
+    return facts;
   }
 
   private Object[] getQueryTreeStrings(String fromString, String whereString)

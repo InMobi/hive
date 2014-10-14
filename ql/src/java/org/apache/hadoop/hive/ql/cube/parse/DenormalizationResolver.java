@@ -336,6 +336,7 @@ public class DenormalizationResolver implements ContextRewriter {
           throw new SemanticException(ErrorMsg.NO_FACT_HAS_COLUMN,
               cubeql.getColumnsQueried(cubeql.getCube().getName()).toString());
         }
+        cubeql.pruneCandidateFactSet(CubeTableCause.COLUMN_NOT_FOUND);
       }
       if (cubeql.getDimensions() != null && !cubeql.getDimensions().isEmpty()) {
         for (Dimension dim : cubeql.getDimensions()) {
