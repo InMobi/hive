@@ -22,7 +22,7 @@
   </parent>
   <groupId>org.apache.hive</groupId>
   <artifactId>hive</artifactId>
-  <version>0.13.2-inm-SNAPSHOT</version>
+  <version>0.13.3-inm-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Hive</name>
@@ -35,7 +35,7 @@
     <connection>scm:git:git://github.com/InMobi/hive</connection>
     <url>https://github.com/InMobi/hive</url>
     <developerConnection>scm:git:git@github.com:InMobi/hive.git</developerConnection>
-    <tag>hive-0.13.1-inm</tag>
+    <tag>hive-0.13.2-inm</tag>
   </scm>
 
 
@@ -251,6 +251,7 @@
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
         <version>${protobuf.version}</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>com.google.code.tempus-fugit</groupId>
