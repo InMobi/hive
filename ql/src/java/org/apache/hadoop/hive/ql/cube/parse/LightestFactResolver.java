@@ -31,7 +31,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class LightestFactResolver implements ContextRewriter {
@@ -43,38 +42,13 @@ public class LightestFactResolver implements ContextRewriter {
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
-    /*if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
-        .isEmpty()) {
-      Map<CandidateFact, Double> factWeightMap =
-          new HashMap<CandidateFact, Double>();
-
-      for (CandidateFact fact : cubeql.getCandidateFactTables()) {
-        factWeightMap.put(fact, fact.fact.weight());
-      }
-
-      double minWeight = Collections.min(factWeightMap.values());
-
-      for (Iterator<CandidateFact> i =
-          cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CandidateFact fact = i.next();
-        if (factWeightMap.get(fact) > minWeight) {
-          LOG.info("Not considering fact:" + fact +
-              " from candidate fact tables as it has more fact weight:"
-              + factWeightMap.get(fact) + " minimum:"
-              + minWeight);
-          cubeql.addFactPruningMsgs(fact.fact, new CandidateTablePruneCause(
-              fact.fact.getName(), CubeTableCause.MORE_WEIGHT));
-          i.remove();
-        }
-      }
-    }*/
     if (cubeql.getCube() != null && !cubeql.getCandidateFactSets()
         .isEmpty()) {
       Map<Set<CandidateFact>, Double> factWeightMap =
           new HashMap<Set<CandidateFact>, Double>();
 
       for (Set<CandidateFact> facts : cubeql.getCandidateFactSets()) {
-        factWeightMap.put(facts, getWeitgh(facts));
+        factWeightMap.put(facts, getWeight(facts));
       }
 
       double minWeight = Collections.min(factWeightMap.values());
@@ -94,7 +68,7 @@ public class LightestFactResolver implements ContextRewriter {
     }
   }
 
-  private Double getWeitgh(Set<CandidateFact> set) {
+  private Double getWeight(Set<CandidateFact> set) {
     Double weight = 0.0;
     for (CandidateFact f :set) {
       weight += f.fact.weight();

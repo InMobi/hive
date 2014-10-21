@@ -342,6 +342,13 @@ public class HQLParser {
     }
   }
 
+  static boolean hasSpaces(String text) {
+    if (P_WSPACE.matcher(text).find()) {
+      return true;
+    }
+    return false;
+  }
+
   /**
    * Recursively reconstruct query string given a query AST
    *
@@ -370,7 +377,7 @@ public class HQLParser {
         buf.append(" false ");
       } else if (Identifier == rootType &&
         TOK_SELEXPR == ((ASTNode)root.getParent()).getToken().getType()
-        && P_WSPACE.matcher(rootText).find()) {
+        && hasSpaces(rootText)) {
         // If column alias contains spaces, enclose in back quotes
         buf.append(" as `").append(rootText).append("` ");
       } else if (Identifier == rootType &&

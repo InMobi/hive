@@ -43,9 +43,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.metadata.ReferencedDimAtrribute;
 import org.apache.hadoop.hive.ql.cube.metadata.TableReference;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateTable;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -84,14 +81,16 @@ public class DenormalizationResolver implements ContextRewriter {
   public static class PickedReference {
     TableReference reference;
     String srcAlias;
+    String pickedFor;
 
-    PickedReference(TableReference reference, String srcAlias) {
+    PickedReference(TableReference reference, String srcAlias, String pickedFor) {
       this.srcAlias = srcAlias;
       this.reference = reference;
+      this.pickedFor = pickedFor;
     }
     
     public String toString() {
-      return srcAlias + ":" + reference;
+      return srcAlias + ":" + reference + " for :" + pickedFor;
     }
   }
 
@@ -181,7 +180,7 @@ public class DenormalizationResolver implements ContextRewriter {
     }
 
     public Set<Dimension> rewriteDenormctx(CandidateFact cfact,
-        Map<Dimension, CandidateDim> dimsToQuery) throws SemanticException {
+        Map<Dimension, CandidateDim> dimsToQuery, boolean replaceFact) throws SemanticException {
       Set<Dimension> refTbls = new HashSet<Dimension>();
 
       if (!tableToRefCols.isEmpty()) {
@@ -196,14 +195,32 @@ public class DenormalizationResolver implements ContextRewriter {
           }
         }
         // Replace picked reference in all the base trees
-        replaceReferencedColumns();
+        replaceReferencedColumns(cfact, replaceFact);
 
         // Add the picked references to dimsToQuery
         for (PickedReference picked : pickedRefs) {
-          refTbls.add((Dimension) cubeql.getCubeTableForAlias(picked.reference.getDestTable()));
+          if (isPickedFor(picked, cfact, dimsToQuery)) {
+            refTbls.add((Dimension) cubeql.getCubeTableForAlias(picked.reference.getDestTable()));
+          }
         }
       }
       return refTbls;
+    }
+
+    private boolean isPickedFor(PickedReference picked, CandidateFact cfact,
+        Map<Dimension, CandidateDim> dimsToQuery) {
+      if (cfact != null &&
+          picked.pickedFor.equalsIgnoreCase(cfact.getName())) {
+        return true;
+      }
+      if (dimsToQuery != null) {
+        for (CandidateDim cdim : dimsToQuery.values()) {
+          if (picked.pickedFor.equalsIgnoreCase(cdim.getName())) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
 
     private void pickColumnsForTable(String tbl) {
@@ -220,18 +237,28 @@ public class DenormalizationResolver implements ContextRewriter {
           }
           PickedReference picked = new PickedReference(
               refered.references.iterator().next(), 
-              cubeql.getAliasForTabName(refered.srcTable.getName()));
+              cubeql.getAliasForTabName(refered.srcTable.getName()), tbl);
           addPickedReference(refered.col.getName(), picked);
           pickedRefs.add(picked);
         }
       }
     }
 
-    private void replaceReferencedColumns() throws SemanticException {
-      resolveClause(cubeql, cubeql.getSelectAST());
-      resolveClause(cubeql, cubeql.getWhereAST());
-      resolveClause(cubeql, cubeql.getGroupByAST());
-      resolveClause(cubeql, cubeql.getHavingAST());
+    private void replaceReferencedColumns(CandidateFact cfact,
+        boolean replaceFact) throws SemanticException {
+      if (replaceFact && (tableToRefCols.get(cfact.getName()) != null
+          && !tableToRefCols.get(cfact.getName()).isEmpty())) {
+        resolveClause(cubeql, cfact.getSelectAST());
+        resolveClause(cubeql, cfact.getWhereAST());
+        resolveClause(cubeql, cfact.getGroupByAST());
+        resolveClause(cubeql, cfact.getHavingAST());
+      } else {
+        resolveClause(cubeql, cubeql.getSelectAST());
+        resolveClause(cubeql, cubeql.getWhereAST());
+        resolveClause(cubeql, cubeql.getGroupByAST());
+        resolveClause(cubeql, cubeql.getHavingAST());
+
+      }
       resolveClause(cubeql, cubeql.getOrderByAST());
     }
 

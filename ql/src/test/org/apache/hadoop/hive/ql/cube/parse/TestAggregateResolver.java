@@ -183,7 +183,7 @@ public class TestAggregateResolver {
     CubeQueryContext cubeql = driver.rewrite(query);
     String hQL = cubeql.toHQL();
     Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
-    CubeQueryContext.CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     String expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
         " testCube.msr2 from ", null, null,
@@ -243,7 +243,7 @@ public class TestAggregateResolver {
     CubeQueryContext cubeql = driver.rewrite(query);
     String hQL = cubeql.toHQL();
     Assert.assertEquals(1, cubeql.getCandidateFactTables().size());
-    CubeQueryContext.CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
+    CandidateFact candidateFact = cubeql.getCandidateFactTables().iterator().next();
     Assert.assertEquals("testFact2_raw".toLowerCase(), candidateFact.fact.getName().toLowerCase());
     String expectedQL = getExpectedQuery(cubeName, "SELECT testcube.cityid," +
         " avg(testCube.msr2)) from ", null, "group by testcube.cityid",

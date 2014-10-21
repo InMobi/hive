@@ -661,6 +661,8 @@ public class CubeTestSetup {
     measures = new HashSet<String>();
     measures.add("msr2");
     measures.add("msr12");
+    measures.add("msr13");
+    measures.add("msr14");
     dimensions = new HashSet<String>();
     dimensions.add("dim1");
     dimensions.add("dim2");
@@ -670,6 +672,7 @@ public class CubeTestSetup {
         dimensions, derivedProperties, 10L);
     measures = new HashSet<String>();
     measures.add("msr3");
+    measures.add("msr13");
     dimensions = new HashSet<String>();
     dimensions.add("dim1");
     dimensions.add("location");
@@ -736,6 +739,7 @@ public class CubeTestSetup {
     factColumns.add(new FieldSchema("cityid","int", "city id"));
     factColumns.add(new FieldSchema("stateid","int", "city id"));
     factColumns.add(new FieldSchema("dim1", "string", "base dim"));
+    factColumns.add(new FieldSchema("dim11", "string", "base dim"));
 
     // create cube fact
     client.createCubeFactTable(BASE_CUBE_NAME, factName, factColumns,
@@ -746,6 +750,19 @@ public class CubeTestSetup {
     factColumns = new ArrayList<FieldSchema>();
     factColumns.add(new FieldSchema("msr11", "int", "first measure"));
     factColumns.add(new FieldSchema("msr12", "float", "second measure"));
+
+    // add dimensions of the cube
+    factColumns.add(new FieldSchema("dim1", "string", "base dim"));
+    factColumns.add(new FieldSchema("dim11", "string", "base dim"));
+    factColumns.add(new FieldSchema("dim2", "int", "dim2 id"));
+
+    // create cube fact
+    client.createCubeFactTable(BASE_CUBE_NAME, factName, factColumns,
+        storageAggregatePeriods, 0L, null, storageTables);
+
+    // create fact only with extra measures
+    factName = "testFact3_BASE";
+    factColumns = new ArrayList<FieldSchema>();
     factColumns.add(new FieldSchema("msr13", "double", "third measure"));
     factColumns.add(new FieldSchema("msr14", "bigint", "fourth measure"));
 
@@ -762,8 +779,6 @@ public class CubeTestSetup {
     factColumns = new ArrayList<FieldSchema>();
     factColumns.add(new FieldSchema("msr11", "int", "first measure"));
     factColumns.add(new FieldSchema("msr12", "float", "second measure"));
-    factColumns.add(new FieldSchema("msr13", "double", "third measure"));
-    factColumns.add(new FieldSchema("msr14", "bigint", "fourth measure"));
 
     // add dimensions of the cube
     factColumns.add(new FieldSchema("dim1", "string", "base dim"));
@@ -785,6 +800,30 @@ public class CubeTestSetup {
 
     client.createCubeFactTable(BASE_CUBE_NAME, factName, factColumns,
         storageAggregatePeriods, 100L, properties, storageTables);
+
+    // create raw fact only with extra measures
+    factName = "testFact3_RAW_BASE";
+    factColumns = new ArrayList<FieldSchema>();
+    factColumns.add(new FieldSchema("msr13", "double", "third measure"));
+    factColumns.add(new FieldSchema("msr14", "bigint", "fourth measure"));
+
+    // add dimensions of the cube
+    factColumns.add(new FieldSchema("dim1", "string", "base dim"));
+    factColumns.add(new FieldSchema("dim11", "string", "base dim"));
+    factColumns.add(new FieldSchema("dim12", "string", "base dim"));
+
+    storageAggregatePeriods =
+        new HashMap<String, Set<UpdatePeriod>>();
+    updates  = new HashSet<UpdatePeriod>();
+    updates.add(UpdatePeriod.HOURLY);
+    storageAggregatePeriods.put(c1, updates);
+
+    storageTables = new HashMap<String, StorageTableDesc>();
+    storageTables.put(c1, s1);
+
+    client.createCubeFactTable(BASE_CUBE_NAME, factName, factColumns,
+        storageAggregatePeriods, 100L, properties, storageTables);
+
   }
 
   private void createCubeFact(CubeMetastoreClient client) throws HiveException {

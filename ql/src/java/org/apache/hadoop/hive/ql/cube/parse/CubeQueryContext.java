@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hive.ql.parse.QB;
 import org.apache.hadoop.hive.ql.parse.QBJoinTree;
 import org.apache.hadoop.hive.ql.parse.QBParseInfo;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.ql.session.SessionState;
 import org.codehaus.jackson.map.ObjectMapper;
 
 public class CubeQueryContext {
@@ -90,6 +90,8 @@ public class CubeQueryContext {
       new HashMap<String, Set<String>>();
   // Mapping of an expression to its column alias in the query
   private final Map<String, String> exprToAlias = new HashMap<String, String>();
+  private final List<String> selectAliases = new ArrayList<String>();
+  private final List<String> selectFinalAliases = new ArrayList<String>();
   // All aggregate expressions in the query
   private final Set<String> aggregateExprs = new HashSet<String>();
   // Join conditions used in all join expressions
@@ -578,7 +580,7 @@ public class CubeQueryContext {
       builder.append(joinCond);
       if (joiningTable != null) {
         // assuming the joining table to be dimension table
-        HQLContext.appendWhereClause(builder,
+        DimOnlyHQLContext.appendWhereClause(builder,
             getWhereClauseWithAlias(dimsToQuery, joiningTable), true);
         dimsToQuery.get(cubeTbls.get(joiningTable)).setWhereClauseAdded();
       }
@@ -697,15 +699,38 @@ public class CubeQueryContext {
     Map<Dimension, CandidateDim> dimsToQuery = pickCandidateDimsToQuery(dimensions);
     if (autoJoinCtx != null) {
       // prune join paths for picked fact and dimensions
-      autoJoinCtx.pruneAllPaths(cfacts, dimsToQuery);
+      autoJoinCtx.pruneAllPaths(cube, cfacts, dimsToQuery);
     }
 
-    // add range where clause
-    HQLContext.addRangeClauses(this, cfact);
+    Map<CandidateFact, Set<Dimension>> factDimMap = new HashMap<CandidateFact, Set<Dimension>>();
+    if (cfacts != null) {
+      if (cfacts.size() > 1) {
+        // copy ASTs for each fact
+        for (CandidateFact cfact : cfacts) {
+          cfact.copyASTs(this);
+          cfact.updateTimeranges(this);
+          factDimMap.put(cfact, new HashSet<Dimension>(dimsToQuery.keySet()));
+        }
+      } else {
+        SingleFactHQLContext.addRangeClauses(this, cfacts.iterator().next());
+      }
+    }
 
     // pick denorm tables for the picked fact and dimensions
-    Set<Dimension> denormTables = deNormCtx.rewriteDenormctx(cfact, dimsToQuery);
-    LOG.info("Adding denormTables " + denormTables + " to pick candidates");
+    Set<Dimension> denormTables = new HashSet<Dimension>();
+    if (cfacts != null) {
+      for (CandidateFact cfact : cfacts) {
+        Set<Dimension> factDenormTables = deNormCtx.rewriteDenormctx(cfact,
+            dimsToQuery, cfacts.size() > 1);
+        denormTables.addAll(factDenormTables);
+        if (cfacts.size() > 1) {
+          factDimMap.get(cfact).addAll(factDenormTables);
+        }
+      }
+    } else {
+      denormTables.addAll(deNormCtx.rewriteDenormctx(null,
+          dimsToQuery, false));
+    }
     if (dimsToQuery == null) {
       dimsToQuery = pickCandidateDimsToQuery(denormTables);
     } else {
@@ -714,15 +739,34 @@ public class CubeQueryContext {
     if (autoJoinCtx != null) {
       // add optional dims from Join resolver
       Set<Dimension> joiningTables = autoJoinCtx.pickOptionalTables(dimsToQuery, this);
-      LOG.info("Adding joiningTables " + joiningTables + " to pick candidates");
+      if (cfacts != null && cfacts.size() > 1) {
+        // copy tables for each fact
+        for (CandidateFact cfact : cfacts) {
+          factDimMap.get(cfact).addAll(joiningTables);
+        }
+      }
       if (dimsToQuery == null) {
         dimsToQuery = pickCandidateDimsToQuery(joiningTables);
       } else {
         dimsToQuery.putAll(pickCandidateDimsToQuery(joiningTables));
       }
     }
-    LOG.info("Picked Fact:" + cfact + " dimsToQuery:" + dimsToQuery);
-    hqlContext = new HQLContext(cfact, dimsToQuery, this);
+    // Prune join paths once denorm tables and joining tables are picked
+    if (autoJoinCtx != null) {
+      // prune join paths for picked fact and dimensions
+      autoJoinCtx.pruneAllPaths(cube, cfacts, dimsToQuery);
+    }
+    LOG.info("Picked Fact:" + cfacts + " dimsToQuery:" + dimsToQuery);
+
+    if (cfacts != null) {
+      if (cfacts.size() > 1) {
+        // Update ASTs for each fact
+        for (CandidateFact cfact : cfacts) {
+          cfact.updateASTs(this);
+        }
+      }
+    }
+    hqlContext = new HQLContext(cfacts, dimsToQuery, factDimMap, this);
     return hqlContext.toHQL();
   }
 
@@ -799,6 +843,14 @@ public class CubeQueryContext {
     return exprToAlias.get(expr);
   }
 
+  public String getSelectAlias(int index) {
+    return selectAliases.get(index);
+  }
+
+  public String getSelectFinalAlias(int index) {
+    return selectFinalAliases.get(index);
+  }
+
   public Map<String, String> getExprToAliasMap() {
     return exprToAlias;
   }
@@ -873,6 +925,15 @@ public class CubeQueryContext {
   public void addExprToAlias(ASTNode expr, ASTNode alias) {
     exprToAlias.put(HQLParser.getString(expr).trim(),
         alias.getText().toLowerCase());
+  }
+
+  public void addSelectAlias(String alias, String spacedAlias) {
+    selectAliases.add(alias);
+    if (!StringUtils.isBlank(spacedAlias)) {
+      selectFinalAliases.add("`" + spacedAlias+ "`");
+    } else {
+      selectFinalAliases.add(alias);
+    }
   }
 
   public List<TimeRange> getTimeRanges() {
@@ -1003,169 +1064,6 @@ public class CubeQueryContext {
             cfact.getName(), pruneCause));
         i.remove();
       }
-    }
-  }
-
-  static interface CandidateTable {
-    public String getStorageString(String alias);
-    public AbstractCubeTable getTable();
-    public AbstractCubeTable getBaseTable();
-    public String getName();
-  }
-
-  static class CandidateFact implements CandidateTable {
-    final CubeFactTable fact;
-    Set<String> storageTables;
-    // flag to know if querying multiple storage tables is enabled for this fact
-    boolean enabledMultiTableSelect;
-    int numQueriedParts = 0;
-    final Map<TimeRange, String> rangeToWhereClause = new HashMap<TimeRange, String>();
-    private boolean dbResolved = false;
-    private CubeInterface baseTable;
-
-    CandidateFact(CubeFactTable fact, CubeInterface cube) {
-      this.fact = fact;
-      this.baseTable = cube;
-    }
-
-    @Override
-    public String toString() {
-      return fact.toString();
-    }
-    
-    public String getStorageString(String alias) {
-      if (!dbResolved) {
-        String database = SessionState.get().getCurrentDatabase();
-        // Add database name prefix for non default database
-        if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
-          Set<String> storageTbls = new HashSet<String>();
-          Iterator<String> names = storageTables.iterator();
-          while (names.hasNext()) {
-            storageTbls.add(database + "." + names.next());
-          }
-          this.storageTables = storageTbls;
-        }
-        dbResolved = true;
-      }
-      return StringUtils.join(storageTables, ",") + " " + alias;
-
-    }
-
-    @Override
-    public AbstractCubeTable getBaseTable() {
-      return (AbstractCubeTable)baseTable;
-    }
-
-    @Override
-    public CubeFactTable getTable() {
-      return fact;
-    }
-
-    @Override
-    public String getName() {
-      return fact.getName();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (!super.equals(obj)) {
-        return false;
-      }
-      CandidateFact other = (CandidateFact) obj;
-
-      if (this.getTable() == null) {
-        if (other.getTable() != null) {
-          return false;
-        }
-      }
-      return true;
-    }
-    
-    @Override
-    public int hashCode() {
-      final int prime = 31;
-      int result = super.hashCode();
-      result = prime * result + ((getTable() == null) ? 0 :
-        getTable().getName().toLowerCase().hashCode());
-      return result;
-    }
-  }
-
-  static class CandidateDim implements CandidateTable {
-    final CubeDimensionTable dimtable;
-    String storageTable;
-    String whereClause;
-    private boolean dbResolved = false;
-    private boolean whereClauseAdded = false;
-    private Dimension baseTable;
-
-    public boolean isWhereClauseAdded() {
-      return whereClauseAdded;
-    }
-
-    public void setWhereClauseAdded() {
-      this.whereClauseAdded = true;
-    }
-
-    CandidateDim(CubeDimensionTable dimtable, Dimension dim) {
-      this.dimtable = dimtable;
-      this.baseTable = dim;
-    }
-
-    @Override
-    public String toString() {
-      return dimtable.toString();
-    }
-
-    public String getStorageString(String alias) {
-      if (!dbResolved) {
-        String database = SessionState.get().getCurrentDatabase();
-        // Add database name prefix for non default database
-        if (StringUtils.isNotBlank(database) && !"default".equalsIgnoreCase(database)) {
-          storageTable = database + "." + storageTable;
-        }
-        dbResolved = true;
-      }
-      return storageTable + " " + alias;
-    }
-
-    @Override
-    public Dimension getBaseTable() {
-      return baseTable;
-    }
-
-    @Override
-    public CubeDimensionTable getTable() {
-      return dimtable;
-    }
-
-    @Override
-    public String getName() {
-      return dimtable.getName();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (!super.equals(obj)) {
-        return false;
-      }
-      CandidateDim other = (CandidateDim) obj;
-
-      if (this.getTable() == null) {
-        if (other.getTable() != null) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    @Override
-    public int hashCode() {
-      final int prime = 31;
-      int result = super.hashCode();
-      result = prime * result + ((getTable() == null) ? 0 :
-        getTable().getName().toLowerCase().hashCode());
-      return result;
     }
   }
 }

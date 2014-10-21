@@ -1,0 +1,158 @@
+package org.apache.hadoop.hive.ql.cube.parse;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+
+public abstract class SimpleHQLContext implements HQLContextInterface {
+
+  public static Log LOG = LogFactory.getLog(SimpleHQLContext.class.getName());
+
+  private String select;
+  private String from; 
+  private String where;
+  private String groupby;
+  private String orderby;
+  private String having;
+  private Integer limit;
+
+  SimpleHQLContext() {
+  }
+
+  SimpleHQLContext(String select, String from, String where, String groupby,
+      String orderby, String having, Integer limit) {
+    this.select = select;
+    this.from = from;
+    this.where = where;
+    this.groupby = groupby;
+    this.orderby = orderby;
+    this.having = having;
+    this.limit = limit;
+  }
+
+  SimpleHQLContext(String select, String groupby,
+      String orderby, String having, Integer limit) {
+    this.select = select;
+    this.groupby = groupby;
+    this.orderby = orderby;
+    this.having = having;
+    this.limit = limit;
+  }
+
+  protected void setAll() throws SemanticException {
+  }
+
+  public String toHQL() throws SemanticException {
+    setAll();
+    String qfmt = getQueryFormat();
+    Object[] queryTreeStrings = getQueryTreeStrings();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("qfmt:" + qfmt + " Query strings: " + Arrays.toString(queryTreeStrings));
+    }
+    String baseQuery = String.format(qfmt, queryTreeStrings);
+    return baseQuery;
+  }
+
+  private Object[] getQueryTreeStrings()
+      throws SemanticException {
+    List<String> qstrs = new ArrayList<String>();
+    qstrs.add(select);
+    qstrs.add(from);
+    if (!StringUtils.isBlank(where)) {
+      qstrs.add(where);
+    }
+    if (!StringUtils.isBlank(groupby)) {
+      qstrs.add(groupby);
+    }
+    if (!StringUtils.isBlank(having)) {
+      qstrs.add(having);
+    }
+    if (!StringUtils.isBlank(orderby)) {
+      qstrs.add(orderby);
+    }
+    if (limit != null) {
+      qstrs.add(String.valueOf(limit));
+    }
+    return qstrs.toArray(new String[0]);
+  }
+
+  private final String baseQueryFormat = "SELECT %s FROM %s";
+
+  private String getQueryFormat() {
+    StringBuilder queryFormat = new StringBuilder();
+    queryFormat.append(baseQueryFormat);
+    if (!StringUtils.isBlank(where)) {
+      queryFormat.append(" WHERE %s");
+    }
+    if (!StringUtils.isBlank(groupby)) {
+      queryFormat.append(" GROUP BY %s");
+    }
+    if (!StringUtils.isBlank(having)) {
+      queryFormat.append(" HAVING %s");
+    }
+    if (!StringUtils.isBlank(orderby)) {
+      queryFormat.append(" ORDER BY %s");
+    }
+    if (limit != null) {
+      queryFormat.append(" LIMIT %s");
+    }
+    return queryFormat.toString();
+  }
+
+  public String getFrom() {
+    return from;
+  }
+
+  public String getWhere() {
+    return where;
+  }
+
+  public String getSelect() {
+    return select;
+  }
+
+  public String getGroupby() {
+    return groupby;
+  }
+
+  public String getHaving() {
+    return having;
+  }
+
+  public String getOrderby() {
+    return orderby;
+  }
+
+  public Integer getLimit() {
+    return limit;
+  }
+
+  protected void setFrom(String from) {
+    this.from = from;
+  }
+
+  protected void setWhere(String where) {
+    this.where = where;
+  }
+
+  protected void setSelect(String select) {
+    this.select = select;
+  }
+  protected void setGroupby(String groupby) {
+    this.groupby = groupby;
+  }
+
+  protected void setHaving(String having) {
+    this.having = having;
+  }
+
+  protected void setOrderby(String orderby) {
+    this.orderby = orderby;
+  }
+
+}

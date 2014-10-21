@@ -31,7 +31,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 public class LeastPartitionResolver implements ContextRewriter {
@@ -68,25 +67,6 @@ public class LeastPartitionResolver implements ContextRewriter {
       }
       cubeql.pruneCandidateFactWithCandidateSet(CubeTableCause.MORE_PARTITIONS);
     }
-
-    /*    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables().isEmpty())
-    {
-      int minPartitions = getMinPartitions(cubeql.getCandidateFactTables());
-
-      for (Iterator<CandidateFact> i =
-          cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CandidateFact fact = i.next();
-        if (fact.numQueriedParts > minPartitions) {
-          LOG.info("Not considering fact:" + fact +
-              " from candidate fact tables as it requires more partitions to" +
-              " be queried:" + fact.numQueriedParts + " minimum:"
-              + minPartitions);
-          cubeql.addFactPruningMsgs(fact.fact, new CandidateTablePruneCause(
-              fact.fact.getName(), CubeTableCause.MORE_PARTITIONS));
-          i.remove();
-        }
-      }
-    }*/
   }
 
   private int getPartCount(Set<CandidateFact> set) {

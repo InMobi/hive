@@ -235,7 +235,11 @@ public class DerivedCube extends AbstractCubeTable implements CubeInterface {
 
   @Override
   public Set<String> getDimAttributeNames() {
-    return dimensions;
+    Set<String> dimNames = new HashSet<String>();
+    for (CubeDimAttribute f : getDimAttributes()) {
+      MetastoreUtil.addColumnNames(f, dimNames);
+    }
+    return dimNames;
   }
 
   @Override

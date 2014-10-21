@@ -105,7 +105,7 @@ public class AliasReplacer implements ContextRewriter {
   private void doFieldValidation(CubeQueryContext cubeql) throws SemanticException {
     CubeInterface cube = cubeql.getCube();
     if (cube != null) {
-      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
+      Set<String> cubeColsQueried = cubeql.getColumnsQueried(cube.getName());
       Set<String> queriedDimAttrs = new HashSet<String>();
       Set<String> queriedMsrs = new HashSet<String>();
       for (String col : cubeColsQueried) {
@@ -117,7 +117,7 @@ public class AliasReplacer implements ContextRewriter {
       }
       cubeql.addQueriedDimAttrs(queriedDimAttrs);
       cubeql.addQueriedMsrs(queriedMsrs);
-      if (!cubeql.getCube().allFieldsQueriable()) {
+      if (!cube.allFieldsQueriable()) {
         // do queried field validation
         List<DerivedCube> dcubes;
         try {

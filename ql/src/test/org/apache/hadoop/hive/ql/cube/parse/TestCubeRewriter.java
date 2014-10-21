@@ -315,6 +315,33 @@ public class TestCubeRewriter {
     Assert.assertTrue(expectedTrimmed.equalsIgnoreCase(actualTrimmed));
   }
 
+  static void compareConatins(String expected, String actual) {
+    if (expected == null && actual == null) {
+      return;
+    } else if (expected == null) {
+      Assert.fail();
+    } else if (actual == null) {
+      Assert.fail("Rewritten query is null");
+    }
+    String expectedTrimmed = expected.replaceAll("\\W", "");
+    String actualTrimmed = actual.replaceAll("\\W", "");
+
+    if(!actualTrimmed.toLowerCase().contains(expectedTrimmed.toLowerCase())) {
+      String method = null;
+      for (StackTraceElement trace : Thread.currentThread().getStackTrace()) {
+        if (trace.getMethodName().startsWith("test")) {
+          method = trace.getMethodName() + ":" + trace.getLineNumber();
+        }
+      }
+
+      System.err.println("__FAILED__ " + method
+        + "\n\tExpected: " + expected + "\n\t---------\n\tActual: " + actual);
+      System.err.println("__FAILED__ " + method
+          + "\n\tExpected: " + expectedTrimmed.toLowerCase() + "\n\t---------\n\tActual: " + actualTrimmed.toLowerCase());
+    }
+    Assert.assertTrue(actualTrimmed.toLowerCase().contains(expectedTrimmed.toLowerCase()));
+  }
+
   @Test
   public void testCubeWhereQuery() throws Exception {
     String hqlQuery = rewrite(driver, "select SUM(msr2) from testCube" +

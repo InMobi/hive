@@ -435,6 +435,7 @@ public enum ErrorMsg {
   NO_DIM_HAS_COLUMN(15026, "No dimension table has the queried columns for {0}, columns: {1}", true),
   NO_CANDIDATE_DIM_AVAILABLE(15027, "No candidate dimension table available for {0} to answer the query, because {1}", true),
   CANNOT_USE_TIMERANGE_WRITER(15028, "Configured timerange writer cannot be used. Reason {0}", true),
+  EXPRESSION_NOT_IN_SINGLE_FACT(15029, "Expression {0} is not available in any fact", true),
 
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),

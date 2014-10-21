@@ -51,8 +51,6 @@ import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipStorageCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipUpdatePeriodCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
