@@ -49,7 +49,8 @@ public class DimOnlyHQLContext extends DimHQLContext {
     String fromTable = getFromTable();
     if (query.getAutoJoinCtx() != null &&
         query.getAutoJoinCtx().isJoinsResolved()) {
-      fromString = query.getAutoJoinCtx().getFromString(fromTable, null, getDimsToQuery().keySet(), getDimsToQuery(), query);
+      fromString = query.getAutoJoinCtx().getFromString(fromTable, null,
+          getDimsToQuery().keySet(), getDimsToQuery(), query);
     } else {
       fromString = fromTable;
     }

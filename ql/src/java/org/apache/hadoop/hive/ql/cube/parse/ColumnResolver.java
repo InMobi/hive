@@ -86,7 +86,8 @@ public class ColumnResolver implements ContextRewriter {
     }
   }
 
-  private void getColsForTree(final CubeQueryContext cubeql, ASTNode tree) throws SemanticException {
+  private void getColsForTree(final CubeQueryContext cubeql,
+      ASTNode tree) throws SemanticException {
     if (tree == null) {
       return;
     }
@@ -165,7 +166,8 @@ public class ColumnResolver implements ContextRewriter {
     }
   }
 
-  private static void addColumnsForWhere(final CubeQueryContext cubeql, ASTNode node, ASTNode parent) {
+  private static void addColumnsForWhere(final CubeQueryContext cubeql,
+      ASTNode node, ASTNode parent) {
     if (node.getToken().getType() == TOK_TABLE_OR_COL
         && (parent != null && parent.getToken().getType() != DOT)) {
       // Take child ident.totext

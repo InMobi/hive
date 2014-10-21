@@ -246,16 +246,16 @@ public class TestBaseCubeQueries {
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr12 msr12," +
             " mq2.msr2 msr2, mq3.msr13 msr13, mq2.msr3 msr3 from ")
-        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr12 msr12," +
-            " mq3.msr2 msr2, mq2.msr13 msr13, mq3.msr3 msr3 from ")
-        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr12 msr12," +
-            " mq1.msr2 msr2, mq3.msr13 msr13, mq1.msr3 msr3 from ")
-        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr12 msr12," +
-            " mq3.msr2 msr2, mq1.msr13 msr13, mq3.msr3 msr3 from ")
-        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq3.msr12 msr12," +
-            " mq1.msr2 msr2, mq2.msr13 msr13, mq1.msr3 msr3 from ")
-        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq3.msr12 msr12," +
-            " mq2.msr2 msr2, mq1.msr13 msr13, mq2.msr3 msr3 from "));
+            || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr12 msr12," +
+                " mq3.msr2 msr2, mq2.msr13 msr13, mq3.msr3 msr3 from ")
+                || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr12 msr12," +
+                    " mq1.msr2 msr2, mq3.msr13 msr13, mq1.msr3 msr3 from ")
+                    || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr12 msr12," +
+                        " mq3.msr2 msr2, mq1.msr13 msr13, mq3.msr3 msr3 from ")
+                        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq3.msr12 msr12," +
+                            " mq1.msr2 msr2, mq2.msr13 msr13, mq1.msr3 msr3 from ")
+                            || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq3.msr12 msr12," +
+                                " mq2.msr2 msr2, mq1.msr13 msr13, mq2.msr3 msr3 from "));
     Assert.assertTrue(hqlQuery.contains("mq1 full outer join ")
         && hqlQuery.contains("mq2 full outer join ")
         && hqlQuery.endsWith("mq3 on mq1.dim1 = mq2.dim1 AND mq1.dim1 = mq3.dim1"));
@@ -275,9 +275,9 @@ public class TestBaseCubeQueries {
     TestCubeRewriter.compareConatins(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.dim11 dim11," +
-             " mq1.msr12 msr12, mq2.msr2 msr2 from ")
-        || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.dim11 dim11," +
-             " mq2.msr12 msr12, mq1.msr2 msr2 from "));
+            " mq1.msr12 msr12, mq2.msr2 msr2 from ")
+            || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.dim11 dim11," +
+                " mq2.msr12 msr12, mq1.msr2 msr2 from "));
 
     Assert.assertTrue(hqlQuery.contains("mq1 full outer join ")
         && hqlQuery.endsWith("mq2 on mq1.dim1 = mq2.dim1 AND mq1.dim11 = mq2.dim11"));
@@ -349,13 +349,13 @@ public class TestBaseCubeQueries {
         " JOIN " + getDbName() + "c1_testdim2tbl testdim2 ON basecube.dim2 = " +
             " testdim2.id and (testdim2.dt = 'latest') ", null,
             " group by testdim2.name", null,
-         getWhereForDailyAndHourly2days(cubeName, "C1_testFact2_BASE"));
+            getWhereForDailyAndHourly2days(cubeName, "C1_testFact2_BASE"));
     expected2 = getExpectedQuery(cubeName,
         "select testdim2.name name, round(sum(basecube.msr2)/1000) msr2 FROM ",
         " JOIN " + getDbName() + "c1_testdim2tbl testdim2 ON basecube.dim2 = " +
             " testdim2.id and (testdim2.dt = 'latest') ", null,
             " group by testdim2.name", null,
-        getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
+            getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
     TestCubeRewriter.compareConatins(expected1, hqlQuery);
     TestCubeRewriter.compareConatins(expected2, hqlQuery);
     Assert.assertTrue(
@@ -390,11 +390,11 @@ public class TestBaseCubeQueries {
         " where " + twoDaysRange);
     expected1 = getExpectedQuery(cubeName,
         "select basecube.dim1 != 'x' AND testdim2.id != 10 expr1," +
-        " avg(basecube.msr13 + basecube.msr14) expr3 FROM ",
-        " JOIN " + getDbName() + "c1_testdim2tbl testdim2 ON basecube.dim12 = " +
-            " testdim2.id and (testdim2.dt = 'latest') ", null,
-        " group by basecube.dim1 != 'x' AND testdim2.id != 10", null,
-        getWhereForHourly2days(cubeName, "C1_testfact3_raw_base"));
+            " avg(basecube.msr13 + basecube.msr14) expr3 FROM ",
+            " JOIN " + getDbName() + "c1_testdim2tbl testdim2 ON basecube.dim12 = " +
+                " testdim2.id and (testdim2.dt = 'latest') ", null,
+                " group by basecube.dim1 != 'x' AND testdim2.id != 10", null,
+                getWhereForHourly2days(cubeName, "C1_testfact3_raw_base"));
     expected2 = getExpectedQuery(cubeName,
         "select basecube.dim1 != 'x' AND basecube.dim2 != 10 expr1," +
             " round(sum(basecube.msr2)/1000) msr2 FROM ", null,

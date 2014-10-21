@@ -62,7 +62,8 @@ public class MultiFactHQLContext extends SimpleHQLContext {
   }
 
   private String getSelectString() throws SemanticException {
-    Map<Integer, Integer> selectToFactIndex = new HashMap<Integer, Integer>(query.getSelectAST().getChildCount());
+    Map<Integer, Integer> selectToFactIndex = 
+        new HashMap<Integer, Integer>(query.getSelectAST().getChildCount());
     int fi = 1;
     for (CandidateFact fact : facts) {
       for(int ind : fact.getSelectIndices()) {
