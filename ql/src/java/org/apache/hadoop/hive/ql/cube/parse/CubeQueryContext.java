@@ -186,9 +186,6 @@ public class CubeQueryContext {
           }
         }
         cube = client.getCube(tblName);
-        if (!cube.canBeQueried()) {
-          throw new SemanticException(ErrorMsg.CUBE_NOT_QUERYABLE, tblName);
-        }
         cubeTbls.put(alias, (AbstractCubeTable)cube);
       } else if (client.isDimension(tblName)) {
         Dimension dim = client.getDimension(tblName);

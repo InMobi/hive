@@ -384,8 +384,8 @@ public class Cube extends AbstractBaseTable implements CubeInterface {
   }
 
   @Override
-  public boolean canBeQueried() {
-    String canbeQueried = getProperties().get(MetastoreConstants.CUBE_CAN_BE_QUERIED);
+  public boolean allFieldsQueriable() {
+    String canbeQueried = getProperties().get(MetastoreConstants.CUBE_ALL_FIELDS_QUERIABLE);
     if (canbeQueried != null) {
       return Boolean.parseBoolean(canbeQueried);
     }

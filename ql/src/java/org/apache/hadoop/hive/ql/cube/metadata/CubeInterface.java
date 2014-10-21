@@ -130,9 +130,14 @@ public interface CubeInterface extends Named {
   public Set<String> getAllFieldNames();
 
   /**
-   * Whether cube can be queried directly. 
+   * Whether all the fields of cube can be queried. 
+   *
+   * If false, the fields can queried through derived cubes. Users can look at 
+   * derived cube fields to know which all fields can be queried together.
+   *
+   * If true, all the fields can be directly queried.
    *
    * @return true or false
    */
-  public boolean canBeQueried();
+  public boolean allFieldsQueriable();
 }
