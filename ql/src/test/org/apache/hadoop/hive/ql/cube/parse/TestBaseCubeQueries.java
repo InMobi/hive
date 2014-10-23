@@ -196,8 +196,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 dim1, round(sum(basecube.msr2)/1000) msr2 FROM ", null,
         " group by basecube.dim1",
         getWhereForDailyAndHourly2days(cubeName, "C1_testFact1_BASE"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr2 msr2, mq1.msr12 msr12 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr2 msr2, mq2.msr12 msr12 from "));
@@ -216,8 +216,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 dim1, round(sum(basecube.msr2)/1000) msr2 FROM ", null,
         " group by basecube.dim1",
         getWhereForDailyAndHourly2days(cubeName, "C1_testFact1_BASE"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr12 msr12, mq1.msr2 msr2 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr12 msr12, mq2.msr2 msr2 from "));
@@ -240,9 +240,9 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 dim1, max(basecube.msr13) msr13 FROM ", null,
         " group by basecube.dim1",
         getWhereForDailyAndHourly2days(cubeName, "c1_testfact3_base"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
-    TestCubeRewriter.compareConatins(expected3, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected3, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr12 msr12," +
             " mq2.msr2 msr2, mq3.msr13 msr13, mq2.msr3 msr3 from ")
@@ -271,8 +271,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 dim1, basecube.dim11 dim11, round(sum(basecube.msr2)/1000) msr2 FROM ", null,
         " group by basecube.dim1",
         getWhereForDailyAndHourly2days(cubeName, "C1_testFact1_BASE"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.dim11 dim11," +
             " mq1.msr12 msr12, mq2.msr2 msr2 from ")
@@ -293,8 +293,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 dim1, round(basecube.msr2/1000) msr2 FROM ", null,
         null,
         getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr11 msr11, mq2.msr2 msr2 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr11 msr11, mq1.msr2 msr2 from "));
@@ -313,8 +313,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 d1, round(sum(basecube.msr2)/1000) m2 FROM ", null,
         " group by basecube.dim1",
         getWhereForDailyAndHourly2days(cubeName, "C1_testFact1_BASE"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.d1 d1, mq2.expr2 `my msr12`, mq1.m2 m2 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.d1 d1, mq1.expr2 `my msr12`, mq2.m2 m2 from "));
@@ -332,8 +332,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim1 dim1, avg(basecube.msr2)) msr2 FROM ", null,
         " group by basecube.dim1",
         getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq2.msr12 msr12, mq1.msr2 msr2 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.dim1 dim1, mq1.msr12 msr12, mq2.msr2 msr2 from "));
@@ -356,8 +356,8 @@ public class TestBaseCubeQueries {
             " testdim2.id and (testdim2.dt = 'latest') ", null,
             " group by testdim2.name", null,
             getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.name name, mq2.msr12 msr12, mq1.msr2 msr2 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.name name, mq1.msr12 msr12, mq2.msr2 msr2 from "));
@@ -377,8 +377,8 @@ public class TestBaseCubeQueries {
         "select basecube.dim2 dim2, round(sum(basecube.msr2)/1000) msr2 FROM ", null,
         " group by basecube.dim2",
         getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.dim2 dim2, mq2.msr13 msr13, mq1.msr2 msr2 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.dim2 dim2, mq1.msr13 msr13, mq2.msr2 msr2 from "));
@@ -400,8 +400,8 @@ public class TestBaseCubeQueries {
             " round(sum(basecube.msr2)/1000) msr2 FROM ", null,
             " group by basecube.dim1 != 'x' AND basecube.dim2 != 10",
             getWhereForHourly2days(cubeName, "C1_testfact1_raw_base"));
-    TestCubeRewriter.compareConatins(expected1, hqlQuery);
-    TestCubeRewriter.compareConatins(expected2, hqlQuery);
+    TestCubeRewriter.compareContains(expected1, hqlQuery);
+    TestCubeRewriter.compareContains(expected2, hqlQuery);
     Assert.assertTrue(
         hqlQuery.toLowerCase().startsWith("select mq1.expr1 expr1, mq2.msr2 msr2, mq1.expr3 expr3 from ")
         || hqlQuery.toLowerCase().startsWith("select mq1.expr1 expr1, mq1.msr2 msr2, mq2.expr3 expr3 from "));

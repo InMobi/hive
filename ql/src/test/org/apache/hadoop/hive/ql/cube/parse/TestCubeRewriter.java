@@ -315,7 +315,7 @@ public class TestCubeRewriter {
     Assert.assertTrue(expectedTrimmed.equalsIgnoreCase(actualTrimmed));
   }
 
-  static void compareConatins(String expected, String actual) {
+  static void compareContains(String expected, String actual) {
     if (expected == null && actual == null) {
       return;
     } else if (expected == null) {
@@ -336,8 +336,6 @@ public class TestCubeRewriter {
 
       System.err.println("__FAILED__ " + method
         + "\n\tExpected: " + expected + "\n\t---------\n\tActual: " + actual);
-      System.err.println("__FAILED__ " + method
-          + "\n\tExpected: " + expectedTrimmed.toLowerCase() + "\n\t---------\n\tActual: " + actualTrimmed.toLowerCase());
     }
     Assert.assertTrue(actualTrimmed.toLowerCase().contains(expectedTrimmed.toLowerCase()));
   }
