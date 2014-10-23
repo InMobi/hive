@@ -34,7 +34,10 @@ import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class LightestDimensionResolver implements ContextRewriter {
+/**
+ * Prune dimension tables having more weight than minimum
+ */
+class LightestDimensionResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       LightestDimensionResolver.class.getName());
 

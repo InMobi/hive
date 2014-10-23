@@ -12,7 +12,11 @@ import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class MultiFactHQLContext extends SimpleHQLContext {
+/**
+ * Writes a join query with all the facts involved, with where, groupby and having
+ * expressions pushed down to the fact queries.
+ */
+class MultiFactHQLContext extends SimpleHQLContext {
 
   public static Log LOG = LogFactory.getLog(MultiFactHQLContext.class.getName());
 
@@ -32,7 +36,7 @@ public class MultiFactHQLContext extends SimpleHQLContext {
     this.factDimMap = factDimMap;
   }
 
-  protected void setAll() throws SemanticException {
+  protected void setMissingExpressions() throws SemanticException {
     setSelect(getSelectString());
     setFrom(getFromString());
     setWhere(getWhereString());
@@ -76,7 +80,7 @@ public class MultiFactHQLContext extends SimpleHQLContext {
     StringBuilder select = new StringBuilder();
     for (int i = 0; i < query.getSelectAST().getChildCount(); i++) {
       if (selectToFactIndex.get(i) == null) {
-        throw new SemanticException(ErrorMsg.EXPRESSION_NOT_IN_SINGLE_FACT,
+        throw new SemanticException(ErrorMsg.EXPRESSION_NOT_IN_ANY_FACT,
             HQLParser.getString((ASTNode) query.getSelectAST().getChild(i)));
       }
       select.append("mq").append(selectToFactIndex.get(i)).append(".")

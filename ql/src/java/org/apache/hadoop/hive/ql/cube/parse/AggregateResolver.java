@@ -55,7 +55,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
  * At this point it's assumed that aliases have been added to all columns.
  * </p>
  */
-public class AggregateResolver implements ContextRewriter {
+class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
 

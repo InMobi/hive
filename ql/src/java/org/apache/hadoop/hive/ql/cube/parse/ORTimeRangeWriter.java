@@ -23,6 +23,9 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import java.util.Iterator;
 import java.util.Set;
 
+/**
+ * Writes timerange partitions as an OR expression.
+ */
 public class ORTimeRangeWriter implements TimeRangeWriter {
 
   @Override

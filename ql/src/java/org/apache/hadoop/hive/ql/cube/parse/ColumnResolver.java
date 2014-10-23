@@ -39,7 +39,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class ColumnResolver implements ContextRewriter {
+class ColumnResolver implements ContextRewriter {
 
   public ColumnResolver(Configuration conf) {
   }
@@ -86,6 +86,7 @@ public class ColumnResolver implements ContextRewriter {
     }
   }
 
+  // finds columns in AST passed.
   private void getColsForTree(final CubeQueryContext cubeql,
       ASTNode tree) throws SemanticException {
     if (tree == null) {
@@ -131,6 +132,9 @@ public class ColumnResolver implements ContextRewriter {
     });
   }
 
+  // find columns in where tree
+  // if where expression is timerange function, then time range columns are added
+  // only if timerange clause shouldn't be replaced with its correspodning partition column
   private void getColsForWhereTree(final CubeQueryContext cubeql) throws SemanticException {
     if (cubeql.getWhereAST() == null) {
       return;
@@ -138,6 +142,22 @@ public class ColumnResolver implements ContextRewriter {
     addColumnsForWhere(cubeql, cubeql.getWhereAST(), null);
   }
 
+  // Find all columns of select tree.
+  // Finds columns in each select expression.
+  //
+  // Updates alias for each selected expression.
+  // Alias is updated as follows:
+  // Case 1: If select expression does not have an alias
+  // ** And the expression has only one column queried, the column name is put as
+  // select alias. 
+  // ** If the expression has more than one column queried, the alias is constructed as
+  // 'expr' + index of the expression.
+  // Case 2: If select expression already has alias
+  // ** Adds it to exprToAlias map
+  // ** and the alias does not have spaces, the select alias and final alias is same.
+  // ** If alias has spaces, select alias is constructed as 'expr' + index of the expression
+  // and user given alias is the final alias of the expression.
+  private static String SELECT_ALIAS_PREFIX = "expr";
   private void getColsForSelectTree(final CubeQueryContext cubeql) throws SemanticException {
     int exprInd = 1;
     for (int i = 0; i < cubeql.getSelectAST().getChildCount(); i++) {
@@ -151,7 +171,7 @@ public class ColumnResolver implements ContextRewriter {
         cubeql.addExprToAlias(selectExpr, alias);
         if (HQLParser.hasSpaces(alias.getText())) {
           selectFinalAlias = alias.getText();
-          selectAlias = "expr" + exprInd;
+          selectAlias = SELECT_ALIAS_PREFIX + exprInd;
         } else {
           selectAlias = alias.getText().trim();
         }
@@ -159,7 +179,7 @@ public class ColumnResolver implements ContextRewriter {
         // add the column name as alias
         selectAlias = cols.iterator().next().toLowerCase();
       } else {
-        selectAlias = "expr" + exprInd;
+        selectAlias = SELECT_ALIAS_PREFIX + exprInd;
       }
       exprInd++;
       cubeql.addSelectAlias(selectAlias, selectFinalAlias);

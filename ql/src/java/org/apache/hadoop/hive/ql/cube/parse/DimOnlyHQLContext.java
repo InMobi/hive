@@ -7,7 +7,14 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class DimOnlyHQLContext extends DimHQLContext {
+/**
+ * HQL context class which passes all query strings from {@link CubeQueryContext}
+ * and works with all dimensions to be queried.
+ *
+ * Updates from string with join clause expanded
+ *
+ */
+class DimOnlyHQLContext extends DimHQLContext {
 
   public static Log LOG = LogFactory.getLog(DimOnlyHQLContext.class.getName());
 
@@ -25,9 +32,9 @@ public class DimOnlyHQLContext extends DimHQLContext {
     this.query = query;
   }
 
-  protected void setAll() throws SemanticException {
+  protected void setMissingExpressions() throws SemanticException {
     setFrom(getFromString());
-    super.setAll();
+    super.setMissingExpressions();
   }
 
   public String toHQL() throws SemanticException {

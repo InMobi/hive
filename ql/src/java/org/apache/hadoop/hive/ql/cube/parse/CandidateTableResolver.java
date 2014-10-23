@@ -24,7 +24,6 @@ package org.apache.hadoop.hive.ql.cube.parse;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -48,17 +47,20 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 /**
  * This resolver prunes the candidate tables for following cases
- * 1. Queried columns are not part of candidate tables. Also Figures out if
+ * 
+ * 1. Queried dimensions are not part of candidate tables. Also Figures out if
  * queried column is not part of candidate table, but a denormalized field which
  * can reached through a reference
- * 2. Required join columns are not part of candidate tables
- * 3. Required source columns(join columns) for reaching a denormalized field, are
+ * 2. Finds all the candidate fact sets containing queried measures. Prunes facts
+ * which do not contain any of the queried measures.
+ * 3. Required join columns are not part of candidate tables
+ * 4. Required source columns(join columns) for reaching a denormalized field, are
  * not part of candidate tables
- * 4. Required denormalized fields are not part of refered tables, there by all the
+ * 5. Required denormalized fields are not part of refered tables, there by all the
  * candidates which are using denormalized fields. 
  *
  */
-public class CandidateTableResolver implements ContextRewriter {
+class CandidateTableResolver implements ContextRewriter {
 
   private static Log LOG = LogFactory.getLog(CandidateTableResolver.class.getName());
   private boolean qlEnabledMultiTableSelect;
@@ -248,6 +250,7 @@ public class CandidateTableResolver implements ContextRewriter {
       if (!checkForColumnExists(cfact, msrs)) {
         // check if fact contains any of the maeasures
         // if not ignore the fact
+        continue;
       } else if (cfact.getColumns().containsAll(msrs)) {
         // return single set
         Set<CandidateFact> one = new LinkedHashSet<CandidateFact>();
@@ -480,7 +483,7 @@ public class CandidateTableResolver implements ContextRewriter {
   }
 
   // The candidate table contains atleast one column in the colSet
-  public static boolean checkForColumnExists(CandidateTable table,
+  static boolean checkForColumnExists(CandidateTable table,
       Collection<String> colSet) {
     if (colSet == null || colSet.isEmpty()) {
       return true;

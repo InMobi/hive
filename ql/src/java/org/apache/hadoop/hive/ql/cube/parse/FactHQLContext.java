@@ -8,6 +8,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * HQL context class which passes all query strings from the fact
+ * and works with required dimensions for the fact.
+ *
+ */
 public class FactHQLContext extends DimHQLContext {
 
   public static Log LOG = LogFactory.getLog(FactHQLContext.class.getName());
@@ -28,9 +33,9 @@ public class FactHQLContext extends DimHQLContext {
     LOG.info("factDims:" + factDims + " for fact:" + fact);
   }
 
-  protected void setAll() throws SemanticException {
+  protected void setMissingExpressions() throws SemanticException {
     setFrom(getFromString());
-    super.setAll();
+    super.setMissingExpressions();
   }
 
   private String getFromString() throws SemanticException {

@@ -62,7 +62,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
  * JoinResolver.
  *
  */
-public class JoinResolver implements ContextRewriter {
+class JoinResolver implements ContextRewriter {
 
   private static final Log LOG = LogFactory.getLog(JoinResolver.class);
 
@@ -415,7 +415,7 @@ public class JoinResolver implements ContextRewriter {
       }
     }
 
-    public Map<Dimension, List<SchemaGraph.JoinPath>> pruneFactPaths(
+    private Map<Dimension, List<SchemaGraph.JoinPath>> pruneFactPaths(
         CubeInterface cube, final CandidateFact cfact) {
       Map<Dimension, List<SchemaGraph.JoinPath>> prunedPaths = new HashMap<Dimension, List<SchemaGraph.JoinPath>>();
       // Remove join paths which cannot be satisfied by the candidate fact
@@ -438,7 +438,7 @@ public class JoinResolver implements ContextRewriter {
       return prunedPaths;
     }
 
-    public void pruneAllPaths(final Map<Dimension, CandidateDim> dimsToQuery) {
+    private void pruneAllPaths(final Map<Dimension, CandidateDim> dimsToQuery) {
       // Remove join paths which cannot be satisfied by the resolved dimension tables
       if (dimsToQuery != null && !dimsToQuery.isEmpty()) {
         for (CandidateDim candidateDim : dimsToQuery.values()) {
@@ -465,7 +465,7 @@ public class JoinResolver implements ContextRewriter {
      * There can be multiple join paths between a dimension and the target. Set of all possible join clauses
      * is the cartesian product of join paths of all dimensions
      */
-    public Iterator<JoinClause> getJoinClausesForAllPaths(final CandidateFact fact,
+    private Iterator<JoinClause> getJoinClausesForAllPaths(final CandidateFact fact,
         final Map<Dimension, CandidateDim> dimsToQuery,
         final Set<Dimension> qdims,
         final CubeQueryContext cubeql) {
@@ -624,7 +624,7 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
-  public void resolveJoins(CubeQueryContext cubeql) throws HiveException {
+  private void resolveJoins(CubeQueryContext cubeql) throws HiveException {
     QB cubeQB = cubeql.getQB();
     boolean joinResolverDisabled = conf.getBoolean(
         CubeQueryConfUtil.DISABLE_AUTO_JOINS, CubeQueryConfUtil.DEFAULT_DISABLE_AUTO_JOINS);
@@ -637,7 +637,7 @@ public class JoinResolver implements ContextRewriter {
     }
   }
 
-  protected SchemaGraph getSchemaGraph() throws HiveException {
+  private SchemaGraph getSchemaGraph() throws HiveException {
     SchemaGraph graph = getMetastoreClient().getSchemaGraph();
     if (graph == null) {
       graph = new SchemaGraph(getMetastoreClient());
@@ -651,7 +651,7 @@ public class JoinResolver implements ContextRewriter {
    * @param cubeql
    * @throws SemanticException
    */
-  public void autoResolveJoins(CubeQueryContext cubeql) throws HiveException {
+  private void autoResolveJoins(CubeQueryContext cubeql) throws HiveException {
     // Check if this query needs a join -
     // A join is needed if there is a cube and at least one dimension, or, 0 cubes and more than one
     // dimensions

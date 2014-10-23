@@ -7,6 +7,10 @@ import org.apache.hadoop.hive.ql.cube.metadata.CubeDimensionTable;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.session.SessionState;
 
+/**
+ * Holds context of a candidate dim table. 
+ *
+ */
 class CandidateDim implements CandidateTable {
   final CubeDimensionTable dimtable;
   String storageTable;

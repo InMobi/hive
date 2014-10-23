@@ -9,6 +9,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Accepts strings of all expressions and constructs HQL query.
+ *
+ * Making this as an abstract class because it provides constructors without
+ * all expressions being set.
+ */
 public abstract class SimpleHQLContext implements HQLContextInterface {
 
   public static Log LOG = LogFactory.getLog(SimpleHQLContext.class.getName());
@@ -44,11 +50,18 @@ public abstract class SimpleHQLContext implements HQLContextInterface {
     this.limit = limit;
   }
 
-  protected void setAll() throws SemanticException {
+  /**
+   * Set all missing expressions of HQL context.
+   * 
+   * Leaving this empty implementation for the case of all expressions
+   * being passed in constructor.
+   * If other constructors are used the missing expressions should be set here
+   */
+  protected void setMissingExpressions() throws SemanticException {
   }
 
   public String toHQL() throws SemanticException {
-    setAll();
+    setMissingExpressions();
     String qfmt = getQueryFormat();
     Object[] queryTreeStrings = getQueryTreeStrings();
     if (LOG.isDebugEnabled()) {
@@ -58,7 +71,7 @@ public abstract class SimpleHQLContext implements HQLContextInterface {
     return baseQuery;
   }
 
-  private Object[] getQueryTreeStrings()
+  private String[] getQueryTreeStrings()
       throws SemanticException {
     List<String> qstrs = new ArrayList<String>();
     qstrs.add(select);

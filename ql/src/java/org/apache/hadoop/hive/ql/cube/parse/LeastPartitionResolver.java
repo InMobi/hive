@@ -33,7 +33,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class LeastPartitionResolver implements ContextRewriter {
+/**
+ * Prune candidate fact sets which require more partitions than minimum parts.
+ */
+class LeastPartitionResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       LeastPartitionResolver.class.getName());
 

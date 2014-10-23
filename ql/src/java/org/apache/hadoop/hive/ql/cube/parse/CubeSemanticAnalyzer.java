@@ -32,6 +32,9 @@ import org.apache.hadoop.hive.ql.parse.QB;
 import org.apache.hadoop.hive.ql.parse.SemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Accepts cube query AST and rewrites into storage table query
+ */
 public class CubeSemanticAnalyzer extends SemanticAnalyzer {
   private final HiveConf conf;
   private final List<ValidationRule> validationRules =

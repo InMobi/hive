@@ -10,7 +10,14 @@ import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class SingleFactHQLContext extends DimOnlyHQLContext {
+/**
+ * HQL context class which passes down all query strings to come from DimOnlyHQLContext
+ * and works with fact being queried.
+ *
+ * Updates from string with join clause expanded
+ *
+ */
+class SingleFactHQLContext extends DimOnlyHQLContext {
 
   public static Log LOG = LogFactory.getLog(SingleFactHQLContext.class.getName());
 

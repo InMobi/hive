@@ -34,6 +34,10 @@ import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.ParseUtils;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Rewrites given cube query into simple storage table HQL. 
+ *
+ */
 public class CubeQueryRewriter {
   private final Configuration conf;
   private final List<ContextRewriter> rewriters = new ArrayList<ContextRewriter>();

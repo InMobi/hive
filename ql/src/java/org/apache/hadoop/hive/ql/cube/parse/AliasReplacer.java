@@ -45,7 +45,17 @@ import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class AliasReplacer implements ContextRewriter {
+/**
+ * Finds queried column to table alias. Finds queried dim attributes and queried 
+ * measures.
+ *
+ * Does queried field validation wrt derived cubes, if all fields of queried
+ * cube cannot be queried together.
+ *
+ * Replaces all the columns in all expressions with tablealias.column
+ *
+ */
+class AliasReplacer implements ContextRewriter {
 
   private static Log LOG = LogFactory.getLog(AliasReplacer.class.getName());
 
@@ -102,6 +112,9 @@ public class AliasReplacer implements ContextRewriter {
 
   }
 
+  // Finds all queried dim-attributes and measures from cube
+  // If all fields in cube are not queryable together, does the validation
+  // wrt to dervided cubes.
   private void doFieldValidation(CubeQueryContext cubeql) throws SemanticException {
     CubeInterface cube = cubeql.getCube();
     if (cube != null) {
@@ -139,6 +152,7 @@ public class AliasReplacer implements ContextRewriter {
           throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE, queriedDimAttrs.toString());
         }
         if (!queriedMsrs.isEmpty()) {
+          // Add appropriate message to know which fields are not queryable together
           if (!queriedDimAttrs.isEmpty()) {
             throw new SemanticException(ErrorMsg.FIELDS_NOT_QUERYABLE,
                 queriedDimAttrs.toString() + " and " + queriedMsrs.toString());

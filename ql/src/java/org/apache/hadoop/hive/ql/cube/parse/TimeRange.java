@@ -28,6 +28,9 @@ import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Timerange data structure
+ */
 public class TimeRange {
   private String partitionColumn;
   private Date toDate;

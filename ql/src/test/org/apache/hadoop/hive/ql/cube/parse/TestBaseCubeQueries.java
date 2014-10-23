@@ -124,7 +124,7 @@ public class TestBaseCubeQueries {
     }
     Assert.assertNotNull(th);
     Assert.assertEquals(th.getCanonicalErrorMsg().getErrorCode(),
-        ErrorMsg.EXPRESSION_NOT_IN_SINGLE_FACT.getErrorCode());
+        ErrorMsg.EXPRESSION_NOT_IN_ANY_FACT.getErrorCode());
 
     // no fact has the all the dimensions queried
     th = null;

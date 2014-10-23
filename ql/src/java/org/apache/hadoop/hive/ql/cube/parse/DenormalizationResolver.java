@@ -207,6 +207,7 @@ public class DenormalizationResolver implements ContextRewriter {
       return refTbls;
     }
 
+    // checks if the reference if picked for facts and dimsToQuery passed
     private boolean isPickedFor(PickedReference picked, CandidateFact cfact,
         Map<Dimension, CandidateDim> dimsToQuery) {
       if (cfact != null &&

@@ -9,7 +9,13 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.cube.metadata.Dimension;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public abstract class DimHQLContext extends SimpleHQLContext {
+/**
+ * Dimension HQLContext.
+ *
+ * Contains all the dimensions queried and their candidate dim tables
+ * Update where string with storage filters added dimensions queried.
+ */
+abstract class DimHQLContext extends SimpleHQLContext {
 
   public static Log LOG = LogFactory.getLog(DimHQLContext.class.getName());
 
@@ -26,7 +32,7 @@ public abstract class DimHQLContext extends SimpleHQLContext {
     this.queriedDims = queriedDims;
   }
 
-  protected void setAll() throws SemanticException {
+  protected void setMissingExpressions() throws SemanticException {
     setWhere(genWhereClauseWithDimPartitions(where));    
   }
 

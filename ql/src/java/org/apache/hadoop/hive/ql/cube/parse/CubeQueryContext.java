@@ -693,7 +693,7 @@ public class CubeQueryContext {
     return facts;
   }
 
-  private HQLContext hqlContext;
+  private HQLContextInterface hqlContext;
   public String toHQL() throws SemanticException {
     Set<CandidateFact> cfacts = pickCandidateFactToQuery();
     Map<Dimension, CandidateDim> dimsToQuery = pickCandidateDimsToQuery(dimensions);
@@ -766,10 +766,24 @@ public class CubeQueryContext {
         }
       }
     }
-    hqlContext = new HQLContext(cfacts, dimsToQuery, factDimMap, this);
+    hqlContext = createHQLContext(cfacts, dimsToQuery, factDimMap, this);
     return hqlContext.toHQL();
   }
 
+  private HQLContextInterface createHQLContext(Set<CandidateFact> facts,
+      Map<Dimension, CandidateDim> dimsToQuery,
+      Map<CandidateFact, Set<Dimension>> factDimMap,
+      CubeQueryContext query) throws SemanticException {
+    if (facts == null || facts.size() == 0) {
+      return new DimOnlyHQLContext(dimsToQuery, query);
+    } else if (facts.size() == 1) {
+      // create singlefact context
+      return new SingleFactHQLContext(facts.iterator().next(), dimsToQuery, query);
+    } else {
+      return new MultiFactHQLContext(facts,
+          dimsToQuery, factDimMap, query);
+    }
+  }
   public ASTNode toAST(Context ctx) throws SemanticException {
     String hql = toHQL();
     ParseDriver pd = new ParseDriver();
@@ -971,7 +985,7 @@ public class CubeQueryContext {
   /**
    * @return the hqlContext
    */
-  public HQLContext getHqlContext() {
+  public HQLContextInterface getHqlContext() {
     return hqlContext;
   }
 
@@ -1035,6 +1049,12 @@ public class CubeQueryContext {
     return candidateFactSets;
   }
 
+  /**
+   * Prune candidate fact sets with respect to available candidate facts.
+   *
+   * Prune a candidate set, if any of the fact is missing.
+   * @param pruneCause
+   */
   public void pruneCandidateFactSet(CubeTableCause pruneCause) {
     // remove candidate fact sets that have missing facts
     for (Iterator<Set<CandidateFact>> i = candidateFactSets.iterator();
@@ -1042,12 +1062,20 @@ public class CubeQueryContext {
       Set<CandidateFact> cfacts = i.next();
       if (!candidateFacts.containsAll(cfacts)) {
         LOG.info("Not considering fact table set:" + cfacts +
-            " as they have non candidate tables and cause:" + pruneCause);
+            " as they have non candidate tables and facts missing because of"
+            + pruneCause);
         i.remove();
       }
     }
   }
 
+  /**
+   * Prune candidate fact with respect to available candidate fact sets.
+   *
+   * If candidate fact is not present in any of the candidate fact sets, remove it.
+   *
+   * @param pruneCause
+   */
   public void pruneCandidateFactWithCandidateSet(CubeTableCause pruneCause) {
     // remove candidate facts that are not part of any covering set
     Set<CandidateFact> allCoveringFacts = new HashSet<CandidateFact>();

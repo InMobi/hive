@@ -29,6 +29,10 @@ import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.session.SessionState;
 
+/**
+ * Holds context of a candidate fact table.
+ *
+ */
 class CandidateFact implements CandidateTable {
   public static Log LOG = LogFactory.getLog(CandidateFact.class.getName());
   final CubeFactTable fact;
@@ -95,6 +99,7 @@ class CandidateFact implements CandidateTable {
     }
   }
 
+  // copy ASTs from CubeQueryContext
   public void copyASTs(CubeQueryContext cubeql) throws SemanticException {
     this.selectAST = HQLParser.copyAST(cubeql.getSelectAST());
     this.whereAST = HQLParser.copyAST(cubeql.getWhereAST());
@@ -127,6 +132,13 @@ class CandidateFact implements CandidateTable {
     }
   }
 
+  /**
+   * Update the ASTs to include only the fields queried from this fact,
+   * in all the expressions
+   * 
+   * @param cubeql
+   * @throws SemanticException
+   */
   public void updateASTs(CubeQueryContext cubeql) throws SemanticException {
     Set<String> cubeColsQueried = cubeql.getColumnsQueried(cubeql.getCube().getName());
 
@@ -159,12 +171,17 @@ class CandidateFact implements CandidateTable {
           this.selectAST.getChild(currentChild).addChild(newAliasNode);
         }
       } else {
-        LOG.info("Dropping child:" + HQLParser.getString(selectExpr));
         this.selectAST.deleteChild(currentChild);
         currentChild--;
       }
       currentChild++;
     }
+
+    // update whereAST to include only filters of this fact
+    // TODO
+
+    // update havingAST to include only filters of this fact
+    // TODO
   }
 
   private Set<String> getColsInExpr(final Set<String> cubeCols, ASTNode expr) throws SemanticException {

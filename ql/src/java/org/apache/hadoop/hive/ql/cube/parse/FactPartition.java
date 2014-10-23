@@ -28,7 +28,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 
-public class FactPartition implements Comparable<FactPartition> {
+class FactPartition implements Comparable<FactPartition> {
   private final String partCol;
   private final Date partSpec;
   private final Set<String> storageTables = new LinkedHashSet<String>();

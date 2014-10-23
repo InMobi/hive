@@ -33,6 +33,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Prune fact tables having more weight than minimum.
+ */
 public class LightestFactResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       LightestFactResolver.class.getName());
