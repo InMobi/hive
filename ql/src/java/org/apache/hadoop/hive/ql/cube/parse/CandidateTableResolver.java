@@ -48,8 +48,8 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 /**
  * This resolver prunes the candidate tables for following cases
  * 
- * 1. Queried dimensions are not part of candidate tables. Also Figures out if
- * queried column is not part of candidate table, but a denormalized field which
+ * 1. If queried dim attributes are not present. Also Figures out if
+ * queried column is not part of candidate table, but is a denormalized field which
  * can reached through a reference
  * 2. Finds all the candidate fact sets containing queried measures. Prunes facts
  * which do not contain any of the queried measures.
