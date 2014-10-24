@@ -40,7 +40,11 @@ import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class GroupbyResolver implements ContextRewriter {
+/**
+ * Promotes groupby to select and select to groupby.
+ *
+ */
+class GroupbyResolver implements ContextRewriter {
   private static Log LOG = LogFactory.getLog(
       GroupbyResolver.class.getName());
 

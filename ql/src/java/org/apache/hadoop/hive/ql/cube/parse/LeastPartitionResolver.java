@@ -18,20 +18,25 @@ package org.apache.hadoop.hive.ql.cube.parse;
  * specific language governing permissions and limitations
  * under the License.
  *
-*/
+ */
 
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class LeastPartitionResolver implements ContextRewriter {
+/**
+ * Prune candidate fact sets which require more partitions than minimum parts.
+ */
+class LeastPartitionResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       LeastPartitionResolver.class.getName());
 
@@ -41,35 +46,38 @@ public class LeastPartitionResolver implements ContextRewriter {
   @Override
   public void rewriteContext(CubeQueryContext cubeql)
       throws SemanticException {
-    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables().isEmpty())
-    {
-      int minPartitions = getMinPartitions(cubeql.getCandidateFactTables());
+    if (cubeql.getCube() != null && !cubeql.getCandidateFactSets()
+        .isEmpty()) {
+      Map<Set<CandidateFact>, Integer> factPartCount =
+          new HashMap<Set<CandidateFact>, Integer>();
 
-      for (Iterator<CandidateFact> i =
-          cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CandidateFact fact = i.next();
-        if (fact.numQueriedParts > minPartitions) {
-          LOG.info("Not considering fact:" + fact +
+      for (Set<CandidateFact> facts : cubeql.getCandidateFactSets()) {
+        factPartCount.put(facts, getPartCount(facts));
+      }
+
+      double minPartitions = Collections.min(factPartCount.values());
+
+      for (Iterator<Set<CandidateFact>> i =
+          cubeql.getCandidateFactSets().iterator(); i.hasNext();) {
+        Set<CandidateFact> facts = i.next();
+        if (factPartCount.get(facts) > minPartitions) {
+          LOG.info("Not considering facts:" + facts +
               " from candidate fact tables as it requires more partitions to" +
-              " be queried:" + fact.numQueriedParts + " minimum:"
+              " be queried:" + factPartCount.get(facts) + " minimum:"
               + minPartitions);
-          cubeql.addFactPruningMsgs(fact.fact, new CandidateTablePruneCause(
-              fact.fact.getName(), CubeTableCause.MORE_PARTITIONS));
           i.remove();
         }
       }
+      cubeql.pruneCandidateFactWithCandidateSet(CubeTableCause.MORE_PARTITIONS);
     }
   }
 
-  int getMinPartitions(Set<CandidateFact> candidateFacts) {
-    Iterator<CandidateFact> it = candidateFacts.iterator();
-    int min = it.next().numQueriedParts;
-    while (it.hasNext()) {
-      CandidateFact fact = it.next();
-      if (fact.numQueriedParts < min) {
-        min = fact.numQueriedParts;
-      }
+  private int getPartCount(Set<CandidateFact> set) {
+    int parts = 0;
+    for (CandidateFact f :set) {
+      parts += f.numQueriedParts;
     }
-    return min;
+    return parts;
   }
+
 }

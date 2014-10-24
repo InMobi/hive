@@ -25,14 +25,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Prune fact tables having more weight than minimum.
+ */
 public class LightestFactResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       LightestFactResolver.class.getName());
@@ -42,30 +45,37 @@ public class LightestFactResolver implements ContextRewriter {
 
   @Override
   public void rewriteContext(CubeQueryContext cubeql) throws SemanticException {
-    if (cubeql.getCube() != null && !cubeql.getCandidateFactTables()
+    if (cubeql.getCube() != null && !cubeql.getCandidateFactSets()
         .isEmpty()) {
-      Map<CandidateFact, Double> factWeightMap =
-          new HashMap<CandidateFact, Double>();
+      Map<Set<CandidateFact>, Double> factWeightMap =
+          new HashMap<Set<CandidateFact>, Double>();
 
-      for (CandidateFact fact : cubeql.getCandidateFactTables()) {
-        factWeightMap.put(fact, fact.fact.weight());
+      for (Set<CandidateFact> facts : cubeql.getCandidateFactSets()) {
+        factWeightMap.put(facts, getWeight(facts));
       }
 
       double minWeight = Collections.min(factWeightMap.values());
 
-      for (Iterator<CandidateFact> i =
-          cubeql.getCandidateFactTables().iterator(); i.hasNext();) {
-        CandidateFact fact = i.next();
-        if (factWeightMap.get(fact) > minWeight) {
-          LOG.info("Not considering fact:" + fact +
+      for (Iterator<Set<CandidateFact>> i =
+          cubeql.getCandidateFactSets().iterator(); i.hasNext();) {
+        Set<CandidateFact> facts = i.next();
+        if (factWeightMap.get(facts) > minWeight) {
+          LOG.info("Not considering facts:" + facts +
               " from candidate fact tables as it has more fact weight:"
-              + factWeightMap.get(fact) + " minimum:"
+              + factWeightMap.get(facts) + " minimum:"
               + minWeight);
-          cubeql.addFactPruningMsgs(fact.fact, new CandidateTablePruneCause(
-              fact.fact.getName(), CubeTableCause.MORE_WEIGHT));
           i.remove();
         }
       }
+      cubeql.pruneCandidateFactWithCandidateSet(CubeTableCause.MORE_WEIGHT);
     }
+  }
+
+  private Double getWeight(Set<CandidateFact> set) {
+    Double weight = 0.0;
+    for (CandidateFact f :set) {
+      weight += f.fact.weight();
+    }
+    return weight;
   }
 }

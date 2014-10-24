@@ -1,6 +1,6 @@
 package org.apache.hadoop.hive.ql.cube.parse;
 
-public class TimeRangeUtils {
+class TimeRangeUtils {
   public static String getTimeRangePartitionFilter(
     FactPartition partition,
     CubeQueryContext cubeQueryContext,

@@ -38,7 +38,11 @@ import org.apache.hadoop.hive.ql.parse.HiveParser;
 import org.apache.hadoop.hive.ql.parse.ParseException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
-public class ExpressionResolver implements ContextRewriter {
+/**
+ * Replaces expression with its AST in all query ASTs
+ *
+ */
+class ExpressionResolver implements ContextRewriter {
 
   public ExpressionResolver(Configuration conf) {
   }

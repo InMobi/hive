@@ -31,7 +31,7 @@ import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class StorageUtil {
+class StorageUtil {
   private static Log LOG = LogFactory.getLog(
       StorageUtil.class.getName());
 

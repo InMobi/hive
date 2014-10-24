@@ -1,10 +1,3 @@
-package org.apache.hadoop.hive.ql.cube.parse;
-
-import java.util.List;
-import java.util.Map;
-
-import org.codehaus.jackson.annotate.JsonWriteNullProperties;
-
 /*
 *
 * Licensed to the Apache Software Foundation (ASF) under one
@@ -25,6 +18,16 @@ import org.codehaus.jackson.annotate.JsonWriteNullProperties;
 * under the License.
 *
 */
+package org.apache.hadoop.hive.ql.cube.parse;
+
+import java.util.List;
+import java.util.Map;
+
+import org.codehaus.jackson.annotate.JsonWriteNullProperties;
+
+/**
+ * Contains the cause why a candidate table is not picked for answering the query
+ */
 @JsonWriteNullProperties(false)
 public class CandidateTablePruneCause {
 

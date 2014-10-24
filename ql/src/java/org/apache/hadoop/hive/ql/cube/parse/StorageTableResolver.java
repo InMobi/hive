@@ -51,14 +51,16 @@ import org.apache.hadoop.hive.ql.cube.metadata.UpdatePeriod;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.CubeTableCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipStorageCause;
 import org.apache.hadoop.hive.ql.cube.parse.CandidateTablePruneCause.SkipUpdatePeriodCause;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateDim;
-import org.apache.hadoop.hive.ql.cube.parse.CubeQueryContext.CandidateFact;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.util.ReflectionUtils;
 
-public class StorageTableResolver implements ContextRewriter {
+/**
+ * Resolve storages and partitions of all candidate tables and prunes candidate
+ * tables with missing storages or partitions.
+ */
+class StorageTableResolver implements ContextRewriter {
   private static Log LOG = LogFactory.getLog(
       StorageTableResolver.class.getName());
 
@@ -144,6 +146,7 @@ public class StorageTableResolver implements ContextRewriter {
     // resolve dimension tables
     resolveDimStorageTablesAndPartitions(cubeql);
     cubeql.setNonexistingParts(nonExistingPartitions);
+    cubeql.pruneCandidateFactSet(CubeTableCause.NO_CANDIDATE_STORAGES);
   }
 
   private void resolveDimStorageTablesAndPartitions(CubeQueryContext cubeql)

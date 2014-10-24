@@ -182,10 +182,7 @@ public class TestJoinResolver {
   }
 
   private String getAutoResolvedFromString(CubeQueryContext query) throws SemanticException {
-    if (query.getAutoJoinCtx() != null) {
-      return query.getAutoJoinCtx().getFromString(query.getHqlContext(), query);
-    }
-    return null;
+    return query.getHqlContext().getFrom();
   }
 
   @Test
@@ -273,10 +270,6 @@ public class TestJoinResolver {
   public void testJoinNotRequired() throws Exception {
     String query = "SELECT msr2 FROM testCube WHERE " + twoDaysRange;
     CubeQueryContext ctx = driver.rewrite(query);
-    String hql = ctx.toHQL();
-    String joinClause = getAutoResolvedFromString(ctx);
-    System.out.println("@Resolved join clause " + joinClause);
-    assertTrue(joinClause == null || joinClause.isEmpty());
     assertTrue(ctx.getAutoJoinCtx() == null);
   }
 

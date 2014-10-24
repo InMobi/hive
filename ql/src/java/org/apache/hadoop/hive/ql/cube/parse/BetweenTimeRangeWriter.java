@@ -27,6 +27,10 @@ import java.util.TreeSet;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
+/**
+ * Writes partitions queried in timerange as between clause.
+ *
+ */
 public class BetweenTimeRangeWriter implements TimeRangeWriter {
 
   @Override

@@ -55,7 +55,7 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
  * At this point it's assumed that aliases have been added to all columns.
  * </p>
  */
-public class AggregateResolver implements ContextRewriter {
+class AggregateResolver implements ContextRewriter {
   public static final Log LOG = LogFactory.getLog(
       AggregateResolver.class.getName());
 
@@ -87,9 +87,9 @@ public class AggregateResolver implements ContextRewriter {
         || hasMeasures(cubeql, cubeql.getWhereAST())
         || hasMeasures(cubeql, cubeql.getGroupByAST())
         || hasMeasures(cubeql, cubeql.getOrderByAST()) ) {
-      Iterator<CubeQueryContext.CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
+      Iterator<CandidateFact> factItr = cubeql.getCandidateFactTables().iterator();
       while (factItr.hasNext()) {
-        CubeQueryContext.CandidateFact candidate = factItr.next();
+        CandidateFact candidate = factItr.next();
         if (candidate.fact.isAggregated()) {
           cubeql.addFactPruningMsgs(candidate.fact,
               new CandidateTablePruneCause(candidate.fact.getName(),
@@ -100,6 +100,8 @@ public class AggregateResolver implements ContextRewriter {
       nonDefaultAggregates = true;
       LOG.info("Query has non default aggregates, no aggregate resolution will be done");
     }
+
+    cubeql.pruneCandidateFactSet(CubeTableCause.MISSING_DEFAULT_AGGREGATE);
 
     if (nonDefaultAggregates || aggregateResolverDisabled) {
       return;
