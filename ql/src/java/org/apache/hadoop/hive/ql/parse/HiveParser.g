@@ -2098,6 +2098,7 @@ selectStatement[boolean topLevel]
 singleSelectStatement
    :
    cubeClause?
+   domainClause?
    selectClause
    fromClause?
    whereClause?
@@ -2108,7 +2109,7 @@ singleSelectStatement
    distributeByClause?
    sortByClause?
    window_clause?
-   limitClause? -> ^(TOK_QUERY cubeClause? fromClause? ^(TOK_INSERT ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
+   limitClause? -> ^(TOK_QUERY cubeClause? domainClause? fromClause? ^(TOK_INSERT ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
                      selectClause whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
                      distributeByClause? sortByClause? window_clause? limitClause?))
    ;
@@ -2188,3 +2189,9 @@ cubeClause
    KW_CUBE -> ^(KW_CUBE)
    ;
 
+domainClause
+@init { pushMsg("domain clause", state); }
+@after { popMsg(state); }
+   :
+   KW_DOMAIN -> ^(KW_DOMAIN)
+   ;
