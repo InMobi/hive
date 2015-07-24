@@ -1062,10 +1062,11 @@ public final class TypeCheckProcFactory {
         RowResolver input = ctx.getInputRR();
         String tableAlias = BaseSemanticAnalyzer.unescapeIdentifier(expr
             .getChild(0).getChild(0).getText());
+        String colAlias = BaseSemanticAnalyzer.unescapeIdentifier(expr.getChild(1).getText());
         // NOTE: tableAlias must be a valid non-ambiguous table alias,
         // because we've checked that in TOK_TABLE_OR_COL's process method.
-        ColumnInfo colInfo = input.get(tableAlias,
-            ((ExprNodeConstantDesc) nodeOutputs[1]).getValue().toString());
+
+        ColumnInfo colInfo = input.get(tableAlias, colAlias);
 
         if (colInfo == null) {
           ctx.setError(ErrorMsg.INVALID_COLUMN.getMsg(expr.getChild(1)), expr);
