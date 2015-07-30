@@ -608,8 +608,6 @@ public class HiveConf extends Configuration {
     HIVESCRIPTOPERATORTRUST("hive.exec.script.trust", false),
     HIVEROWOFFSET("hive.exec.rowoffset", false),
 
-    HIVE_COMBINE_INPUT_FORMAT_SUPPORTS_SPLITTABLE("hive.hadoop.supports.splittable.combineinputformat", false),
-
     // Optimizer
     HIVEOPTINDEXFILTER("hive.optimize.index.filter", false), // automatically use indexes
     HIVEINDEXAUTOUPDATE("hive.optimize.index.autoupdate", false), //automatically update stale indexes

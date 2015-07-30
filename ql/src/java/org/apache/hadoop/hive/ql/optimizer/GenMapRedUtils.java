@@ -897,8 +897,6 @@ public final class GenMapRedUtils {
     work.setPathToAliases(new LinkedHashMap<String, ArrayList<String>>());
     work.setPathToPartitionInfo(new LinkedHashMap<String, PartitionDesc>());
     work.setAliasToWork(new LinkedHashMap<String, Operator<? extends OperatorDesc>>());
-    work.setHadoopSupportsSplittable(
-        conf.getBoolVar(HiveConf.ConfVars.HIVE_COMBINE_INPUT_FORMAT_SUPPORTS_SPLITTABLE));
     return mrWork;
   }
 
@@ -1658,7 +1656,7 @@ public final class GenMapRedUtils {
           // There are separate configuration parameters to control whether to
           // merge for a map-only job
           // or for a map-reduce job
-          if (currTask.getWork() instanceof MapredWork) {  
+          if (currTask.getWork() instanceof MapredWork) {
             ReduceWork reduceWork = ((MapredWork) currTask.getWork()).getReduceWork();
             boolean mergeMapOnly =
               hconf.getBoolVar(ConfVars.HIVEMERGEMAPFILES) && reduceWork == null;
@@ -1753,7 +1751,7 @@ public final class GenMapRedUtils {
     return confirmedPartns;
   }
 
-  public static List<Path> getInputPathsForPartialScan(QBParseInfo parseInfo, StringBuffer aggregationKey) 
+  public static List<Path> getInputPathsForPartialScan(QBParseInfo parseInfo, StringBuffer aggregationKey)
     throws SemanticException {
     List<Path> inputPaths = new ArrayList<Path>();
     switch (parseInfo.getTableSpec().specType) {
