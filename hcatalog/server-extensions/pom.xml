@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.hive.hcatalog</groupId>
     <artifactId>hive-hcatalog</artifactId>
-    <version>0.13.4-inm</version>
+    <version>0.13.5-inm-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
