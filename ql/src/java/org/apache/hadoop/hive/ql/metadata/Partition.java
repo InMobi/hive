@@ -285,7 +285,7 @@ public class Partition implements Serializable {
   public void setOutputFormatClass(Class<? extends HiveOutputFormat> outputFormatClass) {
     this.outputFormatClass = outputFormatClass;
     tPartition.getSd().setOutputFormat(HiveFileFormatUtils
-        .getOutputFormatSubstitute(outputFormatClass, false).toString());
+        .getOutputFormatSubstitute(outputFormatClass, false).getName());
   }
 
   final public Class<? extends InputFormat> getInputFormatClass()
