@@ -12,14 +12,12 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.hive</groupId>
     <artifactId>hive</artifactId>
-    <version>2.1.0-inm-SNAPSHOT</version>
+    <version>2.1.0-inm</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -69,19 +67,19 @@
                 <configuration>
                   <target>
                     <condition property="word.size" value="64" else="32">
-                      <contains string="${os.arch}" substring="64"/>
+                      <contains string="${os.arch}" substring="64" />
                     </condition>
                     <exec executable="${make.cmd}" failonerror="true">
-                      <arg value="clean"/>
-                      <env key="HIVE_ROOT" value="${basedir}/${hive.path.to.root}/"/>
-                      <env key="BASE_DIR" value="${basedir}"/>
+                      <arg value="clean" />
+                      <env key="HIVE_ROOT" value="${basedir}/${hive.path.to.root}/" />
+                      <env key="BASE_DIR" value="${basedir}" />
                     </exec>
                     <exec executable="${make.cmd}" failonerror="true">
-                      <env key="HIVE_ROOT" value="${basedir}/${hive.path.to.root}/"/>
-                      <env key="BASE_DIR" value="${basedir}"/>
-                      <env key="WORD_SIZE" value="${word.size}"/>
-                      <env key="THRIFT_HOME" value="${thrift.home}"/>
-                      <env key="BOOST_HOME" value="${boost.home}"/>
+                      <env key="HIVE_ROOT" value="${basedir}/${hive.path.to.root}/" />
+                      <env key="BASE_DIR" value="${basedir}" />
+                      <env key="WORD_SIZE" value="${word.size}" />
+                      <env key="THRIFT_HOME" value="${thrift.home}" />
+                      <env key="BOOST_HOME" value="${boost.home}" />
                     </exec>
                   </target>
                 </configuration>
@@ -95,14 +93,14 @@
                 <configuration>
                   <target>
                     <condition property="word.size" value="64" else="32">
-                      <contains string="${os.arch}" substring="64"/>
+                      <contains string="${os.arch}" substring="64" />
                     </condition>
                     <exec executable="${make.cmd}" failonerror="true">
-                      <arg value="test"/>
-                      <env key="HIVE_ROOT" value="${basedir}/${hive.path.to.root}/"/>
-                      <env key="BASE_DIR" value="${basedir}"/>
-                      <env key="WORD_SIZE" value="${word.size}"/>
-                      <env key="THRIFT_HOME" value="${thrift.home}"/>
+                      <arg value="test" />
+                      <env key="HIVE_ROOT" value="${basedir}/${hive.path.to.root}/" />
+                      <env key="BASE_DIR" value="${basedir}" />
+                      <env key="WORD_SIZE" value="${word.size}" />
+                      <env key="THRIFT_HOME" value="${thrift.home}" />
                     </exec>
                   </target>
                 </configuration>
