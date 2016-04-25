@@ -37,6 +37,7 @@ import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.FireEventRequest;
 import org.apache.hadoop.hive.metastore.api.FireEventResponse;
+import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.GetAllFunctionsResponse;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
@@ -55,6 +56,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
 import org.apache.hadoop.hive.metastore.api.LockRequest;
 import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.MetadataPpdResult;
 import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
@@ -63,10 +65,13 @@ import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.api.OpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
+import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
@@ -1534,6 +1539,9 @@ public interface IMetaStoreClient {
    */
   Iterable<Entry<Long, ByteBuffer>> getFileMetadata(List<Long> fileIds) throws TException;
 
+  Iterable<Entry<Long, MetadataPpdResult>> getFileMetadataBySarg(
+      List<Long> fileIds, ByteBuffer sarg, boolean doGetFooters) throws TException;
+
   /**
    * Cleares the file metadata cache for respective file IDs.
    */
@@ -1550,4 +1558,16 @@ public interface IMetaStoreClient {
       boolean allParts) throws TException;
 
   long getChangeVersion(String topic) throws TException;
+
+  List<SQLPrimaryKey> getPrimaryKeys(PrimaryKeysRequest request)
+    throws MetaException, NoSuchObjectException, TException;
+
+  List<SQLForeignKey> getForeignKeys(ForeignKeysRequest request) throws MetaException,
+    NoSuchObjectException, TException;
+
+  void createTableWithConstraints(
+    org.apache.hadoop.hive.metastore.api.Table tTbl,
+    List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
+    throws AlreadyExistsException, InvalidObjectException, MetaException, NoSuchObjectException, TException;
+
 }

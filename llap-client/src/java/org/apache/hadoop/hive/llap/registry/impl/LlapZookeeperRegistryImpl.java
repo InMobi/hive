@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -68,8 +67,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.data.ACL;
@@ -242,7 +239,7 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
   }
 
   @Override
-  public void register() throws IOException {
+  public String register() throws IOException {
     ServiceRecord srv = new ServiceRecord();
     Endpoint rpcEndpoint = getRpcEndpoint();
     srv.addInternalEndpoint(rpcEndpoint);
@@ -285,8 +282,10 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
         // No node exists, throw exception
         throw new Exception("Unable to create znode for this LLAP instance on ZooKeeper.");
       }
-      LOG.info("Created a znode on ZooKeeper for LLAP instance: {} znodePath: {}", rpcEndpoint,
-          znodePath);
+      LOG.info(
+          "Registered node. Created a znode on ZooKeeper for LLAP instance: rpc: {}, shuffle: {}," +
+              " webui: {}, mgmt: {}, znodePath: {} ",
+          rpcEndpoint, getShuffleEndpoint(), getServicesEndpoint(), getMngEndpoint(), znodePath);
     } catch (Exception e) {
       LOG.error("Unable to create a znode for this server instance", e);
       CloseableUtils.closeQuietly(znode);
@@ -295,6 +294,7 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Created zknode with path: {} service record: {}", znodePath, srv);
     }
+    return uniq.toString();
   }
 
   @Override
@@ -310,26 +310,34 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
     private final int rpcPort;
     private final int mngPort;
     private final int shufflePort;
+    private final String serviceAddress;
 
     public DynamicServiceInstance(ServiceRecord srv) throws IOException {
       this.srv = srv;
 
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Working with ServiceRecord: {}", srv);
+      }
+
       final Endpoint shuffle = srv.getInternalEndpoint(IPC_SHUFFLE);
       final Endpoint rpc = srv.getInternalEndpoint(IPC_LLAP);
       final Endpoint mng = srv.getInternalEndpoint(IPC_MNG);
+      final Endpoint services = srv.getExternalEndpoint(IPC_SERVICES);
 
       this.host =
           RegistryTypeUtils.getAddressField(rpc.addresses.get(0),
               AddressTypes.ADDRESS_HOSTNAME_FIELD);
       this.rpcPort =
-          Integer.valueOf(RegistryTypeUtils.getAddressField(rpc.addresses.get(0),
+          Integer.parseInt(RegistryTypeUtils.getAddressField(rpc.addresses.get(0),
               AddressTypes.ADDRESS_PORT_FIELD));
       this.mngPort =
-          Integer.valueOf(RegistryTypeUtils.getAddressField(mng.addresses.get(0),
+          Integer.parseInt(RegistryTypeUtils.getAddressField(mng.addresses.get(0),
               AddressTypes.ADDRESS_PORT_FIELD));
       this.shufflePort =
-          Integer.valueOf(RegistryTypeUtils.getAddressField(shuffle.addresses.get(0),
+          Integer.parseInt(RegistryTypeUtils.getAddressField(shuffle.addresses.get(0),
               AddressTypes.ADDRESS_PORT_FIELD));
+      this.serviceAddress =
+          RegistryTypeUtils.getAddressField(services.addresses.get(0), AddressTypes.ADDRESS_URI);
     }
 
     @Override
@@ -353,6 +361,11 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
     }
 
     @Override
+    public String getServicesAddress() {
+      return serviceAddress;
+    }
+
+    @Override
     public boolean isAlive() {
       return alive;
     }
@@ -370,15 +383,16 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
 
     @Override
     public Resource getResource() {
-      int memory = Integer.valueOf(srv.get(ConfVars.LLAP_DAEMON_MEMORY_PER_INSTANCE_MB.varname));
-      int vCores = Integer.valueOf(srv.get(ConfVars.LLAP_DAEMON_NUM_EXECUTORS.varname));
+      int memory = Integer.parseInt(srv.get(ConfVars.LLAP_DAEMON_MEMORY_PER_INSTANCE_MB.varname));
+      int vCores = Integer.parseInt(srv.get(ConfVars.LLAP_DAEMON_NUM_EXECUTORS.varname));
       return Resource.newInstance(memory, vCores);
     }
 
     @Override
     public String toString() {
       return "DynamicServiceInstance [alive=" + alive + ", host=" + host + ":" + rpcPort +
-          " with resources=" + getResource() + "]";
+          " with resources=" + getResource() + ", shufflePort=" + getShufflePort() +
+          ", servicesAddress=" + getServicesAddress() +  ", mgmtPort=" + getManagementPort() + "]";
     }
 
     @Override
@@ -577,6 +591,8 @@ public class LlapZookeeperRegistryImpl implements ServiceRegistry {
       setupZookeeperAuth(this.conf);
       zooKeeperClient.start();
     }
+    // Init closeable utils in case register is not called (see HIVE-13322)
+    CloseableUtils.class.getName();
   }
 
   @Override

@@ -53,10 +53,13 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.model.MConstraint;
 import org.apache.hadoop.hive.metastore.model.MDatabase;
 import org.apache.hadoop.hive.metastore.model.MPartitionColumnStatistics;
 import org.apache.hadoop.hive.metastore.model.MTableColumnStatistics;
@@ -380,7 +383,7 @@ class MetaStoreDirectSql {
     // Derby and Oracle do not interpret filters ANSI-properly in some cases and need a workaround.
     boolean dbHasJoinCastBug = (dbType == DB.DERBY || dbType == DB.ORACLE);
     String sqlFilter = PartitionFilterGenerator.generateSqlFilter(
-        table, tree, params, joins, dbHasJoinCastBug, defaultPartName);
+        table, tree, params, joins, dbHasJoinCastBug, defaultPartName, dbType);
     if (sqlFilter == null) {
       return null; // Cannot make SQL filter to push down.
     }
@@ -395,7 +398,7 @@ class MetaStoreDirectSql {
     // Derby and Oracle do not interpret filters ANSI-properly in some cases and need a workaround.
     boolean dbHasJoinCastBug = (dbType == DB.DERBY || dbType == DB.ORACLE);
     String sqlFilter = PartitionFilterGenerator.generateSqlFilter(
-        table, tree, params, joins, dbHasJoinCastBug, defaultPartName);
+        table, tree, params, joins, dbHasJoinCastBug, defaultPartName, dbType);
     if (sqlFilter == null) {
       return 0; // Cannot make SQL filter to push down.
     }
@@ -557,14 +560,14 @@ class MetaStoreDirectSql {
       Long sdId = extractSqlLong(fields[1]);
       Long colId = extractSqlLong(fields[2]);
       Long serdeId = extractSqlLong(fields[3]);
-      // A partition must have either everything set, or nothing set if it's a view.
-      if (sdId == null || colId == null || serdeId == null) {
+      // A partition must have at least sdId and serdeId set, or nothing set if it's a view.
+      if (sdId == null || serdeId == null) {
         if (isView == null) {
           isView = isViewTable(dbName, tblName);
         }
         if ((sdId != null || colId != null || serdeId != null) || !isView) {
-          throw new MetaException("Unexpected null for one of the IDs, SD " + sdId + ", column "
-              + colId + ", serde " + serdeId + " for a " + (isView ? "" : "non-") + " view");
+          throw new MetaException("Unexpected null for one of the IDs, SD " + sdId +
+                  ", serde " + serdeId + " for a " + (isView ? "" : "non-") + " view");
         }
       }
 
@@ -580,7 +583,7 @@ class MetaStoreDirectSql {
       partitions.put(partitionId, part);
 
       if (sdId == null) continue; // Probably a view.
-      assert colId != null && serdeId != null;
+      assert serdeId != null;
 
       // We assume each partition has an unique SD.
       StorageDescriptor sd = new StorageDescriptor();
@@ -605,14 +608,16 @@ class MetaStoreDirectSql {
       sdSb.append(sdId).append(",");
       part.setSd(sd);
 
-      List<FieldSchema> cols = colss.get(colId);
-      // We expect that colId will be the same for all (or many) SDs.
-      if (cols == null) {
-        cols = new ArrayList<FieldSchema>();
-        colss.put(colId, cols);
-        colsSb.append(colId).append(",");
+      if (colId != null) {
+        List<FieldSchema> cols = colss.get(colId);
+        // We expect that colId will be the same for all (or many) SDs.
+        if (cols == null) {
+          cols = new ArrayList<FieldSchema>();
+          colss.put(colId, cols);
+          colsSb.append(colId).append(",");
+        }
+        sd.setCols(cols);
       }
-      sd.setCols(cols);
 
       // We assume each SD has an unique serde.
       SerDeInfo serde = new SerDeInfo();
@@ -658,8 +663,10 @@ class MetaStoreDirectSql {
       assert serdeSb.length() == 0 && colsSb.length() == 0;
       return orderedResult; // No SDs, probably a view.
     }
-    String sdIds = trimCommaList(sdSb), serdeIds = trimCommaList(serdeSb),
-        colIds = trimCommaList(colsSb);
+
+    String sdIds = trimCommaList(sdSb);
+    String serdeIds = trimCommaList(serdeSb);
+    String colIds = trimCommaList(colsSb);
 
     // Get all the stuff for SD. Don't do empty-list check - we expect partitions do have SDs.
     queryText = "select \"SD_ID\", \"PARAM_KEY\", \"PARAM_VALUE\" from \"SD_PARAMS\""
@@ -962,15 +969,17 @@ class MetaStoreDirectSql {
     private final List<String> joins;
     private final boolean dbHasJoinCastBug;
     private final String defaultPartName;
+    private final DB dbType;
 
     private PartitionFilterGenerator(Table table, List<Object> params, List<String> joins,
-        boolean dbHasJoinCastBug, String defaultPartName) {
+        boolean dbHasJoinCastBug, String defaultPartName, DB dbType) {
       this.table = table;
       this.params = params;
       this.joins = joins;
       this.dbHasJoinCastBug = dbHasJoinCastBug;
       this.filterBuffer = new FilterBuilder(false);
       this.defaultPartName = defaultPartName;
+      this.dbType = dbType;
     }
 
     /**
@@ -980,15 +989,15 @@ class MetaStoreDirectSql {
      * @param joins the joins necessary for the resulting expression
      * @return the string representation of the expression tree
      */
-    private static String generateSqlFilter(Table table, ExpressionTree tree,
-        List<Object> params, List<String> joins, boolean dbHasJoinCastBug, String defaultPartName)
+    private static String generateSqlFilter(Table table, ExpressionTree tree, List<Object> params,
+        List<String> joins, boolean dbHasJoinCastBug, String defaultPartName, DB dbType)
             throws MetaException {
       assert table != null;
       if (tree.getRoot() == null) {
         return "";
       }
       PartitionFilterGenerator visitor = new PartitionFilterGenerator(
-          table, params, joins, dbHasJoinCastBug, defaultPartName);
+          table, params, joins, dbHasJoinCastBug, defaultPartName, dbType);
       tree.accept(visitor);
       if (visitor.filterBuffer.hasError()) {
         LOG.info("Unable to push down SQL filter: " + visitor.filterBuffer.getErrorMessage());
@@ -1124,7 +1133,12 @@ class MetaStoreDirectSql {
         if (colType == FilterType.Integral) {
           tableValue = "cast(" + tableValue + " as decimal(21,0))";
         } else if (colType == FilterType.Date) {
-          tableValue = "cast(" + tableValue + " as date)";
+          if (dbType == DB.ORACLE) {
+            // Oracle requires special treatment... as usual.
+            tableValue = "TO_DATE(" + tableValue + ", 'YYYY-MM-DD')";
+          } else {
+            tableValue = "cast(" + tableValue + " as date)";
+          }
         }
 
         // Workaround for HIVE_DEFAULT_PARTITION - ignore it like JDO does, for now.
@@ -1797,5 +1811,136 @@ class MetaStoreDirectSql {
       }
     }
     return result;
+  }
+
+  public List<SQLForeignKey> getForeignKeys(String parent_db_name, String parent_tbl_name, String foreign_db_name, String foreign_tbl_name) throws MetaException {
+    List<SQLForeignKey> ret = new ArrayList<SQLForeignKey>();
+    String queryText =
+      "SELECT  \"D2\".\"NAME\", \"T2\".\"TBL_NAME\", \"C2\".\"COLUMN_NAME\","
+      + "\"DBS\".\"NAME\", \"TBLS\".\"TBL_NAME\", \"COLUMNS_V2\".\"COLUMN_NAME\", "
+      + "\"KEY_CONSTRAINTS\".\"POSITION\", \"KEY_CONSTRAINTS\".\"UPDATE_RULE\", \"KEY_CONSTRAINTS\".\"DELETE_RULE\", "
+      + "\"KEY_CONSTRAINTS\".\"CONSTRAINT_NAME\" , \"KEY_CONSTRAINTS2\".\"CONSTRAINT_NAME\", \"KEY_CONSTRAINTS\".\"ENABLE_VALIDATE_RELY\""
+      + " FROM \"TBLS\" "
+      + " INNER JOIN \"KEY_CONSTRAINTS\" ON \"TBLS\".\"TBL_ID\" = \"KEY_CONSTRAINTS\".\"CHILD_TBL_ID\" "
+      + " INNER JOIN \"KEY_CONSTRAINTS\" \"KEY_CONSTRAINTS2\" ON \"KEY_CONSTRAINTS2\".\"PARENT_TBL_ID\"  = \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" "
+      + " INNER JOIN \"DBS\" ON \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
+      + " INNER JOIN \"TBLS\" \"T2\" ON  \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" = \"T2\".\"TBL_ID\" "
+      + " INNER JOIN \"DBS\" \"D2\" ON \"T2\".\"DB_ID\" = \"D2\".\"DB_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\"  ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"CHILD_CD_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\" \"C2\" ON \"C2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" "
+      + " WHERE \"KEY_CONSTRAINTS\".\"CONSTRAINT_TYPE\" = "
+      + MConstraint.FOREIGN_KEY_CONSTRAINT
+      + " AND \"KEY_CONSTRAINTS2\".\"CONSTRAINT_TYPE\" = "
+      + MConstraint.PRIMARY_KEY_CONSTRAINT
+      + (foreign_db_name == null ? "" : "\"DBS\".\"NAME\" = ? AND")
+      + (foreign_tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? AND ")
+      + (parent_tbl_name == null ? "" : " \"T2\".\"TBL_NAME\" = ? AND ")
+      + (parent_db_name == null ? "" : "\"D2\".\"NAME\" = ?") ;
+
+    queryText = queryText.trim();
+    if (queryText.endsWith("WHERE")) {
+      queryText = queryText.substring(0, queryText.length()-5);
+    }
+    if (queryText.endsWith("AND")) {
+      queryText = queryText.substring(0, queryText.length()-3);
+    }
+    List<String> pms = new ArrayList<String>();
+    if (foreign_db_name != null) {
+      pms.add(foreign_db_name);
+    }
+    if (foreign_tbl_name != null) {
+      pms.add(foreign_tbl_name);
+    }
+    if (parent_tbl_name != null) {
+      pms.add(parent_tbl_name);
+    }
+    if (parent_db_name != null) {
+      pms.add(parent_db_name);
+    }
+
+    Query queryParams = pm.newQuery("javax.jdo.query.SQL", queryText);
+      List<Object[]> sqlResult = ensureList(executeWithArray(
+        queryParams, pms.toArray(), queryText));
+
+    if (!sqlResult.isEmpty()) {
+      for (Object[] line : sqlResult) {
+        int enableValidateRely = extractSqlInt(line[11]);
+        boolean enable = (enableValidateRely & 4) != 0;
+        boolean validate = (enableValidateRely & 2) != 0;
+        boolean rely = (enableValidateRely & 1) != 0;
+        SQLForeignKey currKey = new SQLForeignKey(
+          extractSqlString(line[0]),
+          extractSqlString(line[1]),
+          extractSqlString(line[2]),
+          extractSqlString(line[3]),
+          extractSqlString(line[4]),
+          extractSqlString(line[5]),
+          extractSqlInt(line[6]),
+          extractSqlInt(line[7]),
+          extractSqlInt(line[8]),
+          extractSqlString(line[9]),
+          extractSqlString(line[10]),
+          enable,
+          validate,
+          rely
+          );
+          ret.add(currKey);
+      }
+    }
+    return ret;
+  }
+
+  public List<SQLPrimaryKey> getPrimaryKeys(String db_name, String tbl_name) throws MetaException {
+    List<SQLPrimaryKey> ret = new ArrayList<SQLPrimaryKey>();
+    String queryText =
+      "SELECT \"DBS\".\"NAME\", \"TBLS\".\"TBL_NAME\", \"COLUMNS_V2\".\"COLUMN_NAME\","
+      + "\"KEY_CONSTRAINTS\".\"POSITION\", "
+      + "\"KEY_CONSTRAINTS\".\"CONSTRAINT_NAME\", \"KEY_CONSTRAINTS\".\"ENABLE_VALIDATE_RELY\" "
+      + " FROM  \"TBLS\" "
+      + " INNER  JOIN \"KEY_CONSTRAINTS\" ON \"TBLS\".\"TBL_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" "
+      + " INNER JOIN \"DBS\" ON \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
+      + " INNER JOIN \"TBLS\" ON \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" = \"TBLS\".\"TBL_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\" ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" "
+      + " WHERE \"KEY_CONSTRAINTS\".\"CONSTRAINT_TYPE\" = "+ MConstraint.PRIMARY_KEY_CONSTRAINT + " AND "
+      + (db_name == null ? "" : "\"DBS\".\"NAME\" = ? AND")
+      + (tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? ") ;
+
+    queryText = queryText.trim();
+    if (queryText.endsWith("WHERE")) {
+      queryText = queryText.substring(0, queryText.length()-5);
+    }
+    if (queryText.endsWith("AND")) {
+      queryText = queryText.substring(0, queryText.length()-3);
+    }
+    List<String> pms = new ArrayList<String>();
+    if (db_name != null) {
+      pms.add(db_name);
+    }
+    if (tbl_name != null) {
+      pms.add(tbl_name);
+    }
+
+    Query queryParams = pm.newQuery("javax.jdo.query.SQL", queryText);
+      List<Object[]> sqlResult = ensureList(executeWithArray(
+        queryParams, pms.toArray(), queryText));
+
+    if (!sqlResult.isEmpty()) {
+      for (Object[] line : sqlResult) {
+          int enableValidateRely = extractSqlInt(line[5]);
+          boolean enable = (enableValidateRely & 4) != 0;
+          boolean validate = (enableValidateRely & 2) != 0;
+          boolean rely = (enableValidateRely & 1) != 0;
+        SQLPrimaryKey currKey = new SQLPrimaryKey(
+          extractSqlString(line[0]),
+          extractSqlString(line[1]),
+          extractSqlString(line[2]),
+          extractSqlInt(line[3]), extractSqlString(line[4]),
+          enable,
+          validate,
+          rely);
+          ret.add(currKey);
+      }
+    }
+    return ret;
   }
 }

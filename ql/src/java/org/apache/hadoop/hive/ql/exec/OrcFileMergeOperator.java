@@ -121,7 +121,9 @@ public class OrcFileMergeOperator extends
             .inspector(reader.getObjectInspector());
         // compression buffer size should only be set if compression is enabled
         if (compression != CompressionKind.NONE) {
-          options.bufferSize(compressBuffSize);
+          // enforce is required to retain the buffer sizes of old files instead of orc writer
+          // inferring the optimal buffer size
+          options.bufferSize(compressBuffSize).enforceBufferSize();
         }
 
         outWriter = OrcFile.createWriter(outPath, options);
@@ -231,22 +233,22 @@ public class OrcFileMergeOperator extends
 
   @Override
   public void closeOp(boolean abort) throws HiveException {
-    // close writer
-    if (outWriter == null) {
-      return;
-    }
-
     try {
       if (fdis != null) {
         fdis.close();
         fdis = null;
       }
 
-      outWriter.close();
-      outWriter = null;
+      if (outWriter != null) {
+        outWriter.close();
+        outWriter = null;
+      }
     } catch (Exception e) {
       throw new HiveException("Unable to close OrcFileMergeOperator", e);
     }
+
+    // When there are no exceptions, this has to be called always to make sure incompatible files
+    // are moved properly to the destination path
     super.closeOp(abort);
   }
 }

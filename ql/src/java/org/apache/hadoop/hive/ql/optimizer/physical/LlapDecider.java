@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.exec.FilterOperator;
@@ -64,24 +62,28 @@ import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
+import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.plan.Statistics;
 import org.apache.hadoop.hive.ql.plan.TezWork;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * LlapDecider takes care of tagging certain vertices in the execution
- * graph as "llap", which in turn causes them to be submitted to an
- * llap daemon instead of a regular yarn container.
+ * LlapDecider takes care of tagging certain vertices in the execution graph as
+ * "llap", which in turn causes them to be submitted to an llap daemon instead
+ * of a regular yarn container.
  *
- * The actual algoritm used is driven by LLAP_EXECUTION_MODE. "all",
- * "none" and "map" mechanically tag those elements. "auto" tries to
- * be smarter by looking for suitable vertices.
+ * The actual algorithm used is driven by LLAP_EXECUTION_MODE. "all", "none" and
+ * "map" mechanically tag those elements. "auto" tries to be smarter by looking
+ * for suitable vertices.
  *
- * Regardless of the algorithm used, it's always ensured that there's
- * not user code that will be sent to the daemon (ie.: script
- * operators, temporary functions, etc)
+ * Regardless of the algorithm used, it's always ensured that there's not user
+ * code that will be sent to the daemon (ie.: script operators, temporary
+ * functions, etc)
  */
 public class LlapDecider implements PhysicalPlanResolver {
 
@@ -107,7 +109,7 @@ public class LlapDecider implements PhysicalPlanResolver {
     public LlapDecisionDispatcher(PhysicalContext pctx, LlapMode mode) {
       conf = pctx.getConf();
       doSkipUdfCheck = HiveConf.getBoolVar(conf, ConfVars.LLAP_SKIP_COMPILE_UDF_CHECK);
-      arePermanentFnsAllowed = HiveConf.getBoolVar(conf, ConfVars.LLAP_DAEMON_ALLOW_PERMANENT_FNS);
+      arePermanentFnsAllowed = HiveConf.getBoolVar(conf, ConfVars.LLAP_ALLOW_PERMANENT_FNS);
       // Don't user uber in "all" mode - everything can go into LLAP, which is better than uber.
       shouldUber = HiveConf.getBoolVar(conf, ConfVars.LLAP_AUTO_ALLOW_UBER) && (mode != all);
     }
@@ -319,7 +321,8 @@ public class LlapDecider implements PhysicalPlanResolver {
           @Override
           public Object process(Node n, Stack<Node> s, NodeProcessorCtx c,
               Object... os) {
-            List<AggregationDesc> aggs = ((GroupByOperator)n).getConf().getAggregators();
+              @SuppressWarnings("unchecked")
+              List<AggregationDesc> aggs = ((Operator<GroupByDesc>) n).getConf().getAggregators();
             return new Boolean(checkAggregators(aggs));
           }
         });
@@ -328,7 +331,8 @@ public class LlapDecider implements PhysicalPlanResolver {
           @Override
           public Object process(Node n, Stack<Node> s, NodeProcessorCtx c,
               Object... os) {
-            List<ExprNodeDesc> exprs = ((SelectOperator)n).getConf().getColList();
+              @SuppressWarnings({ "unchecked" })
+              List<ExprNodeDesc> exprs = ((Operator<SelectDesc>) n).getConf().getColList();
             return new Boolean(checkExpressions(exprs));
           }
         });

@@ -37,6 +37,8 @@ import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.AuthorizationUtils;
 import org.apache.hadoop.hive.ql.security.authorization.PrivilegeScope;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAccessController;
@@ -64,7 +66,7 @@ public class HiveV1Authorizer extends AbstractHiveAuthorizer {
 
   @Override
   public void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> inputsHObjs,
-      List<HivePrivilegeObject> outputHObjs, HiveAuthzContext context)
+      List<HivePrivilegeObject> outputHObjs, QueryContext context)
       throws HiveAuthzPluginException, HiveAccessControlException {
     throw new UnsupportedOperationException("Should not be called for v1 authorizer");
   }
@@ -389,9 +391,20 @@ public class HiveV1Authorizer extends AbstractHiveAuthorizer {
 
   @Override
   public List<HivePrivilegeObject> filterListCmdObjects(List<HivePrivilegeObject> listObjs,
-      HiveAuthzContext context) throws HiveAuthzPluginException, HiveAccessControlException {
+      QueryContext context) throws HiveAuthzPluginException, HiveAccessControlException {
     // do no filtering in old authorizer
     return listObjs;
+  }
+
+  @Override
+  public boolean needTransform() {
+    return false;
+  }
+
+  @Override
+  public List<HivePrivilegeObject> applyRowFilterAndColumnMasking(QueryContext context,
+      List<HivePrivilegeObject> privObjs) throws SemanticException {
+    return null;
   }
 
 }

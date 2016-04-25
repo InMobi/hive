@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hive.llap.cli;
 
+import jline.TerminalFactory;
+
 import java.io.IOException;
 import java.util.Properties;
 
@@ -39,9 +41,6 @@ public class LlapOptionsProcessor {
   public static final String OPTION_INSTANCES = "instances"; //forward as arg
   public static final String OPTION_NAME = "name"; // forward as arg
   public static final String OPTION_DIRECTORY = "directory"; // work-dir
-  public static final String OPTION_ARGS = "args"; // forward as arg
-  public static final String OPTION_LOGLEVEL = "loglevel"; // forward as arg
-  public static final String OPTION_CHAOS_MONKEY = "chaosmonkey"; // forward as arg
   public static final String OPTION_EXECUTORS = "executors"; // llap-daemon-site
   public static final String OPTION_CACHE = "cache"; // llap-daemon-site
   public static final String OPTION_SIZE = "size"; // forward via config.json
@@ -54,7 +53,18 @@ public class LlapOptionsProcessor {
   public static final String OPTION_LLAP_QUEUE = "queue"; // forward via config.json
   public static final String OPTION_IO_THREADS = "iothreads"; // llap-daemon-site
 
-  public class LlapOptions {
+  // Options for the pythin script that are here because our option parser cannot ignore the unknown ones
+  public static final String OPTION_ARGS = "args"; // forward as arg
+  public static final String OPTION_LOGLEVEL = "loglevel"; // forward as arg
+  public static final String OPTION_CHAOS_MONKEY = "chaosmonkey"; // forward as arg
+  public static final String OPTION_SLIDER_KEYTAB_DIR = "slider-keytab-dir";
+  public static final String OPTION_SLIDER_KEYTAB = "slider-keytab";
+  public static final String OPTION_SLIDER_PRINCIPAL = "slider-principal";
+  public static final String OPTION_SLIDER_DEFAULT_KEYTAB = "slider-default-keytab";
+  public static final String OPTION_OUTPUT_DIR = "output";
+
+
+  public static class LlapOptions {
     private final int instances;
     private final String directory;
     private final String name;
@@ -171,6 +181,18 @@ public class LlapOptionsProcessor {
     options.addOption(OptionBuilder.hasArg().withArgName(OPTION_CHAOS_MONKEY).withLongOpt(OPTION_CHAOS_MONKEY)
         .withDescription("chaosmonkey interval").create('m'));
 
+    options.addOption(OptionBuilder.hasArg(false).withArgName(OPTION_SLIDER_DEFAULT_KEYTAB).withLongOpt(OPTION_SLIDER_DEFAULT_KEYTAB)
+        .withDescription("try to set default settings for Slider AM keytab; mostly for dev testing").create());
+
+    options.addOption(OptionBuilder.hasArg().withArgName(OPTION_SLIDER_KEYTAB_DIR).withLongOpt(OPTION_SLIDER_KEYTAB_DIR)
+        .withDescription("Slider AM keytab directory on HDFS (where the headless user keytab is stored by Slider keytab installation, e.g. .slider/keytabs/llap)").create());
+
+    options.addOption(OptionBuilder.hasArg().withArgName(OPTION_SLIDER_KEYTAB).withLongOpt(OPTION_SLIDER_KEYTAB)
+        .withDescription("Slider AM keytab file name inside " + OPTION_SLIDER_KEYTAB_DIR).create());
+
+    options.addOption(OptionBuilder.hasArg().withArgName(OPTION_SLIDER_PRINCIPAL).withLongOpt(OPTION_SLIDER_PRINCIPAL)
+        .withDescription("Slider AM principal; should be the user running the cluster, e.g. hive@EXAMPLE.COM").create());
+
     options.addOption(OptionBuilder.hasArg().withArgName(OPTION_EXECUTORS).withLongOpt(OPTION_EXECUTORS)
         .withDescription("executor per instance").create('e'));
 
@@ -186,6 +208,10 @@ public class LlapOptionsProcessor {
     options.addOption(OptionBuilder.hasArg().withArgName(OPTION_LLAP_QUEUE)
         .withLongOpt(OPTION_LLAP_QUEUE)
         .withDescription("The queue within which LLAP will be started").create('q'));
+
+    options.addOption(OptionBuilder.hasArg().withArgName(OPTION_OUTPUT_DIR)
+        .withLongOpt(OPTION_OUTPUT_DIR)
+        .withDescription("Output directory for the generated scripts").create());
 
     options.addOption(OptionBuilder.hasArg().withArgName(OPTION_AUXJARS).withLongOpt(OPTION_AUXJARS)
         .withDescription("additional jars to package (by default, JSON SerDe jar is packaged"
@@ -205,9 +231,9 @@ public class LlapOptionsProcessor {
         .withDescription("Use value for given property. Overridden by explicit parameters")
         .create());
 
-    options.addOption(OptionBuilder.hasArg().withArgName(OPTION_SLIDER_AM_CONTAINER_MB)
+    options.addOption(OptionBuilder.hasArg().withArgName("b")
         .withLongOpt(OPTION_SLIDER_AM_CONTAINER_MB)
-        .withDescription("The size of the slider AppMaster container in MB").create());
+        .withDescription("The size of the slider AppMaster container in MB").create('b'));
 
     options.addOption(OptionBuilder.hasArg().withArgName(OPTION_IO_THREADS)
         .withLongOpt(OPTION_IO_THREADS).withDescription("executor per instance").create('t'));
@@ -235,7 +261,6 @@ public class LlapOptionsProcessor {
     String name = commandLine.getOptionValue(OPTION_NAME, null);
 
     final int executors = Integer.parseInt(commandLine.getOptionValue(OPTION_EXECUTORS, "-1"));
-    // TODO# here
     final int ioThreads = Integer.parseInt(
         commandLine.getOptionValue(OPTION_IO_THREADS, Integer.toString(executors)));
     final long cache = parseSuffixed(commandLine.getOptionValue(OPTION_CACHE, "-1"));
@@ -266,6 +291,14 @@ public class LlapOptionsProcessor {
   }
 
   private void printUsage() {
-    new HelpFormatter().printHelp("llap", options);
+    HelpFormatter hf = new HelpFormatter();
+    try {
+      int width = hf.getWidth();
+      int jlineWidth = TerminalFactory.get().getWidth();
+      width = Math.min(160, Math.max(jlineWidth, width)); // Ignore potentially incorrect values
+      hf.setWidth(width);
+    } catch (Throwable t) { // Ignore
+    }
+    hf.printHelp("llap", options);
   }
 }

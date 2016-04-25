@@ -18,6 +18,7 @@
 
 package org.apache.hive.jdbc;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.hive.service.cli.RowSet;
 import org.apache.hive.service.cli.RowSetFactory;
 import org.apache.hive.service.rpc.thrift.TCLIService;
@@ -34,6 +35,7 @@ import org.apache.hive.service.rpc.thrift.TGetOperationStatusReq;
 import org.apache.hive.service.rpc.thrift.TGetOperationStatusResp;
 import org.apache.hive.service.rpc.thrift.TOperationHandle;
 import org.apache.hive.service.rpc.thrift.TSessionHandle;
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +63,7 @@ public class HiveStatement implements java.sql.Statement {
   Map<String,String> sessConf = new HashMap<String,String>();
   private int fetchSize = DEFAULT_FETCH_SIZE;
   private boolean isScrollableResultset = false;
+  private boolean isOperationComplete = false;
   /**
    * We need to keep a reference to the result set to support the following:
    * <code>
@@ -221,7 +224,10 @@ public class HiveStatement implements java.sql.Statement {
     }
     closeClientOperation();
     client = null;
-    resultSet = null;
+    if (resultSet != null) {
+      resultSet.close();
+      resultSet = null;
+    }
     isClosed = true;
   }
 
@@ -238,6 +244,48 @@ public class HiveStatement implements java.sql.Statement {
 
   @Override
   public boolean execute(String sql) throws SQLException {
+    runAsyncOnServer(sql);
+    waitForOperationToComplete();
+
+    // The query should be completed by now
+    if (!stmtHandle.isHasResultSet()) {
+      return false;
+    }
+    resultSet =  new HiveQueryResultSet.Builder(this).setClient(client).setSessionHandle(sessHandle)
+        .setStmtHandle(stmtHandle).setMaxRows(maxRows).setFetchSize(fetchSize)
+        .setScrollable(isScrollableResultset)
+        .build();
+    return true;
+  }
+
+  /**
+   * Starts the query execution asynchronously on the server, and immediately returns to the client.
+   * The client subsequently blocks on ResultSet#next or Statement#getUpdateCount, depending on the
+   * query type. Users should call ResultSet.next or Statement#getUpdateCount (depending on whether
+   * query returns results) to ensure that query completes successfully. Calling another execute*
+   * method, or close before query completion would result in the async query getting killed if it
+   * is not already finished.
+   * Note: This method is an API for limited usage outside of Hive by applications like Apache Ambari,
+   * although it is not part of the interface java.sql.Statement.
+   *
+   * @param sql
+   * @return true if the first result is a ResultSet object; false if it is an update count or there
+   *         are no results
+   * @throws SQLException
+   */
+  public boolean executeAsync(String sql) throws SQLException {
+    runAsyncOnServer(sql);
+    if (!stmtHandle.isHasResultSet()) {
+      return false;
+    }
+    resultSet =
+        new HiveQueryResultSet.Builder(this).setClient(client).setSessionHandle(sessHandle)
+            .setStmtHandle(stmtHandle).setMaxRows(maxRows).setFetchSize(fetchSize)
+            .setScrollable(isScrollableResultset).build();
+    return true;
+  }
+
+  private void runAsyncOnServer(String sql) throws SQLException {
     checkConnection("execute");
 
     closeClientOperation();
@@ -265,13 +313,14 @@ public class HiveStatement implements java.sql.Statement {
       isExecuteStatementFailed = true;
       throw new SQLException(ex.toString(), "08S01", ex);
     }
+  }
 
+  void waitForOperationToComplete() throws SQLException {
     TGetOperationStatusReq statusReq = new TGetOperationStatusReq(stmtHandle);
-    boolean operationComplete = false;
     TGetOperationStatusResp statusResp;
 
     // Poll on the operation status, till the operation is complete
-    while (!operationComplete) {
+    while (!isOperationComplete) {
       try {
         /**
          * For an async SQLOperation, GetOperationStatus will use the long polling approach
@@ -283,7 +332,8 @@ public class HiveStatement implements java.sql.Statement {
           switch (statusResp.getOperationState()) {
           case CLOSED_STATE:
           case FINISHED_STATE:
-            operationComplete = true;
+            isOperationComplete = true;
+            isLogBeingGenerated = false;
             break;
           case CANCELED_STATE:
             // 01000 -> warning
@@ -308,17 +358,6 @@ public class HiveStatement implements java.sql.Statement {
         throw new SQLException(e.toString(), "08S01", e);
       }
     }
-    isLogBeingGenerated = false;
-
-    // The query should be completed by now
-    if (!stmtHandle.isHasResultSet()) {
-      return false;
-    }
-    resultSet =  new HiveQueryResultSet.Builder(this).setClient(client).setSessionHandle(sessHandle)
-        .setStmtHandle(stmtHandle).setMaxRows(maxRows).setFetchSize(fetchSize)
-        .setScrollable(isScrollableResultset)
-        .build();
-    return true;
   }
 
   private void checkConnection(String action) throws SQLException {
@@ -332,6 +371,7 @@ public class HiveStatement implements java.sql.Statement {
     isQueryClosed = false;
     isLogBeingGenerated = true;
     isExecuteStatementFailed = false;
+    isOperationComplete = false;
   }
 
   /*
@@ -592,10 +632,15 @@ public class HiveStatement implements java.sql.Statement {
    *
    * @see java.sql.Statement#getUpdateCount()
    */
-
   @Override
   public int getUpdateCount() throws SQLException {
     checkConnection("getUpdateCount");
+    /**
+     * Poll on the operation status, till the operation is complete. We want to ensure that since a
+     * client might end up using executeAsync and then call this to check if the query run is
+     * finished.
+     */
+    waitForOperationToComplete();
     return -1;
   }
 
@@ -837,15 +882,22 @@ public class HiveStatement implements java.sql.Statement {
       }
     } catch (SQLException e) {
       throw e;
+    } catch (TException e) {
+      throw new SQLException("Error when getting query log: " + e, e);
     } catch (Exception e) {
       throw new SQLException("Error when getting query log: " + e, e);
     }
 
-    RowSet rowSet = RowSetFactory.create(tFetchResultsResp.getResults(),
-        connection.getProtocol());
-    for (Object[] row : rowSet) {
-      logs.add(String.valueOf(row[0]));
+    try {
+      RowSet rowSet;
+      rowSet = RowSetFactory.create(tFetchResultsResp.getResults(), connection.getProtocol());
+      for (Object[] row : rowSet) {
+        logs.add(String.valueOf(row[0]));
+      }
+    } catch (TException e) {
+      throw new SQLException("Error building result set for query log: " + e, e);
     }
+
     return logs;
   }
 
@@ -855,5 +907,22 @@ public class HiveStatement implements java.sql.Statement {
     } else {
       return TFetchOrientation.FETCH_FIRST;
     }
+  }
+
+  /**
+   * Returns the Yarn ATS GUID.
+   * This method is a public API for usage outside of Hive, although it is not part of the
+   * interface java.sql.Statement.
+   * @return Yarn ATS GUID or null if it hasn't been created yet.
+   */
+  public String getYarnATSGuid() {
+    if (stmtHandle != null) {
+      // Set on the server side.
+      // @see org.apache.hive.service.cli.operation.SQLOperation#prepare
+      String guid64 =
+          Base64.encodeBase64URLSafeString(stmtHandle.getOperationId().getGuid()).trim();
+      return guid64;
+    }
+    return null;
   }
 }

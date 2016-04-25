@@ -39,7 +39,6 @@ import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.ql.QueryPlan;
-import org.apache.hadoop.hive.ql.exec.FetchFormatter;
 import org.apache.hadoop.hive.ql.exec.ListSinkOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.history.HiveHistory;
@@ -47,6 +46,8 @@ import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.processors.SetProcessor;
 import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
+import org.apache.hadoop.hive.serde2.thrift.ThriftFormatter;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.hive.service.auth.HiveAuthFactory;
@@ -134,9 +135,8 @@ public class HiveSessionImpl implements HiveSession {
     hiveConf.set(ConfVars.HIVESESSIONID.varname,
         this.sessionHandle.getHandleIdentifier().toString());
     // Use thrift transportable formatter
-    hiveConf.set(ListSinkOperator.OUTPUT_FORMATTER,
-        FetchFormatter.ThriftFormatter.class.getName());
-    hiveConf.setInt(ListSinkOperator.OUTPUT_PROTOCOL, protocol.getValue());
+    hiveConf.set(SerDeUtils.LIST_SINK_OUTPUT_FORMATTER, ThriftFormatter.class.getName());
+    hiveConf.setInt(SerDeUtils.LIST_SINK_OUTPUT_PROTOCOL, protocol.getValue());
   }
 
   public HiveSessionImpl(TProtocolVersion protocol, String username, String password,
@@ -159,6 +159,7 @@ public class HiveSessionImpl implements HiveSession {
     sessionState = new SessionState(hiveConf, username);
     sessionState.setUserIpAddress(ipAddress);
     sessionState.setIsHiveServerQuery(true);
+    sessionState.setForwardedAddresses(SessionManager.getForwardedAddresses());
     SessionState.start(sessionState);
     try {
       sessionState.reloadAuxJars();
@@ -326,6 +327,7 @@ public class HiveSessionImpl implements HiveSession {
     // Need to make sure that the this HiveServer2's session's SessionState is
     // stored in the thread local for the handler thread.
     SessionState.setCurrentSessionState(sessionState);
+    sessionState.setForwardedAddresses(SessionManager.getForwardedAddresses());
     if (userAccess) {
       lastAccessTime = System.currentTimeMillis();
     }
@@ -438,16 +440,15 @@ public class HiveSessionImpl implements HiveSession {
           throws HiveSQLException {
     acquire(true);
 
-    // Create the queryId if the client doesn't pass in.
-    // Reuse the client's queryId if exists.
+    // Make a copy of confOverlay
     if (confOverlay == null) {
       confOverlay = new HashMap<String, String>();
+    } else {
+      Map<String, String> conf = new HashMap<String, String>();
+      conf.putAll(confOverlay);
+      confOverlay = conf;
     }
-    String queryId = confOverlay.get(HiveConf.ConfVars.HIVEQUERYID.varname);
-    if (queryId == null || queryId.isEmpty()) {
-      queryId = QueryPlan.makeQueryId();
-      confOverlay.put(HiveConf.ConfVars.HIVEQUERYID.varname, queryId);
-    }
+    confOverlay.put(HiveConf.ConfVars.HIVEQUERYID.varname, QueryPlan.makeQueryId());
 
     OperationManager operationManager = getOperationManager();
     ExecuteStatementOperation operation = operationManager

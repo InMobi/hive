@@ -90,7 +90,7 @@ public interface HadoopShims {
       String nameNode, int numDir) throws IOException;
 
   public MiniMrShim getMiniTezCluster(Configuration conf, int numberOfTaskTrackers,
-      String nameNode, boolean isLlap) throws IOException;
+      String nameNode) throws IOException;
 
   public MiniMrShim getMiniSparkCluster(Configuration conf, int numberOfTaskTrackers,
       String nameNode, int numDir) throws IOException;
@@ -112,6 +112,12 @@ public interface HadoopShims {
       int numDataNodes,
       boolean format,
       String[] racks) throws IOException;
+
+  MiniDFSShim getMiniDfs(Configuration conf,
+      int numDataNodes,
+      boolean format,
+      String[] racks,
+      boolean isHA) throws IOException;
 
   /**
    * Shim around the functions in MiniDFSCluster that Hive uses.

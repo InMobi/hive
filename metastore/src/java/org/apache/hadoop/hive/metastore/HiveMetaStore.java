@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
+
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -112,6 +113,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.jdo.JDOException;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.DateFormat;
@@ -1310,7 +1312,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
     }
 
     private void create_table_core(final RawStore ms, final Table tbl,
-        final EnvironmentContext envContext)
+        final EnvironmentContext envContext, List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
         throws AlreadyExistsException, MetaException,
         InvalidObjectException, NoSuchObjectException {
 
@@ -1395,7 +1397,11 @@ public class HiveMetaStore extends ThriftHiveMetastore {
             tbl.getParameters().get(hive_metastoreConstants.DDL_TIME) == null) {
           tbl.putToParameters(hive_metastoreConstants.DDL_TIME, Long.toString(time));
         }
-        ms.createTable(tbl);
+        if (primaryKeys == null && foreignKeys == null) {
+          ms.createTable(tbl);
+        } else {
+          ms.createTableWithConstraints(tbl, primaryKeys, foreignKeys);
+        }
         success = ms.commitTransaction();
 
       } finally {
@@ -1428,7 +1434,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       boolean success = false;
       Exception ex = null;
       try {
-        create_table_core(getMS(), tbl, envContext);
+        create_table_core(getMS(), tbl, envContext, null, null);
         success = true;
       } catch (NoSuchObjectException e) {
         ex = e;
@@ -1449,6 +1455,34 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       }
     }
 
+    @Override
+    public void create_table_with_constraints(final Table tbl,
+        final List<SQLPrimaryKey> primaryKeys, final List<SQLForeignKey> foreignKeys)
+        throws AlreadyExistsException, MetaException, InvalidObjectException {
+      startFunction("create_table", ": " + tbl.toString());
+      boolean success = false;
+      Exception ex = null;
+      try {
+        create_table_core(getMS(), tbl, null, primaryKeys, foreignKeys);
+        success = true;
+      } catch (NoSuchObjectException e) {
+        ex = e;
+        throw new InvalidObjectException(e.getMessage());
+      } catch (Exception e) {
+        ex = e;
+        if (e instanceof MetaException) {
+          throw (MetaException) e;
+        } else if (e instanceof InvalidObjectException) {
+          throw (InvalidObjectException) e;
+        } else if (e instanceof AlreadyExistsException) {
+          throw (AlreadyExistsException) e;
+        } else {
+          throw newMetaException(e);
+        }
+      } finally {
+        endFunction("create_table", success, ex, tbl.getTableName());
+      }
+    }
     private boolean is_table_exists(RawStore ms, String dbname, String name)
         throws MetaException {
       return (ms.getTable(dbname, name) != null);
@@ -1508,8 +1542,7 @@ public class HiveMetaStore extends ThriftHiveMetastore {
           }
         }
 
-        // tblPath will be null when tbl is a view. We skip the following if block in that case.
-        checkTrashPurgeCombination(tblPath, dbname + "." + name, ifPurge);
+        checkTrashPurgeCombination(tblPath, dbname + "." + name, ifPurge, deleteData && !isExternal);
         // Drop the partitions and get a list of locations which need to be deleted
         partPaths = dropPartitionsAndGetLocations(ms, dbname, name, tblPath,
             tbl.getPartitionKeys(), deleteData && !isExternal);
@@ -1546,15 +1579,20 @@ public class HiveMetaStore extends ThriftHiveMetastore {
      * @param objectName db.table, or db.table.part
      * @param ifPurge if PURGE options is specified
      */
-    private void checkTrashPurgeCombination(Path pathToData, String objectName, boolean ifPurge)
-      throws MetaException {
-      if (!(pathToData != null && !ifPurge)) {//pathToData may be NULL for a view
+    private void checkTrashPurgeCombination(Path pathToData, String objectName, boolean ifPurge,
+        boolean deleteData) throws MetaException {
+      // There is no need to check TrashPurgeCombination in following cases since Purge/Trash
+      // is not applicable:
+      // a) deleteData is false -- drop an external table
+      // b) pathToData is null -- a view
+      // c) ifPurge is true -- force delete without Trash
+      if (!deleteData || pathToData == null || ifPurge) {
         return;
       }
 
       boolean trashEnabled = false;
       try {
-  trashEnabled = 0 < hiveConf.getFloat("fs.trash.interval", -1);
+        trashEnabled = 0 < hiveConf.getFloat("fs.trash.interval", -1);
       } catch(NumberFormatException ex) {
   // nothing to do
       }
@@ -2644,11 +2682,13 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       boolean isArchived = false;
       Path archiveParentDir = null;
       boolean mustPurge = false;
+      boolean isExternalTbl = false;
 
       try {
         ms.openTransaction();
         part = ms.getPartition(db_name, tbl_name, part_vals);
         tbl = get_table_core(db_name, tbl_name);
+        isExternalTbl = isExternal(tbl);
         firePreEvent(new PreDropPartitionEvent(tbl, part, deleteData, this));
         mustPurge = isMustPurge(envContext, tbl);
 
@@ -2661,7 +2701,8 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         if (isArchived) {
           archiveParentDir = MetaStoreUtils.getOriginalLocation(part);
           verifyIsWritablePath(archiveParentDir);
-          checkTrashPurgeCombination(archiveParentDir, db_name + "." + tbl_name + "." + part_vals, mustPurge);
+          checkTrashPurgeCombination(archiveParentDir, db_name + "." + tbl_name + "." + part_vals,
+              mustPurge, deleteData && !isExternalTbl);
         }
         if (!ms.dropPartition(db_name, tbl_name, part_vals)) {
           throw new MetaException("Unable to drop partition");
@@ -2670,13 +2711,14 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         if ((part.getSd() != null) && (part.getSd().getLocation() != null)) {
           partPath = new Path(part.getSd().getLocation());
           verifyIsWritablePath(partPath);
-          checkTrashPurgeCombination(partPath, db_name + "." + tbl_name + "." + part_vals, mustPurge);
+          checkTrashPurgeCombination(partPath, db_name + "." + tbl_name + "." + part_vals,
+              mustPurge, deleteData && !isExternalTbl);
         }
       } finally {
         if (!success) {
           ms.rollbackTransaction();
         } else if (deleteData && ((partPath != null) || (archiveParentDir != null))) {
-          if (tbl != null && !isExternal(tbl)) {
+          if (!isExternalTbl) {
             if (mustPurge) {
               LOG.info("dropPartition() will purge " + partPath + " directly, skipping trash.");
             }
@@ -2761,10 +2803,12 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       Table tbl = null;
       List<Partition> parts = null;
       boolean mustPurge = false;
+      boolean isExternalTbl = false;
       try {
         // We need Partition-s for firing events and for result; DN needs MPartition-s to drop.
         // Great... Maybe we could bypass fetching MPartitions by issuing direct SQL deletes.
         tbl = get_table_core(dbName, tblName);
+        isExternalTbl = isExternal(tbl);
         mustPurge = isMustPurge(envContext, tbl);
         int minCount = 0;
         RequestPartsSpec spec = request.getParts();
@@ -2829,13 +2873,15 @@ public class HiveMetaStore extends ThriftHiveMetastore {
           if (MetaStoreUtils.isArchived(part)) {
             Path archiveParentDir = MetaStoreUtils.getOriginalLocation(part);
             verifyIsWritablePath(archiveParentDir);
-            checkTrashPurgeCombination(archiveParentDir, dbName + "." + tblName + "." + part.getValues(), mustPurge);
+            checkTrashPurgeCombination(archiveParentDir, dbName + "." + tblName + "." +
+                part.getValues(), mustPurge, deleteData && !isExternalTbl);
             archToDelete.add(archiveParentDir);
           }
           if ((part.getSd() != null) && (part.getSd().getLocation() != null)) {
             Path partPath = new Path(part.getSd().getLocation());
             verifyIsWritablePath(partPath);
-            checkTrashPurgeCombination(partPath, dbName + "." + tblName + "." + part.getValues(), mustPurge);
+            checkTrashPurgeCombination(partPath, dbName + "." + tblName + "." + part.getValues(),
+                mustPurge, deleteData && !isExternalTbl);
             dirsToDelete.add(new PathAndPartValSize(partPath, part.getValues().size()));
           }
         }
@@ -5935,17 +5981,16 @@ public class HiveMetaStore extends ThriftHiveMetastore {
       boolean[] eliminated = new boolean[fileIds.size()];
 
       getMS().getFileMetadataByExpr(fileIds, type, req.getExpr(), metadatas, ppdResults, eliminated);
-      for (int i = 0; i < metadatas.length; ++i) {
-        long fileId = fileIds.get(i);
-        ByteBuffer metadata = metadatas[i];
-        if (metadata == null) continue;
-        metadata = (eliminated[i] || !needMetadata) ? null
-            : handleReadOnlyBufferForThrift(metadata);
+      for (int i = 0; i < fileIds.size(); ++i) {
+        if (!eliminated[i] && ppdResults[i] == null) continue; // No metadata => no ppd.
         MetadataPpdResult mpr = new MetadataPpdResult();
-        ByteBuffer bitset = eliminated[i] ? null : handleReadOnlyBufferForThrift(ppdResults[i]);
-        mpr.setMetadata(metadata);
-        mpr.setIncludeBitset(bitset);
-        result.putToMetadata(fileId, mpr);
+        ByteBuffer ppdResult = eliminated[i] ? null : handleReadOnlyBufferForThrift(ppdResults[i]);
+        mpr.setIncludeBitset(ppdResult);
+        if (needMetadata) {
+          ByteBuffer metadata = eliminated[i] ? null : handleReadOnlyBufferForThrift(metadatas[i]);
+          mpr.setMetadata(metadata);
+        }
+        result.putToMetadata(fileIds.get(i), mpr);
       }
       if (!result.isSetMetadata()) {
         result.setMetadata(EMPTY_MAP_FM2); // Set the required field.
@@ -6120,6 +6165,63 @@ public class HiveMetaStore extends ThriftHiveMetastore {
         throws TException {
       return new GetChangeVersionResult(getMS().getChangeVersion(req.getTopic()));
     }
+
+
+    @Override
+    public PrimaryKeysResponse get_primary_keys(PrimaryKeysRequest request)
+      throws MetaException, NoSuchObjectException, TException {
+      String db_name = request.getDb_name();
+      String tbl_name = request.getTbl_name();
+      startTableFunction("get_primary_keys", db_name, tbl_name);
+      List<SQLPrimaryKey> ret = null;
+      Exception ex = null;
+      try {
+        ret = getMS().getPrimaryKeys(db_name, tbl_name);
+      } catch (Exception e) {
+       ex = e;
+       if (e instanceof MetaException) {
+         throw (MetaException) e;
+       } else if (e instanceof NoSuchObjectException) {
+         throw (NoSuchObjectException) e;
+       } else {
+         throw newMetaException(e);
+       }
+     } finally {
+       endFunction("get_primary_keys", ret != null, ex, tbl_name);
+     }
+     return new PrimaryKeysResponse(ret);
+    }
+
+    @Override
+    public ForeignKeysResponse get_foreign_keys(ForeignKeysRequest request) throws MetaException,
+      NoSuchObjectException, TException {
+      String parent_db_name = request.getParent_db_name();
+      String parent_tbl_name = request.getParent_tbl_name();
+      String foreign_db_name = request.getForeign_db_name();
+      String foreign_tbl_name = request.getForeign_tbl_name();
+      startFunction("get_foreign_keys", " : parentdb=" + parent_db_name +
+        " parenttbl=" + parent_tbl_name + " foreigndb=" + foreign_db_name +
+        " foreigntbl=" + foreign_tbl_name);
+      List<SQLForeignKey> ret = null;
+      Exception ex = null;
+      try {
+        ret = getMS().getForeignKeys(parent_db_name, parent_tbl_name,
+              foreign_db_name, foreign_tbl_name);
+      } catch (Exception e) {
+        ex = e;
+        if (e instanceof MetaException) {
+          throw (MetaException) e;
+        } else if (e instanceof NoSuchObjectException) {
+          throw (NoSuchObjectException) e;
+        } else {
+          throw newMetaException(e);
+        }
+      } finally {
+        endFunction("get_foreign_keys", ret != null, ex, foreign_tbl_name);
+      }
+      return new ForeignKeysResponse(ret);
+    }
+
   }
 
 

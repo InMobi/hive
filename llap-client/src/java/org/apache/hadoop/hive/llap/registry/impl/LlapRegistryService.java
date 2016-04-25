@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -28,12 +27,16 @@ import org.apache.hadoop.service.AbstractService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
+
 public class LlapRegistryService extends AbstractService {
 
   private static final Logger LOG = LoggerFactory.getLogger(LlapRegistryService.class);
 
   private ServiceRegistry registry = null;
   private final boolean isDaemon;
+  private boolean isDynamic = false;
+  private String identity = "(pending)";
 
   private static final Map<String, LlapRegistryService> yarnRegistries = new HashMap<>();
 
@@ -56,7 +59,7 @@ public class LlapRegistryService extends AbstractService {
     if (hosts.startsWith("@")) {
       // Caching instances only in case of the YARN registry. Each host based list will get it's own copy.
       String name = hosts.substring(1);
-      if (yarnRegistries.containsKey(name)) {
+      if (yarnRegistries.containsKey(name) && yarnRegistries.get(name).isInState(STATE.STARTED)) {
         registry = yarnRegistries.get(name);
       } else {
         registry = new LlapRegistryService(false);
@@ -79,8 +82,10 @@ public class LlapRegistryService extends AbstractService {
     String hosts = HiveConf.getTrimmedVar(conf, ConfVars.LLAP_DAEMON_SERVICE_HOSTS);
     if (hosts.startsWith("@")) {
       registry = new LlapZookeeperRegistryImpl(hosts.substring(1), conf);
+      this.isDynamic=true;
     } else {
       registry = new LlapFixedRegistryImpl(hosts, conf);
+      this.isDynamic=false;
     }
     LOG.info("Using LLAP registry type " + registry);
   }
@@ -110,7 +115,7 @@ public class LlapRegistryService extends AbstractService {
 
   private void registerWorker() throws IOException {
     if (this.registry != null) {
-      this.registry.register();
+      this.identity = this.registry.register();
     }
   }
 
@@ -127,5 +132,15 @@ public class LlapRegistryService extends AbstractService {
   public void registerStateChangeListener(ServiceInstanceStateChangeListener listener)
       throws IOException {
     this.registry.registerStateChangeListener(listener);
+  }
+
+  // is the registry dynamic (i.e refreshes?)
+  public boolean isDynamic() {
+    return isDynamic;
+  }
+
+  // this is only useful for the daemons to know themselves
+  public String getWorkerIdentity() {
+    return identity;
   }
 }

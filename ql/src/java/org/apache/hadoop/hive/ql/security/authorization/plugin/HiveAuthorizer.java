@@ -23,6 +23,8 @@ import org.apache.hadoop.hive.common.classification.InterfaceAudience.LimitedPri
 import org.apache.hadoop.hive.common.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
 
 /**
@@ -159,7 +161,7 @@ public interface HiveAuthorizer {
    * @throws HiveAccessControlException
    */
   void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> inputsHObjs,
-      List<HivePrivilegeObject> outputHObjs, HiveAuthzContext context)
+      List<HivePrivilegeObject> outputHObjs, QueryContext context)
       throws HiveAuthzPluginException, HiveAccessControlException;
 
 
@@ -173,7 +175,7 @@ public interface HiveAuthorizer {
    * @throws HiveAccessControlException
    */
   List<HivePrivilegeObject> filterListCmdObjects(List<HivePrivilegeObject> listObjs,
-      HiveAuthzContext context)
+      QueryContext context)
           throws HiveAuthzPluginException, HiveAccessControlException;
 
 
@@ -233,6 +235,45 @@ public interface HiveAuthorizer {
    * @throws HiveException
    */
   Object getHiveAuthorizationTranslator() throws HiveAuthzPluginException;
+
+  /**
+   * TableMaskingPolicy defines how users can access base tables. It defines a
+   * policy on what columns and rows are hidden, masked or redacted based on
+   * user, role or location.
+   */
+  /**
+   * applyRowFilterAndColumnMasking is called once for each table in a query. 
+   * (part 1) It expects a valid filter condition to be returned. Null indicates no filtering is
+   * required.
+   *
+   * Example: table foo(c int) -> "c > 0 && c % 2 = 0"
+   *
+   * (part 2) It expects a valid expression as used in a select clause. Null
+   * is NOT a valid option. If no transformation is needed simply return the
+   * column name.
+   *
+   * Example: column a -> "a" (no transform)
+   *
+   * Example: column a -> "reverse(a)" (call the reverse function on a)
+   *
+   * Example: column a -> "5" (replace column a with the constant 5)
+   *
+   * @return List<HivePrivilegeObject>
+   * please return the list of HivePrivilegeObjects that need to be rewritten.
+   *
+   * @throws SemanticException
+   */
+  public List<HivePrivilegeObject> applyRowFilterAndColumnMasking(QueryContext context,
+      List<HivePrivilegeObject> privObjs) throws SemanticException;
+
+  /**
+   * needTransform() is called once per user in a query. 
+   * Returning false short-circuits the generation of row/column transforms.
+   *
+   * @return
+   * @throws SemanticException
+   */
+  public boolean needTransform();
 
 }
 

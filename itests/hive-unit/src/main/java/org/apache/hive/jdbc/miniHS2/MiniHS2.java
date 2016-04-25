@@ -31,9 +31,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.llap.LlapItUtils;
+import org.apache.hadoop.hive.llap.daemon.MiniLlapCluster;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.ql.WindowsPathUtil;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.util.ZooKeeperHiveHelper;
 import org.apache.hadoop.hive.shims.HadoopShims.MiniDFSShim;
 import org.apache.hadoop.hive.shims.HadoopShims.MiniMrShim;
 import org.apache.hadoop.hive.shims.ShimLoader;
@@ -59,6 +62,7 @@ public class MiniHS2 extends AbstractHiveService {
   private static final AtomicLong hs2Counter = new AtomicLong();
   private MiniMrShim mr;
   private MiniDFSShim dfs;
+  private MiniLlapCluster llapCluster = null;
   private final FileSystem localFS;
   private boolean useMiniKdc = false;
   private final String serverPrincipal;
@@ -81,6 +85,8 @@ public class MiniHS2 extends AbstractHiveService {
     private boolean isHTTPTransMode = false;
     private boolean isMetastoreRemote;
     private boolean usePortsFromConf = false;
+    private String authType = "KERBEROS";
+    private boolean isHA = false;
 
     public Builder() {
     }
@@ -97,6 +103,11 @@ public class MiniHS2 extends AbstractHiveService {
       return this;
     }
 
+    public Builder withAuthenticationType(String authType) {
+      this.authType = authType;
+      return this;
+    }
+
     public Builder withRemoteMetastore() {
       this.isMetastoreRemote = true;
       return this;
@@ -104,6 +115,11 @@ public class MiniHS2 extends AbstractHiveService {
 
     public Builder withConf(HiveConf hiveConf) {
       this.hiveConf = hiveConf;
+      return this;
+    }
+
+    public Builder withHA() {
+      this.isHA = true;
       return this;
     }
 
@@ -127,7 +143,7 @@ public class MiniHS2 extends AbstractHiveService {
         hiveConf.setVar(ConfVars.HIVE_SERVER2_TRANSPORT_MODE, HS2_BINARY_MODE);
       }
       return new MiniHS2(hiveConf, miniClusterType, useMiniKdc, serverPrincipal, serverKeytab,
-          isMetastoreRemote, usePortsFromConf);
+          isMetastoreRemote, usePortsFromConf, authType, isHA);
     }
   }
 
@@ -165,7 +181,7 @@ public class MiniHS2 extends AbstractHiveService {
 
   private MiniHS2(HiveConf hiveConf, MiniClusterType miniClusterType, boolean useMiniKdc,
       String serverPrincipal, String serverKeytab, boolean isMetastoreRemote,
-      boolean usePortsFromConf) throws Exception {
+      boolean usePortsFromConf, String authType, boolean isHA) throws Exception {
     super(hiveConf, "localhost",
         (usePortsFromConf ? hiveConf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_PORT) : MetaStoreUtils.findFreePort()),
         (usePortsFromConf ? hiveConf.getIntVar(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_HTTP_PORT) : MetaStoreUtils.findFreePort()));
@@ -179,20 +195,22 @@ public class MiniHS2 extends AbstractHiveService {
 
     if (miniClusterType != MiniClusterType.DFS_ONLY) {
       // Initialize dfs
-      dfs = ShimLoader.getHadoopShims().getMiniDfs(hiveConf, 4, true, null);
+      dfs = ShimLoader.getHadoopShims().getMiniDfs(hiveConf, 4, true, null, isHA);
       fs = dfs.getFileSystem();
       String uriString = WindowsPathUtil.getHdfsUriString(fs.getUri().toString());
 
       // Initialize the execution engine based on cluster type
       switch (miniClusterType) {
       case TEZ:
-        mr = ShimLoader.getHadoopShims().getMiniTezCluster(hiveConf, 4, uriString, false);
+        mr = ShimLoader.getHadoopShims().getMiniTezCluster(hiveConf, 4, uriString);
         break;
       case LLAP:
         if (usePortsFromConf) {
           hiveConf.setBoolean("minillap.usePortsFromConf", true);
         }
-        mr = ShimLoader.getHadoopShims().getMiniTezCluster(hiveConf, 4, uriString, true);
+        llapCluster = LlapItUtils.startAndGetMiniLlapCluster(hiveConf, null, null);
+
+        mr = ShimLoader.getHadoopShims().getMiniTezCluster(hiveConf, 4, uriString);
         break;
       case MR:
         mr = ShimLoader.getHadoopShims().getMiniMrCluster(hiveConf, 4, uriString, 1);
@@ -211,7 +229,7 @@ public class MiniHS2 extends AbstractHiveService {
     if (useMiniKdc) {
       hiveConf.setVar(ConfVars.HIVE_SERVER2_KERBEROS_PRINCIPAL, serverPrincipal);
       hiveConf.setVar(ConfVars.HIVE_SERVER2_KERBEROS_KEYTAB, serverKeytab);
-      hiveConf.setVar(ConfVars.HIVE_SERVER2_AUTHENTICATION, "KERBEROS");
+      hiveConf.setVar(ConfVars.HIVE_SERVER2_AUTHENTICATION, authType);
     }
     String metaStoreURL =  "jdbc:derby:" + baseDir.getAbsolutePath() + File.separator + "test_metastore-" +
         hs2Counter.incrementAndGet() + ";create=true";
@@ -254,7 +272,8 @@ public class MiniHS2 extends AbstractHiveService {
 
   public MiniHS2(HiveConf hiveConf, MiniClusterType clusterType,
       boolean usePortsFromConf) throws Exception {
-    this(hiveConf, clusterType, false, null, null, false, usePortsFromConf);
+    this(hiveConf, clusterType, false, null, null, false, usePortsFromConf,
+      "KERBEROS", false);
   }
 
   public void start(Map<String, String> confOverlay) throws Exception {
@@ -284,6 +303,9 @@ public class MiniHS2 extends AbstractHiveService {
     hiveServer2.stop();
     setStarted(false);
     try {
+      if (llapCluster != null) {
+        llapCluster.stop();
+      }
       if (mr != null) {
         mr.shutdown();
         mr = null;
@@ -303,6 +325,13 @@ public class MiniHS2 extends AbstractHiveService {
     return getServiceClientInternal();
   }
 
+  public HiveConf getServerConf() {
+    if (hiveServer2 != null) {
+      return hiveServer2.getHiveConf();
+    }
+    return null;
+  }
+
   public CLIServiceClient getServiceClientInternal() {
     for (Service service : hiveServer2.getServices()) {
       if (service instanceof ThriftBinaryCLIService) {
@@ -318,8 +347,9 @@ public class MiniHS2 extends AbstractHiveService {
   /**
    * return connection URL for this server instance
    * @return
+   * @throws Exception
    */
-  public String getJdbcURL() {
+  public String getJdbcURL() throws Exception {
     return getJdbcURL("default");
   }
 
@@ -327,8 +357,9 @@ public class MiniHS2 extends AbstractHiveService {
    * return connection URL for this server instance
    * @param dbName - DB name to be included in the URL
    * @return
+   * @throws Exception
    */
-  public String getJdbcURL(String dbName) {
+  public String getJdbcURL(String dbName) throws Exception {
     return getJdbcURL(dbName, "");
   }
 
@@ -337,8 +368,9 @@ public class MiniHS2 extends AbstractHiveService {
    * @param dbName - DB name to be included in the URL
    * @param sessionConfExt - Addional string to be appended to sessionConf part of url
    * @return
+   * @throws Exception
    */
-  public String getJdbcURL(String dbName, String sessionConfExt) {
+  public String getJdbcURL(String dbName, String sessionConfExt) throws Exception {
     return getJdbcURL(dbName, sessionConfExt, "");
   }
 
@@ -348,8 +380,9 @@ public class MiniHS2 extends AbstractHiveService {
    * @param sessionConfExt - Addional string to be appended to sessionConf part of url
    * @param hiveConfExt - Additional string to be appended to HiveConf part of url (excluding the ?)
    * @return
+   * @throws Exception
    */
-  public String getJdbcURL(String dbName, String sessionConfExt, String hiveConfExt) {
+  public String getJdbcURL(String dbName, String sessionConfExt, String hiveConfExt) throws Exception {
     sessionConfExt = (sessionConfExt == null ? "" : sessionConfExt);
     hiveConfExt = (hiveConfExt == null ? "" : hiveConfExt);
     String krbConfig = "";
@@ -359,7 +392,17 @@ public class MiniHS2 extends AbstractHiveService {
     if (isHttpTransportMode()) {
       sessionConfExt = "transportMode=http;httpPath=cliservice;" + sessionConfExt;
     }
-    String baseJdbcURL = getBaseJdbcURL() + dbName + ";" + krbConfig + ";" + sessionConfExt;
+    String baseJdbcURL;
+    if (isDynamicServiceDiscovery()) {
+      String serviceDiscoveryConfig =
+          "serviceDiscoveryMode=zooKeeper;zooKeeperNamespace="
+              + getServerConf().getVar(HiveConf.ConfVars.HIVE_SERVER2_ZOOKEEPER_NAMESPACE) + ";";
+      baseJdbcURL = getZKBaseJdbcURL() + dbName + ";" + serviceDiscoveryConfig;
+    }
+    else {
+      baseJdbcURL = getBaseJdbcURL() + dbName + ";";
+    }
+    baseJdbcURL = baseJdbcURL + krbConfig + ";" + sessionConfExt;
     if (!hiveConfExt.trim().equals("")) {
       baseJdbcURL = "?" + hiveConfExt;
     }
@@ -379,9 +422,33 @@ public class MiniHS2 extends AbstractHiveService {
     }
   }
 
+  /**
+   * Build zk base JDBC URL
+   * @return
+   */
+  private String getZKBaseJdbcURL() throws Exception {
+    HiveConf hiveConf = getServerConf();
+    if (hiveConf != null) {
+      String zkEnsemble =  ZooKeeperHiveHelper.getQuorumServers(hiveConf);
+      return "jdbc:hive2://" + zkEnsemble + "/";
+    }
+    throw new Exception("Server's HiveConf is null. Unable to read ZooKeeper configs.");
+  }
+
   private boolean isHttpTransportMode() {
     String transportMode = getConfProperty(ConfVars.HIVE_SERVER2_TRANSPORT_MODE.varname);
     return transportMode != null && (transportMode.equalsIgnoreCase(HS2_HTTP_MODE));
+  }
+
+  private boolean isDynamicServiceDiscovery() throws Exception {
+    HiveConf hiveConf = getServerConf();
+    if (hiveConf == null) {
+      throw new Exception("Server's HiveConf is null. Unable to read ZooKeeper configs.");
+    }
+    if (hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
+      return true;
+    }
+    return false;
   }
 
   public static String getJdbcDriverName() {

@@ -36,13 +36,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
-
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.mapreduce.MRJobConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -104,21 +98,28 @@ import org.apache.hadoop.hive.ql.processors.CommandProcessor;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.security.authorization.AuthorizationUtils;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzContext;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivObjectActionType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivilegeObjectType;
+import org.apache.hadoop.hive.ql.security.authorization.plugin.QueryContext;
 import org.apache.hadoop.hive.ql.session.OperationLog;
 import org.apache.hadoop.hive.ql.session.OperationLog.LoggingLevel;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.serde2.ByteStream;
+import org.apache.hadoop.hive.serde2.thrift.ThriftJDBCBinarySerDe;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.mapred.ClusterStatus;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hive.common.util.ShutdownHookManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 
 public class Driver implements CommandProcessor {
 
@@ -403,13 +404,7 @@ public class Driver implements CommandProcessor {
     }
     saveSession(queryState);
 
-    // Generate new query id if it's not set for CLI case. If it's session based,
-    // query id is passed in from the client or initialized when the session starts.
     String queryId = conf.getVar(HiveConf.ConfVars.HIVEQUERYID);
-    if (queryId == null || queryId.isEmpty()) {
-      queryId = QueryPlan.makeQueryId();
-      conf.setVar(HiveConf.ConfVars.HIVEQUERYID, queryId);
-    }
 
     //save some info for webUI for use after plan is freed
     this.queryDisplay.setQueryStr(queryStr);
@@ -526,8 +521,7 @@ public class Driver implements CommandProcessor {
         }
       }
 
-      if (conf.getBoolVar(ConfVars.HIVE_LOG_EXPLAIN_OUTPUT) ||
-           conf.isWebUiQueryInfoCacheEnabled()) {
+      if (conf.getBoolVar(ConfVars.HIVE_LOG_EXPLAIN_OUTPUT)) {
         String explainOutput = getExplainOutput(sem, plan, tree);
         if (explainOutput != null) {
           if (conf.getBoolVar(ConfVars.HIVE_LOG_EXPLAIN_OUTPUT)) {
@@ -853,8 +847,8 @@ public class Driver implements CommandProcessor {
     since the insert will get passed the columns from the select.
      */
 
-    HiveAuthzContext.Builder authzContextBuilder = new HiveAuthzContext.Builder();
-    authzContextBuilder.setUserIpAddress(ss.getUserIpAddress());
+    QueryContext.Builder authzContextBuilder = new QueryContext.Builder();
+    authzContextBuilder.setForwardedAddresses(ss.getForwardedAddresses());
     authzContextBuilder.setCommandString(command);
 
     HiveOperationType hiveOpType = getHiveOperationType(op);
@@ -937,6 +931,13 @@ public class Driver implements CommandProcessor {
    */
   public QueryPlan getPlan() {
     return plan;
+  }
+
+  /**
+   * @return The current FetchTask associated with the Driver's plan, if any.
+   */
+  public FetchTask getFetchTask() {
+    return fetchTask;
   }
 
   // Write the current set of valid transactions into the conf file so that it can be read by
@@ -1422,6 +1423,10 @@ public class Driver implements CommandProcessor {
     if (!checkConcurrency()) {
       return false;
     }
+    // Lock operations themselves don't require the lock.
+    if (isExplicitLockOperation()){
+      return false;
+    }
     if (!HiveConf.getBoolVar(conf, ConfVars.HIVE_LOCK_MAPRED_ONLY)) {
       return true;
     }
@@ -1444,7 +1449,24 @@ public class Driver implements CommandProcessor {
     return false;
   }
 
+  private boolean isExplicitLockOperation() {
+    HiveOperation currentOpt = plan.getOperation();
+    if (currentOpt != null) {
+      switch (currentOpt) {
+      case LOCKDB:
+      case UNLOCKDB:
+      case LOCKTABLE:
+      case UNLOCKTABLE:
+        return true;
+      default:
+        return false;
+      }
+    }
+    return false;
+  }
+
   private CommandProcessorResponse createProcessorResponse(int ret) {
+    SessionState.getPerfLogger().cleanupPerfLogMetrics();
     queryDisplay.setErrorMessage(errorMessage);
     return new CommandProcessorResponse(ret, errorMessage, SQLState, downstreamError);
   }
@@ -1490,6 +1512,8 @@ public class Driver implements CommandProcessor {
 
     maxthreads = HiveConf.getIntVar(conf, HiveConf.ConfVars.EXECPARALLETHREADNUMBER);
 
+    HookContext hookContext = null;
+
     try {
       LOG.info("Executing command(queryId=" + queryId + "): " + queryStr);
       // compile and execute can get called from different threads in case of HS2
@@ -1506,7 +1530,7 @@ public class Driver implements CommandProcessor {
       resStream = null;
 
       SessionState ss = SessionState.get();
-      HookContext hookContext = new HookContext(plan, conf, ctx.getPathToCS(), ss.getUserName(),
+      hookContext = new HookContext(plan, conf, ctx.getPathToCS(), ss.getUserName(),
           ss.getUserIpAddress(), operationId);
       hookContext.setHookType(HookContext.HookType.PRE_EXEC_HOOK);
 
@@ -1616,16 +1640,8 @@ public class Driver implements CommandProcessor {
             continue;
 
           } else {
-            hookContext.setHookType(HookContext.HookType.ON_FAILURE_HOOK);
-            // Get all the failure execution hooks and execute them.
-            for (Hook ofh : getHooks(HiveConf.ConfVars.ONFAILUREHOOKS)) {
-              perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.FAILURE_HOOK + ofh.getClass().getName());
-
-              ((ExecuteWithHookContext) ofh).run(hookContext);
-
-              perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.FAILURE_HOOK + ofh.getClass().getName());
-            }
             setErrorMsgAndDetail(exitVal, result.getTaskError(), tsk);
+            invokeFailureHooks(perfLogger, hookContext);
             SQLState = "08S01";
             console.printError(errorMessage);
             driverCxt.shutdown();
@@ -1661,6 +1677,7 @@ public class Driver implements CommandProcessor {
       if (driverCxt.isShutdown()) {
         SQLState = "HY008";
         errorMessage = "FAILED: Operation cancelled";
+        invokeFailureHooks(perfLogger, hookContext);
         console.printError(errorMessage);
         return 1000;
       }
@@ -1715,6 +1732,13 @@ public class Driver implements CommandProcessor {
       }
       // TODO: do better with handling types of Exception here
       errorMessage = "FAILED: Hive Internal Error: " + Utilities.getNameMessage(e);
+      if (hookContext != null) {
+        try {
+          invokeFailureHooks(perfLogger, hookContext);
+        } catch (Exception t) {
+          LOG.warn("Failed to invoke failure hook", t);
+        }
+      }
       SQLState = "08S01";
       downstreamError = e;
       console.printError(errorMessage + "\n"
@@ -1788,6 +1812,20 @@ public class Driver implements CommandProcessor {
       }
     }
   }
+
+  private void invokeFailureHooks(PerfLogger perfLogger, HookContext hookContext) throws Exception {
+    hookContext.setHookType(HookContext.HookType.ON_FAILURE_HOOK);
+    hookContext.setErrorMessage(errorMessage);
+    // Get all the failure execution hooks and execute them.
+    for (Hook ofh : getHooks(HiveConf.ConfVars.ONFAILUREHOOKS)) {
+      perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.FAILURE_HOOK + ofh.getClass().getName());
+
+      ((ExecuteWithHookContext) ofh).run(hookContext);
+
+      perfLogger.PerfLogEnd(CLASS_NAME, PerfLogger.FAILURE_HOOK + ofh.getClass().getName());
+    }
+  }
+
   /**
    * Launches a new task
    *
@@ -1850,6 +1888,17 @@ public class Driver implements CommandProcessor {
       throw new IOException("FAILED: Operation cancelled");
     }
     if (isFetchingTable()) {
+      /**
+       * If resultset serialization to thrift object is enabled, and if the destination table is
+       * indeed written using ThriftJDBCBinarySerDe, read one row from the output sequence file,
+       * since it is a blob of row batches.
+       */
+      if (fetchTask.getWork().isHiveServerQuery() && HiveConf.getBoolVar(conf,
+          HiveConf.ConfVars.HIVE_SERVER2_THRIFT_RESULTSET_SERIALIZE_IN_TASKS)
+          && (fetchTask.getTblDesc().getSerdeClassName()
+              .equalsIgnoreCase(ThriftJDBCBinarySerDe.class.getName()))) {
+        maxRows = 1;
+      }
       fetchTask.setMaxRows(maxRows);
       return fetchTask.fetch(res);
     }

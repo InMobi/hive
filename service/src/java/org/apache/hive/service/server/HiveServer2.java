@@ -59,6 +59,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hive.common.util.HiveStringUtils;
 import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.hive.http.HttpServer;
+import org.apache.hive.http.LlapServlet;
 import org.apache.hive.service.CompositeService;
 import org.apache.hive.service.ServiceException;
 import org.apache.hive.service.cli.CLIService;
@@ -142,8 +143,8 @@ public class HiveServer2 extends CompositeService {
         if (webUIPort <= 0) {
           LOG.info("Web UI is disabled since port is set to " + webUIPort);
         } else {
-          HttpServer.Builder builder = new HttpServer.Builder();
-          builder.setName("hiveserver2").setPort(webUIPort).setConf(hiveConf);
+          HttpServer.Builder builder = new HttpServer.Builder("hiveserver2");
+          builder.setPort(webUIPort).setConf(hiveConf);
           builder.setHost(hiveConf.getVar(ConfVars.HIVE_SERVER2_WEBUI_BIND_HOST));
           builder.setMaxThreads(
             hiveConf.getIntVar(ConfVars.HIVE_SERVER2_WEBUI_MAX_THREADS));
@@ -181,6 +182,7 @@ public class HiveServer2 extends CompositeService {
             builder.setSPNEGOKeytab(spnegoKeytab);
             builder.setUseSPNEGO(true);
           }
+          builder.addServlet("llap", LlapServlet.class);
           webServer = builder.build();
           webServer.addServlet("query_page", "/query_page", QueryProfileServlet.class);
         }
@@ -254,10 +256,6 @@ public class HiveServer2 extends CompositeService {
     String rootNamespace = hiveConf.getVar(HiveConf.ConfVars.HIVE_SERVER2_ZOOKEEPER_NAMESPACE);
     String instanceURI = getServerInstanceURI();
     setUpZooKeeperAuth(hiveConf);
-    // HiveServer2 configs that this instance will publish to ZooKeeper,
-    // so that the clients can read these and configure themselves properly.
-    Map<String, String> confsToPublish = new HashMap<String, String>();
-    addConfsToPublish(hiveConf, confsToPublish);
     int sessionTimeout =
         (int) hiveConf.getTimeVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_SESSION_TIMEOUT,
             TimeUnit.MILLISECONDS);
@@ -291,8 +289,16 @@ public class HiveServer2 extends CompositeService {
               + ZooKeeperHiveHelper.ZOOKEEPER_PATH_SEPARATOR + "serverUri=" + instanceURI + ";"
               + "version=" + HiveVersionInfo.getVersion() + ";" + "sequence=";
       String znodeData = "";
-      // Publish configs for this instance as the data on the node
-      znodeData = Joiner.on(';').withKeyValueSeparator("=").join(confsToPublish);
+      if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ZOOKEEPER_PUBLISH_CONFIGS)) {
+        // HiveServer2 configs that this instance will publish to ZooKeeper,
+        // so that the clients can read these and configure themselves properly.
+        Map<String, String> confsToPublish = new HashMap<String, String>();
+        addConfsToPublish(hiveConf, confsToPublish);
+        // Publish configs for this instance as the data on the node
+        znodeData = Joiner.on(';').withKeyValueSeparator("=").join(confsToPublish);
+      } else {
+        znodeData = instanceURI;
+      }
       byte[] znodeDataUTF8 = znodeData.getBytes(Charset.forName("UTF-8"));
       znode =
           new PersistentEphemeralNode(zooKeeperClient,
@@ -334,12 +340,12 @@ public class HiveServer2 extends CompositeService {
     // Transport specific confs
     if (isHTTPTransportMode(hiveConf)) {
       confsToPublish.put(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PORT.varname,
-          hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PORT));
+          Integer.toString(hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PORT)));
       confsToPublish.put(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PATH.varname,
           hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_HTTP_PATH));
     } else {
       confsToPublish.put(ConfVars.HIVE_SERVER2_THRIFT_PORT.varname,
-          hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_PORT));
+          Integer.toString(hiveConf.getIntVar(ConfVars.HIVE_SERVER2_THRIFT_PORT)));
       confsToPublish.put(ConfVars.HIVE_SERVER2_THRIFT_SASL_QOP.varname,
           hiveConf.getVar(ConfVars.HIVE_SERVER2_THRIFT_SASL_QOP));
     }
@@ -352,7 +358,7 @@ public class HiveServer2 extends CompositeService {
     }
     // SSL conf
     confsToPublish.put(ConfVars.HIVE_SERVER2_USE_SSL.varname,
-        hiveConf.getVar(ConfVars.HIVE_SERVER2_USE_SSL));
+        Boolean.toString(hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_USE_SSL)));
   }
 
   /**
@@ -443,6 +449,17 @@ public class HiveServer2 extends CompositeService {
   @Override
   public synchronized void start() {
     super.start();
+    // If we're supporting dynamic service discovery, we'll add the service uri for this
+    // HiveServer2 instance to Zookeeper as a znode.
+    HiveConf hiveConf = this.getHiveConf();
+    if (hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
+      try {
+        addServerInstanceToZooKeeper(hiveConf);
+      } catch (Exception e) {
+        LOG.error("Error adding this HiveServer2 instance to ZooKeeper: ", e);
+        throw new ServiceException(e);
+      }
+    }
     if (webServer != null) {
       try {
         webServer.start();
@@ -531,12 +548,6 @@ public class HiveServer2 extends CompositeService {
         } catch (Throwable t) {
           LOG.warn("Could not initiate the JvmPauseMonitor thread." + " GCs and Pauses may not be " +
             "warned upon.", t);
-        }
-
-        // If we're supporting dynamic service discovery, we'll add the service uri for this
-        // HiveServer2 instance to Zookeeper as a znode.
-        if (hiveConf.getBoolVar(ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
-          server.addServerInstanceToZooKeeper(hiveConf);
         }
 
         if (sessionPool != null) {

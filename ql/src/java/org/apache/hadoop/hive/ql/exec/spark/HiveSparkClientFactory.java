@@ -28,6 +28,7 @@ import java.util.Set;
 
 import org.apache.commons.compress.utils.CharsetNames;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -52,6 +53,7 @@ public class HiveSparkClientFactory {
   private static final String SPARK_DEFAULT_APP_NAME = "Hive on Spark";
   private static final String SPARK_DEFAULT_SERIALIZER = "org.apache.spark.serializer.KryoSerializer";
   private static final String SPARK_DEFAULT_REFERENCE_TRACKING = "false";
+  private static final String SPARK_YARN_REPORT_INTERVAL = "spark.yarn.report.interval";
 
   public static HiveSparkClient createHiveSparkClient(HiveConf hiveconf) throws Exception {
     Map<String, String> sparkConf = initiateSparkConf(hiveconf);
@@ -120,6 +122,9 @@ public class HiveSparkClientFactory {
       sparkMaster = sparkConf.get("spark.master");
       hiveConf.set("spark.master", sparkMaster);
     }
+    if (SessionState.get() != null && SessionState.get().getConf() != null) {
+      SessionState.get().getConf().set("spark.master", sparkMaster);
+    }
     if (sparkMaster.equals("yarn-cluster")) {
       sparkConf.put("spark.yarn.maxAppAttempts", "1");
     }
@@ -146,7 +151,7 @@ public class HiveSparkClientFactory {
         if (value != null && !value.isEmpty()) {
           sparkConf.put("spark.hadoop." + propertyName, value);
         }
-      } else if (propertyName.startsWith("hbase")) {
+      } else if (propertyName.startsWith("hbase") || propertyName.startsWith("zookeeper.znode")) {
         // Add HBase related configuration to Spark because in security mode, Spark needs it
         // to generate hbase delegation token for Spark. This is a temp solution to deal with
         // Spark problem.
@@ -181,6 +186,14 @@ public class HiveSparkClientFactory {
       if (queueName != null) {
         sparkConf.put(sparkQueueNameKey, queueName);
       }
+    }
+
+    //The application reports tend to spam the hive logs.  This is controlled by spark, and the default seems to be 1s.
+    //If it is not specified, set it to a much higher number.  It can always be overriden by user.
+    String sparkYarnReportInterval = sparkConf.get(SPARK_YARN_REPORT_INTERVAL);
+    if (sparkMaster.startsWith("yarn") && sparkYarnReportInterval == null) {
+      //the new version of spark also takes time-units, but old versions do not.
+      sparkConf.put(SPARK_YARN_REPORT_INTERVAL, "60000");
     }
 
     return sparkConf;

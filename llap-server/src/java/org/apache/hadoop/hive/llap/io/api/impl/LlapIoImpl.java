@@ -18,9 +18,10 @@
 
 package org.apache.hadoop.hive.llap.io.api.impl;
 
-import org.apache.hadoop.hive.llap.LogLevels;
-
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 import javax.management.ObjectName;
@@ -32,7 +33,6 @@ import org.apache.hadoop.hive.common.io.Allocator;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.llap.cache.BuddyAllocator;
 import org.apache.hadoop.hive.llap.cache.BufferUsageManager;
-import org.apache.hadoop.hive.llap.cache.Cache;
 import org.apache.hadoop.hive.llap.cache.EvictionAwareAllocator;
 import org.apache.hadoop.hive.llap.cache.EvictionDispatcher;
 import org.apache.hadoop.hive.llap.cache.LowLevelCacheImpl;
@@ -47,27 +47,30 @@ import org.apache.hadoop.hive.llap.io.decode.ColumnVectorProducer;
 import org.apache.hadoop.hive.llap.io.decode.OrcColumnVectorProducer;
 import org.apache.hadoop.hive.llap.io.metadata.OrcMetadataCache;
 import org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheMetrics;
-import org.apache.hadoop.hive.llap.metrics.LlapDaemonQueueMetrics;
+import org.apache.hadoop.hive.llap.metrics.LlapDaemonIOMetrics;
 import org.apache.hadoop.hive.llap.metrics.MetricsUtils;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.hive.ql.io.orc.encoded.OrcCacheKey;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.metrics2.util.MBeans;
 
+import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class LlapIoImpl implements LlapIo<VectorizedRowBatch> {
-  public static final Logger LOG = LoggerFactory.getLogger(LlapIoImpl.class);
-  public static final LogLevels LOGL = new LogLevels(LOG);
+  public static final Logger LOG = LoggerFactory.getLogger("LlapIoImpl");
+  public static final Logger ORC_LOGGER = LoggerFactory.getLogger("LlapIoOrc");
+  public static final Logger CACHE_LOGGER = LoggerFactory.getLogger("LlapIoCache");
+  public static final Logger LOCKING_LOGGER = LoggerFactory.getLogger("LlapIoLocking");
+
   private static final String MODE_CACHE = "cache", MODE_ALLOCATOR = "allocator";
 
   private final ColumnVectorProducer cvp;
   private final ListeningExecutorService executor;
   private LlapDaemonCacheMetrics cacheMetrics;
-  private LlapDaemonQueueMetrics queueMetrics;
+  private LlapDaemonIOMetrics ioMetrics;
   private ObjectName buddyAllocatorMXBean;
   private Allocator allocator;
 
@@ -75,23 +78,29 @@ public class LlapIoImpl implements LlapIo<VectorizedRowBatch> {
     String ioMode = HiveConf.getVar(conf, HiveConf.ConfVars.LLAP_IO_MEMORY_MODE);
     boolean useLowLevelCache = LlapIoImpl.MODE_CACHE.equalsIgnoreCase(ioMode),
         useAllocOnly = !useLowLevelCache && LlapIoImpl.MODE_ALLOCATOR.equalsIgnoreCase(ioMode);
-    if (LOGL.isInfoEnabled()) {
-      LOG.info("Initializing LLAP IO in " + ioMode + " mode");
-    }
-
+    LOG.info("Initializing LLAP IO in {} mode", ioMode);
     String displayName = "LlapDaemonCacheMetrics-" + MetricsUtils.getHostName();
     String sessionId = conf.get("llap.daemon.metrics.sessionid");
     this.cacheMetrics = LlapDaemonCacheMetrics.create(displayName, sessionId);
 
-    displayName = "LlapDaemonQueueMetrics-" + MetricsUtils.getHostName();
-    int[] intervals = conf.getInts(String.valueOf(
-        HiveConf.ConfVars.LLAP_QUEUE_METRICS_PERCENTILE_INTERVALS));
-    this.queueMetrics = LlapDaemonQueueMetrics.create(displayName, sessionId, intervals);
+    displayName = "LlapDaemonIOMetrics-" + MetricsUtils.getHostName();
+    String[] strIntervals = HiveConf.getTrimmedStringsVar(conf,
+        HiveConf.ConfVars.LLAP_IO_DECODING_METRICS_PERCENTILE_INTERVALS);
+    List<Integer> intervalList = new ArrayList<>();
+    if (strIntervals != null) {
+      for (String strInterval : strIntervals) {
+        try {
+          intervalList.add(Integer.valueOf(strInterval));
+        } catch (NumberFormatException e) {
+          LOG.warn("Ignoring IO decoding metrics interval {} from {} as it is invalid", strInterval,
+              Arrays.toString(strIntervals));
+        }
+      }
+    }
+    this.ioMetrics = LlapDaemonIOMetrics.create(displayName, sessionId, Ints.toArray(intervalList));
 
-    LOG.info("Started llap daemon metrics with displayName: " + displayName +
-        " sessionId: " + sessionId);
-
-    Cache<OrcCacheKey> cache = null; // High-level cache is not implemented or supported.
+    LOG.info("Started llap daemon metrics with displayName: {} sessionId: {}", displayName,
+        sessionId);
 
     OrcMetadataCache metadataCache = null;
     LowLevelCacheImpl orcCache = null;
@@ -128,13 +137,11 @@ public class LlapIoImpl implements LlapIo<VectorizedRowBatch> {
     int numThreads = HiveConf.getIntVar(conf, HiveConf.ConfVars.LLAP_IO_THREADPOOL_SIZE);
     executor = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numThreads,
         new ThreadFactoryBuilder().setNameFormat("IO-Elevator-Thread-%d").setDaemon(true).build()));
-
+    ioMetrics.setIoThreadPoolSize(numThreads);
     // TODO: this should depends on input format and be in a map, or something.
     this.cvp = new OrcColumnVectorProducer(
-        metadataCache, orcCache, bufferManager, cache, conf, cacheMetrics, queueMetrics);
-    if (LOGL.isInfoEnabled()) {
-      LOG.info("LLAP IO initialized");
-    }
+        metadataCache, orcCache, bufferManager, conf, cacheMetrics, ioMetrics);
+    LOG.info("LLAP IO initialized");
 
     registerMXBeans();
   }
@@ -148,14 +155,6 @@ public class LlapIoImpl implements LlapIo<VectorizedRowBatch> {
   public InputFormat<NullWritable, VectorizedRowBatch> getInputFormat(
       InputFormat sourceInputFormat) {
     return new LlapInputFormat(sourceInputFormat, cvp, executor);
-  }
-
-  public LlapDaemonCacheMetrics getCacheMetrics() {
-    return cacheMetrics;
-  }
-
-  public LlapDaemonQueueMetrics getQueueMetrics() {
-    return queueMetrics;
   }
 
   @Override

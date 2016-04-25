@@ -24,14 +24,12 @@ import java.lang.reflect.Field;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Future;
 
 import javolution.util.FastBitSet;
 
@@ -1104,6 +1102,7 @@ public class GroupByOperator extends Operator<GroupByDesc> {
         throw new HiveException(e);
       }
     }
+    hashAggregations = null;
   }
 
   // Group by contains the columns needed - no need to aggregate from children
@@ -1131,7 +1130,7 @@ public class GroupByOperator extends Operator<GroupByDesc> {
    */
   @Override
   public String getName() {
-    return getOperatorName();
+    return GroupByOperator.getOperatorName();
   }
 
   static public String getOperatorName() {

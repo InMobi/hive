@@ -22,6 +22,8 @@ import java.util.List;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.hive.common.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 
 /**
  * Convenience implementation of HiveAuthorizer.
@@ -80,7 +82,7 @@ public class HiveAuthorizerImpl extends AbstractHiveAuthorizer {
 
   @Override
   public void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> inputHObjs,
-      List<HivePrivilegeObject> outputHObjs, HiveAuthzContext context)
+      List<HivePrivilegeObject> outputHObjs, QueryContext context)
       throws HiveAuthzPluginException, HiveAccessControlException {
     authValidator.checkPrivileges(hiveOpType, inputHObjs, outputHObjs, context);
   }
@@ -88,7 +90,7 @@ public class HiveAuthorizerImpl extends AbstractHiveAuthorizer {
 
   @Override
   public List<HivePrivilegeObject> filterListCmdObjects(List<HivePrivilegeObject> listObjs,
-      HiveAuthzContext context) throws HiveAuthzPluginException, HiveAccessControlException {
+      QueryContext context) throws HiveAuthzPluginException, HiveAccessControlException {
     return authValidator.filterListCmdObjects(listObjs, context);
   }
 
@@ -133,6 +135,17 @@ public class HiveAuthorizerImpl extends AbstractHiveAuthorizer {
   @Override
   public void applyAuthorizationConfigPolicy(HiveConf hiveConf) throws HiveAuthzPluginException {
     accessController.applyAuthorizationConfigPolicy(hiveConf);
+  }
+
+  @Override
+  public boolean needTransform() {
+    return authValidator.needTransform();
+  }
+
+  @Override
+  public List<HivePrivilegeObject> applyRowFilterAndColumnMasking(QueryContext context,
+      List<HivePrivilegeObject> privObjs) throws SemanticException {
+    return authValidator.applyRowFilterAndColumnMasking(context, privObjs);
   }
 
 }

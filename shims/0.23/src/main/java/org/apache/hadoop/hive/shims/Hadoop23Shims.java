@@ -64,6 +64,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.MiniDFSNNTopology;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
@@ -370,8 +371,8 @@ public class Hadoop23Shims extends HadoopShimsSecure {
    */
   @Override
   public MiniMrShim getMiniTezCluster(Configuration conf, int numberOfTaskTrackers,
-      String nameNode, boolean isLlap) throws IOException {
-    return new MiniTezShim(conf, numberOfTaskTrackers, nameNode, isLlap);
+      String nameNode) throws IOException {
+    return new MiniTezShim(conf, numberOfTaskTrackers, nameNode);
   }
 
   /**
@@ -381,11 +382,8 @@ public class Hadoop23Shims extends HadoopShimsSecure {
 
     private final MiniTezCluster mr;
     private final Configuration conf;
-    private Class<?> miniLlapKlass;
-    private Object miniLlapCluster;
 
-    public MiniTezShim(Configuration conf, int numberOfTaskTrackers, String nameNode,
-        boolean isLlap) throws IOException {
+    public MiniTezShim(Configuration conf, int numberOfTaskTrackers, String nameNode) throws IOException {
       mr = new MiniTezCluster("hive", numberOfTaskTrackers);
       conf.set("fs.defaultFS", nameNode);
       conf.set("tez.am.log.level", "DEBUG");
@@ -393,54 +391,6 @@ public class Hadoop23Shims extends HadoopShimsSecure {
       mr.init(conf);
       mr.start();
       this.conf = mr.getConfig();
-      if (isLlap) {
-        createAndLaunchLlapDaemon(this.conf);
-      } else {
-        miniLlapCluster = null;
-      }
-    }
-
-    private void createAndLaunchLlapDaemon(final Configuration conf)
-        throws IOException {
-      try {
-        final String clusterName = "llap";
-        Class<?> llapDaemonKlass =
-            Class.forName("org.apache.hadoop.hive.llap.daemon.impl.LlapDaemon",
-                false, ShimLoader.class.getClassLoader());
-        Method totalMemMethod = llapDaemonKlass.getMethod("getTotalHeapSize");
-        final long maxMemory = (long) totalMemMethod.invoke(null);
-        // 15% for io cache
-        final long memoryForCache = (long) (0.15f * maxMemory);
-        // 75% for executors
-        final long totalExecutorMemory = (long) (0.75f * maxMemory);
-        final int numExecutors = conf.getInt("llap.daemon.num.executors", 4);
-        final boolean asyncIOEnabled = true;
-        // enabling this will cause test failures in Mac OS X
-        final boolean directMemoryEnabled = false;
-        final int numLocalDirs = 1;
-        LOG.info("MiniLlap Configs - maxMemory: " + maxMemory + " memoryForCache: " + memoryForCache
-            + " totalExecutorMemory: " + totalExecutorMemory + " numExecutors: " + numExecutors
-            + " asyncIOEnabled: " + asyncIOEnabled + " directMemoryEnabled: " + directMemoryEnabled
-            + " numLocalDirs: " + numLocalDirs);
-
-        miniLlapKlass = Class.forName("org.apache.hadoop.hive.llap.daemon.MiniLlapCluster",
-            false, ShimLoader.class.getClassLoader());
-        Method create = miniLlapKlass.getMethod("createAndLaunch", new Class[]{Configuration.class,
-            String.class, Integer.TYPE, Long.TYPE, Boolean.TYPE, Boolean.TYPE,
-            Long.TYPE, Integer.TYPE});
-        miniLlapCluster = create.invoke(null,
-            conf,
-            clusterName,
-            numExecutors,
-            totalExecutorMemory,
-            asyncIOEnabled,
-            directMemoryEnabled,
-            memoryForCache,
-            numLocalDirs);
-      } catch (Exception e) {
-        LOG.error("Unable to create MiniLlapCluster. Exception: " + e.getMessage());
-        throw new IOException(e);
-      }
     }
 
     @Override
@@ -458,15 +408,6 @@ public class Hadoop23Shims extends HadoopShimsSecure {
     @Override
     public void shutdown() throws IOException {
       mr.stop();
-
-      if (miniLlapKlass != null && miniLlapCluster != null) {
-        try {
-          Method stop = miniLlapKlass.getMethod("stop", new Class[]{});
-          stop.invoke(miniLlapCluster);
-        } catch (Exception e) {
-          LOG.error("Unable to stop llap daemon. Exception: " + e.getMessage());
-        }
-      }
     }
 
     @Override
@@ -574,6 +515,13 @@ public class Hadoop23Shims extends HadoopShimsSecure {
     }
   }
 
+  @Override
+  public HadoopShims.MiniDFSShim getMiniDfs(Configuration conf,
+      int numDataNodes,
+      boolean format,
+      String[] racks) throws IOException{
+    return getMiniDfs(conf, numDataNodes, format, racks, false);
+  }
   // Don't move this code to the parent class. There's a binary
   // incompatibility between hadoop 1 and 2 wrt MiniDFSCluster and we
   // need to have two different shim classes even though they are
@@ -582,16 +530,32 @@ public class Hadoop23Shims extends HadoopShimsSecure {
   public HadoopShims.MiniDFSShim getMiniDfs(Configuration conf,
       int numDataNodes,
       boolean format,
-      String[] racks) throws IOException {
+      String[] racks,
+      boolean isHA) throws IOException {
     configureImpersonation(conf);
-    MiniDFSCluster miniDFSCluster = new MiniDFSCluster(conf, numDataNodes, format, racks);
+    MiniDFSCluster miniDFSCluster;
+    if (isHA) {
+      MiniDFSNNTopology topo = new MiniDFSNNTopology()
+        .addNameservice(new MiniDFSNNTopology.NSConf("minidfs").addNN(
+          new MiniDFSNNTopology.NNConf("nn1")).addNN(
+          new MiniDFSNNTopology.NNConf("nn2")));
+      miniDFSCluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(numDataNodes).format(format)
+        .racks(racks).nnTopology(topo).build();
+      miniDFSCluster.waitActive();
+      miniDFSCluster.transitionToActive(0);
+    } else {
+      miniDFSCluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(numDataNodes).format(format)
+        .racks(racks).build();
+    }
 
     // Need to set the client's KeyProvider to the NN's for JKS,
     // else the updates do not get flushed properly
-    KeyProviderCryptoExtension keyProvider =  miniDFSCluster.getNameNode().getNamesystem().getProvider();
+    KeyProviderCryptoExtension keyProvider =  miniDFSCluster.getNameNode(0).getNamesystem().getProvider();
     if (keyProvider != null) {
       try {
-        setKeyProvider(miniDFSCluster.getFileSystem().getClient(), keyProvider);
+        setKeyProvider(miniDFSCluster.getFileSystem(0).getClient(), keyProvider);
       } catch (Exception err) {
         throw new IOException(err);
       }
@@ -631,7 +595,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
 
     @Override
     public FileSystem getFileSystem() throws IOException {
-      return cluster.getFileSystem();
+      return cluster.getFileSystem(0);
     }
 
     @Override

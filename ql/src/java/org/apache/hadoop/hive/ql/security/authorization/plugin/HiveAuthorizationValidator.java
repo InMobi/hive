@@ -20,6 +20,8 @@ package org.apache.hadoop.hive.ql.security.authorization.plugin;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 
 /**
  * Interface used to check if user has privileges to perform certain action.
@@ -32,12 +34,17 @@ public interface HiveAuthorizationValidator {
    * see HiveAuthorizer.checkPrivileges
    */
   void checkPrivileges(HiveOperationType hiveOpType, List<HivePrivilegeObject> inputHObjs,
-      List<HivePrivilegeObject> outputHObjs, HiveAuthzContext context) throws HiveAuthzPluginException, HiveAccessControlException;
+      List<HivePrivilegeObject> outputHObjs, QueryContext context) throws HiveAuthzPluginException, HiveAccessControlException;
 
   /**
    * see HiveAuthorizer.filterListCmdObjects
    */
   List<HivePrivilegeObject> filterListCmdObjects(List<HivePrivilegeObject> listObjs,
-      HiveAuthzContext context);
+      QueryContext context);
+
+  public List<HivePrivilegeObject> applyRowFilterAndColumnMasking(QueryContext context,
+      List<HivePrivilegeObject> privObjs) throws SemanticException;
+
+  public boolean needTransform();
 
 }

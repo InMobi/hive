@@ -239,7 +239,7 @@ public class TreeReaderFactory {
      * @return next column vector
      * @throws IOException
      */
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       ColumnVector result = (ColumnVector) previousVector;
       if (present != null) {
         // Set noNulls and isNull vector of the ColumnVector based on
@@ -322,7 +322,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final LongColumnVector result;
       if (previousVector == null) {
         result = new LongColumnVector();
@@ -387,7 +387,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final LongColumnVector result;
       if (previousVector == null) {
         result = new LongColumnVector();
@@ -473,7 +473,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final LongColumnVector result;
       if (previousVector == null) {
         result = new LongColumnVector();
@@ -559,7 +559,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final LongColumnVector result;
       if (previousVector == null) {
         result = new LongColumnVector();
@@ -646,7 +646,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final LongColumnVector result;
       if (previousVector == null) {
         result = new LongColumnVector();
@@ -719,7 +719,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, final long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final DoubleColumnVector result;
       if (previousVector == null) {
         result = new DoubleColumnVector();
@@ -832,7 +832,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, final long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final DoubleColumnVector result;
       if (previousVector == null) {
         result = new DoubleColumnVector();
@@ -974,7 +974,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final BytesColumnVector result;
       if (previousVector == null) {
         result = new BytesColumnVector();
@@ -1144,7 +1144,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final TimestampColumnVector result;
       if (previousVector == null) {
         result = new TimestampColumnVector();
@@ -1253,7 +1253,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final LongColumnVector result;
       if (previousVector == null) {
         result = new LongColumnVector();
@@ -1352,7 +1352,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final DecimalColumnVector result;
       if (previousVector == null) {
         result = new DecimalColumnVector(precision, scale);
@@ -1481,7 +1481,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       return reader.nextVector(previousVector, batchSize);
     }
 
@@ -1498,7 +1498,7 @@ public class TreeReaderFactory {
 
     private static byte[] commonReadByteArrays(InStream stream, IntegerReader lengths,
         LongColumnVector scratchlcv,
-        BytesColumnVector result, long batchSize) throws IOException {
+        BytesColumnVector result, final int batchSize) throws IOException {
       // Read lengths
       scratchlcv.isNull = result.isNull;  // Notice we are replacing the isNull vector here...
       lengths.nextVector(scratchlcv, batchSize);
@@ -1534,7 +1534,7 @@ public class TreeReaderFactory {
     // This method has the common code for reading in bytes into a BytesColumnVector.
     public static void readOrcByteArrays(InStream stream, IntegerReader lengths,
         LongColumnVector scratchlcv,
-        BytesColumnVector result, long batchSize) throws IOException {
+        BytesColumnVector result, final int batchSize) throws IOException {
 
       byte[] allBytes = commonReadByteArrays(stream, lengths, scratchlcv, result, batchSize);
 
@@ -1641,7 +1641,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final BytesColumnVector result;
       if (previousVector == null) {
         result = new BytesColumnVector();
@@ -1683,6 +1683,7 @@ public class TreeReaderFactory {
    * stripe.
    */
   public static class StringDictionaryTreeReader extends TreeReader {
+    private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
     private DynamicByteArray dictionaryBuffer;
     private int[] dictionaryOffsets;
     protected IntegerReader reader;
@@ -1815,7 +1816,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final BytesColumnVector result;
       int offset;
       int length;
@@ -1862,11 +1863,20 @@ public class TreeReaderFactory {
         }
         result.isRepeating = scratchlcv.isRepeating;
       } else {
-        // Entire stripe contains null strings.
-        result.isRepeating = true;
-        result.noNulls = false;
-        result.isNull[0] = true;
-        result.setRef(0, "".getBytes(), 0, 0);
+        if (dictionaryOffsets == null) {
+          // Entire stripe contains null strings.
+          result.isRepeating = true;
+          result.noNulls = false;
+          result.isNull[0] = true;
+          result.setRef(0, EMPTY_BYTE_ARRAY, 0, 0);
+        } else {
+          // stripe contains nulls and empty strings
+          for (int i = 0; i < batchSize; i++) {
+            if (!result.isNull[i]) {
+              result.setRef(i, EMPTY_BYTE_ARRAY, 0, 0);
+            }
+          }
+        }
       }
       return result;
     }
@@ -1926,7 +1936,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       // Get the vector of strings from StringTreeReader, then make a 2nd pass to
       // adjust down the length (right trim and truncate) if necessary.
       BytesColumnVector result = (BytesColumnVector) super.nextVector(previousVector, batchSize);
@@ -2000,7 +2010,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       // Get the vector of strings from StringTreeReader, then make a 2nd pass to
       // adjust down the length (truncate) if necessary.
       BytesColumnVector result = (BytesColumnVector) super.nextVector(previousVector, batchSize);
@@ -2137,7 +2147,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       final ColumnVector[] result;
       if (previousVector == null) {
         result = new ColumnVector[readColumnCount];
@@ -2242,7 +2252,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previousVector, long batchSize) throws IOException {
+    public Object nextVector(Object previousVector, final int batchSize) throws IOException {
       throw new UnsupportedOperationException(
           "NextVector is not supported operation for Union type");
     }
@@ -2325,7 +2335,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previous, long batchSize) throws IOException {
+    public Object nextVector(Object previous, final int batchSize) throws IOException {
       throw new UnsupportedOperationException(
           "NextVector is not supported operation for List type");
     }
@@ -2419,7 +2429,7 @@ public class TreeReaderFactory {
     }
 
     @Override
-    public Object nextVector(Object previous, long batchSize) throws IOException {
+    public Object nextVector(Object previous, final int batchSize) throws IOException {
       throw new UnsupportedOperationException(
           "NextVector is not supported operation for Map type");
     }

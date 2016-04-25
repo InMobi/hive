@@ -118,7 +118,6 @@ public class BeeLine implements Closeable {
   private boolean exit = false;
   private final DatabaseConnections connections = new DatabaseConnections();
   public static final String COMMAND_PREFIX = "!";
-  private final Completer beeLineCommandCompleter;
   private Collection<Driver> drivers = null;
   private final BeeLineOpts opts = new BeeLineOpts(this, System.getProperties());
   private String lastProgress = null;
@@ -130,7 +129,7 @@ public class BeeLine implements Closeable {
   private PrintStream errorStream = new PrintStream(System.err, true);
   private ConsoleReader consoleReader;
   private List<String> batch = null;
-  private final Reflector reflector;
+  private final Reflector reflector = new Reflector(this);
   private String dbName = null;
   private String currentDatabase = null;
 
@@ -266,6 +265,7 @@ public class BeeLine implements Closeable {
           null)
   };
 
+  private final Completer beeLineCommandCompleter = new BeeLineCommandCompleter(Arrays.asList(commandHandlers));
 
   static final SortedSet<String> KNOWN_DRIVERS = new TreeSet<String>(Arrays.asList(
       new String[] {
@@ -503,21 +503,7 @@ public class BeeLine implements Closeable {
   }
 
   public BeeLine(boolean isBeeLine) {
-    beeLineCommandCompleter = new BeeLineCommandCompleter(BeeLineCommandCompleter.getCompleters
-        (this));
-    reflector = new Reflector(this);
     this.isBeeLine = isBeeLine;
-    // attempt to dynamically load signal handler
-    /* TODO disable signal handler
-    try {
-      Class<?> handlerClass =
-          Class.forName("org.apache.hive.beeline.SunSignalHandler");
-      signalHandler = (BeeLineSignalHandler)
-          handlerClass.newInstance();
-    } catch (Throwable t) {
-      // ignore and leave cancel functionality disabled
-    }
-    */
   }
 
   DatabaseConnection getDatabaseConnection() {
@@ -678,8 +664,8 @@ public class BeeLine implements Closeable {
     }
 
     dbName = commandLine.getOptionValue("database");
-    getOpts().setVerbose(Boolean.valueOf(commandLine.getOptionValue("verbose")));
-    getOpts().setSilent(Boolean.valueOf(commandLine.getOptionValue("slient")));
+    getOpts().setVerbose(Boolean.parseBoolean(commandLine.getOptionValue("verbose")));
+    getOpts().setSilent(Boolean.parseBoolean(commandLine.getOptionValue("slient")));
 
     int code = 0;
     if (commandLine.getOptionValues("e") != null) {
@@ -953,26 +939,32 @@ public class BeeLine implements Closeable {
   }
 
   private int execute(ConsoleReader reader, boolean exitOnError) {
-    String line;
+    int lastExecutionResult = ERRNO_OK;
     while (!exit) {
       try {
         // Execute one instruction; terminate on executing a script if there is an error
         // in silent mode, prevent the query and prompt being echoed back to terminal
-        line = (getOpts().isSilent() && getOpts().getScriptFile() != null) ? reader
+        String line = (getOpts().isSilent() && getOpts().getScriptFile() != null) ? reader
             .readLine(null, ConsoleReader.NULL_MASK) : reader.readLine(getPrompt());
 
         // trim line
-        line = (line == null) ? null : line.trim();
-
-        if (!dispatch(line) && exitOnError) {
-          return ERRNO_OTHER;
+        if (line != null) {
+          line = line.trim();
         }
+
+        if (!dispatch(line)) {
+          lastExecutionResult = ERRNO_OTHER;
+          if (exitOnError) break;
+        } else if (line != null) {
+          lastExecutionResult = ERRNO_OK;
+        }
+
       } catch (Throwable t) {
         handleException(t);
         return ERRNO_OTHER;
       }
     }
-    return ERRNO_OK;
+    return lastExecutionResult;
   }
 
   @Override

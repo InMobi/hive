@@ -19,7 +19,6 @@
 package org.apache.hadoop.hive.metastore;
 
 import org.apache.hadoop.hive.common.ObjectPair;
-import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience.Public;
@@ -51,9 +50,12 @@ import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.FireEventRequest;
 import org.apache.hadoop.hive.metastore.api.FireEventResponse;
+import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.GetAllFunctionsResponse;
 import org.apache.hadoop.hive.metastore.api.GetChangeVersionRequest;
+import org.apache.hadoop.hive.metastore.api.GetFileMetadataByExprRequest;
+import org.apache.hadoop.hive.metastore.api.GetFileMetadataByExprResult;
 import org.apache.hadoop.hive.metastore.api.GetFileMetadataRequest;
 import org.apache.hadoop.hive.metastore.api.GetFileMetadataResult;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
@@ -79,6 +81,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
 import org.apache.hadoop.hive.metastore.api.LockRequest;
 import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.MetadataPpdResult;
 import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
@@ -92,12 +95,15 @@ import org.apache.hadoop.hive.metastore.api.PartitionEventType;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprRequest;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprResult;
 import org.apache.hadoop.hive.metastore.api.PartitionsStatsRequest;
+import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.PutFileMetadataRequest;
 import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
 import org.apache.hadoop.hive.metastore.api.Role;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.ShowCompactRequest;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
@@ -134,6 +140,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginException;
+
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -734,7 +741,32 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     }
   }
 
-  /**
+  @Override
+  public void createTableWithConstraints(Table tbl,
+    List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
+    throws AlreadyExistsException, InvalidObjectException,
+    MetaException, NoSuchObjectException, TException {
+    HiveMetaHook hook = getHook(tbl);
+    if (hook != null) {
+      hook.preCreateTable(tbl);
+    }
+    boolean success = false;
+    try {
+      // Subclasses can override this step (for example, for temporary tables)
+      client.create_table_with_constraints(tbl, primaryKeys, foreignKeys);
+      if (hook != null) {
+        hook.commitCreateTable(tbl);
+      }
+      success = true;
+    } finally {
+      if (!success && (hook != null)) {
+        hook.rollbackCreateTable(tbl);
+      }
+    }
+  }
+
+
+/**
    * @param type
    * @return true or false
    * @throws AlreadyExistsException
@@ -1526,6 +1558,19 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     return filterHook.filterIndexes(client.get_indexes(dbName, tblName, max));
   }
 
+  @Override
+  public List<SQLPrimaryKey> getPrimaryKeys(PrimaryKeysRequest req)
+    throws MetaException, NoSuchObjectException, TException {
+    return client.get_primary_keys(req).getPrimaryKeys();
+  }
+
+  @Override
+  public List<SQLForeignKey> getForeignKeys(ForeignKeysRequest req) throws MetaException,
+    NoSuchObjectException, TException {
+    return client.get_foreign_keys(req).getForeignKeys();
+  }
+
+
   /** {@inheritDoc} */
   @Override
   public boolean updateTableColumnStatistics(ColumnStatistics statsObj)
@@ -2247,13 +2292,46 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
         if (listIndex == fileIds.size()) return null;
         int endIndex = Math.min(listIndex + fileMetadataBatchSize, fileIds.size());
         List<Long> subList = fileIds.subList(listIndex, endIndex);
-        GetFileMetadataRequest req = new GetFileMetadataRequest();
-        req.setFileIds(subList);
-        GetFileMetadataResult resp = client.get_file_metadata(req);
+        GetFileMetadataResult resp = sendGetFileMetadataReq(subList);
+        // TODO: we could remember if it's unsupported and stop sending calls; although, it might
+        //       be a bad idea for HS2+standalone metastore that could be updated with support.
+        //       Maybe we should just remember this for some time.
+        if (!resp.isIsSupported()) return null;
         listIndex = endIndex;
         return resp.getMetadata();
       }
     };
+  }
+
+  private GetFileMetadataResult sendGetFileMetadataReq(List<Long> fileIds) throws TException {
+    return client.get_file_metadata(new GetFileMetadataRequest(fileIds));
+  }
+
+  @Override
+  public Iterable<Entry<Long, MetadataPpdResult>> getFileMetadataBySarg(
+      final List<Long> fileIds, final ByteBuffer sarg, final boolean doGetFooters)
+          throws TException {
+    return new MetastoreMapIterable<Long, MetadataPpdResult>() {
+      private int listIndex = 0;
+      @Override
+      protected Map<Long, MetadataPpdResult> fetchNextBatch() throws TException {
+        if (listIndex == fileIds.size()) return null;
+        int endIndex = Math.min(listIndex + fileMetadataBatchSize, fileIds.size());
+        List<Long> subList = fileIds.subList(listIndex, endIndex);
+        GetFileMetadataByExprResult resp = sendGetFileMetadataBySargReq(
+            sarg, subList, doGetFooters);
+        if (!resp.isIsSupported()) return null;
+        listIndex = endIndex;
+        return resp.getMetadata();
+      }
+    };
+  }
+
+  private GetFileMetadataByExprResult sendGetFileMetadataBySargReq(
+      ByteBuffer sarg, List<Long> fileIds, boolean doGetFooters) throws TException {
+    GetFileMetadataByExprRequest req = new GetFileMetadataByExprRequest(fileIds, sarg);
+    req.setDoGetFooters(doGetFooters); // No need to get footers
+    return client.get_file_metadata_by_expr(req);
   }
 
   public static abstract class MetastoreMapIterable<K, V>
@@ -2340,4 +2418,5 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   public long getChangeVersion(String topic) throws TException {
     return client.get_change_version(new GetChangeVersionRequest(topic)).getVersion();
   }
+
 }

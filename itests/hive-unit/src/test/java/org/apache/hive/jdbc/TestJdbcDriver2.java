@@ -19,7 +19,6 @@
 package org.apache.hive.jdbc;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveIntervalDayTime;
 import org.apache.hadoop.hive.common.type.HiveIntervalYearMonth;
@@ -109,6 +108,7 @@ public class TestJdbcDriver2 {
   private final HiveConf conf;
   public static String dataFileDir;
   private final Path dataFilePath;
+  private final int dataFileRowCount;
   private final Path dataTypeDataFilePath;
   private Connection con;
   private static boolean standAloneServer = false;
@@ -121,6 +121,7 @@ public class TestJdbcDriver2 {
     dataFileDir = conf.get("test.data.files").replace('\\', '/')
         .replace("c:", "");
     dataFilePath = new Path(dataFileDir, "kv1.txt");
+    dataFileRowCount = 500;
     dataTypeDataFilePath = new Path(dataFileDir, "datatypes.txt");
     standAloneServer = "true".equals(System
         .getProperty("test.service.standalone.server"));
@@ -2343,6 +2344,15 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
   }
 
   /**
+   * Useful for modifying outer class context from anonymous inner class
+   */
+  public static interface Holder<T> {
+    public void set(T obj);
+
+    public T get();
+  }
+
+  /**
    * Test the cancellation of a query that is running.
    * We spawn 2 threads - one running the query and
    * the other attempting to cancel.
@@ -2391,6 +2401,75 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
     tCancel.start();
     tExecute.join();
     tCancel.join();
+    stmt.close();
+  }
+
+  /**
+   * Test the non-null value of the Yarn ATS GUID.
+   * We spawn 2 threads - one running the query and
+   * the other attempting to read the ATS GUID.
+   * We're using a dummy udf to simulate a query,
+   * that runs for a sufficiently long time.
+   * @throws Exception
+   */
+  @Test
+  public void testYarnATSGuid() throws Exception {
+    String udfName = SleepUDF.class.getName();
+    Statement stmt1 = con.createStatement();
+    stmt1.execute("create temporary function sleepUDF as '" + udfName + "'");
+    stmt1.close();
+    final Statement stmt = con.createStatement();
+    final Holder<Boolean> yarnATSGuidSet = new Holder<Boolean>() {
+      public Boolean b = false;
+
+      public void set(Boolean b) {
+        this.b = b;
+      }
+
+      public Boolean get() {
+        return this.b;
+      }
+    };
+
+    // Thread executing the query
+    Thread tExecute = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          System.out.println("Executing query: ");
+          stmt.executeQuery("select sleepUDF(t1.under_col) as u0, t1.under_col as u1, "
+              + "t2.under_col as u2 from " + tableName + " t1 join " + tableName
+              + " t2 on t1.under_col = t2.under_col");
+        } catch (SQLException e) {
+          // No op
+        }
+      }
+    });
+    // Thread reading the ATS GUID
+    Thread tGuid = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          Thread.sleep(10000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        String atsGuid = ((HiveStatement) stmt).getYarnATSGuid();
+        if (atsGuid != null) {
+          yarnATSGuidSet.set(true);
+          System.out.println("Yarn ATS GUID: " + atsGuid);
+        } else {
+          yarnATSGuidSet.set(false);
+        }
+      }
+    });
+    tExecute.start();
+    tGuid.start();
+    tExecute.join();
+    tGuid.join();
+    if (!yarnATSGuidSet.get()) {
+      fail("Failed to set the YARN ATS Guid");
+    }
     stmt.close();
   }
 
@@ -2597,6 +2676,88 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
     } finally {
       mycon.close();
     }
+  }
 
+  /**
+   * Test {@link HiveStatement#executeAsync(String)} for a select query
+   * @throws Exception
+   */
+  @Test
+  public void testSelectExecAsync() throws Exception {
+    HiveStatement stmt = (HiveStatement) con.createStatement();
+    ResultSet rs;
+    // Expected row count of the join query we'll run
+    int expectedCount = 1028;
+    int rowCount = 0;
+    boolean isResulSet =
+        stmt.executeAsync("select t1.value as v11, " + "t2.value as v12 from " + tableName
+            + " t1 join " + tableName + " t2 on t1.under_col = t2.under_col");
+    assertTrue(isResulSet);
+    rs = stmt.getResultSet();
+    assertNotNull(rs);
+    // ResultSet#next blocks until the async query is complete
+    while (rs.next()) {
+      String value = rs.getString(2);
+      rowCount++;
+      assertNotNull(value);
+    }
+    assertEquals(rowCount, expectedCount);
+    stmt.close();
+  }
+
+  /**
+   * Test {@link HiveStatement#executeAsync(String)} for a create table
+   * @throws Exception
+   */
+  @Test
+  public void testCreateTableExecAsync() throws Exception {
+    HiveStatement stmt = (HiveStatement) con.createStatement();
+    String tblName = "testCreateTableExecAsync";
+    boolean isResulSet = stmt.executeAsync("create table " + tblName + " (col1 int , col2 string)");
+    assertFalse(isResulSet);
+    // HiveStatement#getUpdateCount blocks until the async query is complete
+    stmt.getUpdateCount();
+    DatabaseMetaData metadata = con.getMetaData();
+    ResultSet tablesMetadata = metadata.getTables(null, null, "%", null);
+    boolean tblFound = false;
+    while (tablesMetadata.next()) {
+      String tableName = tablesMetadata.getString(3);
+      if (tableName.equalsIgnoreCase(tblName)) {
+        tblFound = true;
+      }
+    }
+    if (!tblFound) {
+      fail("Unable to create table using executeAsync");
+    }
+    stmt.execute("drop table " + tblName);
+    stmt.close();
+  }
+
+  /**
+   * Test {@link HiveStatement#executeAsync(String)} for an insert overwrite into a table
+   * @throws Exception
+   */
+  @Test
+  public void testInsertOverwriteExecAsync() throws Exception {
+    HiveStatement stmt = (HiveStatement) con.createStatement();
+    String tblName = "testInsertOverwriteExecAsync";
+    int rowCount = 0;
+    stmt.execute("create table " + tblName + " (col1 int , col2 string)");
+    boolean isResulSet =
+        stmt.executeAsync("insert overwrite table " + tblName + " select * from " + tableName);
+    assertFalse(isResulSet);
+    // HiveStatement#getUpdateCount blocks until the async query is complete
+    stmt.getUpdateCount();
+    // Read from the new table
+    ResultSet rs = stmt.executeQuery("select * from " + tblName);
+    assertNotNull(rs);
+    while (rs.next()) {
+      String value = rs.getString(2);
+      rowCount++;
+      assertNotNull(value);
+    }
+    assertEquals(rowCount, dataFileRowCount);
+    stmt.execute("drop table " + tblName);
+    stmt.close();
   }
 }

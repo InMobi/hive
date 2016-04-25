@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.ql.CommandNeedRetryException;
 import org.apache.hadoop.hive.ql.Driver;
 import org.apache.hadoop.hive.ql.QueryDisplay;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
+import org.apache.hadoop.hive.ql.exec.FetchTask;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.thrift.ThriftJDBCBinarySerDe;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -343,7 +345,10 @@ public class SQLOperation extends ExecuteStatementOperation {
 
   @Override
   public TableSchema getResultSetSchema() throws HiveSQLException {
-    assertState(OperationState.FINISHED);
+    // Since compilation is always a blocking RPC call, and schema is ready after compilation,
+    // we can return when are in the RUNNING state.
+    assertState(new ArrayList<OperationState>(Arrays.asList(OperationState.RUNNING,
+        OperationState.FINISHED)));
     if (resultSchema == null) {
       resultSchema = new TableSchema(driver.getSchema());
     }
@@ -353,12 +358,26 @@ public class SQLOperation extends ExecuteStatementOperation {
   private transient final List<Object> convey = new ArrayList<Object>();
 
   @Override
-  public RowSet getNextRowSet(FetchOrientation orientation, long maxRows) throws HiveSQLException {
+  public RowSet getNextRowSet(FetchOrientation orientation, long maxRows)
+    throws HiveSQLException {
+
+    HiveConf hiveConf = getConfigForOperation();
     validateDefaultFetchOrientation(orientation);
-    assertState(OperationState.FINISHED);
+    assertState(new ArrayList<OperationState>(Arrays.asList(OperationState.FINISHED)));
 
-    RowSet rowSet = RowSetFactory.create(resultSchema, getProtocolVersion());
+    FetchTask fetchTask = driver.getFetchTask();
+    boolean isBlobBased = false;
 
+    if (fetchTask != null && fetchTask.getWork().isHiveServerQuery() && HiveConf.getBoolVar(hiveConf,
+        HiveConf.ConfVars.HIVE_SERVER2_THRIFT_RESULTSET_SERIALIZE_IN_TASKS)
+        && (fetchTask.getTblDesc().getSerdeClassName().equalsIgnoreCase(ThriftJDBCBinarySerDe.class
+            .getName()))) {
+      // Just fetch one blob if we've serialized thrift objects in final tasks
+      maxRows = 1;
+      isBlobBased = true;
+    }
+    driver.setMaxRows((int) maxRows);
+    RowSet rowSet = RowSetFactory.create(resultSchema, getProtocolVersion(), isBlobBased);
     try {
       /* if client is requesting fetch-from-start and its not the first time reading from this operation
        * then reset the fetch position to beginning
@@ -554,6 +573,11 @@ public class SQLOperation extends ExecuteStatementOperation {
       } catch (IOException e) {
         LOG.warn("Error metrics", e);
       }
+    }
+
+    if (state == OperationState.FINISHED || state == OperationState.CANCELED || state == OperationState.ERROR) {
+      //update runtime
+      sqlOpDisplay.setRuntime(getOperationComplete() - getOperationStart());
     }
 
     if (state == OperationState.CLOSED) {

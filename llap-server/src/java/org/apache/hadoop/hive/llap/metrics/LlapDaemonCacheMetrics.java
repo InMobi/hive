@@ -18,11 +18,14 @@
 package org.apache.hadoop.hive.llap.metrics;
 
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheAllocatedArena;
+import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheArenaSize;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheCapacityRemaining;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheCapacityTotal;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheCapacityUsed;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheHitBytes;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheHitRatio;
+import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheMaxAllocationSize;
+import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheMinAllocationSize;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheNumLockedBuffers;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheReadRequests;
 import static org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheInfo.CacheRequestedBytes;
@@ -45,7 +48,7 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * Llap daemon cache metrics source.
  */
-@Metrics(about = "LlapDaemon Cache Metrics", context = MetricsUtils.METRICS_CONTEXT)
+@Metrics(about = "LlapDaemon Cache Metrics", context = "cache")
 public class LlapDaemonCacheMetrics implements MetricsSource {
   final String name;
   private String sessionId;
@@ -65,6 +68,12 @@ public class LlapDaemonCacheMetrics implements MetricsSource {
   MutableCounterLong cacheAllocatedArena;
   @Metric
   MutableCounterLong cacheNumLockedBuffers;
+  @Metric
+  MutableGaugeLong arenaSize;
+  @Metric
+  MutableGaugeLong minAllocationSize;
+  @Metric
+  MutableGaugeLong maxAllocationSize;
 
   private LlapDaemonCacheMetrics(String name, String sessionId) {
     this.name = name;
@@ -106,6 +115,18 @@ public class LlapDaemonCacheMetrics implements MetricsSource {
     cacheNumLockedBuffers.incr();
   }
 
+  public void setArenaSize(long value) {
+    arenaSize.set(value);
+  }
+
+  public void setMinAllocationSize(long value) {
+    minAllocationSize.set(value);
+  }
+
+  public void setMaxAllocationSize(long value) {
+    maxAllocationSize.set(value);
+  }
+
   public void decrCacheNumLockedBuffers() {
     cacheNumLockedBuffers.incr(-1);
   }
@@ -127,7 +148,7 @@ public class LlapDaemonCacheMetrics implements MetricsSource {
   @Override
   public void getMetrics(MetricsCollector collector, boolean b) {
     MetricsRecordBuilder rb = collector.addRecord(CacheMetrics)
-        .setContext(MetricsUtils.METRICS_CONTEXT)
+        .setContext("cache")
         .tag(ProcessName, MetricsUtils.METRICS_PROCESS_NAME)
         .tag(SessionId, sessionId);
     getCacheStats(rb);
@@ -145,7 +166,10 @@ public class LlapDaemonCacheMetrics implements MetricsSource {
         .addCounter(CacheHitBytes, cacheHitBytes.value())
         .addCounter(CacheAllocatedArena, cacheAllocatedArena.value())
         .addCounter(CacheNumLockedBuffers, cacheNumLockedBuffers.value())
-        .addGauge(CacheHitRatio, cacheHitRatio);
+        .addGauge(CacheHitRatio, cacheHitRatio)
+        .addGauge(CacheArenaSize, arenaSize.value())
+        .addGauge(CacheMinAllocationSize, minAllocationSize.value())
+        .addGauge(CacheMaxAllocationSize, maxAllocationSize.value());
   }
 
 }

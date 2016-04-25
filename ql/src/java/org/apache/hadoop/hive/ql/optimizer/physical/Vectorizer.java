@@ -126,6 +126,7 @@ import org.apache.hadoop.hive.ql.udf.UDFCos;
 import org.apache.hadoop.hive.ql.udf.UDFDayOfMonth;
 import org.apache.hadoop.hive.ql.udf.UDFDegrees;
 import org.apache.hadoop.hive.ql.udf.UDFExp;
+import org.apache.hadoop.hive.ql.udf.UDFFromUnixTime;
 import org.apache.hadoop.hive.ql.udf.UDFHex;
 import org.apache.hadoop.hive.ql.udf.UDFHour;
 import org.apache.hadoop.hive.ql.udf.UDFLength;
@@ -247,6 +248,7 @@ public class Vectorizer implements PhysicalPlanResolver {
     supportedGenericUDFs.add(UDFSecond.class);
     supportedGenericUDFs.add(UDFWeekOfYear.class);
     supportedGenericUDFs.add(GenericUDFToUnixTimeStamp.class);
+    supportedGenericUDFs.add(UDFFromUnixTime.class);
 
     supportedGenericUDFs.add(GenericUDFDateAdd.class);
     supportedGenericUDFs.add(GenericUDFDateSub.class);
@@ -1360,6 +1362,13 @@ public class Vectorizer implements PhysicalPlanResolver {
     List<ExprNodeDesc> valueExprs = desc.getExprs().get(posBigTable);
     if (!validateExprNodeDesc(valueExprs)) {
       LOG.info("Cannot vectorize map work value expression");
+      return false;
+    }
+    Byte[] order = desc.getTagOrder();
+    Byte posSingleVectorMapJoinSmallTable = (order[0] == posBigTable ? order[1] : order[0]);
+    List<ExprNodeDesc> smallTableExprs = desc.getExprs().get(posSingleVectorMapJoinSmallTable);
+    if (!validateExprNodeDesc(smallTableExprs)) {
+      LOG.info("Cannot vectorize map work small table expression");
       return false;
     }
     return true;

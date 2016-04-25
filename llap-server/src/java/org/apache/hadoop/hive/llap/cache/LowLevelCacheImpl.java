@@ -43,8 +43,8 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
   private final EvictionAwareAllocator allocator;
   private final AtomicInteger newEvictions = new AtomicInteger(0);
   private Thread cleanupThread = null;
-  private final ConcurrentHashMap<Long, FileCache> cache =
-      new ConcurrentHashMap<Long, FileCache>();
+  private final ConcurrentHashMap<Object, FileCache> cache =
+      new ConcurrentHashMap<Object, FileCache>();
   private final LowLevelCachePolicy cachePolicy;
   private final long cleanupInterval;
   private final LlapDaemonCacheMetrics metrics;
@@ -58,9 +58,8 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
   @VisibleForTesting
   LowLevelCacheImpl(LlapDaemonCacheMetrics metrics, LowLevelCachePolicy cachePolicy,
       EvictionAwareAllocator allocator, boolean doAssumeGranularBlocks, long cleanupInterval) {
-    if (LlapIoImpl.LOGL.isInfoEnabled()) {
-      LlapIoImpl.LOG.info("Low level cache; cleanup interval " + cleanupInterval + "sec");
-    }
+
+    LlapIoImpl.LOG.info("Low level cache; cleanup interval {} sec", cleanupInterval);
     this.cachePolicy = cachePolicy;
     this.allocator = allocator;
     this.cleanupInterval = cleanupInterval;
@@ -75,11 +74,11 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
   }
 
   @Override
-  public DiskRangeList getFileData(long fileId, DiskRangeList ranges, long baseOffset,
+  public DiskRangeList getFileData(Object fileKey, DiskRangeList ranges, long baseOffset,
       DiskRangeListFactory factory, LowLevelCacheCounters qfCounters, BooleanRef gotAllData) {
     if (ranges == null) return null;
     DiskRangeList prev = ranges.prev;
-    FileCache subCache = cache.get(fileId);
+    FileCache subCache = cache.get(fileKey);
     if (subCache == null || !subCache.incRef()) {
       long totalMissed = ranges.getTotalLength();
       metrics.incrCacheRequestedBytes(totalMissed);
@@ -148,8 +147,8 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
       LlapDataBuffer buffer = e.getValue();
       long requestedLength = currentNotCached.getLength();
       // Lock the buffer, validate it and add to results.
-      if (DebugUtils.isTraceLockingEnabled()) {
-        LlapIoImpl.LOG.info("Locking " + buffer + " during get");
+      if (LlapIoImpl.LOCKING_LOGGER.isTraceEnabled()) {
+        LlapIoImpl.LOCKING_LOGGER.trace("Locking {} during get", buffer);
       }
 
       if (!lockBuffer(buffer, true)) {
@@ -183,7 +182,6 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
    * Adds cached buffer to buffer list.
    * @param currentNotCached Pointer to the list node where we are inserting.
    * @param currentCached The cached buffer found for this node, to insert.
-   * @param resultObj
    * @return The new currentNotCached pointer, following the cached buffer insertion.
    */
   private DiskRangeList addCachedBufferToIter(
@@ -232,16 +230,16 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
   }
 
   @Override
-  public long[] putFileData(long fileId, DiskRange[] ranges, MemoryBuffer[] buffers,
+  public long[] putFileData(Object fileKey, DiskRange[] ranges, MemoryBuffer[] buffers,
       long baseOffset, Priority priority, LowLevelCacheCounters qfCounters) {
     long[] result = null;
     assert buffers.length == ranges.length;
-    FileCache subCache = getOrAddFileSubCache(fileId);
+    FileCache subCache = getOrAddFileSubCache(fileKey);
     try {
       for (int i = 0; i < ranges.length; ++i) {
         LlapDataBuffer buffer = (LlapDataBuffer)buffers[i];
-        if (DebugUtils.isTraceLockingEnabled()) {
-          LlapIoImpl.LOG.info("Locking " + buffer + " at put time");
+        if (LlapIoImpl.LOCKING_LOGGER.isTraceEnabled()) {
+          LlapIoImpl.LOCKING_LOGGER.trace("Locking {} at put time", buffer);
         }
         boolean canLock = lockBuffer(buffer, false);
         assert canLock;
@@ -258,13 +256,13 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
             }
             break;
           }
-          if (DebugUtils.isTraceCachingEnabled()) {
-            LlapIoImpl.LOG.info("Trying to cache when the chunk is already cached for "
-                + fileId + "@" + offset  + " (base " + baseOffset + "); old " + oldVal
-                + ", new " + buffer);
+          if (LlapIoImpl.CACHE_LOGGER.isTraceEnabled()) {
+            LlapIoImpl.CACHE_LOGGER.trace("Trying to cache when the chunk is already cached for" +
+                " {}@{} (base {}); old {}, new {}", fileKey, offset, baseOffset, oldVal, buffer);
           }
-          if (DebugUtils.isTraceLockingEnabled()) {
-            LlapIoImpl.LOG.info("Locking " + oldVal + "  due to cache collision");
+
+          if (LlapIoImpl.LOCKING_LOGGER.isTraceEnabled()) {
+            LlapIoImpl.LOCKING_LOGGER.trace("Locking {} due to cache collision", oldVal);
           }
           if (lockBuffer(oldVal, true)) {
             // We don't do proper overlap checking because it would cost cycles and we
@@ -275,8 +273,9 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
                   + " (base " + baseOffset + ")");
             }
             // We found an old, valid block for this key in the cache.
-            if (DebugUtils.isTraceLockingEnabled()) {
-              LlapIoImpl.LOG.info("Unlocking " + buffer + " due to cache collision with " + oldVal);
+            if (LlapIoImpl.LOCKING_LOGGER.isTraceEnabled()) {
+              LlapIoImpl.LOCKING_LOGGER.trace("Unlocking {} due to cache collision with {}",
+                  buffer, oldVal);
             }
 
             unlockBuffer(buffer, false);
@@ -301,10 +300,10 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
    * All this mess is necessary because we want to be able to remove sub-caches for fully
    * evicted files. It may actually be better to have non-nested map with object keys?
    */
-  private FileCache getOrAddFileSubCache(long fileId) {
+  private FileCache getOrAddFileSubCache(Object fileKey) {
     FileCache newSubCache = null;
     while (true) { // Overwhelmingly executes once.
-      FileCache subCache = cache.get(fileId);
+      FileCache subCache = cache.get(fileKey);
       if (subCache != null) {
         if (subCache.incRef()) return subCache; // Main path - found it, incRef-ed it.
         if (newSubCache == null) {
@@ -312,7 +311,7 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
           newSubCache.incRef();
         }
         // Found a stale value we cannot incRef; try to replace it with new value.
-        if (cache.replace(fileId, subCache, newSubCache)) return newSubCache;
+        if (cache.replace(fileKey, subCache, newSubCache)) return newSubCache;
         continue; // Someone else replaced/removed a stale value, try again.
       }
       // No value found.
@@ -320,11 +319,11 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
         newSubCache = new FileCache();
         newSubCache.incRef();
       }
-      FileCache oldSubCache = cache.putIfAbsent(fileId, newSubCache);
+      FileCache oldSubCache = cache.putIfAbsent(fileKey, newSubCache);
       if (oldSubCache == null) return newSubCache; // Main path 2 - created a new file cache.
       if (oldSubCache.incRef()) return oldSubCache; // Someone created one in parallel.
       // Someone created one in parallel and then it went stale.
-      if (cache.replace(fileId, oldSubCache, newSubCache)) return newSubCache;
+      if (cache.replace(fileKey, oldSubCache, newSubCache)) return newSubCache;
       // Someone else replaced/removed a parallel-added stale value, try again. Max confusion.
     }
   }
@@ -353,8 +352,8 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
       if (buffer.declaredCachedLength != LlapDataBuffer.UNKNOWN_CACHED_LENGTH) {
         cachePolicy.notifyUnlock(buffer);
       } else {
-        if (DebugUtils.isTraceCachingEnabled()) {
-          LlapIoImpl.LOG.info("Deallocating " + buffer + " that was not cached");
+        if (LlapIoImpl.CACHE_LOGGER.isTraceEnabled()) {
+          LlapIoImpl.CACHE_LOGGER.trace("Deallocating {} that was not cached", buffer);
         }
         allocator.deallocate(buffer);
       }
@@ -463,7 +462,7 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
       // Iterate thru all the filecaches. This is best-effort.
       // If these super-long-lived iterators affect the map in some bad way,
       // we'd need to sleep once per round instead.
-      Iterator<Map.Entry<Long, FileCache>> iter = cache.entrySet().iterator();
+      Iterator<Map.Entry<Object, FileCache>> iter = cache.entrySet().iterator();
       boolean isPastEndTime = false;
       while (iter.hasNext()) {
         FileCache fc = iter.next().getValue();
@@ -516,7 +515,7 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
   @Override
   public String debugDumpForOom() {
     StringBuilder sb = new StringBuilder("File cache state ");
-    for (Map.Entry<Long, FileCache> e : cache.entrySet()) {
+    for (Map.Entry<Object, FileCache> e : cache.entrySet()) {
       if (!e.getValue().incRef()) continue;
       try {
         sb.append("\n  file " + e.getKey());

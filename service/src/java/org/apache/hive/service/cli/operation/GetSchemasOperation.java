@@ -18,6 +18,9 @@
 
 package org.apache.hive.service.cli.operation;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hive.service.cli.FetchOrientation;
@@ -43,12 +46,11 @@ public class GetSchemasOperation extends MetadataOperation {
 
   private RowSet rowSet;
 
-  protected GetSchemasOperation(HiveSession parentSession,
-      String catalogName, String schemaName) {
+  protected GetSchemasOperation(HiveSession parentSession, String catalogName, String schemaName) {
     super(parentSession, OperationType.GET_SCHEMAS);
     this.catalogName = catalogName;
     this.schemaName = schemaName;
-    this.rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion());
+    this.rowSet = RowSetFactory.create(RESULT_SET_SCHEMA, getProtocolVersion(), false);
   }
 
   @Override
@@ -77,7 +79,7 @@ public class GetSchemasOperation extends MetadataOperation {
    */
   @Override
   public TableSchema getResultSetSchema() throws HiveSQLException {
-    assertState(OperationState.FINISHED);
+    assertState(new ArrayList<OperationState>(Arrays.asList(OperationState.FINISHED)));
     return RESULT_SET_SCHEMA;
   }
 
@@ -86,7 +88,7 @@ public class GetSchemasOperation extends MetadataOperation {
    */
   @Override
   public RowSet getNextRowSet(FetchOrientation orientation, long maxRows) throws HiveSQLException {
-    assertState(OperationState.FINISHED);
+    assertState(new ArrayList<OperationState>(Arrays.asList(OperationState.FINISHED)));
     validateDefaultFetchOrientation(orientation);
     if (orientation.equals(FetchOrientation.FETCH_FIRST)) {
       rowSet.setStartOffset(0);
