@@ -214,6 +214,7 @@ public class HiveConf extends Configuration {
       HiveConf.ConfVars.HIVE_TXN_TIMEOUT,
       HiveConf.ConfVars.HIVE_TXN_HEARTBEAT_THREADPOOL_SIZE,
       HiveConf.ConfVars.HIVE_TXN_MAX_OPEN_BATCH,
+      HiveConf.ConfVars.HIVE_TXN_RETRYABLE_SQLEX_REGEX,
       HiveConf.ConfVars.HIVE_METASTORE_STATS_NDV_DENSITY_FUNCTION,
       HiveConf.ConfVars.METASTORE_AGGREGATE_STATS_CACHE_ENABLED,
       HiveConf.ConfVars.METASTORE_AGGREGATE_STATS_CACHE_SIZE,
@@ -1679,6 +1680,13 @@ public class HiveConf extends Configuration {
         "transactions that Hive has to track at any given time, which may negatively affect\n" +
         "read performance."),
 
+    HIVE_TXN_RETRYABLE_SQLEX_REGEX("hive.txn.retryable.sqlex.regex", "", "Comma separated list\n" +
+        "of regular expression patterns for SQL state, error code, and error message of\n" +
+        "retryable SQLExceptions, that's suitable for the metastore DB.\n" +
+        "For example: Can't serialize.*,40001$,^Deadlock,.*ORA-08176.*\n" +
+        "The string that the regex will be matched against is of the following form, where ex is a SQLException:\n" +
+        "ex.getMessage() + \" (SQLState=\" + ex.getSQLState() + \", ErrorCode=\" + ex.getErrorCode() + \")\""),
+
     HIVE_COMPACTOR_INITIATOR_ON("hive.compactor.initiator.on", false,
         "Whether to run the initiator and cleaner threads on this metastore instance or not.\n" +
         "Set this to true on one instance of the Thrift metastore service as part of turning\n" +
@@ -2595,6 +2603,10 @@ public class HiveConf extends Configuration {
         "modification time, which is almost certain to identify file uniquely. However, if you\n" +
         "use a FS without file IDs and rewrite files a lot (or are paranoid), you might want\n" +
         "to avoid this setting."),
+    LLAP_CACHE_ENABLE_ORC_GAP_CACHE("hive.llap.orc.gap.cache", true,
+        "Whether LLAP cache for ORC should remember gaps in ORC RG read estimates, to avoid\n" +
+        "re-reading the data that was read once and discarded because it is unneeded. This is\n" +
+        "only necessary for ORC files written before HIVE-9660 (Hive 2.1?)."),
     LLAP_IO_USE_FILEID_PATH("hive.llap.io.use.fileid.path", true,
         "Whether LLAP should use fileId (inode)-based path to ensure better consistency for the\n" +
         "cases of file overwrites. This is supported on HDFS."),
