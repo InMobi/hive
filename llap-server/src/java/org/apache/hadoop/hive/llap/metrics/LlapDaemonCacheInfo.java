@@ -26,6 +26,7 @@ import com.google.common.base.Objects;
  */
 public enum LlapDaemonCacheInfo implements MetricsInfo {
   CacheMetrics("Llap daemon cache related metrics"),
+  CacheCapacityRemainingPercentage("Percentage of memory available in cache"),
   CacheCapacityRemaining("Amount of memory available in cache in bytes"),
   CacheCapacityTotal("Total amount of memory allocated for cache in bytes"),
   CacheCapacityUsed("Amount of memory used in cache in bytes"),
@@ -34,10 +35,7 @@ public enum LlapDaemonCacheInfo implements MetricsInfo {
   CacheHitRatio("Ratio of disk ranges cached vs requested"),
   CacheReadRequests("Number of disk range requests to cache"),
   CacheAllocatedArena("Number of arenas allocated"),
-  CacheNumLockedBuffers("Number of locked buffers in cache"),
-  CacheArenaSize("Size of arena used by allocator"),
-  CacheMinAllocationSize("Minimum allocation size used by allocator"),
-  CacheMaxAllocationSize("Maximum allocation size used by allocator");
+  CacheNumLockedBuffers("Number of locked buffers in cache");
 
   private final String desc;
 

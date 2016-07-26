@@ -36,10 +36,11 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.io.HdfsUtils;
 import org.apache.hadoop.hive.shims.HadoopShims;
-import org.apache.hadoop.hive.shims.HadoopShims.HdfsFileStatus;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -48,7 +49,6 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hive.common.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Collection of file manipulation utilities common across Hive.
@@ -387,14 +387,18 @@ public final class FileUtils {
     // Otherwise, try user impersonation. Current user must be configured to do user impersonation.
     UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
         user, UserGroupInformation.getLoginUser());
-    proxyUser.doAs(new PrivilegedExceptionAction<Object>() {
-      @Override
-      public Object run() throws Exception {
-        FileSystem fsAsUser = FileSystem.get(fs.getUri(), fs.getConf());
-        ShimLoader.getHadoopShims().checkFileAccess(fsAsUser, stat, action);
-        return null;
-      }
-    });
+    try {
+      proxyUser.doAs(new PrivilegedExceptionAction<Object>() {
+        @Override
+        public Object run() throws Exception {
+          FileSystem fsAsUser = FileSystem.get(fs.getUri(), fs.getConf());
+          ShimLoader.getHadoopShims().checkFileAccess(fsAsUser, stat, action);
+          return null;
+        }
+      });
+    } finally {
+      FileSystem.closeAllForUGI(proxyUser);
+    }
   }
 
   /**
@@ -526,11 +530,9 @@ public final class FileUtils {
       if (!success) {
         return false;
       } else {
-        HadoopShims shim = ShimLoader.getHadoopShims();
-        HdfsFileStatus fullFileStatus = shim.getFullFileStatus(conf, fs, lastExistingParent);
         try {
           //set on the entire subtree
-          shim.setFullFileStatus(conf, fullFileStatus, fs, firstNonExistentParent);
+          HdfsUtils.setFullFileStatus(conf, new HdfsUtils.HadoopFileStatus(conf, fs, lastExistingParent), fs, firstNonExistentParent, true);
         } catch (Exception e) {
           LOG.warn("Error setting permissions of " + firstNonExistentParent, e);
         }
@@ -566,9 +568,8 @@ public final class FileUtils {
 
     boolean inheritPerms = conf.getBoolVar(HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
     if (copied && inheritPerms) {
-      HdfsFileStatus fullFileStatus = shims.getFullFileStatus(conf, dstFS, dst);
       try {
-        shims.setFullFileStatus(conf, fullFileStatus, dstFS, dst);
+        HdfsUtils.setFullFileStatus(conf, new HdfsUtils.HadoopFileStatus(conf, dstFS, dst.getParent()), dstFS, dst, true);
       } catch (Exception e) {
         LOG.warn("Error setting permissions or group of " + dst, e);
       }
@@ -577,74 +578,32 @@ public final class FileUtils {
   }
 
   /**
-   * Trashes or deletes all files under a directory. Leaves the directory as is.
-   * @param fs FileSystem to use
-   * @param f path of directory
-   * @param conf hive configuration
-   * @param forceDelete whether to force delete files if trashing does not succeed
-   * @return true if deletion successful
-   * @throws FileNotFoundException
-   * @throws IOException
-   */
-  public static boolean trashFilesUnderDir(FileSystem fs, Path f, Configuration conf,
-      boolean forceDelete) throws FileNotFoundException, IOException {
-    FileStatus[] statuses = fs.listStatus(f, HIDDEN_FILES_PATH_FILTER);
-    boolean result = true;
-    for (FileStatus status : statuses) {
-      result = result & moveToTrash(fs, status.getPath(), conf, forceDelete);
-    }
-    return result;
-  }
-
-  /**
-   * Move a particular file or directory to the trash. If for a certain reason the trashing fails
-   * it will force deletes the file or directory
-   * @param fs FileSystem to use
-   * @param f path of file or directory to move to trash.
-   * @param conf
-   * @return true if move successful
-   * @throws IOException
-   */
-  public static boolean moveToTrash(FileSystem fs, Path f, Configuration conf) throws IOException {
-    return moveToTrash(fs, f, conf, true);
-  }
-
-  /**
    * Move a particular file or directory to the trash.
    * @param fs FileSystem to use
    * @param f path of file or directory to move to trash.
    * @param conf
-   * @param forceDelete whether force delete the file or directory if trashing fails
    * @return true if move successful
    * @throws IOException
    */
-  public static boolean moveToTrash(FileSystem fs, Path f, Configuration conf, boolean forceDelete)
+  public static boolean moveToTrash(FileSystem fs, Path f, Configuration conf)
       throws IOException {
-    LOG.info("deleting  " + f);
-    HadoopShims hadoopShim = ShimLoader.getHadoopShims();
-
+    LOG.debug("deleting  " + f);
     boolean result = false;
     try {
-      result = hadoopShim.moveToAppropriateTrash(fs, f, conf);
+      result = Trash.moveToAppropriateTrash(fs, f, conf);
       if (result) {
-        LOG.info("Moved to trash: " + f);
+        LOG.trace("Moved to trash: " + f);
         return true;
       }
     } catch (IOException ioe) {
-      if (forceDelete) {
-        // for whatever failure reason including that trash has lower encryption zone
-        // retry with force delete
-        LOG.warn(ioe.getMessage() + "; Force to delete it.");
-      } else {
-        throw ioe;
-      }
+      // for whatever failure reason including that trash has lower encryption zone
+      // retry with force delete
+      LOG.warn(ioe.getMessage() + "; Force to delete it.");
     }
 
-    if (forceDelete) {
-      result = fs.delete(f, true);
-      if (!result) {
-        LOG.error("Failed to delete " + f);
-      }
+    result = fs.delete(f, true);
+    if (!result) {
+      LOG.error("Failed to delete " + f);
     }
 
     return result;
@@ -687,10 +646,8 @@ public final class FileUtils {
     } else {
       //rename the directory
       if (fs.rename(sourcePath, destPath)) {
-        HadoopShims shims = ShimLoader.getHadoopShims();
-        HdfsFileStatus fullFileStatus = shims.getFullFileStatus(conf, fs, destPath.getParent());
         try {
-          shims.setFullFileStatus(conf, fullFileStatus, fs, destPath);
+          HdfsUtils.setFullFileStatus(conf, new HdfsUtils.HadoopFileStatus(conf, fs, destPath.getParent()), fs, destPath, true);
         } catch (Exception e) {
           LOG.warn("Error setting permissions or group of " + destPath, e);
         }

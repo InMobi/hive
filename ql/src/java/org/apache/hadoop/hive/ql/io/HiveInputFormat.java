@@ -205,8 +205,8 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     if (!HiveConf.getBoolVar(conf, ConfVars.LLAP_IO_ENABLED, LlapProxy.isDaemon())) {
       return inputFormat; // LLAP not enabled, no-op.
     }
-    boolean isSupported = inputFormat instanceof LlapWrappableInputFormatInterface,
-        isVectorized = Utilities.isVectorMode(conf);
+    boolean isSupported = inputFormat instanceof LlapWrappableInputFormatInterface;
+    boolean isVectorized = Utilities.getUseVectorizedInputFileFormat(conf);
     if (!isSupported || !isVectorized) {
       LOG.info("Not using llap for " + inputFormat + ": supported = " + isSupported
           + ", vectorized = " + isVectorized);
@@ -225,7 +225,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
   }
 
   public static boolean canWrapAnyForLlap(Configuration conf, MapWork mapWork) {
-    return Utilities.isVectorMode(conf, mapWork);
+    return Utilities.getUseVectorizedInputFileFormat(conf, mapWork);
   }
 
   public static boolean canWrapForLlap(Class<? extends InputFormat> inputFormatClass) {
@@ -501,13 +501,11 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
       final StringBuilder readColumnNamesBuffer) {
     String readColIds = readColumnsBuffer.toString();
     String readColNames = readColumnNamesBuffer.toString();
-    boolean readAllColumns = readColIds.isEmpty() ? true : false;
-    newjob.setBoolean(ColumnProjectionUtils.READ_ALL_COLUMNS, readAllColumns);
+    newjob.setBoolean(ColumnProjectionUtils.READ_ALL_COLUMNS, false);
     newjob.set(ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, readColIds);
     newjob.set(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, readColNames);
 
     if (LOG.isInfoEnabled()) {
-      LOG.info("{} = {}", ColumnProjectionUtils.READ_ALL_COLUMNS, readAllColumns);
       LOG.info("{} = {}", ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR, readColIds);
       LOG.info("{} = {}", ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR, readColNames);
     }

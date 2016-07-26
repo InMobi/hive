@@ -19,7 +19,10 @@
 package org.apache.hadoop.hive.llap.cli;
 
 
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -27,7 +30,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.llap.cli.LlapStatusOptionsProcessor.LlapStatusOptions;
 import org.apache.hadoop.hive.llap.configuration.LlapDaemonConfiguration;
@@ -35,6 +42,7 @@ import org.apache.hadoop.hive.llap.registry.ServiceInstance;
 import org.apache.hadoop.hive.llap.registry.impl.LlapRegistryService;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.slider.api.ClusterDescription;
@@ -53,39 +61,140 @@ public class LlapStatusServiceDriver {
 
   private static final Logger LOG = LoggerFactory.getLogger(LlapStatusServiceDriver.class);
 
-  private static final long FIND_YARN_APP_TIMEOUT = 20 * 1000l; // 20seconds to wait for app to be visible
+  // Defining a bunch of configs here instead of in HiveConf. These are experimental, and mainly
+  // for use when retry handling is fixed in Yarn/Hadoop
+
+  private static final String CONF_PREFIX = "hive.llapcli.";
+
+  // The following two keys should ideally be used to control RM connect timeouts. However,
+  // they don't seem to work. The IPC timeout needs to be set instead.
+  @InterfaceAudience.Private
+  private static final String CONFIG_YARN_RM_TIMEOUT_MAX_WAIT_MS =
+      CONF_PREFIX + "yarn.rm.connect.max-wait-ms";
+  private static final long CONFIG_YARN_RM_TIMEOUT_MAX_WAIT_MS_DEFAULT = 10000l;
+  @InterfaceAudience.Private
+  private static final String CONFIG_YARN_RM_RETRY_INTERVAL_MS =
+      CONF_PREFIX + "yarn.rm.connect.retry-interval.ms";
+  private static final long CONFIG_YARN_RM_RETRY_INTERVAL_MS_DEFAULT = 5000l;
+
+  // As of Hadoop 2.7 - this is what controls the RM timeout.
+  @InterfaceAudience.Private
+  private static final String CONFIG_IPC_CLIENT_CONNECT_MAX_RETRIES =
+      CONF_PREFIX + "ipc.client.max-retries";
+  private static final int CONFIG_IPC_CLIENT_CONNECT_MAX_RETRIES_DEFAULT = 2;
+  @InterfaceAudience.Private
+  private static final String CONFIG_IPC_CLIENT_CONNECT_RETRY_INTERVAL_MS =
+      CONF_PREFIX + "ipc.client.connect.retry-interval-ms";
+  private static final long CONFIG_IPC_CLIENT_CONNECT_RETRY_INTERVAL_MS_DEFAULT = 1500l;
+
+  // As of Hadoop 2.8 - this timeout spec behaves in a strnage manner. "2000,1" means 2000s with 1 retry.
+  // However it does this - but does it thrice. Essentially - #retries+2 is the number of times the entire config
+  // is retried. "2000,1" means 3 retries - each with 1 retry with a random 2000ms sleep.
+  @InterfaceAudience.Private
+  private static final String CONFIG_TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_RETRY_POLICY_SPEC =
+      CONF_PREFIX + "timeline.service.fs-store.retry.policy.spec";
+  private static final String
+      CONFIG_TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_RETRY_POLICY_SPEC_DEFAULT = "2000, 1";
+
+  private static final String CONFIG_LLAP_ZK_REGISTRY_TIMEOUT_MS =
+      CONF_PREFIX + "zk-registry.timeout-ms";
+  private static final long CONFIG_LLAP_ZK_REGISTRY_TIMEOUT_MS_DEFAULT = 10000l;
+
 
   private static final String AM_KEY = "slider-appmaster";
   private static final String LLAP_KEY = "LLAP";
 
   private final Configuration conf;
   private final Clock clock = new SystemClock();
-  private final AppStatusBuilder appStatusBuilder = new AppStatusBuilder();
+  @VisibleForTesting
+  final AppStatusBuilder appStatusBuilder = new AppStatusBuilder();
 
   public LlapStatusServiceDriver() {
     SessionState ss = SessionState.get();
     conf = (ss != null) ? ss.getConf() : new HiveConf(SessionState.class);
   }
 
+  /**
+   * Parse command line options.
+   *
+   * @param args
+   * @return command line options.
+   */
+  public LlapStatusOptions parseOptions(String[] args) throws LlapStatusCliException {
 
-  public int run(String[] args) {
+    LlapStatusOptionsProcessor optionsProcessor = new LlapStatusOptionsProcessor();
+    LlapStatusOptions options;
+    try {
+      options = optionsProcessor.processOptions(args);
+      return options;
+    } catch (Exception e) {
+      LOG.info("Failed to parse arguments", e);
+      throw new LlapStatusCliException(ExitCode.INCORRECT_USAGE, "Incorrect usage");
+    }
+  }
+
+  public int run(LlapStatusOptions options) {
 
     SliderClient sliderClient = null;
     try {
-      LlapStatusOptionsProcessor optionsProcessor = new LlapStatusOptionsProcessor();
-      LlapStatusOptions options;
-      try {
-        options = optionsProcessor.processOptions(args);
-      } catch (Exception e) {
-        LOG.info("Failed to parse arguments", e);
-        return ExitCode.INCORRECT_USAGE.getInt();
-      }
 
       for (String f : LlapDaemonConfiguration.DAEMON_CONFIGS) {
         conf.addResource(f);
       }
       conf.reloadConfiguration();
+      for (Map.Entry<Object, Object> props : options.getConf().entrySet()) {
+        conf.set((String) props.getKey(), (String) props.getValue());
+      }
 
+      // Setup timeouts for various services.
+
+      // Once we move to a Hadoop-2.8 dependency, the following paramteer can be used.
+      // conf.set(YarnConfiguration.TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_RETRY_POLICY_SPEC);
+      conf.set("yarn.timeline-service.entity-group-fs-store.retry-policy-spec",
+          conf.get(CONFIG_TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_RETRY_POLICY_SPEC,
+              CONFIG_TIMELINE_SERVICE_ENTITYGROUP_FS_STORE_RETRY_POLICY_SPEC_DEFAULT));
+
+      conf.setLong(YarnConfiguration.RESOURCEMANAGER_CONNECT_MAX_WAIT_MS,
+          conf.getLong(CONFIG_YARN_RM_TIMEOUT_MAX_WAIT_MS,
+              CONFIG_YARN_RM_TIMEOUT_MAX_WAIT_MS_DEFAULT));
+      conf.setLong(YarnConfiguration.RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS,
+          conf.getLong(CONFIG_YARN_RM_RETRY_INTERVAL_MS, CONFIG_YARN_RM_RETRY_INTERVAL_MS_DEFAULT));
+
+      conf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
+          conf.getInt(CONFIG_IPC_CLIENT_CONNECT_MAX_RETRIES,
+              CONFIG_IPC_CLIENT_CONNECT_MAX_RETRIES_DEFAULT));
+      conf.setLong(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY,
+          conf.getLong(CONFIG_IPC_CLIENT_CONNECT_RETRY_INTERVAL_MS,
+              CONFIG_IPC_CLIENT_CONNECT_RETRY_INTERVAL_MS_DEFAULT));
+
+      HiveConf.setVar(conf, HiveConf.ConfVars.HIVE_ZOOKEEPER_SESSION_TIMEOUT, (conf
+          .getLong(CONFIG_LLAP_ZK_REGISTRY_TIMEOUT_MS, CONFIG_LLAP_ZK_REGISTRY_TIMEOUT_MS_DEFAULT) +
+          "ms"));
+
+
+
+      String appName;
+      appName = options.getName();
+      if (StringUtils.isEmpty(appName)) {
+        appName = HiveConf.getVar(conf, HiveConf.ConfVars.LLAP_DAEMON_SERVICE_HOSTS);
+        if (appName.startsWith("@") && appName.length() > 1) {
+          // This is a valid slider app name. Parse it out.
+          appName = appName.substring(1);
+        } else {
+          // Invalid app name. Checked later.
+          appName = null;
+        }
+      }
+      if (StringUtils.isEmpty(appName)) {
+        String message =
+            "Invalid app name. This must be setup via config or passed in as a parameter." +
+                " This tool works with clusters deployed by Slider/YARN";
+        LOG.info(message);
+        return ExitCode.INCORRECT_USAGE.getInt();
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Using appName: {}", appName);
+      }
 
       try {
         sliderClient = createSliderClient();
@@ -97,7 +206,7 @@ public class LlapStatusServiceDriver {
       // Get the App report from YARN
       ApplicationReport appReport = null;
       try {
-        appReport = getAppReport(options, sliderClient, FIND_YARN_APP_TIMEOUT);
+        appReport = getAppReport(appName, sliderClient, options.getFindAppTimeoutMs());
       } catch (LlapStatusCliException e) {
         logError(e);
         return e.getExitCode().getInt();
@@ -120,7 +229,7 @@ public class LlapStatusServiceDriver {
       } else {
         // Get information from slider.
         try {
-          ret = populateAppStatusFromSlider(options, sliderClient, appStatusBuilder);
+          ret = populateAppStatusFromSlider(appName, sliderClient, appStatusBuilder);
         } catch (LlapStatusCliException e) {
           // In case of failure, send back whatever is constructed sop far - which wouldbe from the AppReport
           logError(e);
@@ -132,7 +241,7 @@ public class LlapStatusServiceDriver {
         return ret.getInt();
       } else {
         try {
-          ret = populateAppStatusFromLlapRegistry(options, appStatusBuilder);
+          ret = populateAppStatusFromLlapRegistry(appName, appStatusBuilder);
         } catch (LlapStatusCliException e) {
           logError(e);
           return e.getExitCode().getInt();
@@ -140,8 +249,8 @@ public class LlapStatusServiceDriver {
       }
       return ret.getInt();
     }finally {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Final AppState: " + appStatusBuilder.toString());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Final AppState: " + appStatusBuilder.toString());
       }
       if (sliderClient != null) {
         sliderClient.stop();
@@ -157,6 +266,7 @@ public class LlapStatusServiceDriver {
     try {
       writer.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(appStatusBuilder));
     } catch (IOException e) {
+      LOG.warn("Failed to create JSON", e);
       throw new LlapStatusCliException(ExitCode.LLAP_JSON_GENERATION_ERROR, "Failed to create JSON",
           e);
     }
@@ -185,18 +295,26 @@ public class LlapStatusServiceDriver {
   }
 
 
-  private ApplicationReport getAppReport(LlapStatusOptions options, SliderClient sliderClient,
+  private ApplicationReport getAppReport(String appName, SliderClient sliderClient,
                                          long timeoutMs) throws LlapStatusCliException {
 
     long startTime = clock.getTime();
-    long timeoutTime = startTime + timeoutMs;
+    long timeoutTime = timeoutMs < 0 ? Long.MAX_VALUE : (startTime + timeoutMs);
     ApplicationReport appReport = null;
 
     // TODO HIVE-13454 Maybe add an option to wait for a certain amount of time for the app to
     // move to running state. Potentially even wait for the containers to be launched.
-    while (clock.getTime() < timeoutTime && appReport == null) {
+
+//    while (clock.getTime() < timeoutTime && appReport == null) {
+
+    while (appReport == null) {
       try {
-        appReport = sliderClient.getYarnAppListClient().findInstance(options.getName());
+        appReport = sliderClient.getYarnAppListClient().findInstance(appName);
+        if (timeoutMs == 0) {
+          // break immediately if timeout is 0
+          break;
+        }
+        // Otherwise sleep, and try again.
         if (appReport == null) {
           long remainingTime = Math.min(timeoutTime - clock.getTime(), 500l);
           if (remainingTime > 0) {
@@ -263,18 +381,18 @@ public class LlapStatusServiceDriver {
 
   /**
    *
-   * @param options
+   * @param appName
    * @param sliderClient
    * @param appStatusBuilder
    * @return an ExitCode. An ExitCode other than ExitCode.SUCCESS implies future progress not possible
    * @throws LlapStatusCliException
    */
-  private ExitCode populateAppStatusFromSlider(LlapStatusOptions options, SliderClient sliderClient, AppStatusBuilder appStatusBuilder) throws
+  private ExitCode populateAppStatusFromSlider(String appName, SliderClient sliderClient, AppStatusBuilder appStatusBuilder) throws
       LlapStatusCliException {
 
     ClusterDescription clusterDescription;
     try {
-      clusterDescription = sliderClient.getClusterDescription(options.getName());
+      clusterDescription = sliderClient.getClusterDescription(appName);
     } catch (SliderException e) {
       throw new LlapStatusCliException(ExitCode.SLIDER_CLIENT_ERROR_OTHER,
           "Failed to get cluster description from slider. SliderErrorCode=" + (e).getExitCode(), e);
@@ -348,16 +466,16 @@ public class LlapStatusServiceDriver {
 
   /**
    *
-   * @param options
+   * @param appName
    * @param appStatusBuilder
    * @return an ExitCode. An ExitCode other than ExitCode.SUCCESS implies future progress not possible
    * @throws LlapStatusCliException
    */
-  private ExitCode populateAppStatusFromLlapRegistry(LlapStatusOptions options, AppStatusBuilder appStatusBuilder) throws
+  private ExitCode populateAppStatusFromLlapRegistry(String appName, AppStatusBuilder appStatusBuilder) throws
       LlapStatusCliException {
     Configuration llapRegistryConf= new Configuration(conf);
     llapRegistryConf
-        .set(HiveConf.ConfVars.LLAP_DAEMON_SERVICE_HOSTS.varname, "@" + options.getName());
+        .set(HiveConf.ConfVars.LLAP_DAEMON_SERVICE_HOSTS.varname, "@" + appName);
     LlapRegistryService llapRegistry;
     try {
       llapRegistry = LlapRegistryService.getClient(llapRegistryConf);
@@ -801,17 +919,48 @@ public class LlapStatusServiceDriver {
 
 
   public static void main(String[] args) {
-    int ret;
+    LOG.info("LLAP status invoked with arguments = {}", args);
+    int ret = ExitCode.SUCCESS.getInt();
+
+    LlapStatusServiceDriver statusServiceDriver = null;
+    LlapStatusOptions options = null;
     try {
-      LlapStatusServiceDriver statusServiceDriver = new LlapStatusServiceDriver();
-      ret = statusServiceDriver.run(args);
+      statusServiceDriver = new LlapStatusServiceDriver();
+      options = statusServiceDriver.parseOptions(args);
+    } catch (Throwable t) {
+      logError(t);
+      if (t instanceof LlapStatusCliException) {
+        LlapStatusCliException ce = (LlapStatusCliException) t;
+        ret = ce.getExitCode().getInt();
+      } else {
+        ret = ExitCode.INTERNAL_ERROR.getInt();
+      }
+    }
+    if (ret != 0 || options == null) { // Failure / help
+      System.exit(ret);
+    }
+
+    try {
+      ret = statusServiceDriver.run(options);
       if (ret == ExitCode.SUCCESS.getInt()) {
-        statusServiceDriver.outputJson(new PrintWriter(System.out));
+        try (OutputStream os = options.getOutputFile() == null ? System.out :
+            new BufferedOutputStream(
+                new FileOutputStream(options.getOutputFile())); PrintWriter pw = new PrintWriter(
+            os)) {
+          statusServiceDriver.outputJson(pw);
+        }
       }
 
     } catch (Throwable t) {
       logError(t);
-      ret = ExitCode.INTERNAL_ERROR.getInt();
+      if (t instanceof LlapStatusCliException) {
+        LlapStatusCliException ce = (LlapStatusCliException) t;
+        ret = ce.getExitCode().getInt();
+      } else {
+        ret = ExitCode.INTERNAL_ERROR.getInt();
+      }
+    } finally {
+      LOG.info("LLAP status finished");
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Completed processing - exiting with " + ret);

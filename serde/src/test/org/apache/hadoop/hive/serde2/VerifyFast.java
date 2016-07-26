@@ -32,9 +32,27 @@ import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.fast.DeserializeRead;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.fast.SerializeWrite;
+import org.apache.hadoop.hive.serde2.io.ByteWritable;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
+import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
+import org.apache.hadoop.hive.serde2.io.HiveIntervalDayTimeWritable;
+import org.apache.hadoop.hive.serde2.io.HiveIntervalYearMonthWritable;
+import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
+import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
+import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
+import org.apache.hadoop.io.BooleanWritable;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 
 /**
  * TestBinarySortableSerDe.
@@ -42,27 +60,28 @@ import org.apache.hadoop.io.Text;
  */
 public class VerifyFast {
 
-  public static void verifyDeserializeRead(DeserializeRead deserializeRead, PrimitiveTypeInfo primitiveTypeInfo, Object object) throws IOException {
+  public static void verifyDeserializeRead(DeserializeRead deserializeRead,
+      PrimitiveTypeInfo primitiveTypeInfo, Writable writable) throws IOException {
 
     boolean isNull;
 
     isNull = deserializeRead.readCheckNull();
     if (isNull) {
-      if (object != null) {
+      if (writable != null) {
         TestCase.fail("Field reports null but object is not null");
       }
       return;
-    } else if (object == null) {
+    } else if (writable == null) {
       TestCase.fail("Field report not null but object is null");
     }
     switch (primitiveTypeInfo.getPrimitiveCategory()) {
       case BOOLEAN:
       {
-        boolean value = deserializeRead.readBoolean();
-        if (!(object instanceof Boolean)) {
-          TestCase.fail("Boolean expected object not Boolean");
+        boolean value = deserializeRead.currentBoolean;
+        if (!(writable instanceof BooleanWritable)) {
+          TestCase.fail("Boolean expected writable not Boolean");
         }
-        Boolean expected = (Boolean) object;
+        boolean expected = ((BooleanWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Boolean field mismatch (expected " + expected + " found " + value + ")");
         }
@@ -70,11 +89,11 @@ public class VerifyFast {
       break;
     case BYTE:
       {
-        byte value = deserializeRead.readByte();
-        if (!(object instanceof Byte)) {
-          TestCase.fail("Byte expected object not Byte");
+        byte value = deserializeRead.currentByte;
+        if (!(writable instanceof ByteWritable)) {
+          TestCase.fail("Byte expected writable not Byte");
         }
-        Byte expected = (Byte) object;
+        byte expected = ((ByteWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Byte field mismatch (expected " + (int) expected + " found " + (int) value + ")");
         }
@@ -82,11 +101,11 @@ public class VerifyFast {
       break;
     case SHORT:
       {
-        short value = deserializeRead.readShort();
-        if (!(object instanceof Short)) {
-          TestCase.fail("Short expected object not Short");
+        short value = deserializeRead.currentShort;
+        if (!(writable instanceof ShortWritable)) {
+          TestCase.fail("Short expected writable not Short");
         }
-        Short expected = (Short) object;
+        short expected = ((ShortWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Short field mismatch (expected " + expected + " found " + value + ")");
         }
@@ -94,11 +113,11 @@ public class VerifyFast {
       break;
     case INT:
       {
-        int value = deserializeRead.readInt();
-        if (!(object instanceof Integer)) {
-          TestCase.fail("Integer expected object not Integer");
+        int value = deserializeRead.currentInt;
+        if (!(writable instanceof IntWritable)) {
+          TestCase.fail("Integer expected writable not Integer");
         }
-        Integer expected = (Integer) object;
+        int expected = ((IntWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Int field mismatch (expected " + expected + " found " + value + ")");
         }
@@ -106,11 +125,11 @@ public class VerifyFast {
       break;
     case LONG:
       {
-        long value = deserializeRead.readLong();
-        if (!(object instanceof Long)) {
-          TestCase.fail("Long expected object not Long");
+        long value = deserializeRead.currentLong;
+        if (!(writable instanceof LongWritable)) {
+          TestCase.fail("Long expected writable not Long");
         }
-        Long expected = (Long) object;
+        Long expected = ((LongWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Long field mismatch (expected " + expected + " found " + value + ")");
         }
@@ -118,11 +137,11 @@ public class VerifyFast {
       break;
     case FLOAT:
       {
-        float value = deserializeRead.readFloat();
-        Float expected = (Float) object;
-        if (!(object instanceof Float)) {
-          TestCase.fail("Float expected object not Float");
+        float value = deserializeRead.currentFloat;
+        if (!(writable instanceof FloatWritable)) {
+          TestCase.fail("Float expected writable not Float");
         }
+        float expected = ((FloatWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Float field mismatch (expected " + expected + " found " + value + ")");
         }
@@ -130,11 +149,11 @@ public class VerifyFast {
       break;
     case DOUBLE:
       {
-        double value = deserializeRead.readDouble();
-        Double expected = (Double) object;
-        if (!(object instanceof Double)) {
-          TestCase.fail("Double expected object not Double");
+        double value = deserializeRead.currentDouble;
+        if (!(writable instanceof DoubleWritable)) {
+          TestCase.fail("Double expected writable not Double");
         }
+        double expected = ((DoubleWritable) writable).get();
         if (value != expected) {
           TestCase.fail("Double field mismatch (expected " + expected + " found " + value + ")");
         }
@@ -142,12 +161,13 @@ public class VerifyFast {
       break;
     case STRING:
       {
-        DeserializeRead.ReadStringResults readStringResults = deserializeRead.createReadStringResults();
-        deserializeRead.readString(readStringResults);
-        byte[] stringBytes = Arrays.copyOfRange(readStringResults.bytes, readStringResults.start, readStringResults.start + readStringResults.length);
+        byte[] stringBytes = Arrays.copyOfRange(
+            deserializeRead.currentBytes,
+            deserializeRead.currentBytesStart,
+            deserializeRead.currentBytesStart + deserializeRead.currentBytesLength);
         Text text = new Text(stringBytes);
         String string = text.toString();
-        String expected = (String) object;
+        String expected = ((Text) writable).toString();
         if (!string.equals(expected)) {
           TestCase.fail("String field mismatch (expected '" + expected + "' found '" + string + "')");
         }
@@ -155,10 +175,16 @@ public class VerifyFast {
       break;
     case CHAR:
       {
-        DeserializeRead.ReadHiveCharResults readHiveCharResults = deserializeRead.createReadHiveCharResults();
-        deserializeRead.readHiveChar(readHiveCharResults);
-        HiveChar hiveChar = readHiveCharResults.getHiveChar();
-        HiveChar expected = (HiveChar) object;
+        byte[] stringBytes = Arrays.copyOfRange(
+            deserializeRead.currentBytes,
+            deserializeRead.currentBytesStart,
+            deserializeRead.currentBytesStart + deserializeRead.currentBytesLength);
+        Text text = new Text(stringBytes);
+        String string = text.toString();
+
+        HiveChar hiveChar = new HiveChar(string, ((CharTypeInfo) primitiveTypeInfo).getLength());
+
+        HiveChar expected = ((HiveCharWritable) writable).getHiveChar();
         if (!hiveChar.equals(expected)) {
           TestCase.fail("Char field mismatch (expected '" + expected + "' found '" + hiveChar + "')");
         }
@@ -166,10 +192,16 @@ public class VerifyFast {
       break;
     case VARCHAR:
       {
-        DeserializeRead.ReadHiveVarcharResults readHiveVarcharResults = deserializeRead.createReadHiveVarcharResults();
-        deserializeRead.readHiveVarchar(readHiveVarcharResults);
-        HiveVarchar hiveVarchar = readHiveVarcharResults.getHiveVarchar();
-        HiveVarchar expected = (HiveVarchar) object;
+        byte[] stringBytes = Arrays.copyOfRange(
+            deserializeRead.currentBytes,
+            deserializeRead.currentBytesStart,
+            deserializeRead.currentBytesStart + deserializeRead.currentBytesLength);
+        Text text = new Text(stringBytes);
+        String string = text.toString();
+
+        HiveVarchar hiveVarchar = new HiveVarchar(string, ((VarcharTypeInfo) primitiveTypeInfo).getLength());
+
+        HiveVarchar expected = ((HiveVarcharWritable) writable).getHiveVarchar();
         if (!hiveVarchar.equals(expected)) {
           TestCase.fail("Varchar field mismatch (expected '" + expected + "' found '" + hiveVarchar + "')");
         }
@@ -177,13 +209,11 @@ public class VerifyFast {
       break;
     case DECIMAL:
       {
-        DeserializeRead.ReadDecimalResults readDecimalResults = deserializeRead.createReadDecimalResults();
-        deserializeRead.readHiveDecimal(readDecimalResults);
-        HiveDecimal value = readDecimalResults.getHiveDecimal();
+        HiveDecimal value = deserializeRead.currentHiveDecimalWritable.getHiveDecimal();
         if (value == null) {
           TestCase.fail("Decimal field evaluated to NULL");
         }
-        HiveDecimal expected = (HiveDecimal) object;
+        HiveDecimal expected = ((HiveDecimalWritable) writable).getHiveDecimal();
         if (!value.equals(expected)) {
           DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) primitiveTypeInfo;
           int precision = decimalTypeInfo.getPrecision();
@@ -194,10 +224,8 @@ public class VerifyFast {
       break;
     case DATE:
       {
-        DeserializeRead.ReadDateResults readDateResults = deserializeRead.createReadDateResults();
-        deserializeRead.readDate(readDateResults);
-        Date value = readDateResults.getDate();
-        Date expected = (Date) object;
+        Date value = deserializeRead.currentDateWritable.get();
+        Date expected = ((DateWritable) writable).get();
         if (!value.equals(expected)) {
           TestCase.fail("Date field mismatch (expected " + expected.toString() + " found " + value.toString() + ")");
         }
@@ -205,10 +233,8 @@ public class VerifyFast {
       break;
     case TIMESTAMP:
       {
-        DeserializeRead.ReadTimestampResults readTimestampResults = deserializeRead.createReadTimestampResults();
-        deserializeRead.readTimestamp(readTimestampResults);
-        Timestamp value = readTimestampResults.getTimestamp();
-        Timestamp expected = (Timestamp) object;
+        Timestamp value = deserializeRead.currentTimestampWritable.getTimestamp();
+        Timestamp expected = ((TimestampWritable) writable).getTimestamp();
         if (!value.equals(expected)) {
           TestCase.fail("Timestamp field mismatch (expected " + expected.toString() + " found " + value.toString() + ")");
         }
@@ -216,10 +242,8 @@ public class VerifyFast {
       break;
     case INTERVAL_YEAR_MONTH:
       {
-        DeserializeRead.ReadIntervalYearMonthResults readIntervalYearMonthResults = deserializeRead.createReadIntervalYearMonthResults();
-        deserializeRead.readIntervalYearMonth(readIntervalYearMonthResults);
-        HiveIntervalYearMonth value = readIntervalYearMonthResults.getHiveIntervalYearMonth();
-        HiveIntervalYearMonth expected = (HiveIntervalYearMonth) object;
+        HiveIntervalYearMonth value = deserializeRead.currentHiveIntervalYearMonthWritable.getHiveIntervalYearMonth();
+        HiveIntervalYearMonth expected = ((HiveIntervalYearMonthWritable) writable).getHiveIntervalYearMonth();
         if (!value.equals(expected)) {
           TestCase.fail("HiveIntervalYearMonth field mismatch (expected " + expected.toString() + " found " + value.toString() + ")");
         }
@@ -227,10 +251,8 @@ public class VerifyFast {
       break;
     case INTERVAL_DAY_TIME:
       {
-        DeserializeRead.ReadIntervalDayTimeResults readIntervalDayTimeResults = deserializeRead.createReadIntervalDayTimeResults();
-        deserializeRead.readIntervalDayTime(readIntervalDayTimeResults);
-        HiveIntervalDayTime value = readIntervalDayTimeResults.getHiveIntervalDayTime();
-        HiveIntervalDayTime expected = (HiveIntervalDayTime) object;
+        HiveIntervalDayTime value = deserializeRead.currentHiveIntervalDayTimeWritable.getHiveIntervalDayTime();
+        HiveIntervalDayTime expected = ((HiveIntervalDayTimeWritable) writable).getHiveIntervalDayTime();
         if (!value.equals(expected)) {
           TestCase.fail("HiveIntervalDayTime field mismatch (expected " + expected.toString() + " found " + value.toString() + ")");
         }
@@ -238,10 +260,12 @@ public class VerifyFast {
       break;
     case BINARY:
       {
-        DeserializeRead.ReadBinaryResults readBinaryResults = deserializeRead.createReadBinaryResults();
-        deserializeRead.readBinary(readBinaryResults);
-        byte[] byteArray = Arrays.copyOfRange(readBinaryResults.bytes, readBinaryResults.start, readBinaryResults.start + readBinaryResults.length);
-        byte[] expected = (byte[]) object;
+        byte[] byteArray = Arrays.copyOfRange(
+            deserializeRead.currentBytes,
+            deserializeRead.currentBytesStart,
+            deserializeRead.currentBytesStart + deserializeRead.currentBytesLength);
+        BytesWritable bytesWritable = (BytesWritable) writable;
+        byte[] expected = Arrays.copyOfRange(bytesWritable.getBytes(), 0, bytesWritable.getLength());
         if (byteArray.length != expected.length){
           TestCase.fail("Byte Array field mismatch (expected " + Arrays.toString(expected)
               + " found " + Arrays.toString(byteArray) + ")");
@@ -259,57 +283,58 @@ public class VerifyFast {
     }
   }
 
-  public static void serializeWrite(SerializeWrite serializeWrite, PrimitiveTypeInfo primitiveTypeInfo, Object object) throws IOException {
-    if (object == null) {
+  public static void serializeWrite(SerializeWrite serializeWrite,
+      PrimitiveTypeInfo primitiveTypeInfo, Writable writable) throws IOException {
+    if (writable == null) {
       serializeWrite.writeNull();
       return;
     }
     switch (primitiveTypeInfo.getPrimitiveCategory()) {
       case BOOLEAN:
       {
-        boolean value = (Boolean) object;
+        boolean value = ((BooleanWritable) writable).get();
         serializeWrite.writeBoolean(value);
       }
       break;
     case BYTE:
       {
-        byte value = (Byte) object;
+        byte value = ((ByteWritable) writable).get();
         serializeWrite.writeByte(value);
       }
       break;
     case SHORT:
       {
-        short value = (Short) object;
+        short value = ((ShortWritable) writable).get();
         serializeWrite.writeShort(value);
       }
       break;
     case INT:
       {
-        int value = (Integer) object;
+        int value = ((IntWritable) writable).get();
         serializeWrite.writeInt(value);
       }
       break;
     case LONG:
       {
-        long value = (Long) object;
+        long value = ((LongWritable) writable).get();
         serializeWrite.writeLong(value);
       }
       break;
     case FLOAT:
       {
-        float value = (Float) object;
+        float value = ((FloatWritable) writable).get();
         serializeWrite.writeFloat(value);
       }
       break;
     case DOUBLE:
       {
-        double value = (Double) object;
+        double value = ((DoubleWritable) writable).get();
         serializeWrite.writeDouble(value);
       }
       break;
     case STRING:
       {
-        String value = (String) object;
+        Text value = (Text) writable;
         byte[] stringBytes = value.getBytes();
         int stringLength = stringBytes.length;
         serializeWrite.writeString(stringBytes, 0, stringLength);
@@ -317,51 +342,52 @@ public class VerifyFast {
       break;
     case CHAR:
       {
-        HiveChar value = (HiveChar) object;
+        HiveChar value = ((HiveCharWritable) writable).getHiveChar();
         serializeWrite.writeHiveChar(value);
       }
       break;
     case VARCHAR:
       {
-        HiveVarchar value = (HiveVarchar) object;
+        HiveVarchar value = ((HiveVarcharWritable) writable).getHiveVarchar();
         serializeWrite.writeHiveVarchar(value);
       }
       break;
     case DECIMAL:
       {
-        HiveDecimal value = (HiveDecimal) object;
+        HiveDecimal value = ((HiveDecimalWritable) writable).getHiveDecimal();
         DecimalTypeInfo decTypeInfo = (DecimalTypeInfo)primitiveTypeInfo;
         serializeWrite.writeHiveDecimal(value, decTypeInfo.scale());
       }
       break;
     case DATE:
       {
-        Date value = (Date) object;
+        Date value = ((DateWritable) writable).get();
         serializeWrite.writeDate(value);
       }
       break;
     case TIMESTAMP:
       {
-        Timestamp value = (Timestamp) object;
+        Timestamp value = ((TimestampWritable) writable).getTimestamp();
         serializeWrite.writeTimestamp(value);
       }
       break;
     case INTERVAL_YEAR_MONTH:
       {
-        HiveIntervalYearMonth value = (HiveIntervalYearMonth) object;
+        HiveIntervalYearMonth value = ((HiveIntervalYearMonthWritable) writable).getHiveIntervalYearMonth();
         serializeWrite.writeHiveIntervalYearMonth(value);
       }
       break;
     case INTERVAL_DAY_TIME:
       {
-        HiveIntervalDayTime value = (HiveIntervalDayTime) object;
+        HiveIntervalDayTime value = ((HiveIntervalDayTimeWritable) writable).getHiveIntervalDayTime();
         serializeWrite.writeHiveIntervalDayTime(value);
       }
       break;
     case BINARY:
       {
-        byte[] binaryBytes = (byte[]) object;
-        int length = binaryBytes.length;
+        BytesWritable byteWritable = (BytesWritable) writable;
+        byte[] binaryBytes = byteWritable.getBytes();
+        int length = byteWritable.getLength();
         serializeWrite.writeBinary(binaryBytes, 0, length);
       }
       break;

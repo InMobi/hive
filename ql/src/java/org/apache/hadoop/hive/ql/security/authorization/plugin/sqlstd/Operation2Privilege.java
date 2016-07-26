@@ -231,6 +231,10 @@ public class Operation2Privilege {
 (OWNER_PRIV_AR,  OWNER_PRIV_AR));
     op2Priv.put(HiveOperationType.TRUNCATETABLE, PrivRequirement.newIOPrivRequirement
 (OWNER_PRIV_AR, OWNER_PRIV_AR));
+    op2Priv.put(HiveOperationType.ALTERTABLE_DROPCONSTRAINT, PrivRequirement.newIOPrivRequirement
+(OWNER_PRIV_AR, OWNER_PRIV_AR));
+    op2Priv.put(HiveOperationType.ALTERTABLE_ADDCONSTRAINT, PrivRequirement.newIOPrivRequirement
+(OWNER_PRIV_AR, OWNER_PRIV_AR));
 
     //table ownership for create/drop/alter index
     op2Priv.put(HiveOperationType.CREATEINDEX, PrivRequirement.newIOPrivRequirement
@@ -424,7 +428,8 @@ public class Operation2Privilege {
       (null, null));
     op2Priv.put(HiveOperationType.ALTERTABLE_EXCHANGEPARTITION,
       PrivRequirement.newIOPrivRequirement(null, null));
-
+    op2Priv.put(HiveOperationType.ABORT_TRANSACTIONS, PrivRequirement.newIOPrivRequirement
+      (null, null));
   }
 
   /**

@@ -819,11 +819,6 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   }
 
   @Override
-  public long getChangeVersion(String topic) throws MetaException {
-    return 0;
-  }
-
-  @Override
   public List<SQLPrimaryKey> getPrimaryKeys(String db_name, String tbl_name)
     throws MetaException {
     // TODO Auto-generated method stub
@@ -841,6 +836,24 @@ public class DummyRawStoreControlledCommit implements RawStore, Configurable {
   @Override
   public void createTableWithConstraints(Table tbl,
     List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
+    throws InvalidObjectException, MetaException {
+    // TODO Auto-generated method stub
+  }
+
+  @Override
+  public void dropConstraint(String dbName, String tableName,
+   String constraintName) throws NoSuchObjectException {
+   // TODO Auto-generated method stub
+  }
+
+  @Override
+  public void addPrimaryKeys(List<SQLPrimaryKey> pks)
+    throws InvalidObjectException, MetaException {
+    // TODO Auto-generated method stub
+  }
+
+  @Override
+  public void addForeignKeys(List<SQLForeignKey> fks)
     throws InvalidObjectException, MetaException {
     // TODO Auto-generated method stub
   }

@@ -43,6 +43,9 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  void create_table(Table tbl)')
   print('  void create_table_with_environment_context(Table tbl, EnvironmentContext environment_context)')
   print('  void create_table_with_constraints(Table tbl,  primaryKeys,  foreignKeys)')
+  print('  void drop_constraint(DropConstraintRequest req)')
+  print('  void add_primary_key(AddPrimaryKeyRequest req)')
+  print('  void add_foreign_key(AddForeignKeyRequest req)')
   print('  void drop_table(string dbname, string name, bool deleteData)')
   print('  void drop_table_with_environment_context(string dbname, string name, bool deleteData, EnvironmentContext environment_context)')
   print('   get_tables(string db_name, string pattern)')
@@ -150,6 +153,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  GetOpenTxnsInfoResponse get_open_txns_info()')
   print('  OpenTxnsResponse open_txns(OpenTxnRequest rqst)')
   print('  void abort_txn(AbortTxnRequest rqst)')
+  print('  void abort_txns(AbortTxnsRequest rqst)')
   print('  void commit_txn(CommitTxnRequest rqst)')
   print('  LockResponse lock(LockRequest rqst)')
   print('  LockResponse check_lock(CheckLockRequest rqst)')
@@ -169,7 +173,6 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print('  PutFileMetadataResult put_file_metadata(PutFileMetadataRequest req)')
   print('  ClearFileMetadataResult clear_file_metadata(ClearFileMetadataRequest req)')
   print('  CacheFileMetadataResult cache_file_metadata(CacheFileMetadataRequest req)')
-  print('  GetChangeVersionResult get_change_version(GetChangeVersionRequest req)')
   print('  string getName()')
   print('  string getVersion()')
   print('  fb_status getStatus()')
@@ -352,6 +355,24 @@ elif cmd == 'create_table_with_constraints':
     print('create_table_with_constraints requires 3 args')
     sys.exit(1)
   pp.pprint(client.create_table_with_constraints(eval(args[0]),eval(args[1]),eval(args[2]),))
+
+elif cmd == 'drop_constraint':
+  if len(args) != 1:
+    print('drop_constraint requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.drop_constraint(eval(args[0]),))
+
+elif cmd == 'add_primary_key':
+  if len(args) != 1:
+    print('add_primary_key requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.add_primary_key(eval(args[0]),))
+
+elif cmd == 'add_foreign_key':
+  if len(args) != 1:
+    print('add_foreign_key requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.add_foreign_key(eval(args[0]),))
 
 elif cmd == 'drop_table':
   if len(args) != 3:
@@ -995,6 +1016,12 @@ elif cmd == 'abort_txn':
     sys.exit(1)
   pp.pprint(client.abort_txn(eval(args[0]),))
 
+elif cmd == 'abort_txns':
+  if len(args) != 1:
+    print('abort_txns requires 1 args')
+    sys.exit(1)
+  pp.pprint(client.abort_txns(eval(args[0]),))
+
 elif cmd == 'commit_txn':
   if len(args) != 1:
     print('commit_txn requires 1 args')
@@ -1108,12 +1135,6 @@ elif cmd == 'cache_file_metadata':
     print('cache_file_metadata requires 1 args')
     sys.exit(1)
   pp.pprint(client.cache_file_metadata(eval(args[0]),))
-
-elif cmd == 'get_change_version':
-  if len(args) != 1:
-    print('get_change_version requires 1 args')
-    sys.exit(1)
-  pp.pprint(client.get_change_version(eval(args[0]),))
 
 elif cmd == 'getName':
   if len(args) != 0:

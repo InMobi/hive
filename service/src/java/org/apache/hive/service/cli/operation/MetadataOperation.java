@@ -22,7 +22,7 @@ import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAccessControlException;
-import org.apache.hadoop.hive.ql.security.authorization.plugin.QueryContext;
+import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzContext;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzPluginException;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject;
@@ -44,7 +44,7 @@ public abstract class MetadataOperation extends Operation {
   private static final char SEARCH_STRING_ESCAPE = '\\';
 
   protected MetadataOperation(HiveSession parentSession, OperationType opType) {
-    super(parentSession, opType, false);
+    super(parentSession, opType);
     setHasResultSet(true);
   }
 
@@ -109,7 +109,7 @@ public abstract class MetadataOperation extends Operation {
     pattern = replaceAll(pattern, "^_", ".");
     return pattern;
   }
-  
+
   private String replaceAll(String input, final String pattern, final String replace) {
     while (true) {
       String replaced = input.replaceAll(pattern, replace);
@@ -134,7 +134,8 @@ public abstract class MetadataOperation extends Operation {
   protected void authorizeMetaGets(HiveOperationType opType, List<HivePrivilegeObject> inpObjs,
       String cmdString) throws HiveSQLException {
     SessionState ss = SessionState.get();
-    QueryContext.Builder ctxBuilder = new QueryContext.Builder();
+    HiveAuthzContext.Builder ctxBuilder = new HiveAuthzContext.Builder();
+    ctxBuilder.setUserIpAddress(ss.getUserIpAddress());
     ctxBuilder.setForwardedAddresses(ss.getForwardedAddresses());
     ctxBuilder.setCommandString(cmdString);
     try {
@@ -143,6 +144,11 @@ public abstract class MetadataOperation extends Operation {
     } catch (HiveAuthzPluginException | HiveAccessControlException e) {
       throw new HiveSQLException(e.getMessage(), e);
     }
+  }
+
+  @Override
+  public void cancel(OperationState stateAfterCancel) throws HiveSQLException {
+    throw new UnsupportedOperationException("MetadataOperation.cancel()");
   }
 
 }

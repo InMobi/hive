@@ -370,41 +370,33 @@ class MetaStoreDirectSql {
 
   /**
    * Gets partitions by using direct SQL queries.
-   * @param table The table.
-   * @param tree The expression tree from which the SQL filter will be derived.
+   * @param filter The filter.
    * @param max The maximum number of partitions to return.
-   * @return List of partitions. Null if SQL filter cannot be derived.
+   * @return List of partitions.
    */
   public List<Partition> getPartitionsViaSqlFilter(
-      Table table, ExpressionTree tree, Integer max) throws MetaException {
-    assert tree != null;
-    List<Object> params = new ArrayList<Object>();
-    List<String> joins = new ArrayList<String>();
-    // Derby and Oracle do not interpret filters ANSI-properly in some cases and need a workaround.
-    boolean dbHasJoinCastBug = (dbType == DB.DERBY || dbType == DB.ORACLE);
-    String sqlFilter = PartitionFilterGenerator.generateSqlFilter(
-        table, tree, params, joins, dbHasJoinCastBug, defaultPartName, dbType);
-    if (sqlFilter == null) {
-      return null; // Cannot make SQL filter to push down.
-    }
-    Boolean isViewTable = isViewTable(table);
-    return getPartitionsViaSqlFilterInternal(table.getDbName(), table.getTableName(),
-        isViewTable, sqlFilter, params, joins, max);
+      SqlFilterForPushdown filter, Integer max) throws MetaException {
+    Boolean isViewTable = isViewTable(filter.table);
+    return getPartitionsViaSqlFilterInternal(filter.table.getDbName(), filter.table.getTableName(),
+        isViewTable, filter.filter, filter.params, filter.joins, max);
   }
 
-  public int getNumPartitionsViaSqlFilter(Table table, ExpressionTree tree) throws MetaException {
-    List<Object> params = new ArrayList<Object>();
-    List<String>joins = new ArrayList<String>();
-    // Derby and Oracle do not interpret filters ANSI-properly in some cases and need a workaround.
-    boolean dbHasJoinCastBug = (dbType == DB.DERBY || dbType == DB.ORACLE);
-    String sqlFilter = PartitionFilterGenerator.generateSqlFilter(
-        table, tree, params, joins, dbHasJoinCastBug, defaultPartName, dbType);
-    if (sqlFilter == null) {
-      return 0; // Cannot make SQL filter to push down.
-    }
-    return getNumPartitionsViaSqlFilterInternal(table.getDbName(), table.getTableName(), sqlFilter, params, joins);
+  public static class SqlFilterForPushdown {
+    private List<Object> params = new ArrayList<Object>();
+    private List<String> joins = new ArrayList<String>();
+    private String filter;
+    private Table table;
   }
 
+  public boolean generateSqlFilterForPushdown(
+      Table table, ExpressionTree tree, SqlFilterForPushdown result) throws MetaException {
+    // Derby and Oracle do not interpret filters ANSI-properly in some cases and need a workaround.
+    boolean dbHasJoinCastBug = (dbType == DB.DERBY || dbType == DB.ORACLE);
+    result.table = table;
+    result.filter = PartitionFilterGenerator.generateSqlFilter(
+        table, tree, result.params, result.joins, dbHasJoinCastBug, defaultPartName, dbType);
+    return result.filter != null;
+  }
 
   /**
    * Gets all partitions of a table by using direct SQL queries.
@@ -827,12 +819,10 @@ class MetaStoreDirectSql {
     return orderedResult;
   }
 
-  private int getNumPartitionsViaSqlFilterInternal(String dbName, String tblName,
-                                                   String sqlFilter, List<Object> paramsForFilter,
-                                                   List<String> joinsForFilter) throws MetaException {
+  public int getNumPartitionsViaSqlFilter(SqlFilterForPushdown filter) throws MetaException {
     boolean doTrace = LOG.isDebugEnabled();
-    dbName = dbName.toLowerCase();
-    tblName = tblName.toLowerCase();
+    String dbName = filter.table.getDbName().toLowerCase();
+    String tblName = filter.table.getTableName().toLowerCase();
 
     // Get number of partitions by doing count on PART_ID.
     String queryText = "select count(\"PARTITIONS\".\"PART_ID\") from \"PARTITIONS\""
@@ -840,14 +830,14 @@ class MetaStoreDirectSql {
       + "    and \"TBLS\".\"TBL_NAME\" = ? "
       + "  inner join \"DBS\" on \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
       + "     and \"DBS\".\"NAME\" = ? "
-      + join(joinsForFilter, ' ')
-      + (sqlFilter == null ? "" : (" where " + sqlFilter));
+      + join(filter.joins, ' ')
+      + (filter.filter == null ? "" : (" where " + filter.filter));
 
-    Object[] params = new Object[paramsForFilter.size() + 2];
+    Object[] params = new Object[filter.params.size() + 2];
     params[0] = tblName;
     params[1] = dbName;
-    for (int i = 0; i < paramsForFilter.size(); ++i) {
-      params[i + 2] = paramsForFilter.get(i);
+    for (int i = 0; i < filter.params.size(); ++i) {
+      params[i + 2] = filter.params.get(i);
     }
 
     long start = doTrace ? System.nanoTime() : 0;
@@ -994,6 +984,11 @@ class MetaStoreDirectSql {
         List<String> joins, boolean dbHasJoinCastBug, String defaultPartName, DB dbType)
             throws MetaException {
       assert table != null;
+      if (tree == null) {
+        // consistent with other APIs like makeExpressionTree, null is returned to indicate that
+        // the filter could not pushed down due to parsing issue etc
+        return null;
+      }
       if (tree.getRoot() == null) {
         return "";
       }
@@ -1820,23 +1815,27 @@ class MetaStoreDirectSql {
       "SELECT  \"D2\".\"NAME\", \"T2\".\"TBL_NAME\", \"C2\".\"COLUMN_NAME\","
       + "\"DBS\".\"NAME\", \"TBLS\".\"TBL_NAME\", \"COLUMNS_V2\".\"COLUMN_NAME\", "
       + "\"KEY_CONSTRAINTS\".\"POSITION\", \"KEY_CONSTRAINTS\".\"UPDATE_RULE\", \"KEY_CONSTRAINTS\".\"DELETE_RULE\", "
-      + "\"KEY_CONSTRAINTS\".\"CONSTRAINT_NAME\" , \"KEY_CONSTRAINTS2\".\"CONSTRAINT_NAME\", \"KEY_CONSTRAINTS\".\"ENABLE_VALIDATE_RELY\""
+      + "\"KEY_CONSTRAINTS\".\"CONSTRAINT_NAME\" , \"KEY_CONSTRAINTS2\".\"CONSTRAINT_NAME\", \"KEY_CONSTRAINTS\".\"ENABLE_VALIDATE_RELY\" "
       + " FROM \"TBLS\" "
       + " INNER JOIN \"KEY_CONSTRAINTS\" ON \"TBLS\".\"TBL_ID\" = \"KEY_CONSTRAINTS\".\"CHILD_TBL_ID\" "
       + " INNER JOIN \"KEY_CONSTRAINTS\" \"KEY_CONSTRAINTS2\" ON \"KEY_CONSTRAINTS2\".\"PARENT_TBL_ID\"  = \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" "
+      + " AND \"KEY_CONSTRAINTS2\".\"PARENT_CD_ID\"  = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" AND "
+      + " \"KEY_CONSTRAINTS2\".\"PARENT_INTEGER_IDX\"  = \"KEY_CONSTRAINTS\".\"PARENT_INTEGER_IDX\" "
       + " INNER JOIN \"DBS\" ON \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
       + " INNER JOIN \"TBLS\" \"T2\" ON  \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" = \"T2\".\"TBL_ID\" "
       + " INNER JOIN \"DBS\" \"D2\" ON \"T2\".\"DB_ID\" = \"D2\".\"DB_ID\" "
-      + " INNER JOIN \"COLUMNS_V2\"  ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"CHILD_CD_ID\" "
-      + " INNER JOIN \"COLUMNS_V2\" \"C2\" ON \"C2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\"  ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"CHILD_CD_ID\" AND "
+      + " \"COLUMNS_V2\".\"INTEGER_IDX\" = \"KEY_CONSTRAINTS\".\"CHILD_INTEGER_IDX\" "
+      + " INNER JOIN \"COLUMNS_V2\" \"C2\" ON \"C2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" AND "
+      + " \"C2\".\"INTEGER_IDX\" = \"KEY_CONSTRAINTS\".\"PARENT_INTEGER_IDX\" "
       + " WHERE \"KEY_CONSTRAINTS\".\"CONSTRAINT_TYPE\" = "
       + MConstraint.FOREIGN_KEY_CONSTRAINT
       + " AND \"KEY_CONSTRAINTS2\".\"CONSTRAINT_TYPE\" = "
-      + MConstraint.PRIMARY_KEY_CONSTRAINT
-      + (foreign_db_name == null ? "" : "\"DBS\".\"NAME\" = ? AND")
-      + (foreign_tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? AND ")
-      + (parent_tbl_name == null ? "" : " \"T2\".\"TBL_NAME\" = ? AND ")
-      + (parent_db_name == null ? "" : "\"D2\".\"NAME\" = ?") ;
+      + MConstraint.PRIMARY_KEY_CONSTRAINT + " AND"
+      + (foreign_db_name == null ? "" : " \"DBS\".\"NAME\" = ? AND")
+      + (foreign_tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? AND")
+      + (parent_tbl_name == null ? "" : " \"T2\".\"TBL_NAME\" = ? AND")
+      + (parent_db_name == null ? "" : " \"D2\".\"NAME\" = ?") ;
 
     queryText = queryText.trim();
     if (queryText.endsWith("WHERE")) {
@@ -1900,8 +1899,8 @@ class MetaStoreDirectSql {
       + " FROM  \"TBLS\" "
       + " INNER  JOIN \"KEY_CONSTRAINTS\" ON \"TBLS\".\"TBL_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" "
       + " INNER JOIN \"DBS\" ON \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
-      + " INNER JOIN \"TBLS\" ON \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" = \"TBLS\".\"TBL_ID\" "
-      + " INNER JOIN \"COLUMNS_V2\" ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\" ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" AND "
+      + " \"COLUMNS_V2\".\"INTEGER_IDX\" = \"KEY_CONSTRAINTS\".\"PARENT_INTEGER_IDX\" "
       + " WHERE \"KEY_CONSTRAINTS\".\"CONSTRAINT_TYPE\" = "+ MConstraint.PRIMARY_KEY_CONSTRAINT + " AND "
       + (db_name == null ? "" : "\"DBS\".\"NAME\" = ? AND")
       + (tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? ") ;

@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.io.HdfsUtils;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hive.ql.io.merge.MergeFileTask;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLock;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockManager;
 import org.apache.hadoop.hive.ql.lockmgr.HiveLockObj;
+import org.apache.hadoop.hive.ql.lockmgr.LockException;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -65,8 +67,6 @@ import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.MoveWork;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.hive.ql.session.SessionState;
-import org.apache.hadoop.hive.shims.HadoopShims;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,6 +115,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
       if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_INSERT_INTO_MULTILEVEL_DIRS)) {
         deletePath = createTargetPath(targetPath, fs);
       }
+      Hive.clearDestForSubDirSrc(conf, targetPath, sourcePath, false);
       if (!Hive.moveFile(conf, sourcePath, targetPath, true, false)) {
         try {
           if (deletePath != null) {
@@ -179,11 +180,9 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         actualPath = actualPath.getParent();
       }
       fs.mkdirs(mkDirPath);
-      HadoopShims shims = ShimLoader.getHadoopShims();
       if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS)) {
         try {
-          HadoopShims.HdfsFileStatus status = shims.getFullFileStatus(conf, fs, actualPath);
-          shims.setFullFileStatus(conf, status, fs, actualPath);
+          HdfsUtils.setFullFileStatus(conf, new HdfsUtils.HadoopFileStatus(conf, fs, actualPath), fs, mkDirPath, true);
         } catch (Exception e) {
           LOG.warn("Error setting permissions or group of " + actualPath, e);
         }
@@ -217,13 +216,28 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
       List<HiveLock> locks = lockMgr.getLocks(lockObj.getObj(), false, true);
       for (HiveLock lock : locks) {
         if (lock.getHiveLockMode() == lockObj.getMode()) {
-          LOG.info("about to release lock for output: " + output.toString() +
-              " lock: " + lock.getHiveLockObject().getName());
-          lockMgr.unlock(lock);
-          ctx.getHiveLocks().remove(lock);
+          if (ctx.getHiveLocks().remove(lock)) {
+            LOG.info("about to release lock for output: " + output.toString() +
+                " lock: " + lock.getHiveLockObject().getName());
+            try {
+              lockMgr.unlock(lock);
+            } catch (LockException le) {
+              // should be OK since the lock is ephemeral and will eventually be deleted
+              // when the query finishes and zookeeper session is closed.
+              LOG.warn("Could not release lock " + lock.getHiveLockObject().getName());
+            }
+          }
         }
       }
     }
+  }
+
+  // we check if there is only one immediate child task and it is stats task
+  public boolean hasFollowingStatsTask() {
+    if (this.getNumChild() == 1) {
+      return this.getChildTasks().get(0) instanceof StatsTask;
+    }
+    return false;
   }
 
   @Override
@@ -339,10 +353,10 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
         DataContainer dc = null;
         if (tbd.getPartitionSpec().size() == 0) {
           dc = new DataContainer(table.getTTable());
-          db.loadTable(tbd.getSourcePath(), tbd.getTable()
-              .getTableName(), tbd.getReplace(), work.isSrcLocal(),
-              isSkewedStoredAsDirs(tbd),
-              work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID);
+          db.loadTable(tbd.getSourcePath(), tbd.getTable().getTableName(), tbd.getReplace(),
+              work.isSrcLocal(), isSkewedStoredAsDirs(tbd),
+              work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID,
+              hasFollowingStatsTask());
           if (work.getOutputs() != null) {
             work.getOutputs().add(new WriteEntity(table,
                 (tbd.getReplace() ? WriteEntity.WriteType.INSERT_OVERWRITE :
@@ -424,7 +438,8 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
                 dpCtx.getNumDPCols(),
                 isSkewedStoredAsDirs(tbd),
                 work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID,
-                SessionState.get().getTxnMgr().getCurrentTxnId());
+                SessionState.get().getTxnMgr().getCurrentTxnId(), hasFollowingStatsTask(),
+                work.getLoadTableWork().getWriteType());
 
             console.printInfo("\t Time taken to load dynamic partitions: "  +
                 (System.currentTimeMillis() - startTime)/1000.0 + " seconds");
@@ -483,7 +498,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
             db.loadPartition(tbd.getSourcePath(), tbd.getTable().getTableName(),
                 tbd.getPartitionSpec(), tbd.getReplace(),
                 tbd.getInheritTableSpecs(), isSkewedStoredAsDirs(tbd), work.isSrcLocal(),
-                work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID);
+                work.getLoadTableWork().getWriteType() != AcidUtils.Operation.NOT_ACID, hasFollowingStatsTask());
             Partition partn = db.getPartition(table, tbd.getPartitionSpec(), false);
 
             if (bucketCols != null || sortCols != null) {

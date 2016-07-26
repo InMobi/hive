@@ -109,6 +109,7 @@ public class SessionState {
   private static final String HDFS_SESSION_PATH_KEY = "_hive.hdfs.session.path";
   private static final String TMP_TABLE_SPACE_KEY = "_hive.tmp_table_space";
   static final String LOCK_FILE_NAME = "inuse.lck";
+  static final String INFO_FILE_NAME = "inuse.info";
 
   private final Map<String, Map<String, Table>> tempTables = new HashMap<String, Map<String, Table>>();
   private final Map<String, Map<String, ColumnStatisticsObj>> tempTableColStats =
@@ -259,7 +260,7 @@ public class SessionState {
    */
   private final Set<String> preReloadableAuxJars = new HashSet<String>();
 
-  private final Registry registry = new Registry();
+  private final Registry registry;
 
   /**
    * CURRENT_TIMESTAMP value for query
@@ -352,6 +353,7 @@ public class SessionState {
   public SessionState(HiveConf conf, String userName) {
     this.sessionConf = conf;
     this.userName = userName;
+    this.registry = new Registry(false);
     if (LOG.isDebugEnabled()) {
       LOG.debug("SessionState user: " + userName);
     }
@@ -444,7 +446,7 @@ public class SessionState {
         if ("hdfs".equals(fs.getUri().getScheme())) {
           hdfsEncryptionShim = ShimLoader.getHadoopShims().createHdfsEncryptionShim(fs, sessionConf);
         } else {
-          LOG.info("Could not get hdfsEncryptionShim, it is only applicable to hdfs filesystem.");
+          LOG.debug("Could not get hdfsEncryptionShim, it is only applicable to hdfs filesystem.");
         }
       } catch (Exception e) {
         throw new HiveException(e);
@@ -581,7 +583,7 @@ public class SessionState {
 
     try {
       if (startSs.tezSessionState == null) {
-        startSs.tezSessionState = new TezSessionState(startSs.getSessionId());
+        startSs.setTezSession(new TezSessionState(startSs.getSessionId()));
       }
       if (startSs.tezSessionState.isOpen()) {
         return;
@@ -642,10 +644,12 @@ public class SessionState {
     // 5. hold a lock file in HDFS session dir to indicate the it is in use
     if (conf.getBoolVar(HiveConf.ConfVars.HIVE_SCRATCH_DIR_LOCK)) {
       FileSystem fs = hdfsSessionPath.getFileSystem(conf);
+      FSDataOutputStream hdfsSessionPathInfoFile = fs.create(new Path(hdfsSessionPath, INFO_FILE_NAME),
+          true);
+      hdfsSessionPathInfoFile.writeUTF("process: " + ManagementFactory.getRuntimeMXBean().getName()
+          +"\n");
+      hdfsSessionPathInfoFile.close();
       hdfsSessionPathLockFile = fs.create(new Path(hdfsSessionPath, LOCK_FILE_NAME), true);
-      hdfsSessionPathLockFile.writeUTF("hostname: " + InetAddress.getLocalHost().getHostName() + "\n");
-      hdfsSessionPathLockFile.writeUTF("process: " + ManagementFactory.getRuntimeMXBean().getName() + "\n");
-      hdfsSessionPathLockFile.hsync();
     }
     // 6. Local session path
     localSessionPath = new Path(HiveConf.getVar(conf, HiveConf.ConfVars.LOCALSCRATCHDIR), sessionId);
@@ -1483,12 +1487,12 @@ public class SessionState {
 
     try {
       if (tezSessionState != null) {
-        TezSessionPoolManager.getInstance().closeIfNotDefault(tezSessionState, false);
+        TezSessionPoolManager.closeIfNotDefault(tezSessionState, false);
       }
     } catch (Exception e) {
       LOG.info("Error closing tez session", e);
     } finally {
-      tezSessionState = null;
+      setTezSession(null);
     }
 
     try {
@@ -1573,8 +1577,17 @@ public class SessionState {
     return tezSessionState;
   }
 
+  /** Called from TezTask to attach a TezSession to use to the threadlocal. Ugly pattern... */
   public void setTezSession(TezSessionState session) {
-    this.tezSessionState = session;
+    if (tezSessionState == session) return; // The same object.
+    if (tezSessionState != null) {
+      tezSessionState.markFree();
+      tezSessionState = null;
+    }
+    if (session != null) {
+      session.markInUse();
+    }
+    tezSessionState = session;
   }
 
   public String getUserName() {

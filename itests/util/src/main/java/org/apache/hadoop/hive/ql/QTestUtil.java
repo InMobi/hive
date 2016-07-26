@@ -981,8 +981,8 @@ public class QTestUtil {
         && (clusterType == MiniClusterType.tez || clusterType == MiniClusterType.llap)) {
       // Copy the tezSessionState from the old CliSessionState.
       tezSessionState = oldSs.getTezSession();
-      ss.setTezSession(tezSessionState);
       oldSs.setTezSession(null);
+      ss.setTezSession(tezSessionState);
       oldSs.close();
     }
 
@@ -1468,7 +1468,12 @@ public class QTestUtil {
       ".*Input:.*/data/files/.*",
       ".*Output:.*/data/files/.*",
       ".*total number of created files now is.*",
-      ".*.hive-staging.*"
+      ".*.hive-staging.*",
+      "pk_-?[0-9]*_[0-9]*_[0-9]*",
+      "fk_-?[0-9]*_[0-9]*_[0-9]*",
+      ".*at com\\.sun\\.proxy.*",
+      ".*at com\\.jolbox.*",
+      "org\\.apache\\.hadoop\\.hive\\.metastore\\.model\\.MConstraint@([0-9]|[a-z])*"
   });
 
   private final Pattern[] partialReservedPlanMask = toPattern(new String[] {
@@ -1651,6 +1656,7 @@ public class QTestUtil {
   public void resetParser() throws SemanticException {
     drv.init();
     pd = new ParseDriver();
+    queryState = new QueryState(conf);
     sem = new SemanticAnalyzer(queryState);
   }
 
@@ -2090,14 +2096,16 @@ public class QTestUtil {
         }
       }
       for (Map.Entry<String, Integer> entry : tableNameToID.entrySet()) {
-        String toReplace = "_" + entry.getKey() + "_" ;
-        String replacementString = ""+entry.getValue();
+        String toReplace1 = ",_" + entry.getKey() + "_" ;
+        String replacementString1 = ","+entry.getValue();
+        String toReplace2 = "_" + entry.getKey() + "_," ;
+        String replacementString2 = ""+entry.getValue()+",";
         try {
           String content1 = FileUtils.readFileToString(tmpFileLoc1, "UTF-8");
-          content1 = content1.replaceAll(toReplace, replacementString);
+          content1 = content1.replaceAll(toReplace1, replacementString1);
           FileUtils.writeStringToFile(tmpFileLoc1, content1, "UTF-8");
           String content2 = FileUtils.readFileToString(tmpFileLoc2, "UTF-8");
-          content2 = content2.replaceAll(toReplace, replacementString);
+          content2 = content2.replaceAll(toReplace2, replacementString2);
           FileUtils.writeStringToFile(tmpFileLoc2, content2, "UTF-8");
         } catch (IOException e) {
           LOG.info("Generating file failed", e);

@@ -22,6 +22,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponseElement;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.txn.TxnDbUtil;
 import org.apache.hadoop.hive.metastore.txn.TxnStore;
 import org.apache.hadoop.hive.ql.Context;
@@ -61,6 +62,9 @@ public class TestDbTxnManager {
   HashSet<WriteEntity> writeEntities;
 
   public TestDbTxnManager() throws Exception {
+    conf
+    .setVar(HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER,
+        "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory");
     TxnDbUtil.setConfValues(conf);
     SessionState.start(conf);
     ctx = new Context(conf);
@@ -500,6 +504,12 @@ public class TestDbTxnManager {
       partCols.add(fs);
       t.setPartCols(partCols);
     }
+    Map<String, String> tblProps = t.getParameters();
+    if(tblProps == null) {
+      tblProps = new HashMap<>();
+    }
+    tblProps.put(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, "true");
+    t.setParameters(tblProps);
     return t;
   }
 

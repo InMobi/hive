@@ -109,6 +109,19 @@ struct GrantRevokeType {
 
 extern const std::map<int, const char*> _GrantRevokeType_VALUES_TO_NAMES;
 
+struct DataOperationType {
+  enum type {
+    SELECT = 1,
+    INSERT = 2,
+    UPDATE = 3,
+    DELETE = 4,
+    UNSET = 5,
+    NO_TXN = 6
+  };
+};
+
+extern const std::map<int, const char*> _DataOperationType_VALUES_TO_NAMES;
+
 struct EventRequestType {
   enum type {
     INSERT = 1,
@@ -251,6 +264,12 @@ class ForeignKeysRequest;
 
 class ForeignKeysResponse;
 
+class DropConstraintRequest;
+
+class AddPrimaryKeyRequest;
+
+class AddForeignKeyRequest;
+
 class PartitionsByExprResult;
 
 class PartitionsByExprRequest;
@@ -290,6 +309,8 @@ class OpenTxnRequest;
 class OpenTxnsResponse;
 
 class AbortTxnRequest;
+
+class AbortTxnsRequest;
 
 class CommitTxnRequest;
 
@@ -340,10 +361,6 @@ class FireEventRequestData;
 class FireEventRequest;
 
 class FireEventResponse;
-
-class GetChangeVersionRequest;
-
-class GetChangeVersionResult;
 
 class MetadataPpdResult;
 
@@ -3460,23 +3477,36 @@ inline std::ostream& operator<<(std::ostream& out, const AggrStats& obj)
   return out;
 }
 
+typedef struct _SetPartitionsStatsRequest__isset {
+  _SetPartitionsStatsRequest__isset() : needMerge(false) {}
+  bool needMerge :1;
+} _SetPartitionsStatsRequest__isset;
 
 class SetPartitionsStatsRequest {
  public:
 
   SetPartitionsStatsRequest(const SetPartitionsStatsRequest&);
   SetPartitionsStatsRequest& operator=(const SetPartitionsStatsRequest&);
-  SetPartitionsStatsRequest() {
+  SetPartitionsStatsRequest() : needMerge(0) {
   }
 
   virtual ~SetPartitionsStatsRequest() throw();
   std::vector<ColumnStatistics>  colStats;
+  bool needMerge;
+
+  _SetPartitionsStatsRequest__isset __isset;
 
   void __set_colStats(const std::vector<ColumnStatistics> & val);
+
+  void __set_needMerge(const bool val);
 
   bool operator == (const SetPartitionsStatsRequest & rhs) const
   {
     if (!(colStats == rhs.colStats))
+      return false;
+    if (__isset.needMerge != rhs.__isset.needMerge)
+      return false;
+    else if (__isset.needMerge && !(needMerge == rhs.needMerge))
       return false;
     return true;
   }
@@ -3683,6 +3713,13 @@ inline std::ostream& operator<<(std::ostream& out, const PrimaryKeysResponse& ob
   return out;
 }
 
+typedef struct _ForeignKeysRequest__isset {
+  _ForeignKeysRequest__isset() : parent_db_name(false), parent_tbl_name(false), foreign_db_name(false), foreign_tbl_name(false) {}
+  bool parent_db_name :1;
+  bool parent_tbl_name :1;
+  bool foreign_db_name :1;
+  bool foreign_tbl_name :1;
+} _ForeignKeysRequest__isset;
 
 class ForeignKeysRequest {
  public:
@@ -3697,6 +3734,8 @@ class ForeignKeysRequest {
   std::string parent_tbl_name;
   std::string foreign_db_name;
   std::string foreign_tbl_name;
+
+  _ForeignKeysRequest__isset __isset;
 
   void __set_parent_db_name(const std::string& val);
 
@@ -3773,6 +3812,136 @@ class ForeignKeysResponse {
 void swap(ForeignKeysResponse &a, ForeignKeysResponse &b);
 
 inline std::ostream& operator<<(std::ostream& out, const ForeignKeysResponse& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+class DropConstraintRequest {
+ public:
+
+  DropConstraintRequest(const DropConstraintRequest&);
+  DropConstraintRequest& operator=(const DropConstraintRequest&);
+  DropConstraintRequest() : dbname(), tablename(), constraintname() {
+  }
+
+  virtual ~DropConstraintRequest() throw();
+  std::string dbname;
+  std::string tablename;
+  std::string constraintname;
+
+  void __set_dbname(const std::string& val);
+
+  void __set_tablename(const std::string& val);
+
+  void __set_constraintname(const std::string& val);
+
+  bool operator == (const DropConstraintRequest & rhs) const
+  {
+    if (!(dbname == rhs.dbname))
+      return false;
+    if (!(tablename == rhs.tablename))
+      return false;
+    if (!(constraintname == rhs.constraintname))
+      return false;
+    return true;
+  }
+  bool operator != (const DropConstraintRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DropConstraintRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DropConstraintRequest &a, DropConstraintRequest &b);
+
+inline std::ostream& operator<<(std::ostream& out, const DropConstraintRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+class AddPrimaryKeyRequest {
+ public:
+
+  AddPrimaryKeyRequest(const AddPrimaryKeyRequest&);
+  AddPrimaryKeyRequest& operator=(const AddPrimaryKeyRequest&);
+  AddPrimaryKeyRequest() {
+  }
+
+  virtual ~AddPrimaryKeyRequest() throw();
+  std::vector<SQLPrimaryKey>  primaryKeyCols;
+
+  void __set_primaryKeyCols(const std::vector<SQLPrimaryKey> & val);
+
+  bool operator == (const AddPrimaryKeyRequest & rhs) const
+  {
+    if (!(primaryKeyCols == rhs.primaryKeyCols))
+      return false;
+    return true;
+  }
+  bool operator != (const AddPrimaryKeyRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const AddPrimaryKeyRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(AddPrimaryKeyRequest &a, AddPrimaryKeyRequest &b);
+
+inline std::ostream& operator<<(std::ostream& out, const AddPrimaryKeyRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+class AddForeignKeyRequest {
+ public:
+
+  AddForeignKeyRequest(const AddForeignKeyRequest&);
+  AddForeignKeyRequest& operator=(const AddForeignKeyRequest&);
+  AddForeignKeyRequest() {
+  }
+
+  virtual ~AddForeignKeyRequest() throw();
+  std::vector<SQLForeignKey>  foreignKeyCols;
+
+  void __set_foreignKeyCols(const std::vector<SQLForeignKey> & val);
+
+  bool operator == (const AddForeignKeyRequest & rhs) const
+  {
+    if (!(foreignKeyCols == rhs.foreignKeyCols))
+      return false;
+    return true;
+  }
+  bool operator != (const AddForeignKeyRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const AddForeignKeyRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(AddForeignKeyRequest &a, AddForeignKeyRequest &b);
+
+inline std::ostream& operator<<(std::ostream& out, const AddForeignKeyRequest& obj)
 {
   obj.printTo(out);
   return out;
@@ -4901,6 +5070,46 @@ inline std::ostream& operator<<(std::ostream& out, const AbortTxnRequest& obj)
 }
 
 
+class AbortTxnsRequest {
+ public:
+
+  AbortTxnsRequest(const AbortTxnsRequest&);
+  AbortTxnsRequest& operator=(const AbortTxnsRequest&);
+  AbortTxnsRequest() {
+  }
+
+  virtual ~AbortTxnsRequest() throw();
+  std::vector<int64_t>  txn_ids;
+
+  void __set_txn_ids(const std::vector<int64_t> & val);
+
+  bool operator == (const AbortTxnsRequest & rhs) const
+  {
+    if (!(txn_ids == rhs.txn_ids))
+      return false;
+    return true;
+  }
+  bool operator != (const AbortTxnsRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const AbortTxnsRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(AbortTxnsRequest &a, AbortTxnsRequest &b);
+
+inline std::ostream& operator<<(std::ostream& out, const AbortTxnsRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
 class CommitTxnRequest {
  public:
 
@@ -4941,9 +5150,11 @@ inline std::ostream& operator<<(std::ostream& out, const CommitTxnRequest& obj)
 }
 
 typedef struct _LockComponent__isset {
-  _LockComponent__isset() : tablename(false), partitionname(false) {}
+  _LockComponent__isset() : tablename(false), partitionname(false), operationType(true), isAcid(true) {}
   bool tablename :1;
   bool partitionname :1;
+  bool operationType :1;
+  bool isAcid :1;
 } _LockComponent__isset;
 
 class LockComponent {
@@ -4951,7 +5162,9 @@ class LockComponent {
 
   LockComponent(const LockComponent&);
   LockComponent& operator=(const LockComponent&);
-  LockComponent() : type((LockType::type)0), level((LockLevel::type)0), dbname(), tablename(), partitionname() {
+  LockComponent() : type((LockType::type)0), level((LockLevel::type)0), dbname(), tablename(), partitionname(), operationType((DataOperationType::type)5), isAcid(false) {
+    operationType = (DataOperationType::type)5;
+
   }
 
   virtual ~LockComponent() throw();
@@ -4960,6 +5173,8 @@ class LockComponent {
   std::string dbname;
   std::string tablename;
   std::string partitionname;
+  DataOperationType::type operationType;
+  bool isAcid;
 
   _LockComponent__isset __isset;
 
@@ -4972,6 +5187,10 @@ class LockComponent {
   void __set_tablename(const std::string& val);
 
   void __set_partitionname(const std::string& val);
+
+  void __set_operationType(const DataOperationType::type val);
+
+  void __set_isAcid(const bool val);
 
   bool operator == (const LockComponent & rhs) const
   {
@@ -4988,6 +5207,14 @@ class LockComponent {
     if (__isset.partitionname != rhs.__isset.partitionname)
       return false;
     else if (__isset.partitionname && !(partitionname == rhs.partitionname))
+      return false;
+    if (__isset.operationType != rhs.__isset.operationType)
+      return false;
+    else if (__isset.operationType && !(operationType == rhs.operationType))
+      return false;
+    if (__isset.isAcid != rhs.__isset.isAcid)
+      return false;
+    else if (__isset.isAcid && !(isAcid == rhs.isAcid))
       return false;
     return true;
   }
@@ -5640,9 +5867,10 @@ inline std::ostream& operator<<(std::ostream& out, const HeartbeatTxnRangeRespon
 }
 
 typedef struct _CompactionRequest__isset {
-  _CompactionRequest__isset() : partitionname(false), runas(false) {}
+  _CompactionRequest__isset() : partitionname(false), runas(false), properties(false) {}
   bool partitionname :1;
   bool runas :1;
+  bool properties :1;
 } _CompactionRequest__isset;
 
 class CompactionRequest {
@@ -5659,6 +5887,7 @@ class CompactionRequest {
   std::string partitionname;
   CompactionType::type type;
   std::string runas;
+  std::map<std::string, std::string>  properties;
 
   _CompactionRequest__isset __isset;
 
@@ -5671,6 +5900,8 @@ class CompactionRequest {
   void __set_type(const CompactionType::type val);
 
   void __set_runas(const std::string& val);
+
+  void __set_properties(const std::map<std::string, std::string> & val);
 
   bool operator == (const CompactionRequest & rhs) const
   {
@@ -5687,6 +5918,10 @@ class CompactionRequest {
     if (__isset.runas != rhs.__isset.runas)
       return false;
     else if (__isset.runas && !(runas == rhs.runas))
+      return false;
+    if (__isset.properties != rhs.__isset.properties)
+      return false;
+    else if (__isset.properties && !(properties == rhs.properties))
       return false;
     return true;
   }
@@ -5909,13 +6144,19 @@ inline std::ostream& operator<<(std::ostream& out, const ShowCompactResponse& ob
   return out;
 }
 
+typedef struct _AddDynamicPartitions__isset {
+  _AddDynamicPartitions__isset() : operationType(true) {}
+  bool operationType :1;
+} _AddDynamicPartitions__isset;
 
 class AddDynamicPartitions {
  public:
 
   AddDynamicPartitions(const AddDynamicPartitions&);
   AddDynamicPartitions& operator=(const AddDynamicPartitions&);
-  AddDynamicPartitions() : txnid(0), dbname(), tablename() {
+  AddDynamicPartitions() : txnid(0), dbname(), tablename(), operationType((DataOperationType::type)5) {
+    operationType = (DataOperationType::type)5;
+
   }
 
   virtual ~AddDynamicPartitions() throw();
@@ -5923,6 +6164,9 @@ class AddDynamicPartitions {
   std::string dbname;
   std::string tablename;
   std::vector<std::string>  partitionnames;
+  DataOperationType::type operationType;
+
+  _AddDynamicPartitions__isset __isset;
 
   void __set_txnid(const int64_t val);
 
@@ -5931,6 +6175,8 @@ class AddDynamicPartitions {
   void __set_tablename(const std::string& val);
 
   void __set_partitionnames(const std::vector<std::string> & val);
+
+  void __set_operationType(const DataOperationType::type val);
 
   bool operator == (const AddDynamicPartitions & rhs) const
   {
@@ -5941,6 +6187,10 @@ class AddDynamicPartitions {
     if (!(tablename == rhs.tablename))
       return false;
     if (!(partitionnames == rhs.partitionnames))
+      return false;
+    if (__isset.operationType != rhs.__isset.operationType)
+      return false;
+    else if (__isset.operationType && !(operationType == rhs.operationType))
       return false;
     return true;
   }
@@ -6363,86 +6613,6 @@ class FireEventResponse {
 void swap(FireEventResponse &a, FireEventResponse &b);
 
 inline std::ostream& operator<<(std::ostream& out, const FireEventResponse& obj)
-{
-  obj.printTo(out);
-  return out;
-}
-
-
-class GetChangeVersionRequest {
- public:
-
-  GetChangeVersionRequest(const GetChangeVersionRequest&);
-  GetChangeVersionRequest& operator=(const GetChangeVersionRequest&);
-  GetChangeVersionRequest() : topic() {
-  }
-
-  virtual ~GetChangeVersionRequest() throw();
-  std::string topic;
-
-  void __set_topic(const std::string& val);
-
-  bool operator == (const GetChangeVersionRequest & rhs) const
-  {
-    if (!(topic == rhs.topic))
-      return false;
-    return true;
-  }
-  bool operator != (const GetChangeVersionRequest &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const GetChangeVersionRequest & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(GetChangeVersionRequest &a, GetChangeVersionRequest &b);
-
-inline std::ostream& operator<<(std::ostream& out, const GetChangeVersionRequest& obj)
-{
-  obj.printTo(out);
-  return out;
-}
-
-
-class GetChangeVersionResult {
- public:
-
-  GetChangeVersionResult(const GetChangeVersionResult&);
-  GetChangeVersionResult& operator=(const GetChangeVersionResult&);
-  GetChangeVersionResult() : version(0) {
-  }
-
-  virtual ~GetChangeVersionResult() throw();
-  int64_t version;
-
-  void __set_version(const int64_t val);
-
-  bool operator == (const GetChangeVersionResult & rhs) const
-  {
-    if (!(version == rhs.version))
-      return false;
-    return true;
-  }
-  bool operator != (const GetChangeVersionResult &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const GetChangeVersionResult & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(GetChangeVersionResult &a, GetChangeVersionResult &b);
-
-inline std::ostream& operator<<(std::ostream& out, const GetChangeVersionResult& obj)
 {
   obj.printTo(out);
   return out;

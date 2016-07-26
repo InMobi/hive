@@ -25,10 +25,13 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
+import org.apache.hadoop.hive.common.LogUtils;
+import org.apache.hadoop.hive.common.LogUtils.LogInitializationException;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
@@ -51,6 +54,10 @@ import org.apache.hadoop.ipc.RemoteException;
 public class ClearDanglingScratchDir {
 
   public static void main(String[] args) throws Exception {
+    try {
+      LogUtils.initHiveLog4j();
+    } catch (LogInitializationException e) {
+    }
     Options opts = createOptions();
     CommandLine cli = new GnuParser().parse(opts, args);
 
@@ -66,6 +73,7 @@ public class ClearDanglingScratchDir {
 
     if (cli.hasOption("r")) {
       dryRun = true;
+      SessionState.getConsole().printInfo("dry-run mode on");
     }
 
     if (cli.hasOption("v")) {
@@ -99,23 +107,47 @@ public class ClearDanglingScratchDir {
           }
           continue;
         }
+        boolean removable = false;
+        boolean inuse = false;
         try {
           IOUtils.closeStream(fs.append(lockFilePath));
-          scratchDirToRemove.add(scratchDir.getPath());
-        } catch (RemoteException e) {
+          removable = true;
+        } catch (RemoteException eAppend) {
           // RemoteException with AlreadyBeingCreatedException will be thrown
           // if the file is currently held by a writer
-          if(AlreadyBeingCreatedException.class.getName().equals(e.getClassName())){
-            // Cannot open the lock file for writing, must be held by a live process
-            String message = scratchDir.getPath() + " is being used by live process";
-            if (verbose) {
-              SessionState.getConsole().printInfo(message);
-            } else {
-              SessionState.getConsole().logInfo(message);
+          if(AlreadyBeingCreatedException.class.getName().equals(eAppend.getClassName())){
+            inuse = true;
+          } else if (UnsupportedOperationException.class.getName().equals(eAppend.getClassName())) {
+            // Append is not supported in the cluster, try to use create
+            try {
+              IOUtils.closeStream(fs.create(lockFilePath, false));
+            } catch (RemoteException eCreate) {
+              if (AlreadyBeingCreatedException.class.getName().equals(eCreate.getClassName())){
+                // If the file is held by a writer, will throw AlreadyBeingCreatedException
+                inuse = true;
+              }  else {
+                SessionState.getConsole().printInfo("Unexpected error:" + eCreate.getMessage());
+              }
+            } catch (FileAlreadyExistsException eCreateNormal) {
+                // Otherwise, throw FileAlreadyExistsException, which means the file owner is
+                // dead
+                removable = true;
             }
           } else {
-            throw e;
+            SessionState.getConsole().printInfo("Unexpected error:" + eAppend.getMessage());
           }
+        }
+        if (inuse) {
+          // Cannot open the lock file for writing, must be held by a live process
+          String message = scratchDir.getPath() + " is being used by live process";
+          if (verbose) {
+            SessionState.getConsole().printInfo(message);
+          } else {
+            SessionState.getConsole().logInfo(message);
+          }
+        }
+        if (removable) {
+          scratchDirToRemove.add(scratchDir.getPath());
         }
       }
     }

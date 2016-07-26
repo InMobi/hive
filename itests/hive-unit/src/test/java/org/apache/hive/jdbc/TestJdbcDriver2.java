@@ -55,6 +55,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -134,6 +135,7 @@ public class TestJdbcDriver2 {
     System.setProperty(ConfVars.HIVE_SERVER2_LOGGING_OPERATION_LEVEL.varname, "verbose");
     System.setProperty(ConfVars.HIVEMAPREDMODE.varname, "nonstrict");
     System.setProperty(ConfVars.HIVE_AUTHORIZATION_MANAGER.varname, "org.apache.hadoop.hive.ql.security.authorization.DefaultHiveAuthorizationProvider");
+    System.setProperty(ConfVars.HIVE_SERVER2_PARALLEL_OPS_IN_SESSION.varname, "false");
 
     Statement stmt1 = con1.createStatement();
     assertNotNull("Statement is null", stmt1);
@@ -324,6 +326,23 @@ public class TestJdbcDriver2 {
     } catch(JdbcUriParseException e) {
       assertTrue(e.getMessage().contains("Bad URL format"));
     }
+  }
+
+  @Test
+  public void testSerializedExecution() throws Exception {
+    // Test running parallel queries (with parallel queries disabled).
+    // Should be serialized in the order of execution.
+    HiveStatement stmt1 = (HiveStatement) con.createStatement();
+    HiveStatement stmt2 = (HiveStatement) con.createStatement();
+    stmt1.execute("create temporary function sleepMsUDF as '" + SleepMsUDF.class.getName() + "'");
+    stmt1.execute("create table test_ser_1(i int)");
+    stmt1.executeAsync("insert into test_ser_1 select sleepMsUDF(under_col, 500) from "
+        + tableName + " limit 1");
+    boolean isResultSet = stmt2.executeAsync("select * from test_ser_1");
+    assertTrue(isResultSet);
+    ResultSet rs = stmt2.getResultSet();
+    assertTrue(rs.next());
+    assertFalse(rs.next());
   }
 
   @Test
@@ -1605,14 +1624,14 @@ public class TestJdbcDriver2 {
 
     ResultSet res = stmt.executeQuery(
         "select c1, c2, c3, c4, c5 as a, c6, c7, c8, c9, c10, c11, c12, " +
-            "c1*2, sentences(null, null, null) as b, c17, c18, c20, c21, c22, c23 from " + dataTypeTableName +
+            "c1*2, sentences(null, null, null) as b, c17, c18, c20, c21, c22, c23, null as null_val from " + dataTypeTableName +
         " limit 1");
     ResultSetMetaData meta = res.getMetaData();
 
     ResultSet colRS = con.getMetaData().getColumns(null, null,
         dataTypeTableName.toLowerCase(), null);
 
-    assertEquals(20, meta.getColumnCount());
+    assertEquals(21, meta.getColumnCount());
 
     assertTrue(colRS.next());
 
@@ -1876,6 +1895,14 @@ public class TestJdbcDriver2 {
     assertEquals(15, meta.getPrecision(19));
     assertEquals(0, meta.getScale(19));
 
+    assertEquals("c22", colRS.getString("COLUMN_NAME"));
+    assertEquals(Types.CHAR, colRS.getInt("DATA_TYPE"));
+    assertEquals("char", colRS.getString("TYPE_NAME").toLowerCase());
+    assertEquals(meta.getPrecision(19), colRS.getInt("COLUMN_SIZE"));
+    assertEquals(meta.getScale(19), colRS.getInt("DECIMAL_DIGITS"));
+
+    assertTrue(colRS.next());
+
     assertEquals("c23", meta.getColumnName(20));
     assertEquals(Types.BINARY, meta.getColumnType(20));
     assertEquals("binary", meta.getColumnTypeName(20));
@@ -1883,11 +1910,14 @@ public class TestJdbcDriver2 {
     assertEquals(Integer.MAX_VALUE, meta.getPrecision(20));
     assertEquals(0, meta.getScale(20));
 
-    assertEquals("c22", colRS.getString("COLUMN_NAME"));
-    assertEquals(Types.CHAR, colRS.getInt("DATA_TYPE"));
-    assertEquals("char", colRS.getString("TYPE_NAME").toLowerCase());
-    assertEquals(meta.getPrecision(19), colRS.getInt("COLUMN_SIZE"));
-    assertEquals(meta.getScale(19), colRS.getInt("DECIMAL_DIGITS"));
+    assertTrue(colRS.next());
+
+    assertEquals("null_val", meta.getColumnName(21));
+    assertEquals(Types.NULL, meta.getColumnType(21));
+    assertEquals("void", meta.getColumnTypeName(21));
+    assertEquals(4, meta.getColumnDisplaySize(21));
+    assertEquals(0, meta.getPrecision(21));
+    assertEquals(0, meta.getScale(21));
 
     for (int i = 1; i <= meta.getColumnCount(); i++) {
       assertFalse(meta.isAutoIncrement(i));
@@ -2373,7 +2403,7 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
         try {
           System.out.println("Executing query: ");
           stmt.executeQuery("select sleepUDF(t1.under_col) as u0, t1.under_col as u1, " +
-              "t2.under_col as u2 from " + tableName +  "t1 join " + tableName +
+              "t2.under_col as u2 from " + tableName +  " t1 join " + tableName +
               " t2 on t1.under_col = t2.under_col");
           fail("Expecting SQLException");
         } catch (SQLException e) {
@@ -2388,7 +2418,7 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
       @Override
       public void run() {
         try {
-          Thread.sleep(1000);
+          Thread.sleep(10000);
           System.out.println("Cancelling query: ");
           stmt.cancel();
         } catch (Exception e) {
@@ -2400,6 +2430,44 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
     tCancel.start();
     tExecute.join();
     tCancel.join();
+    stmt.close();
+  }
+
+  @Test
+  public void testQueryTimeout() throws Exception {
+    String udfName = SleepUDF.class.getName();
+    Statement stmt1 = con.createStatement();
+    stmt1.execute("create temporary function sleepUDF as '" + udfName + "'");
+    stmt1.close();
+    Statement stmt = con.createStatement();
+    // Test a query where timeout kicks in
+    // Set query timeout to 15 seconds
+    stmt.setQueryTimeout(15);
+    System.err.println("Executing query: ");
+    try {
+      // Sleep UDF sleeps for 100ms for each select call
+      // The test table has 500 rows, so that should be sufficient time
+      stmt.executeQuery("select sleepUDF(t1.under_col) as u0, t1.under_col as u1, "
+          + "t2.under_col as u2 from " + tableName + " t1 join " + tableName
+          + " t2 on t1.under_col = t2.under_col");
+      fail("Expecting SQLTimeoutException");
+    } catch (SQLTimeoutException e) {
+      assertNotNull(e);
+      System.err.println(e.toString());
+    } catch (SQLException e) {
+      fail("Expecting SQLTimeoutException, but got SQLException: " + e);
+      e.printStackTrace();
+    }
+
+    // Test a query where timeout does not kick in. Set it to 25s
+    stmt.setQueryTimeout(25);
+    try {
+      stmt.executeQuery("show tables");
+    } catch (SQLException e) {
+      fail("Unexpected SQLException: " + e);
+      e.printStackTrace();
+    }
+
     stmt.close();
   }
 
@@ -2477,6 +2545,19 @@ public void testParseUrlHttpMode() throws SQLException, JdbcUriParseException,
     public Integer evaluate(final Integer value) {
       try {
         Thread.sleep(100);
+      } catch (InterruptedException e) {
+        // No-op
+      }
+      return value;
+    }
+  }
+
+
+  // A udf which sleeps for some number of ms to simulate a long running query
+  public static class SleepMsUDF extends UDF {
+    public Integer evaluate(final Integer value, final Integer ms) {
+      try {
+        Thread.sleep(ms);
       } catch (InterruptedException e) {
         // No-op
       }

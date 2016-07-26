@@ -54,6 +54,7 @@ import javax.jdo.Transaction;
 import javax.jdo.datastore.DataStoreCache;
 import javax.jdo.identity.IntIdentity;
 
+import com.google.common.collect.Maps;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
@@ -63,8 +64,12 @@ import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceStability;
+import org.apache.hadoop.hive.common.metrics.common.Metrics;
+import org.apache.hadoop.hive.common.metrics.common.MetricsConstant;
+import org.apache.hadoop.hive.common.metrics.common.MetricsFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.metastore.MetaStoreDirectSql.SqlFilterForPushdown;
 import org.apache.hadoop.hive.metastore.api.AggrStats;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
@@ -109,7 +114,6 @@ import org.apache.hadoop.hive.metastore.api.Type;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
-import org.apache.hadoop.hive.metastore.model.MChangeVersion;
 import org.apache.hadoop.hive.metastore.model.MColumnDescriptor;
 import org.apache.hadoop.hive.metastore.model.MConstraint;
 import org.apache.hadoop.hive.metastore.model.MDBPrivilege;
@@ -167,7 +171,6 @@ import com.google.common.collect.Lists;
  * to be made into a interface that can read both from a database and a
  * filestore.
  */
-@SuppressWarnings("unchecked")
 public class ObjectStore implements RawStore, Configurable {
   private static Properties prop = null;
   private static PersistenceManagerFactory pmf = null;
@@ -183,11 +186,11 @@ public class ObjectStore implements RawStore, Configurable {
     NO_STATE, OPEN, COMMITED, ROLLBACK
   }
 
-  private static final Map<String, Class<?>> PINCLASSMAP;
+  private static final Map<String, Class> PINCLASSMAP;
   private static final String HOSTNAME;
   private static final String USER;
   static {
-    Map<String, Class<?>> map = new HashMap<String, Class<?>>();
+    Map<String, Class> map = new HashMap<String, Class>();
     map.put("table", MTable.class);
     map.put("storagedescriptor", MStorageDescriptor.class);
     map.put("serdeinfo", MSerDeInfo.class);
@@ -382,6 +385,7 @@ public class ObjectStore implements RawStore, Configurable {
   @SuppressWarnings("nls")
   private static Properties getDataSourceProps(Configuration conf) {
     Properties prop = new Properties();
+    correctAutoStartMechanism(conf);
 
     Iterator<Map.Entry<String, String>> iter = conf.iterator();
     while (iter.hasNext()) {
@@ -415,6 +419,24 @@ public class ObjectStore implements RawStore, Configurable {
     }
 
     return prop;
+  }
+
+  /**
+   * Update conf to set datanucleus.autoStartMechanismMode=ignored.
+   * This is necessary to able to use older version of hive against
+   * an upgraded but compatible metastore schema in db from new version
+   * of hive
+   * @param conf
+   */
+  private static void correctAutoStartMechanism(Configuration conf) {
+    final String autoStartKey = "datanucleus.autoStartMechanismMode";
+    final String autoStartIgnore = "ignored";
+    String currentAutoStartVal = conf.get(autoStartKey);
+    if(currentAutoStartVal != null && !currentAutoStartVal.equalsIgnoreCase(autoStartIgnore)) {
+      LOG.warn(autoStartKey + " is set to unsupported value " + conf.get(autoStartKey) +
+          " . Setting it to value " + autoStartIgnore);
+    }
+    conf.set(autoStartKey, autoStartIgnore);
   }
 
   private static synchronized PersistenceManagerFactory getPMF() {
@@ -758,9 +780,9 @@ public class ObjectStore implements RawStore, Configurable {
       query = pm.newQuery(queryStr);
       query.setResult("name");
       query.setOrdering("name ascending");
-      Collection<?> names = (Collection<?>) query.execute();
+      Collection names = (Collection) query.execute();
       databases = new ArrayList<String>();
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      for (Iterator i = names.iterator(); i.hasNext();) {
         databases.add((String) i.next());
       }
       commited = commitTransaction();
@@ -910,9 +932,12 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       createTable(tbl);
-      addPrimaryKeys(primaryKeys);
-      addForeignKeys(foreignKeys);
-	  success = commitTransaction();
+      // Add primary keys and foreign keys.
+      // We need not do a deep retrieval of the Table Column Descriptor while persisting the PK/FK
+      // since this transaction involving create table is not yet committed.
+      addPrimaryKeys(primaryKeys, false);
+      addForeignKeys(foreignKeys, false);
+      success = commitTransaction();
     } finally {
       if (!success) {
         rollbackTransaction();
@@ -1022,7 +1047,8 @@ public class ObjectStore implements RawStore, Configurable {
           " table " + tableName + " record to delete");
         }
 
-        List<MConstraint> tabConstraints = listAllTableConstraints(dbName, tableName);
+        List<MConstraint> tabConstraints = listAllTableConstraintsWithOptionalConstraintName(
+                                           dbName, tableName, null);
         if (tabConstraints != null && tabConstraints.size() > 0) {
           pm.deletePersistentAll(tabConstraints);
         }
@@ -1040,19 +1066,27 @@ public class ObjectStore implements RawStore, Configurable {
     return success;
   }
 
-  private List<MConstraint> listAllTableConstraints(String dbName, String tableName) {
+  private List<MConstraint> listAllTableConstraintsWithOptionalConstraintName
+    (String dbName, String tableName, String constraintname) {
     List<MConstraint> mConstraints = null;
     List<String> constraintNames = new ArrayList<String>();
     Query query = null;
 
     try {
       query = pm.newQuery("select constraintName from org.apache.hadoop.hive.metastore.model.MConstraint  where "
-        + "(parentTable.tableName == ptblname && parentTable.database.name == pdbname) || "
-        + "(childTable != null && childTable.tableName == ctblname && childTable.database.name == cdbname)");
+        + "((parentTable.tableName == ptblname && parentTable.database.name == pdbname) || "
+        + "(childTable != null && childTable.tableName == ctblname && "
+        + "childTable.database.name == cdbname)) " + (constraintname != null ?
+        " && constraintName == constraintname" : ""));
       query.declareParameters("java.lang.String ptblname, java.lang.String pdbname,"
-      + "java.lang.String ctblname, java.lang.String cdbname");
-      Collection<?> constraintNamesColl = (Collection<?>) query.
-        executeWithArray(tableName, dbName, tableName, dbName);
+      + "java.lang.String ctblname, java.lang.String cdbname" +
+        (constraintname != null ? ", java.lang.String constraintname" : ""));
+      Collection<?> constraintNamesColl =
+        constraintname != null ?
+          ((Collection<?>) query.
+            executeWithArray(tableName, dbName, tableName, dbName, constraintname)):
+          ((Collection<?>) query.
+            executeWithArray(tableName, dbName, tableName, dbName));
       for (Iterator<?> i = constraintNamesColl.iterator(); i.hasNext();) {
         String currName = (String) i.next();
         constraintNames.add(currName);
@@ -1118,9 +1152,9 @@ public class ObjectStore implements RawStore, Configurable {
       query.declareParameters("java.lang.String dbName");
       query.setResult("tableName");
       query.setOrdering("tableName ascending");
-      Collection<?> names = (Collection<?>) query.execute(dbName);
+      Collection names = (Collection) query.execute(dbName);
       tbls = new ArrayList<String>();
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      for (Iterator i = names.iterator(); i.hasNext();) {
         tbls.add((String) i.next());
       }
       commited = commitTransaction();
@@ -1255,7 +1289,20 @@ public class ObjectStore implements RawStore, Configurable {
     return getTables(dbName, ".*");
   }
 
-  private MTable getMTable(String db, String table) {
+  class AttachedMTableInfo {
+    MTable mtbl;
+    MColumnDescriptor mcd;
+
+    public AttachedMTableInfo() {}
+
+    public AttachedMTableInfo(MTable mtbl, MColumnDescriptor mcd) {
+      this.mtbl = mtbl;
+      this.mcd = mcd;
+    }
+  }
+
+  private AttachedMTableInfo getMTable(String db, String table, boolean retrieveCD) {
+    AttachedMTableInfo nmtbl = new AttachedMTableInfo();
     MTable mtbl = null;
     boolean commited = false;
     Query query = null;
@@ -1268,6 +1315,12 @@ public class ObjectStore implements RawStore, Configurable {
       query.setUnique(true);
       mtbl = (MTable) query.execute(table, db);
       pm.retrieve(mtbl);
+      // Retrieving CD can be expensive and unnecessary, so do it only when required.
+      if (mtbl != null && retrieveCD) {
+        pm.retrieve(mtbl.getSd());
+        pm.retrieveAll(mtbl.getSd().getCD());
+        nmtbl.mcd = mtbl.getSd().getCD();
+      }
       commited = commitTransaction();
     } finally {
       if (!commited) {
@@ -1277,7 +1330,13 @@ public class ObjectStore implements RawStore, Configurable {
         query.closeAll();
       }
     }
-    return mtbl;
+    nmtbl.mtbl = mtbl;
+    return nmtbl;
+  }
+
+  private MTable getMTable(String db, String table) {
+    AttachedMTableInfo nmtbl = getMTable(db, table, false);
+    return nmtbl.mtbl;
   }
 
   @Override
@@ -1306,8 +1365,8 @@ public class ObjectStore implements RawStore, Configurable {
       query = pm.newQuery(MTable.class);
       query.setFilter("database.name == db && tbl_names.contains(tableName)");
       query.declareParameters("java.lang.String db, java.util.Collection tbl_names");
-      Collection<?> mtables = (Collection<?>) query.execute(db, lowered_tbl_names);
-      for (Iterator<?> iter = mtables.iterator(); iter.hasNext();) {
+      Collection mtables = (Collection) query.execute(db, lowered_tbl_names);
+      for (Iterator iter = mtables.iterator(); iter.hasNext();) {
         tables.add(convertToTable((MTable) iter.next()));
       }
       committed = commitTransaction();
@@ -1793,7 +1852,8 @@ public class ObjectStore implements RawStore, Configurable {
 
   private MPartition getMPartition(String dbName, String tableName, List<String> part_vals)
       throws MetaException {
-    MPartition mpart = null;
+    List<MPartition> mparts = null;
+    MPartition ret = null;
     boolean commited = false;
     Query query = null;
     try {
@@ -1813,10 +1873,27 @@ public class ObjectStore implements RawStore, Configurable {
           pm.newQuery(MPartition.class,
               "table.tableName == t1 && table.database.name == t2 && partitionName == t3");
       query.declareParameters("java.lang.String t1, java.lang.String t2, java.lang.String t3");
-      query.setUnique(true);
-      mpart = (MPartition) query.execute(tableName, dbName, name);
-      pm.retrieve(mpart);
+      mparts = (List<MPartition>) query.execute(tableName, dbName, name);
+      pm.retrieveAll(mparts);
       commited = commitTransaction();
+      // We need to compare partition name with requested name since some DBs
+      // (like MySQL, Derby) considers 'a' = 'a ' whereas others like (Postgres,
+      // Oracle) doesn't exhibit this problem.
+      if (mparts != null && mparts.size() > 0) {
+        if (mparts.size() > 1) {
+          throw new MetaException(
+              "Expecting only one partition but more than one partitions are found.");
+        } else {
+          MPartition mpart = mparts.get(0);
+          if (name.equals(mpart.getPartitionName())) {
+            ret = mpart;
+          } else {
+            throw new MetaException("Expecting a partition with name " + name
+                + ", but metastore is returning a partition with name " + mpart.getPartitionName()
+                + ".");
+          }
+        }
+      }
     } finally {
       if (!commited) {
         rollbackTransaction();
@@ -1825,7 +1902,7 @@ public class ObjectStore implements RawStore, Configurable {
         query.closeAll();
       }
     }
-    return mpart;
+    return ret;
   }
 
   /**
@@ -2156,8 +2233,8 @@ public class ObjectStore implements RawStore, Configurable {
     if (max > 0) {
       query.setRange(0, max);
     }
-    Collection<?> names = (Collection<?>) query.execute(dbName, tableName);
-    for (Iterator<?> i = names.iterator(); i.hasNext();) {
+    Collection names = (Collection) query.execute(dbName, tableName);
+    for (Iterator i = names.iterator(); i.hasNext();) {
       pns.add((String) i.next());
     }
     if (query != null) {
@@ -2181,7 +2258,7 @@ public class ObjectStore implements RawStore, Configurable {
    *          you want results for.  E.g., if resultsCol is partitionName, the Collection
    *          has types of String, and if resultsCol is null, the types are MPartition.
    */
-  private Collection<?> getPartitionPsQueryResults(String dbName, String tableName,
+  private Collection getPartitionPsQueryResults(String dbName, String tableName,
       List<String> part_vals, short max_parts, String resultsCol, QueryWrapper queryWrapper)
       throws MetaException, NoSuchObjectException {
     dbName = HiveStringUtils.normalizeIdentifier(dbName);
@@ -2221,7 +2298,7 @@ public class ObjectStore implements RawStore, Configurable {
       query.setResult(resultsCol);
     }
 
-    return (Collection<?>) query.execute(dbName, tableName, partNameMatcher);
+    return (Collection) query.execute(dbName, tableName, partNameMatcher);
   }
 
   @Override
@@ -2235,7 +2312,7 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("executing listPartitionNamesPsWithAuth");
-      Collection<?> parts = getPartitionPsQueryResults(db_name, tbl_name,
+      Collection parts = getPartitionPsQueryResults(db_name, tbl_name,
           part_vals, max_parts, null, queryWrapper);
       MTable mtbl = getMTable(db_name, tbl_name);
       for (Object o : parts) {
@@ -2271,7 +2348,7 @@ public class ObjectStore implements RawStore, Configurable {
     try {
       openTransaction();
       LOG.debug("Executing listPartitionNamesPs");
-      Collection<?> names = getPartitionPsQueryResults(dbName, tableName,
+      Collection names = getPartitionPsQueryResults(dbName, tableName,
           part_vals, max_parts, "partitionName", queryWrapper);
       for (Object o : names) {
         partitionNames.add((String) o);
@@ -2355,16 +2432,16 @@ public class ObjectStore implements RawStore, Configurable {
         // If we have some sort of expression tree, try SQL filter pushdown.
         List<Partition> result = null;
         if (exprTree != null) {
-          result = directSql.getPartitionsViaSqlFilter(ctx.getTable(), exprTree, null);
+          SqlFilterForPushdown filter = new SqlFilterForPushdown();
+          if (directSql.generateSqlFilterForPushdown(ctx.getTable(), exprTree, filter)) {
+            return directSql.getPartitionsViaSqlFilter(filter, null);
+          }
         }
-        if (result == null) {
-          // We couldn't do SQL filter pushdown. Get names via normal means.
-          List<String> partNames = new LinkedList<String>();
-          hasUnknownPartitions.set(getPartitionNamesPrunedByExprNoTxn(
-              ctx.getTable(), expr, defaultPartitionName, maxParts, partNames));
-          result = directSql.getPartitionsViaSqlFilter(dbName, tblName, partNames);
-        }
-        return result;
+        // We couldn't do SQL filter pushdown. Get names via normal means.
+        List<String> partNames = new LinkedList<String>();
+        hasUnknownPartitions.set(getPartitionNamesPrunedByExprNoTxn(
+            ctx.getTable(), expr, defaultPartitionName, maxParts, partNames));
+        return directSql.getPartitionsViaSqlFilter(dbName, tblName, partNames);
       }
 
       @Override
@@ -2556,7 +2633,8 @@ public class ObjectStore implements RawStore, Configurable {
   }
 
   /** Helper class for getting stuff w/transaction, direct SQL, perf logging, etc. */
-  private abstract class GetHelper<T> {
+  @VisibleForTesting
+  public abstract class GetHelper<T> {
     private final boolean isInTxn, doTrace, allowJdo;
     private boolean doUseDirectSql;
     private long start;
@@ -2586,12 +2664,19 @@ public class ObjectStore implements RawStore, Configurable {
       // the fallback from failed SQL to JDO is not possible.
       boolean isConfigEnabled = HiveConf.getBoolVar(getConf(), ConfVars.METASTORE_TRY_DIRECT_SQL)
           && (HiveConf.getBoolVar(getConf(), ConfVars.METASTORE_TRY_DIRECT_SQL_DDL) || !isInTxn);
+      if (isConfigEnabled && directSql == null) {
+        directSql = new MetaStoreDirectSql(pm, getConf());
+      }
+
       if (!allowJdo && isConfigEnabled && !directSql.isCompatibleDatastore()) {
         throw new MetaException("SQL is not operational"); // test path; SQL is enabled and broken.
       }
       this.doUseDirectSql = allowSql && isConfigEnabled && directSql.isCompatibleDatastore();
     }
 
+    protected boolean canUseDirectSql(GetHelper<T> ctx) throws MetaException {
+      return true; // By default, assume we can user directSQL - that's kind of the point.
+    }
     protected abstract String describeResult();
     protected abstract T getSqlResult(GetHelper<T> ctx) throws MetaException;
     protected abstract T getJdoResult(
@@ -2603,13 +2688,16 @@ public class ObjectStore implements RawStore, Configurable {
         if (doUseDirectSql) {
           try {
             directSql.prepareTxn();
-            setResult(getSqlResult(this));
+            this.results = getSqlResult(this);
           } catch (Exception ex) {
             handleDirectSqlError(ex);
           }
         }
+        // Note that this will be invoked in 2 cases:
+        //    1) DirectSQL was disabled to start with;
+        //    2) DirectSQL threw and was disabled in handleDirectSqlError.
         if (!doUseDirectSql) {
-          setResult(getJdoResult(this));
+          this.results = getJdoResult(this);
         }
         return commit();
       } catch (NoSuchObjectException ex) {
@@ -2630,11 +2718,7 @@ public class ObjectStore implements RawStore, Configurable {
       if (initTable && (tblName != null)) {
         table = ensureGetTable(dbName, tblName);
       }
-    }
-
-    private boolean setResult(T results) {
-      this.results = results;
-      return this.results != null;
+      doUseDirectSql = doUseDirectSql && canUseDirectSql(this);
     }
 
     private void handleDirectSqlError(Exception ex) throws MetaException, NoSuchObjectException {
@@ -2668,11 +2752,17 @@ public class ObjectStore implements RawStore, Configurable {
       } else {
         start = doTrace ? System.nanoTime() : 0;
       }
-      doUseDirectSql = false;
-    }
 
-    public void disableDirectSql() {
-      this.doUseDirectSql = false;
+      Metrics metrics = MetricsFactory.getInstance();
+      if (metrics != null) {
+        try {
+          metrics.incrementCounter(MetricsConstant.DIRECTSQL_ERRORS);
+        } catch (Exception e) {
+          LOG.warn("Error reporting Direct SQL errors to metrics system", e);
+        }
+      }
+
+      doUseDirectSql = false;
     }
 
     private T commit() {
@@ -2707,7 +2797,8 @@ public class ObjectStore implements RawStore, Configurable {
     }
   }
 
-  private abstract class GetDbHelper extends GetHelper<Database> {
+  @VisibleForTesting
+  public abstract class GetDbHelper extends GetHelper<Database> {
     /**
      * GetHelper for returning db info using directSql/JDO.
      * Since this is a db-level call, tblName is ignored, and null is passed irrespective of what is passed in.
@@ -2753,15 +2844,21 @@ public class ObjectStore implements RawStore, Configurable {
     final ExpressionTree tree = (filter != null && !filter.isEmpty())
       ? PartFilterExprUtil.getFilterParser(filter).tree : ExpressionTree.EMPTY_TREE;
     return new GetHelper<Integer>(dbName, tblName, allowSql, allowJdo) {
+      private SqlFilterForPushdown filter = new SqlFilterForPushdown();
       @Override
       protected String describeResult() {
-        return null;
+        return "Partition count";
       }
+
+      protected boolean canUseDirectSql(GetHelper<Integer> ctx) throws MetaException {
+        return directSql.generateSqlFilterForPushdown(ctx.getTable(), tree, filter);
+      };
 
       @Override
       protected Integer getSqlResult(GetHelper<Integer> ctx) throws MetaException {
-        return directSql.getNumPartitionsViaSqlFilter(ctx.getTable(), tree);
+        return directSql.getNumPartitionsViaSqlFilter(filter);
       }
+
       @Override
       protected Integer getJdoResult(
         GetHelper<Integer> ctx) throws MetaException, NoSuchObjectException {
@@ -2775,19 +2872,19 @@ public class ObjectStore implements RawStore, Configurable {
       throws MetaException, NoSuchObjectException {
     final ExpressionTree tree = (filter != null && !filter.isEmpty())
         ? PartFilterExprUtil.getFilterParser(filter).tree : ExpressionTree.EMPTY_TREE;
-
     return new GetListHelper<Partition>(dbName, tblName, allowSql, allowJdo) {
+      private SqlFilterForPushdown filter = new SqlFilterForPushdown();
+
+      @Override
+      protected boolean canUseDirectSql(GetHelper<List<Partition>> ctx) throws MetaException {
+        return directSql.generateSqlFilterForPushdown(ctx.getTable(), tree, filter);
+      };
+
       @Override
       protected List<Partition> getSqlResult(GetHelper<List<Partition>> ctx) throws MetaException {
-        List<Partition> parts = directSql.getPartitionsViaSqlFilter(
-            ctx.getTable(), tree, (maxParts < 0) ? null : (int)maxParts);
-        if (parts == null) {
-          // Cannot push down SQL filter. The message has been logged internally.
-          // This is not an error so don't roll back, just go to JDO.
-          ctx.disableDirectSql();
-        }
-        return parts;
+        return directSql.getPartitionsViaSqlFilter(filter, (maxParts < 0) ? null : (int)maxParts);
       }
+
       @Override
       protected List<Partition> getJdoResult(
           GetHelper<List<Partition>> ctx) throws MetaException, NoSuchObjectException {
@@ -2917,10 +3014,10 @@ public class ObjectStore implements RawStore, Configurable {
       String parameterDeclaration = makeParameterDeclarationStringObj(params);
       query.declareParameters(parameterDeclaration);
       query.setFilter(queryFilterString);
-      Collection<?> names = (Collection<?>)query.executeWithMap(params);
+      Collection names = (Collection)query.executeWithMap(params);
       // have to emulate "distinct", otherwise tables with the same name may be returned
       Set<String> tableNamesSet = new HashSet<String>();
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      for (Iterator i = names.iterator(); i.hasNext();) {
         tableNamesSet.add((String) i.next());
       }
       tableNames = new ArrayList<String>(tableNamesSet);
@@ -2970,9 +3067,9 @@ public class ObjectStore implements RawStore, Configurable {
       query.declareParameters(parameterDeclaration);
       query.setOrdering("partitionName ascending");
       query.setResult("partitionName");
-      Collection<?> names = (Collection<?>) query.executeWithMap(params);
+      Collection names = (Collection) query.executeWithMap(params);
       partNames = new ArrayList<String>();
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      for (Iterator i = names.iterator(); i.hasNext();) {
         partNames.add((String) i.next());
       }
       LOG.debug("Done executing query for listMPartitionNamesByFilter");
@@ -3262,15 +3359,17 @@ public class ObjectStore implements RawStore, Configurable {
     return sds;
   }
 
-  private MColumnDescriptor getColumnFromTable(MTable mtbl, String col) {
-   for (MFieldSchema mfs: mtbl.getSd().getCD().getCols()) {
-     if (mfs.getName().equals(col)) {
-       List<MFieldSchema> mfsl = new ArrayList<MFieldSchema>();
-       mfsl.add(mfs);
-       return new MColumnDescriptor(mfsl);
-     }
-   }
-   return null;
+  private int getColumnIndexFromTableColumns(List<MFieldSchema> cols, String col) {
+    if (cols == null) {
+      return -1;
+    }
+    for (int i = 0; i < cols.size(); i++) {
+      MFieldSchema mfs = cols.get(i);
+      if (mfs.getName().equalsIgnoreCase(col)) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private  boolean constraintNameAlreadyExists(String name) {
@@ -3311,33 +3410,47 @@ public class ObjectStore implements RawStore, Configurable {
     throw new MetaException("Error while trying to generate the constraint name for " + ArrayUtils.toString(parameters));
   }
 
+  @Override
+  public void addForeignKeys(
+    List<SQLForeignKey> fks) throws InvalidObjectException, MetaException {
+   addForeignKeys(fks, true);
+  }
+
   private void addForeignKeys(
-    List<SQLForeignKey> fks) throws InvalidObjectException,
+    List<SQLForeignKey> fks, boolean retrieveCD) throws InvalidObjectException,
     MetaException {
     List<MConstraint> mpkfks = new ArrayList<MConstraint>();
     String currentConstraintName = null;
 
     for (int i = 0; i < fks.size(); i++) {
-      MTable parentTable =
-        getMTable(fks.get(i).getPktable_db(), fks.get(i).getPktable_name());
-      MTable childTable =
-        getMTable(fks.get(i).getFktable_db(), fks.get(i).getFktable_name());
-      MColumnDescriptor parentColumn =
-        getColumnFromTable(parentTable, fks.get(i).getPkcolumn_name());
-      MColumnDescriptor childColumn =
-        getColumnFromTable(childTable, fks.get(i).getFkcolumn_name());
+      AttachedMTableInfo nParentTable = getMTable(fks.get(i).getPktable_db(), fks.get(i).getPktable_name(), retrieveCD);
+      MTable parentTable = nParentTable.mtbl;
       if (parentTable == null) {
         throw new InvalidObjectException("Parent table not found: " + fks.get(i).getPktable_name());
       }
+
+      AttachedMTableInfo nChildTable = getMTable(fks.get(i).getFktable_db(), fks.get(i).getFktable_name(), retrieveCD);
+      MTable childTable = nChildTable.mtbl;
       if (childTable == null) {
         throw new InvalidObjectException("Child table not found: " + fks.get(i).getFktable_name());
       }
-      if (parentColumn == null) {
+
+      MColumnDescriptor parentCD = retrieveCD ? nParentTable.mcd : parentTable.getSd().getCD();
+      List<MFieldSchema> parentCols = parentCD.getCols();
+      int parentIntegerIndex =
+        getColumnIndexFromTableColumns(parentCols, fks.get(i).getPkcolumn_name());
+      if (parentIntegerIndex == -1) {
         throw new InvalidObjectException("Parent column not found: " + fks.get(i).getPkcolumn_name());
       }
-      if (childColumn == null) {
-        throw new InvalidObjectException("Child column not found" + fks.get(i).getFkcolumn_name());
+
+      MColumnDescriptor childCD = retrieveCD ? nChildTable.mcd : childTable.getSd().getCD();
+      List<MFieldSchema> childCols = childCD.getCols();
+      int childIntegerIndex =
+        getColumnIndexFromTableColumns(childCols, fks.get(i).getFkcolumn_name());
+      if (childIntegerIndex == -1) {
+        throw new InvalidObjectException("Child column not found: " + fks.get(i).getFkcolumn_name());
       }
+
       if (fks.get(i).getFk_name() == null) {
         // When there is no explicit foreign key name associated with the constraint and the key is composite,
         // we expect the foreign keys to be send in order in the input list.
@@ -3367,27 +3480,40 @@ public class ObjectStore implements RawStore, Configurable {
         enableValidateRely,
         parentTable,
         childTable,
-        parentColumn,
-        childColumn
+        parentCD,
+        childCD,
+        childIntegerIndex,
+        parentIntegerIndex
       );
       mpkfks.add(mpkfk);
     }
     pm.makePersistentAll(mpkfks);
   }
 
-  private void addPrimaryKeys(List<SQLPrimaryKey> pks) throws InvalidObjectException,
+  @Override
+  public void addPrimaryKeys(List<SQLPrimaryKey> pks) throws InvalidObjectException,
+    MetaException {
+    addPrimaryKeys(pks, true);
+  }
+
+  private void addPrimaryKeys(List<SQLPrimaryKey> pks, boolean retrieveCD) throws InvalidObjectException,
     MetaException {
     List<MConstraint> mpks = new ArrayList<MConstraint>();
     String constraintName = null;
+
     for (int i = 0; i < pks.size(); i++) {
-      MTable parentTable =
-        getMTable(pks.get(i).getTable_db(), pks.get(i).getTable_name());
-      MColumnDescriptor parentColumn =
-        getColumnFromTable(parentTable, pks.get(i).getColumn_name());
+      AttachedMTableInfo nParentTable =
+        getMTable(pks.get(i).getTable_db(), pks.get(i).getTable_name(), retrieveCD);
+      MTable parentTable = nParentTable.mtbl;
       if (parentTable == null) {
         throw new InvalidObjectException("Parent table not found: " + pks.get(i).getTable_name());
       }
-      if (parentColumn == null) {
+
+      MColumnDescriptor parentCD = retrieveCD ? nParentTable.mcd : parentTable.getSd().getCD();
+      int parentIntegerIndex =
+        getColumnIndexFromTableColumns(parentCD.getCols(), pks.get(i).getColumn_name());
+
+      if (parentIntegerIndex == -1) {
         throw new InvalidObjectException("Parent column not found: " + pks.get(i).getColumn_name());
       }
       if (getPrimaryKeyConstraintName(
@@ -3403,6 +3529,7 @@ public class ObjectStore implements RawStore, Configurable {
       } else {
         constraintName = pks.get(i).getPk_name();
       }
+
       int enableValidateRely = (pks.get(i).isEnable_cstr() ? 4 : 0) +
       (pks.get(i).isValidate_cstr() ? 2 : 0) + (pks.get(i).isRely_cstr() ? 1 : 0);
       MConstraint mpk = new MConstraint(
@@ -3414,8 +3541,10 @@ public class ObjectStore implements RawStore, Configurable {
         enableValidateRely,
         parentTable,
         null,
-        parentColumn,
-        null);
+        parentCD,
+        null,
+        null,
+        parentIntegerIndex);
       mpks.add(mpk);
     }
     pm.makePersistentAll(mpks);
@@ -3604,8 +3733,8 @@ public class ObjectStore implements RawStore, Configurable {
               + "order by indexName asc");
       query.declareParameters("java.lang.String t1, java.lang.String t2");
       query.setResult("indexName");
-      Collection<?> names = (Collection<?>) query.execute(dbName, origTableName);
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      Collection names = (Collection) query.execute(dbName, origTableName);
+      for (Iterator i = names.iterator(); i.hasNext();) {
         pns.add((String) i.next());
       }
       success = commitTransaction();
@@ -4010,9 +4139,9 @@ public class ObjectStore implements RawStore, Configurable {
       LOG.debug("Executing listAllRoleNames");
       query = pm.newQuery("select roleName from org.apache.hadoop.hive.metastore.model.MRole");
       query.setResult("roleName");
-      Collection<?> names = (Collection<?>) query.execute();
+      Collection names = (Collection) query.execute();
       List<String> roleNames = new ArrayList<String>();
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      for (Iterator i = names.iterator(); i.hasNext();) {
         roleNames.add((String) i.next());
       }
       success = commitTransaction();
@@ -6663,8 +6792,9 @@ public class ObjectStore implements RawStore, Configurable {
     }
   }
 
-  private void writeMTableColumnStatistics(Table table, MTableColumnStatistics mStatsObj)
-    throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException {
+  private void writeMTableColumnStatistics(Table table, MTableColumnStatistics mStatsObj,
+      MTableColumnStatistics oldStats) throws NoSuchObjectException, MetaException,
+      InvalidObjectException, InvalidInputException {
     String dbName = mStatsObj.getDbName();
     String tableName = mStatsObj.getTableName();
     String colName = mStatsObj.getColName();
@@ -6675,12 +6805,8 @@ public class ObjectStore implements RawStore, Configurable {
         + " colName=" + colName);
       validateTableCols(table, Lists.newArrayList(colName));
 
-      List<MTableColumnStatistics> oldStats =
-          getMTableColumnStatistics(table, Lists.newArrayList(colName), queryWrapper);
-
-      if (!oldStats.isEmpty()) {
-        assert oldStats.size() == 1;
-        StatObjectConverter.setFieldsIntoOldStats(mStatsObj, oldStats.get(0));
+      if (oldStats != null) {
+        StatObjectConverter.setFieldsIntoOldStats(mStatsObj, oldStats);
       } else {
         pm.makePersistent(mStatsObj);
       }
@@ -6690,8 +6816,8 @@ public class ObjectStore implements RawStore, Configurable {
   }
 
   private void writeMPartitionColumnStatistics(Table table, Partition partition,
-      MPartitionColumnStatistics mStatsObj) throws NoSuchObjectException,
-        MetaException, InvalidObjectException, InvalidInputException {
+      MPartitionColumnStatistics mStatsObj, MPartitionColumnStatistics oldStats)
+      throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException {
     String dbName = mStatsObj.getDbName();
     String tableName = mStatsObj.getTableName();
     String partName = mStatsObj.getPartitionName();
@@ -6715,17 +6841,39 @@ public class ObjectStore implements RawStore, Configurable {
 
     QueryWrapper queryWrapper = new QueryWrapper();
     try {
-      List<MPartitionColumnStatistics> oldStats = getMPartitionColumnStatistics(
-          table, Lists.newArrayList(partName), Lists.newArrayList(colName), queryWrapper);
-      if (!oldStats.isEmpty()) {
-        assert oldStats.size() == 1;
-        StatObjectConverter.setFieldsIntoOldStats(mStatsObj, oldStats.get(0));
-    } else {
-      pm.makePersistent(mStatsObj);
-    }
+      if (oldStats != null) {
+        StatObjectConverter.setFieldsIntoOldStats(mStatsObj, oldStats);
+      } else {
+        pm.makePersistent(mStatsObj);
+      }
     } finally {
       queryWrapper.close();
     }
+  }
+
+  /**
+   * Get table's column stats
+   *
+   * @param table
+   * @param colNames
+   * @return Map of column name and its stats
+   * @throws NoSuchObjectException
+   * @throws MetaException
+   */
+  private Map<String, MTableColumnStatistics> getPartitionColStats(Table table,
+     List<String> colNames) throws NoSuchObjectException, MetaException {
+    Map<String, MTableColumnStatistics> statsMap = Maps.newHashMap();
+    QueryWrapper queryWrapper = new QueryWrapper();
+    try {
+      List<MTableColumnStatistics> stats = getMTableColumnStatistics(table,
+          colNames, queryWrapper);
+      for(MTableColumnStatistics cStat : stats) {
+        statsMap.put(cStat.getColName(), cStat);
+      }
+    } finally {
+      queryWrapper.close();
+    }
+    return statsMap;
   }
 
   @Override
@@ -6742,11 +6890,16 @@ public class ObjectStore implements RawStore, Configurable {
       // So let's not use them anywhere unless absolutely necessary.
       Table table = ensureGetTable(statsDesc.getDbName(), statsDesc.getTableName());
       List<String> colNames = new ArrayList<>();
+      for (ColumnStatisticsObj statsObj : statsObjs) {
+        colNames.add(statsObj.getColName());
+      }
+      Map<String, MTableColumnStatistics> oldStats = getPartitionColStats(table, colNames);
+
       for (ColumnStatisticsObj statsObj:statsObjs) {
         // We have to get mtable again because DataNucleus.
         MTableColumnStatistics mStatsObj = StatObjectConverter.convertToMTableColumnStatistics(
             ensureGetMTable(statsDesc.getDbName(), statsDesc.getTableName()), statsDesc, statsObj);
-        writeMTableColumnStatistics(table, mStatsObj);
+        writeMTableColumnStatistics(table, mStatsObj, oldStats.get(statsObj.getColName()));
         colNames.add(statsObj.getColName());
       }
 
@@ -6768,40 +6921,70 @@ public class ObjectStore implements RawStore, Configurable {
     }
   }
 
+  /**
+   * Get partition's column stats
+   *
+   * @param table
+   * @param partitionName
+   * @param colNames
+   * @return Map of column name and its stats
+   * @throws NoSuchObjectException
+   * @throws MetaException
+   */
+  private Map<String, MPartitionColumnStatistics> getPartitionColStats(Table table,
+      String partitionName, List<String> colNames) throws NoSuchObjectException, MetaException {
+    Map<String, MPartitionColumnStatistics> statsMap = Maps.newHashMap();
+    QueryWrapper queryWrapper = new QueryWrapper();
+    try {
+      List<MPartitionColumnStatistics> stats = getMPartitionColumnStatistics(table,
+          Lists.newArrayList(partitionName), colNames, queryWrapper);
+      for(MPartitionColumnStatistics cStat : stats) {
+        statsMap.put(cStat.getColName(), cStat);
+      }
+    } finally {
+      queryWrapper.close();
+    }
+    return statsMap;
+  }
+
   @Override
   public boolean updatePartitionColumnStatistics(ColumnStatistics colStats, List<String> partVals)
     throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException {
     boolean committed = false;
 
     try {
-    openTransaction();
-    List<ColumnStatisticsObj> statsObjs = colStats.getStatsObj();
-    ColumnStatisticsDesc statsDesc = colStats.getStatsDesc();
-    Table table = ensureGetTable(statsDesc.getDbName(), statsDesc.getTableName());
-    Partition partition = convertToPart(getMPartition(
-        statsDesc.getDbName(), statsDesc.getTableName(), partVals));
-    List<String> colNames = new ArrayList<>();
-    for (ColumnStatisticsObj statsObj:statsObjs) {
-      // We have to get partition again because DataNucleus
+      openTransaction();
+      List<ColumnStatisticsObj> statsObjs = colStats.getStatsObj();
+      ColumnStatisticsDesc statsDesc = colStats.getStatsDesc();
+      Table table = ensureGetTable(statsDesc.getDbName(), statsDesc.getTableName());
+      Partition partition = convertToPart(getMPartition(
+          statsDesc.getDbName(), statsDesc.getTableName(), partVals));
+      List<String> colNames = new ArrayList<>();
+
+      for(ColumnStatisticsObj statsObj : statsObjs) {
+        colNames.add(statsObj.getColName());
+      }
+
+      Map<String, MPartitionColumnStatistics> oldStats = getPartitionColStats(table, statsDesc
+          .getPartName(), colNames);
+
       MPartition mPartition = getMPartition(
           statsDesc.getDbName(), statsDesc.getTableName(), partVals);
       if (partition == null) {
         throw new NoSuchObjectException("Partition for which stats is gathered doesn't exist.");
       }
-      MPartitionColumnStatistics mStatsObj =
-          StatObjectConverter.convertToMPartitionColumnStatistics(mPartition, statsDesc, statsObj);
-      writeMPartitionColumnStatistics(table, partition, mStatsObj);
-      colNames.add(statsObj.getColName());
-    }
-    // Set the partition properties
-    // No need to check again if it exists.
-    MPartition mPartition = getMPartition(
-        statsDesc.getDbName(), statsDesc.getTableName(), partVals);
-    Map<String, String> parameters = mPartition.getParameters();
-    StatsSetupConst.setColumnStatsState(parameters, colNames);
-    mPartition.setParameters(parameters);
-    committed = commitTransaction();
-    return committed;
+
+      for (ColumnStatisticsObj statsObj : statsObjs) {
+        MPartitionColumnStatistics mStatsObj =
+            StatObjectConverter.convertToMPartitionColumnStatistics(mPartition, statsDesc, statsObj);
+        writeMPartitionColumnStatistics(table, partition, mStatsObj,
+            oldStats.get(statsObj.getColName()));
+      }
+      Map<String, String> parameters = mPartition.getParameters();
+      StatsSetupConst.setColumnStatsState(parameters, colNames);
+      mPartition.setParameters(parameters);
+      committed = commitTransaction();
+      return committed;
     } finally {
       if (!committed) {
         rollbackTransaction();
@@ -7490,34 +7673,36 @@ public class ObjectStore implements RawStore, Configurable {
     boolean strictValidation =
       HiveConf.getBoolVar(getConf(), HiveConf.ConfVars.METASTORE_SCHEMA_VERIFICATION);
     // read the schema version stored in metastore db
-    String schemaVer = getMetaStoreSchemaVersion();
-    if (schemaVer == null) {
+    String dbSchemaVer = getMetaStoreSchemaVersion();
+    // version of schema for this version of hive
+    String hiveSchemaVer = MetaStoreSchemaInfo.getHiveSchemaVersion();
+
+    if (dbSchemaVer == null) {
       if (strictValidation) {
         throw new MetaException("Version information not found in metastore. ");
       } else {
         LOG.warn("Version information not found in metastore. "
             + HiveConf.ConfVars.METASTORE_SCHEMA_VERIFICATION.toString() +
             " is not enabled so recording the schema version " +
-            MetaStoreSchemaInfo.getHiveSchemaVersion());
-        setMetaStoreSchemaVersion(MetaStoreSchemaInfo.getHiveSchemaVersion(),
+            hiveSchemaVer);
+        setMetaStoreSchemaVersion(hiveSchemaVer,
           "Set by MetaStore " + USER + "@" + HOSTNAME);
       }
     } else {
-      // metastore schema version is different than Hive distribution needs
-      if (schemaVer.equalsIgnoreCase(MetaStoreSchemaInfo.getHiveSchemaVersion())) {
-        LOG.debug("Found expected HMS version of " + schemaVer);
+      if (MetaStoreSchemaInfo.isVersionCompatible(hiveSchemaVer, dbSchemaVer)) {
+        LOG.debug("Found expected HMS version of " + dbSchemaVer);
       } else {
+        // metastore schema version is different than Hive distribution needs
         if (strictValidation) {
-          throw new MetaException("Hive Schema version "
-              + MetaStoreSchemaInfo.getHiveSchemaVersion() +
-              " does not match metastore's schema version " + schemaVer +
+          throw new MetaException("Hive Schema version " + hiveSchemaVer +
+              " does not match metastore's schema version " + dbSchemaVer +
               " Metastore is not upgraded or corrupt");
         } else {
-          LOG.error("Version information found in metastore differs " + schemaVer +
-              " from expected schema version " + MetaStoreSchemaInfo.getHiveSchemaVersion() +
+          LOG.error("Version information found in metastore differs " + dbSchemaVer +
+              " from expected schema version " + hiveSchemaVer +
               ". Schema verififcation is disabled " +
-              HiveConf.ConfVars.METASTORE_SCHEMA_VERIFICATION + " so setting version.");
-          setMetaStoreSchemaVersion(MetaStoreSchemaInfo.getHiveSchemaVersion(),
+              HiveConf.ConfVars.METASTORE_SCHEMA_VERIFICATION);
+          setMetaStoreSchemaVersion(hiveSchemaVer,
             "Set by MetaStore " + USER + "@" + HOSTNAME);
         }
       }
@@ -7593,6 +7778,7 @@ public class ObjectStore implements RawStore, Configurable {
         "version = " + schemaVersion + ", comment = " + comment);
       return;
     }
+    LOG.warn("Setting metastore schema version in db to " + schemaVersion);
 
     try {
       mSchemaVer = getMSchemaVersion();
@@ -7617,37 +7803,10 @@ public class ObjectStore implements RawStore, Configurable {
   @Override
   public boolean doesPartitionExist(String dbName, String tableName, List<String> partVals)
       throws MetaException {
-    boolean success = false;
-    Query query = null;
     try {
-      openTransaction();
-      dbName = HiveStringUtils.normalizeIdentifier(dbName);
-      tableName = HiveStringUtils.normalizeIdentifier(tableName);
-
-      // TODO: this could also be passed from upper layer; or this method should filter the list.
-      MTable mtbl = getMTable(dbName, tableName);
-      if (mtbl == null) {
-        success = commitTransaction();
-        return false;
-      }
-      query =
-          pm.newQuery("select partitionName from org.apache.hadoop.hive.metastore.model.MPartition "
-              + "where table.tableName == t1 && table.database.name == t2 && partitionName == t3");
-      query.declareParameters("java.lang.String t1, java.lang.String t2, java.lang.String t3");
-      query.setUnique(true);
-      query.setResult("partitionName");
-      String name =
-          Warehouse.makePartName(convertToFieldSchemas(mtbl.getPartitionKeys()), partVals);
-      String result = (String) query.execute(tableName, dbName, name);
-      success = commitTransaction();
-      return result != null;
-    } finally {
-      if (!success) {
-        rollbackTransaction();
-      }
-      if (query != null) {
-        query.closeAll();
-      }
+      return this.getPartition(dbName, tableName, partVals) != null;
+    } catch (NoSuchObjectException e) {
+      return false;
     }
   }
 
@@ -7752,7 +7911,6 @@ public class ObjectStore implements RawStore, Configurable {
       openTransaction();
       MFunction mfunc = convertToMFunction(func);
       pm.makePersistent(mfunc);
-      incrementChangeVersionNoTx(IMetaStoreClient.PERMANENT_FUNCTION_CV);
       committed = commitTransaction();
     } finally {
       if (!committed) {
@@ -7779,8 +7937,6 @@ public class ObjectStore implements RawStore, Configurable {
         throw new MetaException("function " + funcName + " doesn't exist");
       }
 
-      incrementChangeVersionNoTx(IMetaStoreClient.PERMANENT_FUNCTION_CV);
-
       // For now only alter name, owner, class name, type
       oldf.setFunctionName(HiveStringUtils.normalizeIdentifier(newf.getFunctionName()));
       oldf.setDatabase(newf.getDatabase());
@@ -7798,15 +7954,6 @@ public class ObjectStore implements RawStore, Configurable {
     }
   }
 
-  private void incrementChangeVersionNoTx(String topic) {
-    MChangeVersion cv = getMChangeVersionNoTx(topic);
-    if (cv == null) {
-      cv = new MChangeVersion(topic, 1);
-      pm.makePersistent(cv);
-    }
-    cv.setVersion(cv.getVersion() + 1);
-  }
-
   @Override
   public void dropFunction(String dbName, String funcName) throws MetaException,
   NoSuchObjectException, InvalidObjectException, InvalidInputException {
@@ -7819,7 +7966,6 @@ public class ObjectStore implements RawStore, Configurable {
         // TODO: When function privileges are implemented, they should be deleted here.
         pm.deletePersistentAll(mfunc);
       }
-      incrementChangeVersionNoTx(IMetaStoreClient.PERMANENT_FUNCTION_CV);
       success = commitTransaction();
     } finally {
       if (!success) {
@@ -7853,27 +7999,6 @@ public class ObjectStore implements RawStore, Configurable {
     return mfunc;
   }
 
-  private MChangeVersion getMChangeVersionNoTx(String topic) {
-    Query query = null;
-    try {
-      query = pm.newQuery(MChangeVersion.class, "topic == topicName");
-      query.declareParameters("java.lang.String topicName");
-      query.setUnique(true);
-      Object obj = query.execute(topic);
-      if (obj == null) {
-        return null;
-      } else {
-        MChangeVersion mversion = (MChangeVersion)obj;
-        pm.retrieve(mversion);
-        return mversion;
-      }
-    } finally {
-      if (query != null) {
-        query.closeAll();
-      }
-    }
-  }
-
   @Override
   public Function getFunction(String dbName, String funcName) throws MetaException {
     boolean commited = false;
@@ -7888,21 +8013,6 @@ public class ObjectStore implements RawStore, Configurable {
       }
     }
     return func;
-  }
-
-  @Override
-  public long getChangeVersion(String topic) throws MetaException {
-    boolean commited = false;
-    try {
-      openTransaction();
-      long result = getMChangeVersionNoTx(topic).getVersion();
-      commited = commitTransaction();
-      return result;
-    } finally {
-      if (!commited) {
-        rollbackTransaction();
-      }
-    }
   }
 
   @Override
@@ -7950,9 +8060,9 @@ public class ObjectStore implements RawStore, Configurable {
       query.declareParameters("java.lang.String dbName");
       query.setResult("functionName");
       query.setOrdering("functionName ascending");
-      Collection<?> names = (Collection<?>) query.execute(dbName);
+      Collection names = (Collection) query.execute(dbName);
       funcs = new ArrayList<String>();
-      for (Iterator<?> i = names.iterator(); i.hasNext();) {
+      for (Iterator i = names.iterator(); i.hasNext();) {
         funcs.add((String) i.next());
       }
       commited = commitTransaction();
@@ -7977,8 +8087,7 @@ public class ObjectStore implements RawStore, Configurable {
       query = pm.newQuery(MNotificationLog.class, "eventId > lastEvent");
       query.declareParameters("java.lang.Long lastEvent");
       query.setOrdering("eventId ascending");
-      Collection<MNotificationLog> events = (Collection<MNotificationLog>)
-          query.execute(lastEvent);
+      Collection<MNotificationLog> events = (Collection) query.execute(lastEvent);
       commited = commitTransaction();
       if (events == null) {
         return null;
@@ -8211,7 +8320,7 @@ public class ObjectStore implements RawStore, Configurable {
         boolean rely = (enableValidateRely & 1) != 0;
         primaryKeys.add(new SQLPrimaryKey(db_name,
          tbl_name,
-         currPK.getParentColumn().getCols().get(0).getName(),
+         currPK.getParentColumn().getCols().get(currPK.getParentIntegerIndex()).getName(),
          currPK.getPosition(),
          currPK.getConstraintName(), enable, validate, rely));
       }
@@ -8297,11 +8406,11 @@ public class ObjectStore implements RawStore, Configurable {
     Map<String, String> tblToConstraint = new HashMap<String, String>();
     try {
       openTransaction();
-      String queryText = (parent_tbl_name != null ? "parentTable.tableName == parent_tbl_name &&" : "")
-        + (parent_db_name != null ? "parentTable.database.name == parent_db_name &&" : "")
-        + (foreign_tbl_name != null ? "childTable.tableName == foreign_tbl_name &&" : "")
-        + (parent_db_name != null ? "childTable.database.name == foreign_db_name &&" : "")
-        + "constraintType == MConstraint.FOREIGN_KEY_CONSTRAINT";
+      String queryText = (parent_tbl_name != null ? "parentTable.tableName == parent_tbl_name && " : "")
+        + (parent_db_name != null ? " parentTable.database.name == parent_db_name && " : "")
+        + (foreign_tbl_name != null ? " childTable.tableName == foreign_tbl_name && " : "")
+        + (foreign_db_name != null ? " childTable.database.name == foreign_db_name && " : "")
+        + " constraintType == MConstraint.FOREIGN_KEY_CONSTRAINT";
       queryText = queryText.trim();
       query = pm.newQuery(MConstraint.class, queryText);
       String paramText = (parent_tbl_name == null ? "" : "java.lang.String parent_tbl_name,")
@@ -8323,13 +8432,20 @@ public class ObjectStore implements RawStore, Configurable {
       if (foreign_tbl_name != null) {
         params.add(foreign_tbl_name);
       }
-      if (parent_db_name != null) {
+      if (foreign_db_name != null) {
         params.add(foreign_db_name);
       }
       if (params.size() == 0) {
         constraints = (Collection<?>) query.execute();
+      } else if (params.size() ==1) {
+        constraints = (Collection<?>) query.execute(params.get(0));
+      } else if (params.size() == 2) {
+        constraints = (Collection<?>) query.execute(params.get(0), params.get(1));
+      } else if (params.size() == 3) {
+        constraints = (Collection<?>) query.execute(params.get(0), params.get(1), params.get(2));
       } else {
-        constraints = (Collection<?>) query.executeWithArray(params);
+        constraints = (Collection<?>) query.executeWithArray(params.get(0), params.get(1),
+          params.get(2), params.get(3));
       }
       pm.retrieveAll(constraints);
       foreignKeys = new ArrayList<SQLForeignKey>();
@@ -8353,10 +8469,10 @@ public class ObjectStore implements RawStore, Configurable {
         foreignKeys.add(new SQLForeignKey(
           currPKFK.getParentTable().getDatabase().getName(),
           currPKFK.getParentTable().getDatabase().getName(),
-          currPKFK.getParentColumn().getCols().get(0).getName(),
+          currPKFK.getParentColumn().getCols().get(currPKFK.getParentIntegerIndex()).getName(),
           currPKFK.getChildTable().getDatabase().getName(),
           currPKFK.getChildTable().getTableName(),
-          currPKFK.getChildColumn().getCols().get(0).getName(),
+          currPKFK.getChildColumn().getCols().get(currPKFK.getChildIntegerIndex()).getName(),
           currPKFK.getPosition(),
           currPKFK.getUpdateRule(),
           currPKFK.getDeleteRule(),
@@ -8372,6 +8488,29 @@ public class ObjectStore implements RawStore, Configurable {
       }
     }
     return foreignKeys;
+  }
+
+  @Override
+  public void dropConstraint(String dbName, String tableName,
+    String constraintName) throws NoSuchObjectException {
+    boolean success = false;
+    try {
+      openTransaction();
+
+      List<MConstraint> tabConstraints = listAllTableConstraintsWithOptionalConstraintName(
+                                         dbName, tableName, constraintName);
+      if (tabConstraints != null && tabConstraints.size() > 0) {
+        pm.deletePersistentAll(tabConstraints);
+      } else {
+        throw new NoSuchObjectException("The constraint: " + constraintName +
+          " does not exist for the associated table: " + dbName + "." + tableName);
+      }
+      success = commitTransaction();
+    } finally {
+      if (!success) {
+        rollbackTransaction();
+      }
+    }
   }
 
 }

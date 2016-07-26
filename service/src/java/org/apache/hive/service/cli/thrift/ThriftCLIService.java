@@ -33,10 +33,13 @@ import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.common.ServerUtils;
 import org.apache.hadoop.hive.shims.HadoopShims.KerberosNameShim;
 import org.apache.hadoop.hive.shims.ShimLoader;
+import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hive.service.AbstractService;
 import org.apache.hive.service.ServiceException;
+import org.apache.hive.service.ServiceUtils;
 import org.apache.hive.service.auth.HiveAuthFactory;
 import org.apache.hive.service.auth.TSetIpAddressProcessor;
+import org.apache.hive.service.auth.HiveAuthFactory.AuthTypes;
 import org.apache.hive.service.cli.CLIService;
 import org.apache.hive.service.cli.FetchOrientation;
 import org.apache.hive.service.cli.FetchType;
@@ -237,7 +240,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       throws TException {
     TGetDelegationTokenResp resp = new TGetDelegationTokenResp();
 
-    if (hiveAuthFactory == null) {
+    if (hiveAuthFactory == null || !hiveAuthFactory.isSASLKerberosUser()) {
       resp.setStatus(unsecureTokenErrorStatus());
     } else {
       try {
@@ -261,7 +264,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       throws TException {
     TCancelDelegationTokenResp resp = new TCancelDelegationTokenResp();
 
-    if (hiveAuthFactory == null) {
+    if (hiveAuthFactory == null || !hiveAuthFactory.isSASLKerberosUser()) {
       resp.setStatus(unsecureTokenErrorStatus());
     } else {
       try {
@@ -280,7 +283,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
   public TRenewDelegationTokenResp RenewDelegationToken(TRenewDelegationTokenReq req)
       throws TException {
     TRenewDelegationTokenResp resp = new TRenewDelegationTokenResp();
-    if (hiveAuthFactory == null) {
+    if (hiveAuthFactory == null || !hiveAuthFactory.isSASLKerberosUser()) {
       resp.setStatus(unsecureTokenErrorStatus());
     } else {
       try {
@@ -358,6 +361,7 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
    */
   private String getUserName(TOpenSessionReq req) throws HiveSQLException, IOException {
     String userName = null;
+
     if (hiveAuthFactory != null && hiveAuthFactory.isSASLWithKerberizedHadoop()) {
       userName = hiveAuthFactory.getRemoteUser();
     }
@@ -385,8 +389,15 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
     String ret = null;
 
     if (userName != null) {
-      KerberosNameShim fullKerberosName = ShimLoader.getHadoopShims().getKerberosNameShim(userName);
-      ret = fullKerberosName.getShortName();
+      if (hiveAuthFactory != null && hiveAuthFactory.isSASLKerberosUser()) {
+        // KerberosName.getShorName can only be used for kerberos user, but not for the user
+        // logged in via other authentications such as LDAP
+        KerberosNameShim fullKerberosName = ShimLoader.getHadoopShims().getKerberosNameShim(userName);
+        ret = fullKerberosName.getShortName();
+      } else {
+        int indexOfDomainMatch = ServiceUtils.indexOfDomainMatch(userName);
+        ret = (indexOfDomainMatch <= 0) ? userName : userName.substring(0, indexOfDomainMatch);
+      }
     }
 
     return ret;
@@ -493,15 +504,17 @@ public abstract class ThriftCLIService extends AbstractService implements TCLISe
       String statement = req.getStatement();
       Map<String, String> confOverlay = req.getConfOverlay();
       Boolean runAsync = req.isRunAsync();
-      OperationHandle operationHandle = runAsync ?
-          cliService.executeStatementAsync(sessionHandle, statement, confOverlay)
-          : cliService.executeStatement(sessionHandle, statement, confOverlay);
-          resp.setOperationHandle(operationHandle.toTOperationHandle());
-          resp.setStatus(OK_STATUS);
+      long queryTimeout = req.getQueryTimeout();
+      OperationHandle operationHandle =
+          runAsync ? cliService.executeStatementAsync(sessionHandle, statement, confOverlay,
+              queryTimeout) : cliService.executeStatement(sessionHandle, statement, confOverlay,
+              queryTimeout);
+      resp.setOperationHandle(operationHandle.toTOperationHandle());
+      resp.setStatus(OK_STATUS);
     } catch (Exception e) {
       // Note: it's rather important that this (and other methods) catch Exception, not Throwable;
-      //       in combination with HiveSessionProxy.invoke code, perhaps unintentionally, it used
-      //       to also catch all errors; and now it allows OOMs only to propagate.
+      // in combination with HiveSessionProxy.invoke code, perhaps unintentionally, it used
+      // to also catch all errors; and now it allows OOMs only to propagate.
       LOG.warn("Error executing statement: ", e);
       resp.setStatus(HiveSQLException.toTStatus(e));
     }

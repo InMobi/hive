@@ -67,7 +67,6 @@ public abstract class Operation {
   public static final long DEFAULT_FETCH_MAX_ROWS = 100;
   protected boolean hasResultSet;
   protected volatile HiveSQLException operationException;
-  protected final boolean runAsync;
   protected volatile Future<?> backgroundHandle;
   protected OperationLog operationLog;
   protected boolean isOperationLogEnabled;
@@ -85,27 +84,29 @@ public abstract class Operation {
   protected static final EnumSet<FetchOrientation> DEFAULT_FETCH_ORIENTATION_SET =
       EnumSet.of(FetchOrientation.FETCH_NEXT,FetchOrientation.FETCH_FIRST);
 
-  protected Operation(HiveSession parentSession, OperationType opType, boolean runInBackground) {
-    this(parentSession, null, opType, runInBackground);
- }
 
-  protected Operation(HiveSession parentSession, Map<String, String> confOverlay, OperationType opType, boolean runInBackground) {
+  protected Operation(HiveSession parentSession, OperationType opType) {
+    this(parentSession, null, opType);
+  }
+  
+  protected Operation(HiveSession parentSession, Map<String, String> confOverlay,
+      OperationType opType) {
+    this(parentSession, confOverlay, opType, false);
+  }
+
+  protected Operation(HiveSession parentSession,
+      Map<String, String> confOverlay, OperationType opType, boolean isAsyncQueryState) {
     this.parentSession = parentSession;
     if (confOverlay != null) {
       this.confOverlay = confOverlay;
     }
-    this.runAsync = runInBackground;
     this.opHandle = new OperationHandle(opType, parentSession.getProtocolVersion());
     beginTime = System.currentTimeMillis();
     lastAccessTime = beginTime;
     operationTimeout = HiveConf.getTimeVar(parentSession.getHiveConf(),
         HiveConf.ConfVars.HIVE_SERVER2_IDLE_OPERATION_TIMEOUT, TimeUnit.MILLISECONDS);
     setMetrics(state);
-    queryState = new QueryState(parentSession.getHiveConf(), confOverlay, runAsync);
-  }
-
-  public QueryState getQueryState() {
-    return queryState;
+    queryState = new QueryState(parentSession.getHiveConf(), confOverlay, isAsyncQueryState);
   }
 
   public Future<?> getBackgroundHandle() {
@@ -117,9 +118,8 @@ public abstract class Operation {
   }
 
   public boolean shouldRunAsync() {
-    return runAsync;
+    return false; // Most operations cannot run asynchronously.
   }
-
 
   public HiveSession getParentSession() {
     return parentSession;
@@ -327,22 +327,23 @@ public abstract class Operation {
     }
   }
 
-  protected void cleanupOperationLog() {
+  protected synchronized void cleanupOperationLog() {
     if (isOperationLogEnabled) {
+      if (opHandle == null) {
+        LOG.warn("Operation seems to be in invalid state, opHandle is null");
+        return;
+      }
       if (operationLog == null) {
-        LOG.error("Operation [ " + opHandle.getHandleIdentifier() + " ] "
-          + "logging is enabled, but its OperationLog object cannot be found.");
+        LOG.warn("Operation [ " + opHandle.getHandleIdentifier() + " ] " + "logging is enabled, "
+            + "but its OperationLog object cannot be found. "
+            + "Perhaps the operation has already terminated.");
       } else {
         operationLog.close();
       }
     }
   }
 
-  // TODO: make this abstract and implement in subclasses.
-  public void cancel() throws HiveSQLException {
-    setState(OperationState.CANCELED);
-    throw new UnsupportedOperationException("SQLOperation.cancel()");
-  }
+  public abstract void cancel(OperationState stateAfterCancel) throws HiveSQLException;
 
   public abstract void close() throws HiveSQLException;
 

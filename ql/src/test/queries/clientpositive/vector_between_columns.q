@@ -6,7 +6,9 @@ set hive.fetch.task.conversion=none;
 set hive.mapred.mode=nonstrict;
 
 -- SORT_QUERY_RESULTS
-
+--
+-- Verify the VectorUDFAdaptor to GenericUDFBetween works for PROJECTION and FILTER.
+--
 create table if not exists TSINT_txt ( RNUM int , CSINT smallint )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' LINES TERMINATED BY '\n';
 
@@ -21,9 +23,14 @@ create table TSINT stored as orc AS SELECT * FROM TSINT_txt;
 
 create table TINT stored as orc AS SELECT * FROM TINT_txt;
 
--- We DO NOT expect the following to vectorized because the BETWEEN range expressions
--- are not constants.  We currently do not support the range expressions being columns.
-explain
-select tint.rnum, tsint.rnum from tint , tsint where tint.cint between tsint.csint and tsint.csint;
 
-select tint.rnum, tsint.rnum from tint , tsint where tint.cint between tsint.csint and tsint.csint;
+explain
+select tint.rnum, tsint.rnum, tint.cint, tsint.csint, (case when (tint.cint between tsint.csint and tsint.csint) then "Ok" else "NoOk" end) as between_col from tint , tsint;
+
+select tint.rnum, tsint.rnum, tint.cint, tsint.csint, (case when (tint.cint between tsint.csint and tsint.csint) then "Ok" else "NoOk" end) as between_col from tint , tsint;
+
+
+explain
+select tint.rnum, tsint.rnum, tint.cint, tsint.csint from tint , tsint where tint.cint between tsint.csint and tsint.csint;
+
+select tint.rnum, tsint.rnum, tint.cint, tsint.csint from tint , tsint where tint.cint between tsint.csint and tsint.csint;

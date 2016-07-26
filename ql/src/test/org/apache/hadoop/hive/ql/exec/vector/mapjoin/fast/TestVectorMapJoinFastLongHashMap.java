@@ -18,11 +18,14 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.mapjoin.fast;
 
+import java.io.IOException;
 import java.util.Random;
 
 import org.apache.hadoop.hive.ql.exec.JoinUtil;
 import org.apache.hadoop.hive.ql.exec.vector.mapjoin.hashtable.VectorMapJoinHashMapResult;
+import org.apache.hadoop.hive.ql.exec.vector.mapjoin.fast.CheckFastHashTable.VerifyFastLongHashMap;
 import org.apache.hadoop.hive.ql.exec.vector.mapjoin.fast.VectorMapJoinFastLongHashMap;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.VectorMapJoinDesc.HashTableKeyType;
 import org.junit.Test;
 
@@ -31,91 +34,141 @@ import static org.junit.Assert.*;
 public class TestVectorMapJoinFastLongHashMap extends CommonFastHashTable {
 
   @Test
-  public void testPutGetOne() throws Exception {
-    random = new Random(47496);
+  public void testOneKey() throws Exception {
+    random = new Random(33221);
 
     VectorMapJoinFastLongHashMap map =
-        new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, CAPACITY, LOAD_FACTOR, WB_SIZE);
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, CAPACITY, LOAD_FACTOR, WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
-    RandomByteArrayStream randomByteArrayValueStream = new RandomByteArrayStream(random);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
-    long key = randomLongKeyStream.next();
-    byte[] value = randomByteArrayValueStream.next();
-    map.putRow(key, value);
-    verifyHashMapResult(map, key, randomByteArrayValueStream.get(0));
+    long key = random.nextLong();
+    byte[] value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+    random.nextBytes(value);
 
-    key = randomLongKeyStream.next();
-    value = randomByteArrayValueStream.next();
-    map.putRow(key, value);
-    verifyHashMapResult(map, key, randomByteArrayValueStream.get(1));
+    map.testPutRow(key, value);
+    verifyTable.add(key, value);
+    verifyTable.verify(map);
+
+    // Second value.
+    value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+    random.nextBytes(value);
+    map.testPutRow(key, value);
+    verifyTable.add(key, value);
+    verifyTable.verify(map);
+
+    // Third value.
+    value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+    random.nextBytes(value);
+    map.testPutRow(key, value);
+    verifyTable.add(key, value);
+    verifyTable.verify(map);
   }
 
   @Test
-  public void testPutGetMultiple() throws Exception {
-    random = new Random(2990);
+  public void testMultipleKeysSingleValue() throws Exception {
+    random = new Random(900);
 
-    VectorMapJoinFastLongHashMap map = new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, CAPACITY, LOAD_FACTOR, WB_SIZE);
+    VectorMapJoinFastLongHashMap map =
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, CAPACITY, LOAD_FACTOR, WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
-    RandomByteArrayStream randomByteArrayValueStream = new RandomByteArrayStream(random);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
-    long key = randomLongKeyStream.next();
-    byte[] value = randomByteArrayValueStream.next();
-    map.putRow(key, value);
-    verifyHashMapResult(map, key, value);
+    int keyCount = 100 + random.nextInt(1000);
+    for (int i = 0; i < keyCount; i++) {
+      long key;
+      while (true) {
+        key = random.nextLong();
+        if (!verifyTable.contains(key)) {
+          // Unique keys for this test.
+          break;
+        }
+      }
+      byte[] value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+      random.nextBytes(value);
 
-    // Same key, multiple values.
-    for (int i = 0; i < 3; ++i) {
-      value = randomByteArrayValueStream.next();
-      map.putRow(key, value);
-      verifyHashMapResult(map, key, randomByteArrayValueStream);
+      map.testPutRow(key, value);
+      verifyTable.add(key, value);
+      // verifyTable.verify(map);
     }
+    verifyTable.verify(map);
   }
 
   @Test
   public void testGetNonExistent() throws Exception {
-    random = new Random(16916);
+    random = new Random(450);
 
-    VectorMapJoinFastLongHashMap map = new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, CAPACITY, LOAD_FACTOR, WB_SIZE);
+    VectorMapJoinFastLongHashMap map =
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, CAPACITY, LOAD_FACTOR, WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
-    RandomByteArrayStream randomByteArrayValueStream = new RandomByteArrayStream(random);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
-    long key = randomLongKeyStream.next();
-    byte[] value = randomByteArrayValueStream.next();
-    map.putRow(key, value);
+    long key1 = random.nextLong();
+    byte[] value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+    random.nextBytes(value);
 
-    key += 1;
-    map.putRow(key, value);
+    map.testPutRow(key1, value);
+    verifyTable.add(key1, value);
+    verifyTable.verify(map);
 
-    key += 1;
+    long key2 = key1 += 1;
     VectorMapJoinHashMapResult hashMapResult = map.createHashMapResult();
-    JoinUtil.JoinResult joinResult = map.lookup(key, hashMapResult);
+    JoinUtil.JoinResult joinResult = map.lookup(key2, hashMapResult);
+    assertTrue(joinResult == JoinUtil.JoinResult.NOMATCH);
+    assertTrue(!hashMapResult.hasRows());
+
+    map.testPutRow(key2, value);
+    verifyTable.add(key2, value);
+    verifyTable.verify(map);
+
+    long key3 = key2 += 1;
+    hashMapResult = map.createHashMapResult();
+    joinResult = map.lookup(key3, hashMapResult);
     assertTrue(joinResult == JoinUtil.JoinResult.NOMATCH);
     assertTrue(!hashMapResult.hasRows());
   }
 
   @Test
-  public void testPutWithFullMap() throws Exception {
-    random = new Random(26078);
+  public void testFullMap() throws Exception {
+    random = new Random(93440);
 
     // Make sure the map does not expand; should be able to find space.
-    VectorMapJoinFastLongHashMap map = new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, CAPACITY, 1f, WB_SIZE);
+    VectorMapJoinFastLongHashMap map =
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, CAPACITY, 1f, WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
-    RandomByteArrayStream randomByteArrayValueStream = new RandomByteArrayStream(random);
-    for (int i = 0; i < CAPACITY; ++i) {
-      long key = randomLongKeyStream.next();
-      byte[] value = randomByteArrayValueStream.next();
-      map.putRow(key, value);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
+
+    for (int i = 0; i < CAPACITY; i++) {
+      long key;
+      while (true) {
+        key = random.nextLong();
+        if (!verifyTable.contains(key)) {
+          // Unique keys for this test.
+          break;
+        }
+      }
+      byte[] value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+      random.nextBytes(value);
+
+      map.testPutRow(key, value);
+      verifyTable.add(key, value);
+      // verifyTable.verify(map);
     }
-    for (int i = 0; i < randomLongKeyStream.size(); ++i) {
-      verifyHashMapResult(map, randomLongKeyStream.get(i), randomByteArrayValueStream.get(i));
+    verifyTable.verify(map);
+
+    long anotherKey;
+    while (true) {
+      anotherKey = random.nextLong();
+      if (!verifyTable.contains(anotherKey)) {
+        // Unique keys for this test.
+        break;
+      }
     }
-    // assertEquals(CAPACITY, map.getCapacity());
-    // Get of non-existent key should terminate..
-    long anotherKey = randomLongKeyStream.next();
+
     VectorMapJoinHashMapResult hashMapResult = map.createHashMapResult();
     JoinUtil.JoinResult joinResult = map.lookup(anotherKey, hashMapResult);
     assertTrue(joinResult == JoinUtil.JoinResult.NOMATCH);
@@ -123,97 +176,91 @@ public class TestVectorMapJoinFastLongHashMap extends CommonFastHashTable {
 
   @Test
   public void testExpand() throws Exception {
-    random = new Random(22470);
+    random = new Random(5227);
 
     // Start with capacity 1; make sure we expand on every put.
-    VectorMapJoinFastLongHashMap map = new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, 1, 0.0000001f, WB_SIZE);
+    VectorMapJoinFastLongHashMap map =
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, 1, 0.0000001f, WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
-    RandomByteArrayStream randomByteArrayValueStream = new RandomByteArrayStream(random);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
     for (int i = 0; i < 18; ++i) {
-      long key = randomLongKeyStream.next();
-      byte[] value = randomByteArrayValueStream.next();
-      map.putRow(key, value);
-      for (int j = 0; j <= i; ++j) {
-        verifyHashMapResult(map, randomLongKeyStream.get(j), randomByteArrayValueStream.get(j));
+      long key;
+      while (true) {
+        key = random.nextLong();
+        if (!verifyTable.contains(key)) {
+          // Unique keys for this test.
+          break;
+        }
       }
+      byte[] value = new byte[random.nextInt(MAX_VALUE_LENGTH)];
+      random.nextBytes(value);
+
+      map.testPutRow(key, value);
+      verifyTable.add(key, value);
+      // verifyTable.verify(map);
     }
+    verifyTable.verify(map);
     // assertEquals(1 << 18, map.getCapacity());
   }
 
+  public void addAndVerifyMultipleKeyMultipleValue(int keyCount,
+      VectorMapJoinFastLongHashMap map, VerifyFastLongHashMap verifyTable)
+          throws HiveException, IOException {
+    for (int i = 0; i < keyCount; i++) {
+      byte[] value = new byte[generateLargeCount() - 1];
+      random.nextBytes(value);
+
+      // Add a new key or add a value to an existing key?
+      if (random.nextBoolean() || verifyTable.getCount() == 0) {
+        long key;
+        while (true) {
+          key = random.nextLong();
+          if (!verifyTable.contains(key)) {
+            // Unique keys for this test.
+            break;
+          }
+        }
+
+        map.testPutRow(key, value);
+        verifyTable.add(key, value);
+        verifyTable.verify(map);
+      } else {
+        long randomExistingKey = verifyTable.addRandomExisting(value, random);
+        map.testPutRow(randomExistingKey, value);
+        // verifyTable.verify(map);
+      }
+      verifyTable.verify(map);
+    }
+  }
   @Test
-  public void testLarge() throws Exception {
-    random = new Random(40719);
+  public void testMultipleKeysMultipleValue() throws Exception {
+    random = new Random(8);
 
     // Use a large capacity that doesn't require expansion, yet.
-    VectorMapJoinFastLongHashMap map = new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, LARGE_CAPACITY, LOAD_FACTOR, LARGE_WB_SIZE);
+    VectorMapJoinFastLongHashMap map =
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, LARGE_CAPACITY, LOAD_FACTOR, LARGE_WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
-    final int largeSize = 1000;
-    RandomByteArrayStream[] randomByteArrayValueStreams = new RandomByteArrayStream[largeSize];
-    for (int i = 0; i < largeSize; i++) {
-      randomByteArrayValueStreams[i] = new RandomByteArrayStream(random);
-      int count = generateLargeCount();
-      long key = randomLongKeyStream.next();
-      for (int v = 0; v < count; v++) {
-        byte[] value = randomByteArrayValueStreams[i].next();
-        map.putRow(key, value);
-      }
-    }
-    for (int i = 0; i < largeSize; i++) {
-      verifyHashMapResult(map, randomLongKeyStream.get(i), randomByteArrayValueStreams[i]);
-    }
+    int keyCount = 1000;
+    addAndVerifyMultipleKeyMultipleValue(keyCount, map, verifyTable);
   }
 
   @Test
   public void testLargeAndExpand() throws Exception {
-    random = new Random(46809);
+    random = new Random(20);
 
     // Use a large capacity that doesn't require expansion, yet.
-    VectorMapJoinFastLongHashMap map = new VectorMapJoinFastLongHashMap(false, false, HashTableKeyType.LONG, MODERATE_CAPACITY, LOAD_FACTOR, MODERATE_WB_SIZE);
+    VectorMapJoinFastLongHashMap map =
+        new VectorMapJoinFastLongHashMap(
+            false, false, HashTableKeyType.LONG, MODERATE_CAPACITY, LOAD_FACTOR, MODERATE_WB_SIZE);
 
-    RandomLongStream randomLongKeyStream = new RandomLongStream(random);
+    VerifyFastLongHashMap verifyTable = new VerifyFastLongHashMap();
 
-    final int largeSize = 1000;
-    RandomByteArrayStream[] randomByteArrayValueStreams = new RandomByteArrayStream[largeSize];
-    for (int i = 0; i < largeSize; i++) {
-      randomByteArrayValueStreams[i] = new RandomByteArrayStream(random);
-      int count = generateLargeCount();
-      long key = randomLongKeyStream.next();
-      for (int v = 0; v < count; v++) {
-        byte[] value = randomByteArrayValueStreams[i].next();
-        map.putRow(key, value);
-      }
-    }
-    for (int i = 0; i < largeSize; i++) {
-      verifyHashMapResult(map, randomLongKeyStream.get(i), randomByteArrayValueStreams[i]);
-    }
+    int keyCount = 1000;
+    addAndVerifyMultipleKeyMultipleValue(keyCount, map, verifyTable);
   }
-
-  private void verifyHashMapResult(VectorMapJoinFastLongHashMap map, long key,
-          RandomByteArrayStream randomByteArrayValueStream) {
-
-    VectorMapJoinHashMapResult hashMapResult = map.createHashMapResult();
-    JoinUtil.JoinResult joinResult = map.lookup(key, hashMapResult);
-    if (joinResult != JoinUtil.JoinResult.MATCH) {
-      assertTrue(false);
-    }
-
-    CommonFastHashTable.verifyHashMapResult(hashMapResult, randomByteArrayValueStream);
-  }
-
-  private void verifyHashMapResult(VectorMapJoinFastLongHashMap map, long key,
-      byte[] valueBytes) {
-
-    VectorMapJoinHashMapResult hashMapResult = map.createHashMapResult();
-    JoinUtil.JoinResult joinResult = map.lookup(key, hashMapResult);
-    if (joinResult != JoinUtil.JoinResult.MATCH) {
-      assertTrue(false);
-    }
-
-    CommonFastHashTable.verifyHashMapResult(hashMapResult, valueBytes);
-  }
-
 }

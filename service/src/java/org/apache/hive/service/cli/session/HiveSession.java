@@ -20,6 +20,7 @@ package org.apache.hive.service.cli.session;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.ql.metadata.Hive;
@@ -56,8 +57,18 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle executeStatement(String statement,
-      Map<String, String> confOverlay) throws HiveSQLException;
+  OperationHandle executeStatement(String statement, Map<String, String> confOverlay) throws HiveSQLException;
+
+  /**
+   * execute operation handler
+   * @param statement
+   * @param confOverlay
+   * @param queryTimeout
+   * @return
+   * @throws HiveSQLException
+   */
+  OperationHandle executeStatement(String statement, Map<String, String> confOverlay,
+      long queryTimeout) throws HiveSQLException;
 
   /**
    * execute operation handler
@@ -66,8 +77,18 @@ public interface HiveSession extends HiveSessionBase {
    * @return
    * @throws HiveSQLException
    */
-  OperationHandle executeStatementAsync(String statement,
-      Map<String, String> confOverlay) throws HiveSQLException;
+  OperationHandle executeStatementAsync(String statement, Map<String, String> confOverlay) throws HiveSQLException;
+
+  /**
+   * execute operation handler
+   * @param statement
+   * @param confOverlay
+   * @param queryTimeout
+   * @return
+   * @throws HiveSQLException
+   */
+  OperationHandle executeStatementAsync(String statement, Map<String, String> confOverlay,
+      long queryTimeout) throws HiveSQLException;
 
   /**
    * getTypeInfo operation handler
@@ -191,4 +212,6 @@ public interface HiveSession extends HiveSessionBase {
   void closeExpiredOperations();
 
   long getNoOperationTime();
+
+  Future<?> submitBackgroundOperation(Runnable work);
 }

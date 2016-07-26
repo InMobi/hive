@@ -663,9 +663,6 @@ public interface RawStore extends Configurable {
   @InterfaceStability.Evolving
   int getDatabaseCount() throws MetaException;
 
-  @InterfaceStability.Evolving
-  long getChangeVersion(String topic) throws MetaException;
-
   public abstract List<SQLPrimaryKey> getPrimaryKeys(String db_name,
     String tbl_name) throws MetaException;
 
@@ -675,4 +672,10 @@ public interface RawStore extends Configurable {
 
   void createTableWithConstraints(Table tbl, List<SQLPrimaryKey> primaryKeys,
     List<SQLForeignKey> foreignKeys) throws InvalidObjectException, MetaException;
+
+  void dropConstraint(String dbName, String tableName, String constraintName) throws NoSuchObjectException;
+
+  void addPrimaryKeys(List<SQLPrimaryKey> pks) throws InvalidObjectException, MetaException;
+
+  void addForeignKeys(List<SQLForeignKey> fks) throws InvalidObjectException, MetaException;
 }

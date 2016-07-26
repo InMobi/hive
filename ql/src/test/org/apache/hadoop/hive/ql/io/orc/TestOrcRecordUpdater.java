@@ -30,6 +30,7 @@ import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.AcidOutputFormat;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.RecordIdentifier;
@@ -40,6 +41,8 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.Reporter;
+import org.apache.orc.impl.OrcAcidUtils;
+import org.apache.orc.tools.FileDump;
 import org.junit.Test;
 
 public class TestOrcRecordUpdater {
@@ -115,7 +118,7 @@ public class TestOrcRecordUpdater {
     assertEquals(5L, updater.getStats().getRowCount());
 
     Path bucketPath = AcidUtils.createFilename(root, options);
-    Path sidePath = OrcRecordUpdater.getSideFile(bucketPath);
+    Path sidePath = OrcAcidUtils.getSideFile(bucketPath);
     DataInputStream side = fs.open(sidePath);
 
     // read the stopping point for the first flush and make sure we only see
@@ -195,6 +198,8 @@ public class TestOrcRecordUpdater {
     }
     Properties tblProps = new Properties();
     tblProps.setProperty("orc.compress", "SNAPPY");
+    tblProps.setProperty("orc.compress.size", "8192");
+    HiveConf.setIntVar(conf, HiveConf.ConfVars.HIVE_ORC_BASE_DELTA_RATIO, 4);
     AcidOutputFormat.Options options = new AcidOutputFormat.Options(conf)
         .filesystem(fs)
         .bucket(10)
@@ -221,6 +226,7 @@ public class TestOrcRecordUpdater {
     System.out.flush();
     String outDump = new String(myOut.toByteArray());
     assertEquals(true, outDump.contains("Compression: SNAPPY"));
+    assertEquals(true, outDump.contains("Compression size: 2048"));
     System.setOut(origOut);
     updater.close(false);
   }

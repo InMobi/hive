@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -167,7 +168,7 @@ class CompactionTxnHandler extends TxnHandler {
         dbConn = getDbConn(Connection.TRANSACTION_READ_COMMITTED);
         stmt = dbConn.createStatement();
         String s = "select cq_id, cq_database, cq_table, cq_partition, " +
-          "cq_type from COMPACTION_QUEUE where cq_state = '" + INITIATED_STATE + "'";
+          "cq_type, cq_tblproperties from COMPACTION_QUEUE where cq_state = '" + INITIATED_STATE + "'";
         LOG.debug("Going to execute query <" + s + ">");
         rs = stmt.executeQuery(s);
         if (!rs.next()) {
@@ -183,6 +184,7 @@ class CompactionTxnHandler extends TxnHandler {
           info.tableName = rs.getString(3);
           info.partName = rs.getString(4);
           info.type = dbCompactionType2ThriftType(rs.getString(5).charAt(0));
+          info.properties = rs.getString(6);
           // Now, update this record as being worked on by this worker.
           long now = getDbTime(dbConn);
           s = "update COMPACTION_QUEUE set cq_worker_id = '" + workerId + "', " +
@@ -327,7 +329,7 @@ class CompactionTxnHandler extends TxnHandler {
       try {
         dbConn = getDbConn(Connection.TRANSACTION_READ_COMMITTED);
         stmt = dbConn.createStatement();
-        rs = stmt.executeQuery("select CQ_ID, CQ_DATABASE, CQ_TABLE, CQ_PARTITION, CQ_STATE, CQ_TYPE, CQ_WORKER_ID, CQ_START, CQ_RUN_AS, CQ_HIGHEST_TXN_ID, CQ_META_INFO, CQ_HADOOP_JOB_ID from COMPACTION_QUEUE WHERE CQ_ID = " + info.id);
+        rs = stmt.executeQuery("select CQ_ID, CQ_DATABASE, CQ_TABLE, CQ_PARTITION, CQ_STATE, CQ_TYPE, CQ_TBLPROPERTIES, CQ_WORKER_ID, CQ_START, CQ_RUN_AS, CQ_HIGHEST_TXN_ID, CQ_META_INFO, CQ_HADOOP_JOB_ID from COMPACTION_QUEUE WHERE CQ_ID = " + info.id);
         if(rs.next()) {
           info = CompactionInfo.loadFullFromCompactionQueue(rs);
         }
@@ -343,7 +345,7 @@ class CompactionTxnHandler extends TxnHandler {
           LOG.debug("Going to rollback");
           dbConn.rollback();
         }
-        pStmt = dbConn.prepareStatement("insert into COMPLETED_COMPACTIONS(CC_ID, CC_DATABASE, CC_TABLE, CC_PARTITION, CC_STATE, CC_TYPE, CC_WORKER_ID, CC_START, CC_END, CC_RUN_AS, CC_HIGHEST_TXN_ID, CC_META_INFO, CC_HADOOP_JOB_ID) VALUES(?,?,?,?,?, ?,?,?,?,?, ?,?,?)");
+        pStmt = dbConn.prepareStatement("insert into COMPLETED_COMPACTIONS(CC_ID, CC_DATABASE, CC_TABLE, CC_PARTITION, CC_STATE, CC_TYPE, CC_TBLPROPERTIES, CC_WORKER_ID, CC_START, CC_END, CC_RUN_AS, CC_HIGHEST_TXN_ID, CC_META_INFO, CC_HADOOP_JOB_ID) VALUES(?,?,?,?,?, ?,?,?,?,?, ?,?,?,?)");
         info.state = SUCCEEDED_STATE;
         CompactionInfo.insertIntoCompletedCompactions(pStmt, info, getDbTime(dbConn));
         updCount = pStmt.executeUpdate();
@@ -451,7 +453,7 @@ class CompactionTxnHandler extends TxnHandler {
         if(txnids.size() <= 0) {
           return;
         }
-
+        Collections.sort(txnids);//easier to read logs
         List<String> queries = new ArrayList<String>();
         StringBuilder prefix = new StringBuilder();
         StringBuilder suffix = new StringBuilder();
@@ -690,7 +692,7 @@ class CompactionTxnHandler extends TxnHandler {
   }
 
   /**
-   * For any given compactable entity (partition, table if not partitioned) the history of compactions
+   * For any given compactable entity (partition; table if not partitioned) the history of compactions
    * may look like "sssfffaaasffss", for example.  The idea is to retain the tail (most recent) of the
    * history such that a configurable number of each type of state is present.  Any other entries
    * can be purged.  This scheme has advantage of always retaining the last failure/success even if
@@ -792,7 +794,7 @@ class CompactionTxnHandler extends TxnHandler {
           "CC_DATABASE = " + quoteString(ci.dbname) + " and " +
           "CC_TABLE = " + quoteString(ci.tableName) +
           (ci.partName != null ? "and CC_PARTITION = " + quoteString(ci.partName) : "") +
-          " order by CC_ID desc");
+          " and CC_STATE != " + quoteChar(ATTEMPTED_STATE) + " order by CC_ID desc");
         int numFailed = 0;
         int numTotal = 0;
         int failedThreshold = conf.getIntVar(HiveConf.ConfVars.COMPACTOR_INITIATOR_FAILED_THRESHOLD);
@@ -823,8 +825,8 @@ class CompactionTxnHandler extends TxnHandler {
   /**
    * If there is an entry in compaction_queue with ci.id, remove it
    * Make entry in completed_compactions with status 'f'.
-   *
-   * but what abount markCleaned() which is called when table is had been deleted...
+   * If there is no entry in compaction_queue, it means Initiator failed to even schedule a compaction,
+   * which we record as ATTEMPTED_STATE entry in history.
    */
   public void markFailed(CompactionInfo ci) throws MetaException {//todo: this should not throw
     //todo: this should take "comment" as parameter to set in CC_META_INFO to provide some context for the failure
@@ -836,7 +838,7 @@ class CompactionTxnHandler extends TxnHandler {
       try {
         dbConn = getDbConn(Connection.TRANSACTION_READ_COMMITTED);
         stmt = dbConn.createStatement();
-        rs = stmt.executeQuery("select CQ_ID, CQ_DATABASE, CQ_TABLE, CQ_PARTITION, CQ_STATE, CQ_TYPE, CQ_WORKER_ID, CQ_START, CQ_RUN_AS, CQ_HIGHEST_TXN_ID, CQ_META_INFO, CQ_HADOOP_JOB_ID from COMPACTION_QUEUE WHERE CQ_ID = " + ci.id);
+        rs = stmt.executeQuery("select CQ_ID, CQ_DATABASE, CQ_TABLE, CQ_PARTITION, CQ_STATE, CQ_TYPE, CQ_TBLPROPERTIES, CQ_WORKER_ID, CQ_START, CQ_RUN_AS, CQ_HIGHEST_TXN_ID, CQ_META_INFO, CQ_HADOOP_JOB_ID from COMPACTION_QUEUE WHERE CQ_ID = " + ci.id);
         if(rs.next()) {
           ci = CompactionInfo.loadFullFromCompactionQueue(rs);
           String s = "delete from COMPACTION_QUEUE where cq_id = " + ci.id;
@@ -844,12 +846,27 @@ class CompactionTxnHandler extends TxnHandler {
           int updCnt = stmt.executeUpdate(s);
         }
         else {
-          throw new IllegalStateException("No record with CQ_ID=" + ci.id + " found in COMPACTION_QUEUE");
+          if(ci.id > 0) {
+            //the record with valid CQ_ID has disappeared - this is a sign of something wrong
+            throw new IllegalStateException("No record with CQ_ID=" + ci.id + " found in COMPACTION_QUEUE");
+          }
+        }
+        if(ci.id == 0) {
+          //The failure occurred before we even made an entry in COMPACTION_QUEUE
+          //generate ID so that we can make an entry in COMPLETED_COMPACTIONS
+          ci.id = generateCompactionQueueId(stmt);
+          //mostly this indicates that the Initiator is paying attention to some table even though
+          //compactions are not happening.
+          ci.state = ATTEMPTED_STATE;
+          //this is not strictly accurate, but 'type' cannot be null.
+          ci.type = CompactionType.MINOR;
+        }
+        else {
+          ci.state = FAILED_STATE;
         }
         close(rs, stmt, null);
 
-        pStmt = dbConn.prepareStatement("insert into COMPLETED_COMPACTIONS(CC_ID, CC_DATABASE, CC_TABLE, CC_PARTITION, CC_STATE, CC_TYPE, CC_WORKER_ID, CC_START, CC_END, CC_RUN_AS, CC_HIGHEST_TXN_ID, CC_META_INFO, CC_HADOOP_JOB_ID) VALUES(?,?,?,?,?, ?,?,?,?,?, ?,?,?)");
-        ci.state = FAILED_STATE;
+        pStmt = dbConn.prepareStatement("insert into COMPLETED_COMPACTIONS(CC_ID, CC_DATABASE, CC_TABLE, CC_PARTITION, CC_STATE, CC_TYPE, CC_TBLPROPERTIES, CC_WORKER_ID, CC_START, CC_END, CC_RUN_AS, CC_HIGHEST_TXN_ID, CC_META_INFO, CC_HADOOP_JOB_ID) VALUES(?,?,?,?,?, ?,?,?,?,?, ?,?,?,?)");
         CompactionInfo.insertIntoCompletedCompactions(pStmt, ci, getDbTime(dbConn));
         int updCount = pStmt.executeUpdate();
         LOG.debug("Going to commit");

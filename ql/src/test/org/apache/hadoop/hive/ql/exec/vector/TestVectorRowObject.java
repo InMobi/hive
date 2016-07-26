@@ -19,13 +19,10 @@
 package org.apache.hadoop.hive.ql.exec.vector;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.fast.RandomRowObjectSource;
 
 import junit.framework.TestCase;
 
@@ -34,13 +31,13 @@ import junit.framework.TestCase;
  */
 public class TestVectorRowObject extends TestCase {
 
-  void examineBatch(VectorizedRowBatch batch, VectorExtractRowSameBatch vectorExtractRow,
+  void examineBatch(VectorizedRowBatch batch, VectorExtractRow vectorExtractRow,
               Object[][] randomRows, int firstRandomRowIndex ) {
 
     int rowSize = vectorExtractRow.getCount();
     Object[] row = new Object[rowSize];
     for (int i = 0; i < batch.size; i++) {
-      vectorExtractRow.extractRow(i, row);
+      vectorExtractRow.extractRow(batch, i, row);
       Object[] expectedRow = randomRows[firstRandomRowIndex + i];
       for (int c = 0; c < rowSize; c++) {
         if (!row[c].equals(expectedRow[c])) {
@@ -50,7 +47,7 @@ public class TestVectorRowObject extends TestCase {
     }
   }
 
-  void testVectorRowObject(int caseNum, Random r) throws HiveException {
+  void testVectorRowObject(int caseNum, boolean sort, Random r) throws HiveException {
 
     String[] emptyScratchTypeNames = new String[0];
 
@@ -67,20 +64,21 @@ public class TestVectorRowObject extends TestCase {
       cv.noNulls = false;
     }
 
-    VectorAssignRowSameBatch vectorAssignRow = new VectorAssignRowSameBatch();
+    VectorAssignRow vectorAssignRow = new VectorAssignRow();
     vectorAssignRow.init(source.typeNames());
-    vectorAssignRow.setOneBatch(batch);
-    
-    VectorExtractRowSameBatch vectorExtractRow = new VectorExtractRowSameBatch();
+
+    VectorExtractRow vectorExtractRow = new VectorExtractRow();
     vectorExtractRow.init(source.typeNames());
-    vectorExtractRow.setOneBatch(batch);
 
     Object[][] randomRows = source.randomRows(100000);
+    if (sort) {
+      source.sort(randomRows);
+    }
     int firstRandomRowIndex = 0;
     for (int i = 0; i < randomRows.length; i++) {
       Object[] row = randomRows[i];
 
-      vectorAssignRow.assignRow(batch.size, row);
+      vectorAssignRow.assignRow(batch, batch.size, row);
       batch.size++;
       if (batch.size == batch.DEFAULT_SIZE) {
         examineBatch(batch, vectorExtractRow, randomRows, firstRandomRowIndex);
@@ -95,14 +93,22 @@ public class TestVectorRowObject extends TestCase {
 
   public void testVectorRowObject() throws Throwable {
 
-  try {
-    Random r = new Random(5678);
-    for (int c = 0; c < 10; c++) {
-      testVectorRowObject(c, r);
+    try {
+      Random r = new Random(5678);
+
+      int caseNum = 0;
+      for (int i = 0; i < 10; i++) {
+        testVectorRowObject(caseNum, false, r);
+        caseNum++;
+      }
+
+      // Try one sorted.
+      testVectorRowObject(caseNum, true, r);
+      caseNum++;
+
+    } catch (Throwable e) {
+      e.printStackTrace();
+      throw e;
     }
-  } catch (Throwable e) {
-    e.printStackTrace();
-    throw e;
-  }
   }
 }

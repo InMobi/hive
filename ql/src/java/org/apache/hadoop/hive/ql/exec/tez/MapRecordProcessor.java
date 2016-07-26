@@ -33,8 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.AbstractMapOperator;
 import org.apache.hadoop.hive.llap.io.api.LlapProxy;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.llap.LlapOutputFormat;
 import org.apache.hadoop.hive.ql.exec.DummyStoreOperator;
 import org.apache.hadoop.hive.ql.exec.HashTableDummyOperator;
 import org.apache.hadoop.hive.ql.exec.MapOperator;
@@ -75,15 +77,14 @@ public class MapRecordProcessor extends RecordProcessor {
   public static final Logger l4j = LoggerFactory.getLogger(MapRecordProcessor.class);
   protected static final String MAP_PLAN_KEY = "__MAP_PLAN__";
 
-  private MapOperator mapOp;
-  private final List<MapOperator> mergeMapOpList = new ArrayList<MapOperator>();
+  private AbstractMapOperator mapOp;
+  private final List<AbstractMapOperator> mergeMapOpList = new ArrayList<AbstractMapOperator>();
   private MapRecordSource[] sources;
   private final Map<String, MultiMRInput> multiMRInputMap = new HashMap<String, MultiMRInput>();
   private int position;
   MRInputLegacy legacyMRInput;
   MultiMRInput mainWorkMultiMRInput;
   private final ExecMapperContext execContext;
-  private boolean abort;
   private MapWork mapWork;
   List<MapWork> mergeWorkList;
   List<String> cacheKeys;
@@ -94,6 +95,9 @@ public class MapRecordProcessor extends RecordProcessor {
     super(jconf, context);
     String queryId = HiveConf.getVar(jconf, HiveConf.ConfVars.HIVEQUERYID);
     if (LlapProxy.isDaemon()) { // do not cache plan
+      String id = queryId + "_" + context.getTaskIndex();
+      l4j.info("LLAP_OF_ID: "+id);
+      jconf.set(LlapOutputFormat.LLAP_OF_ID_KEY, id);
       cache = new org.apache.hadoop.hive.ql.exec.mr.ObjectCache();
     } else {
       cache = ObjectCacheFactory.getCache(jconf, queryId);
@@ -109,10 +113,12 @@ public class MapRecordProcessor extends RecordProcessor {
       Map<String, LogicalInput> inputs, Map<String, LogicalOutput> outputs) throws Exception {
     perfLogger.PerfLogBegin(CLASS_NAME, PerfLogger.TEZ_INIT_OPERATORS);
     super.init(mrReporter, inputs, outputs);
+    checkAbortCondition();
 
 
     String key = processorContext.getTaskVertexName() + MAP_PLAN_KEY;
     cacheKeys.add(key);
+
 
     // create map and fetch operators
     mapWork = (MapWork) cache.retrieve(key, new Callable<Object>() {
@@ -121,6 +127,7 @@ public class MapRecordProcessor extends RecordProcessor {
           return Utilities.getMapWork(jconf);
         }
       });
+    // TODO HIVE-14042. Cleanup may be required if exiting early.
     Utilities.setMapWork(jconf, mapWork);
 
     String prefixes = jconf.get(DagUtils.TEZ_MERGE_WORK_FILE_PREFIXES);
@@ -135,6 +142,7 @@ public class MapRecordProcessor extends RecordProcessor {
         key = processorContext.getTaskVertexName() + prefix;
         cacheKeys.add(key);
 
+        checkAbortCondition();
         mergeWorkList.add(
             (MapWork) cache.retrieve(key,
                 new Callable<Object>() {
@@ -151,6 +159,7 @@ public class MapRecordProcessor extends RecordProcessor {
     ((TezContext) MapredContext.get()).setTezProcessorContext(processorContext);
 
     // Update JobConf using MRInput, info like filename comes via this
+    checkAbortCondition();
     legacyMRInput = getMRInput(inputs);
     if (legacyMRInput != null) {
       Configuration updatedConf = legacyMRInput.getConfigUpdates();
@@ -160,6 +169,7 @@ public class MapRecordProcessor extends RecordProcessor {
         }
       }
     }
+    checkAbortCondition();
 
     createOutputMap();
     // Start all the Outputs.
@@ -168,6 +178,7 @@ public class MapRecordProcessor extends RecordProcessor {
       outputEntry.getValue().start();
       ((TezKVOutputCollector) outMap.get(outputEntry.getKey())).initialize();
     }
+    checkAbortCondition();
 
     try {
 
@@ -177,14 +188,24 @@ public class MapRecordProcessor extends RecordProcessor {
       } else {
         mapOp = new MapOperator(runtimeCtx);
       }
+      // Not synchronizing creation of mapOp with an invocation. Check immediately
+      // after creation in case abort has been set.
+      // Relying on the regular flow to clean up the actual operator. i.e. If an exception is
+      // thrown, an attempt will be made to cleanup the op.
+      // If we are here - exit out via an exception. If we're in the middle of the opeartor.initialize
+      // call further down, we rely upon op.abort().
+      checkAbortCondition();
 
       mapOp.clearConnectedOperators();
       mapOp.setExecContext(execContext);
 
       boolean fromCache = false;
       if (mergeWorkList != null) {
-        MapOperator mergeMapOp = null;
+        AbstractMapOperator mergeMapOp = null;
         for (BaseWork mergeWork : mergeWorkList) {
+          // TODO HIVE-14042. What is mergeWork, and why is it not part of the regular operator chain.
+          // The mergeMapOp.initialize call further down can block, and will not receive information
+          // about an abort request.
           MapWork mergeMapWork = (MapWork) mergeWork;
           if (mergeMapWork.getVectorMode()) {
             mergeMapOp = new VectorMapOperator(runtimeCtx);
@@ -252,17 +273,20 @@ public class MapRecordProcessor extends RecordProcessor {
       l4j.info("Main input name is " + mapWork.getName());
       jconf.set(Utilities.INPUT_NAME, mapWork.getName());
       mapOp.initialize(jconf, null);
+      checkAbortCondition();
       mapOp.setChildren(jconf);
       mapOp.passExecContext(execContext);
       l4j.info(mapOp.dump(0));
 
       mapOp.initializeLocalWork(jconf);
 
+      checkAbortCondition();
       initializeMapRecordSources();
       mapOp.initializeMapOperator(jconf);
       if ((mergeMapOpList != null) && mergeMapOpList.isEmpty() == false) {
-        for (MapOperator mergeMapOp : mergeMapOpList) {
+        for (AbstractMapOperator mergeMapOp : mergeMapOpList) {
           jconf.set(Utilities.INPUT_NAME, mergeMapOp.getConf().getName());
+          // TODO HIVE-14042. abort handling: Handling of mergeMapOp
           mergeMapOp.initializeMapOperator(jconf);
         }
       }
@@ -275,6 +299,7 @@ public class MapRecordProcessor extends RecordProcessor {
       if (dummyOps != null) {
         for (Operator<? extends OperatorDesc> dummyOp : dummyOps){
           dummyOp.setExecContext(execContext);
+          // TODO HIVE-14042. Handling of dummyOps, and propagating abort information to them
           dummyOp.initialize(jconf, null);
         }
       }
@@ -289,6 +314,10 @@ public class MapRecordProcessor extends RecordProcessor {
         // will this be true here?
         // Don't create a new object if we are already out of memory
         throw (OutOfMemoryError) e;
+      } else if (e instanceof InterruptedException) {
+        l4j.info("Hit an interrupt while initializing MapRecordProcessor. Message={}",
+            e.getMessage());
+        throw (InterruptedException) e;
       } else {
         throw new RuntimeException("Map operator initialization failed", e);
       }
@@ -309,7 +338,7 @@ public class MapRecordProcessor extends RecordProcessor {
       reader = legacyMRInput.getReader();
     }
     sources[position].init(jconf, mapOp, reader);
-    for (MapOperator mapOp : mergeMapOpList) {
+    for (AbstractMapOperator mapOp : mergeMapOpList) {
       int tag = mapOp.getConf().getTag();
       sources[tag] = new MapRecordSource();
       String inputName = mapOp.getConf().getName();
@@ -326,7 +355,7 @@ public class MapRecordProcessor extends RecordProcessor {
 
   @SuppressWarnings("deprecation")
   private KeyValueReader getKeyValueReader(Collection<KeyValueReader> keyValueReaders,
-      MapOperator mapOp)
+      AbstractMapOperator mapOp)
     throws Exception {
     List<KeyValueReader> kvReaderList = new ArrayList<KeyValueReader>(keyValueReaders);
     // this sets up the map operator contexts correctly
@@ -355,22 +384,25 @@ public class MapRecordProcessor extends RecordProcessor {
   void run() throws Exception {
     while (sources[position].pushRecord()) {
       if (nRows++ == CHECK_INTERRUPTION_AFTER_ROWS) {
-        if (abort && Thread.interrupted()) {
-          throw new HiveException("Processing thread interrupted");
-        }
+        checkAbortCondition();
         nRows = 0;
       }
     }
   }
 
+
   @Override
   public void abort() {
-    // this will stop run() from pushing records
-    abort = true;
+    // this will stop run() from pushing records, along with potentially
+    // blocking initialization.
+    super.abort();
 
     // this will abort initializeOp()
     if (mapOp != null) {
+      l4j.info("Forwarding abort to mapOp: {} " + mapOp.getName());
       mapOp.abort();
+    } else {
+      l4j.info("mapOp not setup yet. abort not being forwarded");
     }
   }
 
@@ -394,7 +426,7 @@ public class MapRecordProcessor extends RecordProcessor {
       }
       mapOp.close(abort);
       if (mergeMapOpList.isEmpty() == false) {
-        for (MapOperator mergeMapOp : mergeMapOpList) {
+        for (AbstractMapOperator mergeMapOp : mergeMapOpList) {
           mergeMapOp.close(abort);
         }
       }
@@ -436,6 +468,8 @@ public class MapRecordProcessor extends RecordProcessor {
         li.add(inp);
       }
     }
+    // TODO: HIVE-14042. Potential blocking call. MRInput handles this correctly even if an interrupt is swallowed.
+    // MultiMRInput may not. Fix once TEZ-3302 is resolved.
     processorContext.waitForAllInputsReady(li);
 
     l4j.info("The input names are: " + Arrays.toString(inputs.keySet().toArray()));

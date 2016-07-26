@@ -43,7 +43,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.hive.llap.daemon.FinishableStateUpdateHandler;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.FragmentRuntimeInfo;
-import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.FragmentSpecProto;
+import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.SignableVertexSpec;
+import org.apache.hadoop.hive.llap.metrics.LlapDaemonExecutorMetrics;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.tez.runtime.task.EndReason;
 import org.apache.tez.runtime.task.TaskRunner2Result;
@@ -93,7 +94,9 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
   private final ListeningExecutorService waitQueueExecutorService;
   // Thread pool for callbacks on completion of execution of a work unit.
   private final ListeningExecutorService executionCompletionExecutorService;
-  private final BlockingQueue<TaskWrapper> preemptionQueue;
+
+  @VisibleForTesting
+  final BlockingQueue<TaskWrapper> preemptionQueue;
   private final boolean enablePreemption;
   private final ThreadPoolExecutor threadPoolExecutor;
   private final AtomicInteger numSlotsAvailable;
@@ -104,10 +107,11 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
   final ConcurrentMap<String, TaskWrapper> knownTasks = new ConcurrentHashMap<>();
 
   private final Object lock = new Object();
+  private final LlapDaemonExecutorMetrics metrics;
 
   public TaskExecutorService(int numExecutors, int waitQueueSize,
       String waitQueueComparatorClassName, boolean enablePreemption,
-      ClassLoader classLoader) {
+      ClassLoader classLoader, final LlapDaemonExecutorMetrics metrics) {
     super(TaskExecutorService.class.getSimpleName());
     LOG.info("TaskExecutorService is being setup with parameters: "
         + "numExecutors=" + numExecutors
@@ -127,6 +131,10 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
         new PreemptionQueueComparator());
     this.enablePreemption = enablePreemption;
     this.numSlotsAvailable = new AtomicInteger(numExecutors);
+    this.metrics = metrics;
+    if (metrics != null) {
+      metrics.setNumExecutorsAvailable(numSlotsAvailable.get());
+    }
 
     // single threaded scheduler for tasks from wait queue to executor threads
     ExecutorService wes = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
@@ -177,6 +185,7 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
 
   @Override
   public Set<String> getExecutorsStatus() {
+    // TODO Change this method to make the output easier to parse (parse programmatically)
     Set<String> result = new HashSet<>();
     StringBuilder value = new StringBuilder();
     for (Map.Entry<String, TaskWrapper> e : knownTasks.entrySet()) {
@@ -185,8 +194,8 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
       TaskWrapper task = e.getValue();
       boolean isFirst = true;
       TaskRunnerCallable c = task.getTaskRunnerCallable();
-      if (c != null && c.getRequest() != null && c.getRequest().getFragmentSpec() != null) {
-        FragmentSpecProto fs = c.getRequest().getFragmentSpec();
+      if (c != null && c.getVertexSpec() != null) {
+        SignableVertexSpec fs = c.getVertexSpec();
         value.append(isFirst ? " (" : ", ").append(fs.getDagName())
           .append("/").append(fs.getVertexName());
         isFirst = false;
@@ -267,7 +276,11 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
               trySchedule(task);
               // wait queue could have been re-ordered in the mean time because of concurrent task
               // submission. So remove the specific task instead of the head task.
-              waitQueue.remove(task);
+              if (waitQueue.remove(task)) {
+                if (metrics != null) {
+                  metrics.setExecutorNumQueuedRequests(waitQueue.size());
+                }
+              }
             } catch (RejectedExecutionException e) {
               rejectedException = e;
             }
@@ -361,6 +374,9 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
         if (isDebugEnabled) {
           LOG.debug("{} is {} as wait queue is full", taskWrapper.getRequestId(), result);
         }
+        if (metrics != null) {
+          metrics.incrTotalRejectedRequests();
+        }
         return result;
       }
     }
@@ -392,12 +408,27 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
         LOG.info("{} evicted from wait queue in favor of {} because of lower priority",
             evictedTask.getRequestId(), task.getRequestId());
       }
+      if (metrics != null) {
+        metrics.incrTotalEvictedFromWaitQueue();
+      }
     }
     synchronized (lock) {
       lock.notify();
     }
 
+    if (metrics != null) {
+      metrics.setExecutorNumQueuedRequests(waitQueue.size());
+    }
     return result;
+  }
+
+  @Override
+  public QueryIdentifier findQueryByFragment(String fragmentId) {
+    synchronized (lock) {
+      TaskWrapper taskWrapper = knownTasks.get(fragmentId);
+      return taskWrapper == null ? null : taskWrapper.getTaskRunnerCallable()
+          .getFragmentInfo().getQueryInfo().getQueryIdentifier();
+    }
   }
 
   @Override
@@ -411,14 +442,17 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
             LOG.debug("Removing {} from waitQueue", fragmentId);
           }
           taskWrapper.setIsInWaitQueue(false);
-          waitQueue.remove(taskWrapper);
+          if (waitQueue.remove(taskWrapper)) {
+            if (metrics != null) {
+              metrics.setExecutorNumQueuedRequests(waitQueue.size());
+            }
+          }
         }
         if (taskWrapper.isInPreemptionQueue()) {
           if (isDebugEnabled) {
             LOG.debug("Removing {} from preemptionQueue", fragmentId);
           }
-          taskWrapper.setIsInPreemptableQueue(false);
-          preemptionQueue.remove(taskWrapper);
+          removeFromPreemptionQueue(taskWrapper);
         }
         taskWrapper.getTaskRunnerCallable().killTask();
       } else {
@@ -428,7 +462,8 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
     }
   }
 
-  private void trySchedule(final TaskWrapper taskWrapper) throws RejectedExecutionException {
+  @VisibleForTesting
+  void trySchedule(final TaskWrapper taskWrapper) throws RejectedExecutionException {
 
       synchronized (lock) {
         boolean canFinish = taskWrapper.getTaskRunnerCallable().canFinish();
@@ -460,6 +495,9 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
         }
       }
       numSlotsAvailable.decrementAndGet();
+      if (metrics != null) {
+        metrics.setNumExecutorsAvailable(numSlotsAvailable.get());
+      }
   }
 
   private void handleScheduleAttemptedRejection(TaskWrapper taskWrapper) {
@@ -470,7 +508,7 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
         LOG.debug("Preemption Queue: " + preemptionQueue);
       }
 
-      TaskWrapper pRequest = removeAndGetFromPreemptionQueue();
+      TaskWrapper pRequest = removeAndGetNextFromPreemptionQueue();
 
       // Avoid preempting tasks which are finishable - callback still to be processed.
       if (pRequest != null) {
@@ -510,12 +548,12 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
       if (newFinishableState == true && taskWrapper.isInPreemptionQueue()) {
         LOG.debug("Removing {} from preemption queue because it's state changed to {}",
             taskWrapper.getRequestId(), newFinishableState);
-        preemptionQueue.remove(taskWrapper.getTaskRunnerCallable());
+        removeFromPreemptionQueue(taskWrapper);
       } else if (newFinishableState == false && !taskWrapper.isInPreemptionQueue() &&
           !taskWrapper.isInWaitQueue()) {
         LOG.debug("Adding {} to preemption queue since finishable state changed to {}",
             taskWrapper.getRequestId(), newFinishableState);
-        preemptionQueue.offer(taskWrapper);
+        addToPreemptionQueue(taskWrapper);
       }
       lock.notify();
     }
@@ -523,17 +561,48 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
 
   private void addToPreemptionQueue(TaskWrapper taskWrapper) {
     synchronized (lock) {
-      preemptionQueue.add(taskWrapper);
+      boolean added = preemptionQueue.offer(taskWrapper);
+      if (!added) {
+        LOG.warn("Failed to add element {} to preemption queue. Terminating", taskWrapper);
+        Thread.getDefaultUncaughtExceptionHandler().uncaughtException(Thread.currentThread(),
+            new IllegalStateException("Preemption queue full. Cannot proceed"));
+      }
       taskWrapper.setIsInPreemptableQueue(true);
+      if (metrics != null) {
+        metrics.setExecutorNumPreemptableRequests(preemptionQueue.size());
+      }
     }
   }
 
-  private TaskWrapper removeAndGetFromPreemptionQueue() {
+  /**
+   * Remove the specified taskWrapper from the preemption queue
+   * @param taskWrapper the taskWrapper to be removed
+   * @return true if the element existed in the queue and wasa removed, false otherwise
+   */
+  private boolean removeFromPreemptionQueue(TaskWrapper taskWrapper) {
+    synchronized (lock) {
+      return removeFromPreemptionQueueUnlocked(taskWrapper);
+    }
+  }
+
+  private boolean removeFromPreemptionQueueUnlocked(TaskWrapper taskWrapper) {
+    boolean removed = preemptionQueue.remove(taskWrapper);
+    taskWrapper.setIsInPreemptableQueue(false);
+    if (metrics != null) {
+      metrics.setExecutorNumPreemptableRequests(preemptionQueue.size());
+    }
+    return removed;
+  }
+
+  private TaskWrapper removeAndGetNextFromPreemptionQueue() {
     TaskWrapper taskWrapper;
     synchronized (lock) {
-       taskWrapper = preemptionQueue.remove();
+       taskWrapper = preemptionQueue.poll();
       if (taskWrapper != null) {
         taskWrapper.setIsInPreemptableQueue(false);
+        if (metrics != null) {
+          metrics.setExecutorNumPreemptableRequests(preemptionQueue.size());
+        }
       }
     }
     return taskWrapper;
@@ -552,6 +621,24 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
     public InternalCompletionListener(TaskWrapper taskWrapper) {
       this.taskWrapper = taskWrapper;
     }
+
+    // By the time either success / failed are called, the task itself knows that it has terminated,
+    // and will ignore subsequent kill requests if they go out.
+
+    // There's a race between removing the current task from the preemption queue and the actual scheduler
+    // attempting to take an element from the preemption queue to make space for another task.
+    // If the current element is removed to make space - that is OK, since the current task is completing and
+    // will end up making space for execution. Any kill message sent out by the scheduler to the task will
+    // be ignored, since the task knows it has completed (otherwise it would not be in this callback).
+    //
+    // If the task is removed from the queue as a result of this callback, and the scheduler happens to
+    // be in the section where it's looking for a preemptible task - the scheuler may end up pulling the
+    // next pre-emptible task and killing it (an extra preemption).
+    // TODO: This potential extra preemption can be avoided by synchronizing the entire tryScheduling block.\
+    // This would essentially synchronize all operations - it would be better to see if there's an
+    // approach where multiple locks could be used to avoid single threaded operation.
+    // - It checks available and preempts (which could be this task)
+    // - Or this task completes making space, and removing the need for preemption
 
     @Override
     public void onSuccess(TaskRunner2Result result) {
@@ -576,15 +663,18 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
       // if this task was added to pre-emption list, remove it
       if (enablePreemption) {
         String state = reason == null ? "FAILED" : reason.name();
-        boolean removed = preemptionQueue.remove(taskWrapper);
+        boolean removed = removeFromPreemptionQueueUnlocked(taskWrapper);
         if (removed && isInfoEnabled) {
-          LOG.info(TaskRunnerCallable
-              .getTaskIdentifierString(taskWrapper.getTaskRunnerCallable().getRequest())
-              + " request " + state + "! Removed from preemption list.");
+          TaskRunnerCallable trc = taskWrapper.getTaskRunnerCallable();
+          LOG.info(TaskRunnerCallable.getTaskIdentifierString(trc.getRequest(),
+              trc.getVertexSpec()) + " request " + state + "! Removed from preemption list.");
         }
       }
 
       numSlotsAvailable.incrementAndGet();
+      if (metrics != null) {
+        metrics.setNumExecutorsAvailable(numSlotsAvailable.get());
+      }
       if (isDebugEnabled) {
         LOG.debug("Task {} complete. WaitQueueSize={}, numSlotsAvailable={}, preemptionQueueSize={}",
           taskWrapper.getRequestId(), waitQueue.size(), numSlotsAvailable.get(),
@@ -725,7 +815,7 @@ public class TaskExecutorService extends AbstractService implements Scheduler<Ta
           ", firstAttemptStartTime=" + taskRunnerCallable.getFragmentRuntimeInfo().getFirstAttemptStartTime() +
           ", dagStartTime=" + taskRunnerCallable.getFragmentRuntimeInfo().getDagStartTime() +
           ", withinDagPriority=" + taskRunnerCallable.getFragmentRuntimeInfo().getWithinDagPriority() +
-          ", vertexParallelism= " + taskRunnerCallable.getFragmentSpec().getVertexParallelism() +
+          ", vertexParallelism= " + taskRunnerCallable.getVertexSpec().getVertexParallelism() +
           ", selfAndUpstreamParallelism= " + taskRunnerCallable.getFragmentRuntimeInfo().getNumSelfAndUpstreamTasks() +
           ", selfAndUpstreamComplete= " + taskRunnerCallable.getFragmentRuntimeInfo().getNumSelfAndUpstreamCompletedTasks() +
           '}';

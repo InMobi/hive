@@ -60,6 +60,13 @@ public interface ServiceInstance {
    */
   public String getServicesAddress();
   /**
+   * OutputFormat endpoint for service instance
+   *
+   * @return
+   */
+  public int getOutputFormatPort();
+
+  /**
    * Return the last known state (without refreshing)
    * 
    * @return

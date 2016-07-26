@@ -215,6 +215,7 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
     Context ctx = driverContext.getCtx();
     boolean ctxCreated = false;
     Path emptyScratchDir;
+    JobClient jc = null;
 
     MapWork mWork = work.getMapWork();
     ReduceWork rWork = work.getReduceWork();
@@ -394,7 +395,7 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
         }
       }
 
-      JobClient jc = new JobClient(job);
+      jc = new JobClient(job);
       // make this client wait if job tracker is not behaving well.
       Throttle.checkJobTracker(job, LOG);
 
@@ -433,10 +434,11 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
       rj = jc.submitJob(job);
       this.jobID = rj.getJobID();
       updateStatusInQueryDisplay();
-      returnVal = jobExecHelper.progress(rj, jc);
+      returnVal = jobExecHelper.progress(rj, jc, ctx);
       success = (returnVal == 0);
     } catch (Exception e) {
       e.printStackTrace();
+      setException(e);
       String mesg = " with exception '" + Utilities.getNameMessage(e) + "'";
       if (rj != null) {
         mesg = "Ended Job = " + rj.getJobID() + mesg;
@@ -462,6 +464,9 @@ public class ExecDriver extends Task<MapredWork> implements Serializable, Hadoop
             rj.killJob();
           }
           jobID = rj.getID().toString();
+        }
+        if (jc!=null) {
+          jc.close();
         }
       } catch (Exception e) {
 	LOG.warn("Failed while cleaning up ", e);

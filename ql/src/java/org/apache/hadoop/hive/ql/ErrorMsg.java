@@ -377,7 +377,7 @@ public enum ErrorMsg {
       "instantiated, check hive.txn.manager"),
   TXN_NO_SUCH_TRANSACTION(10262, "No record of transaction {0} could be found, " +
       "may have timed out", true),
-  TXN_ABORTED(10263, "Transaction manager has aborted the transaction {0}.", true),
+  TXN_ABORTED(10263, "Transaction manager has aborted the transaction {0}.  Reason: {1}", true),
   DBTXNMGR_REQUIRES_CONCURRENCY(10264,
       "To use DbTxnManager you must set hive.support.concurrency=true"),
   TXNMGR_NOT_ACID(10265, "This command is not allowed on an ACID table {0}.{1} with a non-ACID transaction manager", true),
@@ -449,6 +449,8 @@ public enum ErrorMsg {
   IMPORT_SEMANTIC_ERROR(10324, "Import Semantic Analyzer Error"),
   INVALID_FK_SYNTAX(10325, "Invalid Foreign Key syntax"),
   INVALID_PK_SYNTAX(10326, "Invalid Primary Key syntax"),
+  ACID_NOT_ENOUGH_HISTORY(10327, "Not enough history available for ({0},{1}).  " +
+    "Oldest available base: {2}", true),
   //========================== 20000 range starts here ========================//
   SCRIPT_INIT_ERROR(20000, "Unable to initialize custom script."),
   SCRIPT_IO_ERROR(20001, "An error occurred while reading or writing to your custom script. "

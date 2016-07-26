@@ -27,6 +27,8 @@ import java.util.List;
 
 import org.apache.hadoop.hive.llap.counters.LlapIOCounters;
 import org.apache.hadoop.hive.llap.metrics.LlapDaemonIOMetrics;
+import org.apache.orc.impl.DataReaderProperties;
+import org.apache.orc.impl.OrcIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -58,7 +60,6 @@ import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.io.HdfsUtils;
 import org.apache.orc.CompressionKind;
 import org.apache.orc.DataReader;
-import org.apache.orc.impl.MetadataReader;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile.ReaderOptions;
 import org.apache.orc.OrcConf;
@@ -66,13 +67,12 @@ import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcSplit;
 import org.apache.hadoop.hive.ql.io.orc.encoded.Reader;
 import org.apache.hadoop.hive.ql.io.orc.RecordReaderImpl;
-import org.apache.hadoop.hive.ql.io.orc.RecordReaderImpl.SargApplier;
 import org.apache.hadoop.hive.ql.io.orc.encoded.EncodedOrcFile;
 import org.apache.hadoop.hive.ql.io.orc.encoded.EncodedReader;
 import org.apache.hadoop.hive.ql.io.orc.encoded.OrcBatchKey;
 import org.apache.hadoop.hive.ql.io.orc.encoded.Reader.OrcEncodedColumnBatch;
 import org.apache.hadoop.hive.ql.io.orc.encoded.Reader.PoolFactory;
-import org.apache.hadoop.hive.ql.io.orc.RecordReaderUtils;
+import org.apache.orc.impl.RecordReaderUtils;
 import org.apache.orc.StripeInformation;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.mapred.FileSplit;
@@ -144,8 +144,9 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
   // Read state.
   private int stripeIxFrom;
   private OrcFileMetadata fileMetadata;
+  private Path path;
   private Reader orcReader;
-  private MetadataReader metadataReader;
+  private DataReader metadataReader;
   private EncodedReader stripeReader;
   private Object fileKey;
   private FileSystem fs;
@@ -180,9 +181,6 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    LlapDaemonIOMetrics ioMetrics = consumer.getIOMetrics();
-    ioMetrics.setColumnStreamDataPoolSize(CSD_POOL.size());
-    ioMetrics.setEncodedColumnBatchPoolSize(ECB_POOL.size());
   }
 
   @Override
@@ -344,7 +342,8 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
         // intermediate changes for individual columns will unset values in the array.
         // Skip this case for 0-column read. We could probably special-case it just like we do
         // in EncodedReaderImpl, but for now it's not that important.
-        if (colRgs.length > 0 && colRgs[0] == SargApplier.READ_NO_RGS) continue;
+        if (colRgs.length > 0 && colRgs[0] ==
+            RecordReaderImpl.SargApplier.READ_NO_RGS) continue;
 
         // 6.1. Determine the columns to read (usually the same as requested).
         if (cols == null || cols.size() == colRgs.length) {
@@ -555,16 +554,16 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
    * Closes the stripe readers (on error).
    */
   private void cleanupReaders() {
-    if (metadataReader != null) {
+    if (stripeReader != null) {
       try {
-        metadataReader.close();
+        stripeReader.close();
       } catch (IOException ex) {
         // Ignore.
       }
     }
-    if (stripeReader != null) {
+    if (metadataReader != null) {
       try {
-        stripeReader.close();
+        metadataReader.close();
       } catch (IOException ex) {
         // Ignore.
       }
@@ -576,7 +575,7 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
    */
   private void ensureOrcReader() throws IOException {
     if (orcReader != null) return;
-    Path path = split.getPath();
+    path = split.getPath();
     if (fileKey instanceof Long && HiveConf.getBoolVar(conf, ConfVars.LLAP_IO_USE_FILEID_PATH)) {
       path = HdfsUtils.getFileIdPath(fs, path, (long)fileKey);
     }
@@ -661,7 +660,16 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
     ensureOrcReader();
     if (metadataReader != null) return;
     long startTime = counters.startTimeCounter();
-    metadataReader = orcReader.metadata();
+    boolean useZeroCopy = (conf != null) && OrcConf.USE_ZEROCOPY.getBoolean(conf);
+    metadataReader = RecordReaderUtils.createDefaultDataReader(
+        DataReaderProperties.builder()
+        .withBufferSize(orcReader.getCompressionSize())
+        .withCompression(orcReader.getCompressionKind())
+        .withFileSystem(fs)
+        .withPath(path)
+        .withTypeCount(orcReader.getSchema().getMaximumId() + 1)
+        .withZeroCopy(useZeroCopy)
+        .build());
     counters.incrTimeCounter(LlapIOCounters.HDFS_TIME_NS, startTime);
   }
 
@@ -690,12 +698,13 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
    */
   private boolean determineRgsToRead(boolean[] globalIncludes, int rowIndexStride,
       ArrayList<OrcStripeMetadata> metadata) throws IOException {
-    SargApplier sargApp = null;
+    RecordReaderImpl.SargApplier sargApp = null;
     if (sarg != null && rowIndexStride != 0) {
       List<OrcProto.Type> types = fileMetadata.getTypes();
       String[] colNamesForSarg = OrcInputFormat.getSargColumnNames(
           columnNames, types, globalIncludes, fileMetadata.isOriginalFormat());
-      sargApp = new SargApplier(sarg, colNamesForSarg, rowIndexStride, types, globalIncludes.length);
+      sargApp = new RecordReaderImpl.SargApplier(sarg, colNamesForSarg,
+          rowIndexStride, types, globalIncludes.length);
     }
     boolean hasAnyData = false;
     // readState should have been initialized by this time with an empty array.
@@ -709,8 +718,8 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
         rgsToRead = sargApp.pickRowGroups(stripe, stripeMetadata.getRowIndexes(),
             stripeMetadata.getBloomFilterIndexes(), true);
       }
-      boolean isNone = rgsToRead == SargApplier.READ_NO_RGS,
-          isAll = rgsToRead == SargApplier.READ_ALL_RGS;
+      boolean isNone = rgsToRead == RecordReaderImpl.SargApplier.READ_NO_RGS,
+          isAll = rgsToRead == RecordReaderImpl.SargApplier.READ_ALL_RGS;
       hasAnyData = hasAnyData || !isNone;
       if (LlapIoImpl.ORC_LOGGER.isTraceEnabled()) {
         if (isNone) {
@@ -805,13 +814,13 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
   private class DataWrapperForOrc implements DataReader, DataCache {
     private final DataReader orcDataReader;
 
-    public DataWrapperForOrc() {
-      boolean useZeroCopy = (conf != null) && OrcConf.USE_ZEROCOPY.getBoolean(conf);
-      if (useZeroCopy && !getAllocator().isDirectAlloc()) {
-        throw new UnsupportedOperationException("Cannot use zero-copy reader with non-direct cache "
-            + "buffers; either disable zero-copy or enable direct cache allocation");
-      }
-      this.orcDataReader = orcReader.createDefaultDataReader(useZeroCopy);
+    private DataWrapperForOrc(DataWrapperForOrc other) {
+      orcDataReader = other.orcDataReader.clone();
+    }
+
+    public DataWrapperForOrc() throws IOException {
+      ensureMetadataReader();
+      this.orcDataReader = metadataReader.clone();
     }
 
     @Override
@@ -855,6 +864,9 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
     @Override
     public void close() throws IOException {
       orcDataReader.close();
+      if (metadataReader != null) {
+        metadataReader.close();
+      }
     }
 
     @Override
@@ -881,10 +893,32 @@ public class OrcEncodedDataReader extends CallableWithNdc<Void>
     }
 
     @Override
+    public DataWrapperForOrc clone() {
+      return new DataWrapperForOrc(this);
+    }
+
+    @Override
     public void open() throws IOException {
       long startTime = counters.startTimeCounter();
       orcDataReader.open();
       counters.recordHdfsTime(startTime);
+    }
+
+    @Override
+    public OrcIndex readRowIndex(StripeInformation stripe,
+                                 OrcProto.StripeFooter footer,
+                                 boolean[] included,
+                                 OrcProto.RowIndex[] indexes,
+                                 boolean[] sargColumns,
+                                 OrcProto.BloomFilterIndex[] bloomFilterIndices
+                                 ) throws IOException {
+      return orcDataReader.readRowIndex(stripe, footer, included, indexes,
+          sargColumns, bloomFilterIndices);
+    }
+
+    @Override
+    public OrcProto.StripeFooter readStripeFooter(StripeInformation stripe) throws IOException {
+      return orcDataReader.readStripeFooter(stripe);
     }
   }
 }

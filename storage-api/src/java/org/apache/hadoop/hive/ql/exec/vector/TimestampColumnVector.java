@@ -281,8 +281,13 @@ public class TimestampColumnVector extends ColumnVector {
    * @param timestamp
    */
   public void set(int elementNum, Timestamp timestamp) {
-    this.time[elementNum] = timestamp.getTime();
-    this.nanos[elementNum] = timestamp.getNanos();
+    if (timestamp == null) {
+      this.noNulls = false;
+      this.isNull[elementNum] = true;
+    } else {
+      this.time[elementNum] = timestamp.getTime();
+      this.nanos[elementNum] = timestamp.getNanos();
+    }
   }
 
   /**
@@ -390,6 +395,25 @@ public class TimestampColumnVector extends ColumnVector {
       buffer.append(scratchTimestamp.toString());
     } else {
       buffer.append("null");
+    }
+  }
+
+  @Override
+  public void ensureSize(int size, boolean preserveData) {
+    super.ensureSize(size, preserveData);
+    if (size <= time.length) return;
+    long[] oldTime = time;
+    int[] oldNanos = nanos;
+    time = new long[size];
+    nanos = new int[size];
+    if (preserveData) {
+      if (isRepeating) {
+        time[0] = oldTime[0];
+        nanos[0] = oldNanos[0];
+      } else {
+        System.arraycopy(oldTime, 0, time, 0, oldTime.length);
+        System.arraycopy(oldNanos, 0, nanos, 0, oldNanos.length);
+      }
     }
   }
 }

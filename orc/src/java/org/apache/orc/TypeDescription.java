@@ -61,7 +61,7 @@ public class TypeDescription {
     LIST("array", false),
     MAP("map", false),
     STRUCT("struct", false),
-    UNION("union", false);
+    UNION("uniontype", false);
 
     Category(String name, boolean isPrimitive) {
       this.name = name;
@@ -258,6 +258,66 @@ public class TypeDescription {
     return id;
   }
 
+  public TypeDescription clone() {
+    TypeDescription result = new TypeDescription(category);
+    result.maxLength = maxLength;
+    result.precision = precision;
+    result.scale = scale;
+    if (fieldNames != null) {
+      result.fieldNames.addAll(fieldNames);
+    }
+    if (children != null) {
+      for(TypeDescription child: children) {
+        TypeDescription clone = child.clone();
+        clone.parent = result;
+        result.children.add(clone);
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public int hashCode() {
+    return getId();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == null || other.getClass() != TypeDescription.class) {
+      return false;
+    }
+    if (other == this) {
+      return true;
+    }
+    TypeDescription castOther = (TypeDescription) other;
+    if (category != castOther.category ||
+        getId() != castOther.getId() ||
+        getMaximumId() != castOther.getMaximumId() ||
+        maxLength != castOther.maxLength ||
+        scale != castOther.scale ||
+        precision != castOther.precision) {
+      return false;
+    }
+    if (children != null) {
+      if (children.size() != castOther.children.size()) {
+        return false;
+      }
+      for (int i = 0; i < children.size(); ++i) {
+        if (!children.get(i).equals(castOther.children.get(i))) {
+          return false;
+        }
+      }
+    }
+    if (category == Category.STRUCT) {
+      for(int i=0; i < fieldNames.size(); ++i) {
+        if (!fieldNames.get(i).equals(castOther.fieldNames.get(i))) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   /**
    * Get the maximum id assigned to this type or its children.
    * The first call will cause all of the the ids in tree to be assigned, so
@@ -284,25 +344,25 @@ public class TypeDescription {
       case INT:
       case LONG:
       case DATE:
-        return new LongColumnVector();
+        return new LongColumnVector(maxSize);
       case TIMESTAMP:
-        return new TimestampColumnVector();
+        return new TimestampColumnVector(maxSize);
       case FLOAT:
       case DOUBLE:
-        return new DoubleColumnVector();
+        return new DoubleColumnVector(maxSize);
       case DECIMAL:
-        return new DecimalColumnVector(precision, scale);
+        return new DecimalColumnVector(maxSize, precision, scale);
       case STRING:
       case BINARY:
       case CHAR:
       case VARCHAR:
-        return new BytesColumnVector();
+        return new BytesColumnVector(maxSize);
       case STRUCT: {
         ColumnVector[] fieldVector = new ColumnVector[children.size()];
         for(int i=0; i < fieldVector.length; ++i) {
           fieldVector[i] = children.get(i).createColumn(maxSize);
         }
-        return new StructColumnVector(VectorizedRowBatch.DEFAULT_SIZE,
+        return new StructColumnVector(maxSize,
                 fieldVector);
       }
       case UNION: {
@@ -310,14 +370,14 @@ public class TypeDescription {
         for(int i=0; i < fieldVector.length; ++i) {
           fieldVector[i] = children.get(i).createColumn(maxSize);
         }
-        return new UnionColumnVector(VectorizedRowBatch.DEFAULT_SIZE,
+        return new UnionColumnVector(maxSize,
             fieldVector);
       }
       case LIST:
-        return new ListColumnVector(VectorizedRowBatch.DEFAULT_SIZE,
+        return new ListColumnVector(maxSize,
             children.get(0).createColumn(maxSize));
       case MAP:
-        return new MapColumnVector(VectorizedRowBatch.DEFAULT_SIZE,
+        return new MapColumnVector(maxSize,
             children.get(0).createColumn(maxSize),
             children.get(1).createColumn(maxSize));
       default:

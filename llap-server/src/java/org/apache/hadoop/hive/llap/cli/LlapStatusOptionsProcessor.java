@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hive.llap.cli;
 
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+
 import jline.TerminalFactory;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -33,11 +36,17 @@ public class LlapStatusOptionsProcessor {
 
   private static final String LLAPSTATUS_CONSTANT = "llapstatus";
 
+  private static final long FIND_YARN_APP_TIMEOUT_MS = 20 * 1000l; // 20seconds to wait for app to be visible
+
   enum OptionConstants {
 
-    NAME("name", 'n', "LLAP cluster name"),
+    NAME("name", 'n', "LLAP cluster name", true),
+    FIND_APP_TIMEOUT("findAppTimeout", 'f',
+        "Amount of time(s) that the tool will sleep to wait for the YARN application to start. negative values=wait forever, 0=Do not wait. default=" +
+            TimeUnit.SECONDS.convert(FIND_YARN_APP_TIMEOUT_MS, TimeUnit.MILLISECONDS) + "s", true),
+    OUTPUT_FILE("outputFile", 'o', "File to which output should be written (Default stdout)", true),
     HIVECONF("hiveconf", null, "Use value for given property. Overridden by explicit parameters", "property=value", 2),
-    HELP("help", 'H', "Print help information"),;
+    HELP("help", 'H', "Print help information", false);
 
 
     private final String longOpt;
@@ -46,9 +55,8 @@ public class LlapStatusOptionsProcessor {
     private final String argName;
     private final int numArgs;
 
-    OptionConstants(String longOpt, char shortOpt, String description) {
-      this(longOpt, shortOpt, description, longOpt, 1);
-
+    OptionConstants(String longOpt, char shortOpt, String description, boolean hasArgs) {
+      this(longOpt, shortOpt, description, longOpt, hasArgs ? 1 : 0);
     }
 
     OptionConstants(String longOpt, Character shortOpt, String description, String argName, int numArgs) {
@@ -83,13 +91,36 @@ public class LlapStatusOptionsProcessor {
 
   public static class LlapStatusOptions {
     private final String name;
+    private final Properties conf;
+    private final long findAppTimeoutMs;
+    private final String outputFile;
 
-    LlapStatusOptions(String name) {
+    public LlapStatusOptions(String name, Properties hiveProperties, long findAppTimeoutMs,
+                             String outputFile) {
       this.name = name;
+      this.conf = hiveProperties;
+      this.findAppTimeoutMs = findAppTimeoutMs;
+      this.outputFile = outputFile;
+    }
+
+    public LlapStatusOptions(String name) {
+      this(name, new Properties(), FIND_YARN_APP_TIMEOUT_MS, null);
     }
 
     public String getName() {
       return name;
+    }
+
+    public Properties getConf() {
+      return conf;
+    }
+
+    public long getFindAppTimeoutMs() {
+      return findAppTimeoutMs;
+    }
+
+    public String getOutputFile() {
+      return outputFile;
     }
   }
 
@@ -113,18 +144,37 @@ public class LlapStatusOptionsProcessor {
 
   public LlapStatusOptions processOptions(String[] args) throws ParseException {
     commandLine = new GnuParser().parse(options, args);
-    if (commandLine.hasOption(OptionConstants.HELP.getShortOpt()) ||
-        false == commandLine.hasOption(OptionConstants.NAME.getLongOpt())) {
+    if (commandLine.hasOption(OptionConstants.HELP.getShortOpt())) {
       printUsage();
       return null;
     }
 
     String name = commandLine.getOptionValue(OptionConstants.NAME.getLongOpt());
-    return new LlapStatusOptions(name);
+
+    long findAppTimeoutMs = FIND_YARN_APP_TIMEOUT_MS;
+    if (commandLine.hasOption(OptionConstants.FIND_APP_TIMEOUT.getLongOpt())) {
+      findAppTimeoutMs = TimeUnit.MILLISECONDS.convert(Long.parseLong(
+          commandLine.getOptionValue(OptionConstants.FIND_APP_TIMEOUT.getLongOpt())),
+          TimeUnit.SECONDS);
+    }
+
+    Properties hiveConf;
+    if (commandLine.hasOption(OptionConstants.HIVECONF.getLongOpt())) {
+      hiveConf = commandLine.getOptionProperties(OptionConstants.HIVECONF.getLongOpt());
+    } else {
+      hiveConf = new Properties();
+    }
+
+    String outputFile = null;
+    if (commandLine.hasOption(OptionConstants.OUTPUT_FILE.getLongOpt())) {
+      outputFile = commandLine.getOptionValue(OptionConstants.OUTPUT_FILE.getLongOpt());
+    }
+
+    return new LlapStatusOptions(name, hiveConf, findAppTimeoutMs, outputFile);
   }
 
 
-  private void printUsage() {
+  public static void printUsage() {
     HelpFormatter hf = new HelpFormatter();
     try {
       int width = hf.getWidth();
@@ -133,7 +183,9 @@ public class LlapStatusOptionsProcessor {
       hf.setWidth(width);
     } catch (Throwable t) { // Ignore
     }
-    hf.printHelp(LLAPSTATUS_CONSTANT, options);
+
+    LlapStatusOptionsProcessor optionsProcessor = new LlapStatusOptionsProcessor();
+    hf.printHelp(LLAPSTATUS_CONSTANT, optionsProcessor.options);
   }
 
 }

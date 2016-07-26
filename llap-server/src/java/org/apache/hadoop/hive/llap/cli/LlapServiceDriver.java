@@ -20,7 +20,6 @@ package org.apache.hadoop.hive.llap.cli;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.URI;
@@ -36,6 +35,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.llap.configuration.LlapDaemonConfiguration;
 import org.apache.hadoop.hive.llap.daemon.impl.LlapDaemon;
 import org.apache.hadoop.hive.llap.daemon.impl.StaticPermanentFunctionChecker;
@@ -55,16 +55,12 @@ import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.llap.cli.LlapOptionsProcessor.LlapOptions;
 import org.apache.hadoop.hive.llap.io.api.impl.LlapInputFormat;
 import org.apache.hadoop.hive.metastore.api.Function;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
-import org.apache.hadoop.hive.ql.exec.FunctionTask;
 import org.apache.hadoop.hive.ql.exec.Utilities;
-import org.apache.hadoop.hive.ql.exec.FunctionInfo.FunctionResource;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.session.SessionState;
-import org.apache.hadoop.hive.ql.session.SessionState.ResourceType;
 import org.apache.hadoop.hive.ql.util.ResourceDownloader;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.mapred.JobConf;
@@ -85,6 +81,9 @@ public class LlapServiceDriver {
   private static final String[] NEEDED_CONFIGS = LlapDaemonConfiguration.DAEMON_CONFIGS;
   private static final String[] OPTIONAL_CONFIGS = LlapDaemonConfiguration.SSL_DAEMON_CONFIGS;
 
+  // This is not a config that users set in hive-site. It's only use is to share information
+  // between the java component of the service driver and the python component.
+  private static final String CONFIG_CLUSTER_NAME = "private.hive.llap.servicedriver.cluster.name";
 
   /**
    * This is a working configuration for the instance to merge various variables.
@@ -98,6 +97,7 @@ public class LlapServiceDriver {
   }
 
   public static void main(String[] args) throws Exception {
+    LOG.info("LLAP service driver invoked with arguments={}", args);
     int ret = 0;
     try {
       new LlapServiceDriver().run(args);
@@ -105,6 +105,8 @@ public class LlapServiceDriver {
       System.err.println("Failed: " + t.getMessage());
       t.printStackTrace();
       ret = 3;
+    } finally {
+      LOG.info("LLAP service driver finished");
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Completed processing - exiting with " + ret);
@@ -134,7 +136,7 @@ public class LlapServiceDriver {
     }
   }
 
-  private static void populateConfWithLlapProperties(Configuration conf, Properties properties) {
+  static void populateConfWithLlapProperties(Configuration conf, Properties properties) {
     for(Entry<Object, Object> props : properties.entrySet()) {
       String key = (String) props.getKey();
       if (HiveConf.getLlapDaemonConfVars().contains(key)) {
@@ -193,21 +195,36 @@ public class LlapServiceDriver {
       // if needed, use --hiveconf llap.daemon.service.hosts=@llap0 to dynamically switch between
       // instances
       conf.set(ConfVars.LLAP_DAEMON_SERVICE_HOSTS.varname, "@" + options.getName());
-      propsDirectOptions.setProperty(ConfVars.LLAP_DAEMON_SERVICE_HOSTS.varname, "@" + options.getName());
+      propsDirectOptions.setProperty(ConfVars.LLAP_DAEMON_SERVICE_HOSTS.varname,
+          "@" + options.getName());
     }
 
     if (options.getSize() != -1) {
       if (options.getCache() != -1) {
-        Preconditions.checkArgument(options.getCache() < options.getSize(),
-            "Cache has to be smaller than the container sizing");
+        if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.LLAP_ALLOCATOR_MAPPED) == false) {
+          // direct heap allocations need to be safer
+          Preconditions.checkArgument(options.getCache() < options.getSize(),
+              "Cache size (" + humanReadableByteCount(options.getCache()) + ") has to be smaller" +
+                  " than the container sizing (" + humanReadableByteCount(options.getSize()) + ")");
+        } else if (options.getCache() < options.getSize()) {
+          LOG.warn("Note that this might need YARN physical memory monitoring to be turned off "
+              + "(yarn.nodemanager.pmem-check-enabled=false)");
+        }
       }
       if (options.getXmx() != -1) {
         Preconditions.checkArgument(options.getXmx() < options.getSize(),
-            "Working memory has to be smaller than the container sizing");
+            "Working memory (Xmx=" + humanReadableByteCount(options.getXmx()) + ") has to be" +
+                " smaller than the container sizing (" +
+                humanReadableByteCount(options.getSize()) + ")");
       }
-      if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.LLAP_ALLOCATOR_DIRECT)) {
+      if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.LLAP_ALLOCATOR_DIRECT)
+          && false == HiveConf.getBoolVar(conf, HiveConf.ConfVars.LLAP_ALLOCATOR_MAPPED)) {
+        // direct and not memory mapped
         Preconditions.checkArgument(options.getXmx() + options.getCache() < options.getSize(),
-            "Working memory + cache has to be smaller than the containing sizing ");
+            "Working memory + cache (Xmx="+ humanReadableByteCount(options.getXmx()) +
+                " + cache=" + humanReadableByteCount(options.getCache()) + ")"
+                + " has to be smaller than the container sizing (" +
+                humanReadableByteCount(options.getSize()) + ")");
       }
     }
 
@@ -217,7 +234,8 @@ public class LlapServiceDriver {
     if (options.getSize() != -1) {
       containerSize = options.getSize() / (1024 * 1024);
       Preconditions.checkArgument(containerSize >= minAlloc,
-          "Container size should be greater than minimum allocation(%s)", minAlloc + "m");
+          "Container size (" + humanReadableByteCount(options.getSize()) + ") should be greater" +
+              " than minimum allocation(" + humanReadableByteCount(minAlloc * 1024L * 1024L) + ")");
       conf.setLong(ConfVars.LLAP_DAEMON_YARN_CONTAINER_MB.varname, containerSize);
       propsDirectOptions.setProperty(ConfVars.LLAP_DAEMON_YARN_CONTAINER_MB.varname, String.valueOf(containerSize));
     }
@@ -234,20 +252,23 @@ public class LlapServiceDriver {
           String.valueOf(options.getIoThreads()));
     }
 
+    long cache = -1, xmx = -1;
     if (options.getCache() != -1) {
-      conf.set(HiveConf.ConfVars.LLAP_IO_MEMORY_MAX_SIZE.varname,
-          Long.toString(options.getCache()));
+      cache = options.getCache();
+      conf.set(HiveConf.ConfVars.LLAP_IO_MEMORY_MAX_SIZE.varname, Long.toString(cache));
       propsDirectOptions.setProperty(HiveConf.ConfVars.LLAP_IO_MEMORY_MAX_SIZE.varname,
-          Long.toString(options.getCache()));
+          Long.toString(cache));
     }
 
     if (options.getXmx() != -1) {
       // Needs more explanation here
-      // Xmx is not the max heap value in JDK8
-      // You need to subtract 50% of the survivor fraction from this, to get actual usable memory before it goes into GC
-      long xmx = (long) (options.getXmx() / (1024 * 1024));
-      conf.setLong(ConfVars.LLAP_DAEMON_MEMORY_PER_INSTANCE_MB.varname, xmx);
-      propsDirectOptions.setProperty(ConfVars.LLAP_DAEMON_MEMORY_PER_INSTANCE_MB.varname, String.valueOf(xmx));
+      // Xmx is not the max heap value in JDK8. You need to subtract 50% of the survivor fraction
+      // from this, to get actual usable  memory before it goes into GC
+      xmx = options.getXmx();
+      long xmxMb = (long)(xmx / (1024 * 1024));
+      conf.setLong(ConfVars.LLAP_DAEMON_MEMORY_PER_INSTANCE_MB.varname, xmxMb);
+      propsDirectOptions.setProperty(ConfVars.LLAP_DAEMON_MEMORY_PER_INSTANCE_MB.varname,
+          String.valueOf(xmxMb));
     }
 
     if (options.getLlapQueueName() != null && !options.getLlapQueueName().isEmpty()) {
@@ -255,8 +276,6 @@ public class LlapServiceDriver {
       propsDirectOptions
           .setProperty(ConfVars.LLAP_DAEMON_QUEUE_NAME.varname, options.getLlapQueueName());
     }
-
-
 
     URL logger = conf.getResource(LlapDaemon.LOG4j2_PROPERTIES_FILE);
 
@@ -318,6 +337,12 @@ public class LlapServiceDriver {
 
     for (String className : DEFAULT_AUX_CLASSES) {
       localizeJarForClass(lfs, libDir, className, false);
+    }
+    Collection<String> codecs = conf.getStringCollection("io.compression.codecs");
+    if (codecs != null) {
+      for (String codecClassName : codecs) {
+        localizeJarForClass(lfs, libDir, codecClassName, false);
+      }
     }
 
     if (options.getIsHBase()) {
@@ -399,12 +424,22 @@ public class LlapServiceDriver {
     IOUtils.copyBytes(loggerContent,
         lfs.create(new Path(confPath, "llap-daemon-log4j2.properties"), true), conf, true);
 
-    URL metrics2 = conf.getResource(LlapDaemon.HADOOP_METRICS2_PROPERTIES_FILE);
+    String metricsFile = LlapDaemon.LLAP_HADOOP_METRICS2_PROPERTIES_FILE;
+    URL metrics2 = conf.getResource(metricsFile);
+    if (metrics2 == null) {
+      LOG.warn(LlapDaemon.LLAP_HADOOP_METRICS2_PROPERTIES_FILE + " cannot be found." +
+          " Looking for " + LlapDaemon.HADOOP_METRICS2_PROPERTIES_FILE);
+      metricsFile = LlapDaemon.HADOOP_METRICS2_PROPERTIES_FILE;
+      metrics2 = conf.getResource(metricsFile);
+    }
     if (metrics2 != null) {
       InputStream metrics2FileStream = metrics2.openStream();
-      IOUtils.copyBytes(metrics2FileStream,
-          lfs.create(new Path(confPath, LlapDaemon.HADOOP_METRICS2_PROPERTIES_FILE), true),
+      IOUtils.copyBytes(metrics2FileStream, lfs.create(new Path(confPath, metricsFile), true),
           conf, true);
+      LOG.info("Copied hadoop metrics2 properties file from " + metrics2);
+    } else {
+      LOG.warn("Cannot find " + LlapDaemon.LLAP_HADOOP_METRICS2_PROPERTIES_FILE + " or " +
+          LlapDaemon.HADOOP_METRICS2_PROPERTIES_FILE + " in classpath.");
     }
 
     PrintWriter udfStream =
@@ -445,11 +480,21 @@ public class LlapServiceDriver {
           HiveConf.getVar(conf, ConfVars.LLAP_DAEMON_QUEUE_NAME));
     }
 
+    // Propagate the cluster name to the script.
+    String clusterHosts = HiveConf.getVar(conf, ConfVars.LLAP_DAEMON_SERVICE_HOSTS);
+    if (!StringUtils.isEmpty(clusterHosts) && clusterHosts.startsWith("@") &&
+        clusterHosts.length() > 1) {
+      configs.put(CONFIG_CLUSTER_NAME, clusterHosts.substring(1));
+    }
+
     configs.put(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
         conf.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB, -1));
 
     configs.put(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
         conf.getInt(YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES, -1));
+
+    long maxDirect = (xmx > 0 && cache > 0 && xmx < cache * 1.25) ? (long)(cache * 1.25) : -1;
+    configs.put("max_direct_memory", Long.toString(maxDirect));
 
     FSDataOutputStream os = lfs.create(new Path(tmpDir, "config.json"));
     OutputStreamWriter w = new OutputStreamWriter(os);
@@ -510,10 +555,9 @@ public class LlapServiceDriver {
         throw (t instanceof IOException) ? (IOException)t : new IOException(t);
       }
       hasException = true;
-      String err =
-          "Cannot find a jar for [" + className + "] due to an exception (" + t.getMessage()
-              + "); not packaging the jar";
-      LOG.error(err, t);
+      String err = "Cannot find a jar for [" + className + "] due to an exception ("
+          + t.getMessage() + "); not packaging the jar";
+      LOG.error(err);
       System.err.println(err);
     }
     if (jarPath != null) {
@@ -545,5 +589,13 @@ public class LlapServiceDriver {
     lfs.copyFromLocalFile(new Path(conf.getResource(f).toString()), confPath);
   }
 
-
+  private String humanReadableByteCount(long bytes) {
+    int unit = 1024;
+    if (bytes < unit) {
+      return bytes + "B";
+    }
+    int exp = (int) (Math.log(bytes) / Math.log(unit));
+    String suffix = "KMGTPE".charAt(exp-1) + "";
+    return String.format("%.2f%sB", bytes / Math.pow(unit, exp), suffix);
+  }
 }

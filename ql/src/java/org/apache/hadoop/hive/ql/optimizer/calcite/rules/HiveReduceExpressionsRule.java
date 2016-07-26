@@ -59,11 +59,15 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Stacks;
 import org.apache.calcite.util.Util;
+import org.apache.hadoop.hive.ql.optimizer.calcite.HiveCalciteUtil;
 import org.apache.hadoop.hive.ql.optimizer.calcite.HiveRelFactories;
 import org.apache.hadoop.hive.ql.optimizer.calcite.HiveRexUtil;
+import org.apache.hadoop.hive.ql.optimizer.calcite.HiveRexUtil.ExprSimplifier;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveFilter;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveJoin;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveProject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -80,6 +84,9 @@ import com.google.common.collect.Lists;
  * </ul>
  */
 public abstract class HiveReduceExpressionsRule extends RelOptRule {
+
+  protected static final Logger LOG = LoggerFactory.getLogger(HiveReduceExpressionsRule.class);
+
   //~ Static fields/initializers ---------------------------------------------
 
   /**
@@ -125,17 +132,23 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
 
     @Override public void onMatch(RelOptRuleCall call) {
       final Filter filter = call.rel(0);
-      final RexBuilder rexBuilder = filter.getCluster().getRexBuilder();
-
-      RexNode newConditionExp = HiveRexUtil.simplify(rexBuilder, filter.getCondition());
-      final List<RexNode> expList = Lists.newArrayList(newConditionExp);
-      boolean reduced = false;
+      final List<RexNode> expList =
+          Lists.newArrayList(filter.getCondition());
+      RexNode newConditionExp;
+      boolean reduced;
       final RelOptPredicateList predicates =
           RelMetadataQuery.instance().getPulledUpPredicates(filter.getInput());
-      if (reduceExpressions(filter, expList, predicates)) {
+      if (reduceExpressions(filter, expList, predicates, true)) {
         assert expList.size() == 1;
         newConditionExp = expList.get(0);
         reduced = true;
+      } else {
+        // No reduction, but let's still test the original
+        // predicate to see if it was already a constant,
+        // in which case we don't need any runtime decision
+        // about filtering.
+        newConditionExp = filter.getCondition();
+        reduced = false;
       }
 
       // Even if no reduction, let's still test the original
@@ -146,8 +159,7 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
       if (newConditionExp.isAlwaysTrue()) {
         call.transformTo(
             filter.getInput());
-      } else if (reduced
-              || !newConditionExp.toString().equals(filter.getCondition().toString())) {
+      } else if (reduced) {
         call.transformTo(call.builder().
             push(filter.getInput()).filter(newConditionExp).build());
       } else {
@@ -169,26 +181,8 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
       super(projectClass, relBuilderFactory, "HiveReduceExpressionsRule(Project)");
     }
 
-    public boolean matches(RelOptRuleCall call) {
-      Project project = call.rel(0);
-      HiveRulesRegistry registry = call.getPlanner().getContext().unwrap(HiveRulesRegistry.class);
-
-      // If this operator has been visited already by the rule,
-      // we do not need to apply the optimization
-      if (registry != null && registry.getVisited(this).contains(project)) {
-        return false;
-      }
-
-      return true;
-    }
-
     @Override public void onMatch(RelOptRuleCall call) {
       Project project = call.rel(0);
-      // Register that we have visited this operator in this rule
-      HiveRulesRegistry registry = call.getPlanner().getContext().unwrap(HiveRulesRegistry.class);
-      if (registry != null) {
-        registry.registerVisited(this, project);
-      }
       final RelOptPredicateList predicates =
           RelMetadataQuery.instance().getPulledUpPredicates(project.getInput());
       final List<RexNode> expList =
@@ -196,9 +190,6 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
       if (reduceExpressions(project, expList, predicates)) {
         RelNode newProject = call.builder().push(project.getInput())
             .project(expList, project.getRowType().getFieldNames()).build();
-        if (registry != null) {
-          registry.registerVisited(this, newProject);
-        }
         call.transformTo(newProject);
 
         // New plan is absolutely better than old plan.
@@ -275,6 +266,43 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
    */
   protected static boolean reduceExpressions(RelNode rel, List<RexNode> expList,
       RelOptPredicateList predicates) {
+    return reduceExpressions(rel, expList, predicates, false);
+  }
+
+  /**
+   * Reduces a list of expressions.
+   *
+   * @param rel     Relational expression
+   * @param expList List of expressions, modified in place
+   * @param predicates Constraints known to hold on input expressions
+   * @param unknownAsFalse Whether UNKNOWN will be treated as FALSE
+   *
+   * @return whether reduction found something to change, and succeeded
+   */
+  protected static boolean reduceExpressions(RelNode rel, List<RexNode> expList,
+      RelOptPredicateList predicates, boolean unknownAsFalse) {
+    RexBuilder rexBuilder = rel.getCluster().getRexBuilder();
+
+    boolean reduced = reduceExpressionsInternal(rel, expList, predicates);
+
+    // Simplify preds in place
+    ExprSimplifier simplifier = new ExprSimplifier(rexBuilder, unknownAsFalse);
+    List<RexNode> expList2 = Lists.newArrayList(expList);
+    simplifier.mutate(expList2);
+    boolean simplified = false;
+    for (int i = 0; i < expList.size(); i++) {
+      if (!expList2.get(i).toString().equals(expList.get(i).toString())) {
+        expList.remove(i);
+        expList.add(i, expList2.get(i));
+        simplified = true;
+      }
+    }
+
+    return reduced || simplified;
+  }
+
+  protected static boolean reduceExpressionsInternal(RelNode rel, List<RexNode> expList,
+      RelOptPredicateList predicates) {
     RexBuilder rexBuilder = rel.getCluster().getRexBuilder();
 
     // Replace predicates on CASE to CASE on predicates.
@@ -284,8 +312,8 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
     final List<RexNode> constExps = Lists.newArrayList();
     List<Boolean> addCasts = Lists.newArrayList();
     final List<RexNode> removableCasts = Lists.newArrayList();
-    final ImmutableMap<RexNode, RexLiteral> constants =
-        predicateConstants(predicates);
+    final ImmutableMap<RexNode, RexNode> constants =
+        predicateConstants(RexNode.class, rexBuilder, predicates);
     findReducibleExps(rel.getCluster().getTypeFactory(), expList, constants,
         constExps, addCasts, removableCasts);
     if (constExps.isEmpty() && removableCasts.isEmpty()) {
@@ -347,6 +375,13 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
     final List<RexNode> reducedValues = Lists.newArrayList();
     executor.reduce(rexBuilder, constExps2, reducedValues);
 
+    // Use RexNode.digest to judge whether each newly generated RexNode
+    // is equivalent to the original one.
+    if (Lists.transform(constExps, HiveCalciteUtil.REX_STR_FN).equals(
+            Lists.transform(reducedValues, HiveCalciteUtil.REX_STR_FN))) {
+      return false;
+    }
+
     // For Project, we have to be sure to preserve the result
     // types, so always cast regardless of the expression type.
     // For other RelNodes like Filter, in general, this isn't necessary,
@@ -384,7 +419,7 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
    * @param removableCasts returns the list of cast expressions where the cast
    */
   protected static void findReducibleExps(RelDataTypeFactory typeFactory,
-      List<RexNode> exps, ImmutableMap<RexNode, RexLiteral> constants,
+      List<RexNode> exps, ImmutableMap<RexNode, RexNode> constants,
       List<RexNode> constExps, List<Boolean> addCasts,
       List<RexNode> removableCasts) {
     ReducibleExprLocator gardener =
@@ -396,8 +431,19 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
     assert constExps.size() == addCasts.size();
   }
 
-  protected static ImmutableMap<RexNode, RexLiteral> predicateConstants(
-      RelOptPredicateList predicates) {
+  /** Creates a map containing each (e, constant) pair that occurs within
+   * a predicate list.
+   *
+   * @param clazz Class of expression that is considered constant
+   * @param rexBuilder Rex builder
+   * @param predicates Predicate list
+   * @param <C> what to consider a constant: {@link RexLiteral} to use a narrow
+   *           definition of constant, or {@link RexNode} to use
+   *           {@link RexUtil#isConstant(RexNode)}
+   * @return Map from values to constants
+   */
+  public static <C extends RexNode> ImmutableMap<RexNode, C> predicateConstants(
+          Class<C> clazz, RexBuilder rexBuilder, RelOptPredicateList predicates) {
     // We cannot use an ImmutableMap.Builder here. If there are multiple entries
     // with the same key (e.g. "WHERE deptno = 1 AND deptno = 2"), it doesn't
     // matter which we take, so the latter will replace the former.
@@ -407,20 +453,115 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
     // (e.g. "WHERE deptno = 1 AND deptno = 1")
     // (3) It will return false if there are inconsistent constraints (e.g.
     // "WHERE deptno = 1 AND deptno = 2")
-    final Map<RexNode, RexLiteral> map = new HashMap<>();
+    final Map<RexNode, C> map = new HashMap<>();
     final Set<RexNode> excludeSet = new HashSet<>();
     for (RexNode predicate : predicates.pulledUpPredicates) {
-      gatherConstraints(map, predicate, excludeSet);
+      gatherConstraints(clazz, predicate, map, excludeSet, rexBuilder);
     }
-    final ImmutableMap.Builder<RexNode, RexLiteral> builder =
+    final ImmutableMap.Builder<RexNode, C> builder =
         ImmutableMap.builder();
-    for (Map.Entry<RexNode, RexLiteral> entry : map.entrySet()) {
+    for (Map.Entry<RexNode, C> entry : map.entrySet()) {
       RexNode rexNode = entry.getKey();
       if (!overlap(rexNode, excludeSet)) {
         builder.put(rexNode, entry.getValue());
       }
     }
     return builder.build();
+  }
+
+  private static <C extends RexNode> void gatherConstraints(Class<C> clazz,
+      RexNode predicate, Map<RexNode, C> map, Set<RexNode> excludeSet,
+      RexBuilder rexBuilder) {
+    if (predicate.getKind() != SqlKind.EQUALS
+            && predicate.getKind() != SqlKind.IS_NULL) {
+      decompose(excludeSet, predicate);
+      return;
+    }
+    final List<RexNode> operands = ((RexCall) predicate).getOperands();
+    if (operands.size() != 2 && predicate.getKind() == SqlKind.EQUALS) {
+      decompose(excludeSet, predicate);
+      return;
+    }
+    // if it reaches here, we have rexNode equals rexNode
+    final RexNode left;
+    final RexNode right;
+    if (predicate.getKind() == SqlKind.EQUALS) {
+      left = operands.get(0);
+      right = operands.get(1);
+    } else {
+      left = operands.get(0);
+      right = rexBuilder.makeNullLiteral(left.getType().getSqlTypeName());
+    }
+    // note that literals are immutable too and they can only be compared through
+    // values.
+    gatherConstraint(clazz, left, right, map, excludeSet, rexBuilder);
+    gatherConstraint(clazz, right, left, map, excludeSet, rexBuilder);
+  }
+
+  /** Returns whether a value of {@code type2} can be assigned to a variable
+   * of {@code type1}.
+   *
+   * <p>For example:
+   * <ul>
+   *   <li>{@code canAssignFrom(BIGINT, TINYINT)} returns {@code true}</li>
+   *   <li>{@code canAssignFrom(TINYINT, BIGINT)} returns {@code false}</li>
+   *   <li>{@code canAssignFrom(BIGINT, VARCHAR)} returns {@code false}</li>
+   * </ul>
+   */
+  private static boolean canAssignFrom(RelDataType type1, RelDataType type2) {
+    final SqlTypeName name1 = type1.getSqlTypeName();
+    final SqlTypeName name2 = type2.getSqlTypeName();
+    if (name1.getFamily() == name2.getFamily()) {
+      switch (name1.getFamily()) {
+      case NUMERIC:
+        return name1.compareTo(name2) >= 0;
+      default:
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static <C extends RexNode> void gatherConstraint(Class<C> clazz,
+      RexNode left, RexNode right, Map<RexNode, C> map, Set<RexNode> excludeSet,
+      RexBuilder rexBuilder) {
+    if (!clazz.isInstance(right)) {
+      return;
+    }
+    if (!RexUtil.isConstant(right)) {
+      return;
+    }
+    C constant = clazz.cast(right);
+    if (excludeSet.contains(left)) {
+      return;
+    }
+    final C existedValue = map.get(left);
+    if (existedValue == null) {
+      switch (left.getKind()) {
+      case CAST:
+        // Convert "CAST(c) = literal" to "c = literal", as long as it is a
+        // widening cast.
+        final RexNode operand = ((RexCall) left).getOperands().get(0);
+        if (canAssignFrom(left.getType(), operand.getType())) {
+          final RexNode castRight =
+              rexBuilder.makeCast(operand.getType(), constant);
+          if (castRight instanceof RexLiteral) {
+            left = operand;
+            constant = clazz.cast(castRight);
+          }
+        }
+      }
+      map.put(left, constant);
+    } else {
+      if (existedValue instanceof RexLiteral
+          && constant instanceof RexLiteral
+          && !((RexLiteral) existedValue).getValue()
+              .equals(((RexLiteral) constant).getValue())) {
+        // we found conflicting values, e.g. left = 10 and left = 20
+        map.remove(left);
+        excludeSet.add(left);
+      }
+    }
   }
 
   private static boolean overlap(RexNode rexNode, Set<RexNode> set) {
@@ -445,46 +586,6 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
       }
     } else if (!(rexNode instanceof RexLiteral)) {
       set.add(rexNode);
-    }
-  }
-
-  private static void gatherConstraints(Map<RexNode, RexLiteral> map,
-      RexNode predicate, Set<RexNode> excludeSet) {
-    if (predicate.getKind() != SqlKind.EQUALS) {
-      decompose(excludeSet, predicate);
-      return;
-    }
-    final List<RexNode> operands = ((RexCall) predicate).getOperands();
-    if (operands.size() != 2) {
-      decompose(excludeSet, predicate);
-      return;
-    }
-    // if it reaches here, we have rexNode equals rexNode
-    final RexNode left = operands.get(0);
-    final RexNode right = operands.get(1);
-    // note that literals are immutable too and they can only be compared through
-    // values.
-    if (right instanceof RexLiteral && !excludeSet.contains(left)) {
-      RexLiteral existedValue = map.get(left);
-      if (existedValue == null) {
-        map.put(left, (RexLiteral) right);
-      } else {
-        if (!existedValue.getValue().equals(((RexLiteral) right).getValue())) {
-          // we found conflict values.
-          map.remove(left);
-          excludeSet.add(left);
-        }
-      }
-    } else if (left instanceof RexLiteral && !excludeSet.contains(right)) {
-      RexLiteral existedValue = map.get(right);
-      if (existedValue == null) {
-        map.put(right, (RexLiteral) left);
-      } else {
-        if (!existedValue.getValue().equals(((RexLiteral) left).getValue())) {
-          map.remove(right);
-          excludeSet.add(right);
-        }
-      }
     }
   }
 
@@ -618,7 +719,7 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
 
     private final List<Constancy> stack;
 
-    private final ImmutableMap<RexNode, RexLiteral> constants;
+    private final ImmutableMap<RexNode, RexNode> constants;
 
     private final List<RexNode> constExprs;
 
@@ -629,7 +730,7 @@ public abstract class HiveReduceExpressionsRule extends RelOptRule {
     private final List<SqlOperator> parentCallTypeStack;
 
     ReducibleExprLocator(RelDataTypeFactory typeFactory,
-        ImmutableMap<RexNode, RexLiteral> constants, List<RexNode> constExprs,
+        ImmutableMap<RexNode, RexNode> constants, List<RexNode> constExprs,
         List<Boolean> addCasts, List<RexNode> removableCasts) {
       // go deep
       super(true);

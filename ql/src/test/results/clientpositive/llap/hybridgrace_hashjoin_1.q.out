@@ -4,6 +4,7 @@ PREHOOK: query: -- Hybrid Grace Hash Join
 -- 2. Partitioned table spilling
 -- 3. Vectorization
 
+
 SELECT 1
 PREHOOK: type: QUERY
 PREHOOK: Input: _dummy_database@_dummy_table
@@ -13,6 +14,7 @@ POSTHOOK: query: -- Hybrid Grace Hash Join
 -- 1. Various cases when hash partitions spill
 -- 2. Partitioned table spilling
 -- 3. Vectorization
+
 
 SELECT 1
 POSTHOOK: type: QUERY
@@ -196,7 +198,6 @@ STAGE PLANS:
                         input vertices:
                           1 Map 3
                         Statistics: Num rows: 4505 Data size: 968719 Basic stats: COMPLETE Column stats: NONE
-                        HybridGraceHashJoin: true
                         Group By Operator
                           aggregations: count()
                           mode: hash
@@ -439,7 +440,6 @@ STAGE PLANS:
                         input vertices:
                           1 Map 3
                         Statistics: Num rows: 13516 Data size: 2906160 Basic stats: COMPLETE Column stats: NONE
-                        HybridGraceHashJoin: true
                         Group By Operator
                           aggregations: count()
                           mode: hash
@@ -669,7 +669,6 @@ STAGE PLANS:
                       input vertices:
                         1 Map 3
                       Statistics: Num rows: 13516 Data size: 2906160 Basic stats: COMPLETE Column stats: NONE
-                      HybridGraceHashJoin: true
                       Group By Operator
                         aggregations: count()
                         mode: hash
@@ -1298,7 +1297,7 @@ POSTHOOK: Lineage: decimal_mapjoin.cdecimal1 EXPRESSION [(alltypesorc)alltypesor
 POSTHOOK: Lineage: decimal_mapjoin.cdecimal2 EXPRESSION [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
 POSTHOOK: Lineage: decimal_mapjoin.cdouble SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
 POSTHOOK: Lineage: decimal_mapjoin.cint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cint, type:int, comment:null), ]
-Warning: Map Join MAPJOIN[14][bigTable=?] in task 'Map 1' is a cross product
+Warning: Map Join MAPJOIN[13][bigTable=?] in task 'Map 1' is a cross product
 PREHOOK: query: EXPLAIN SELECT l.cint, r.cint, l.cdecimal1, r.cdecimal2
   FROM decimal_mapjoin l
   JOIN decimal_mapjoin r ON l.cint = r.cint
@@ -1342,14 +1341,14 @@ STAGE PLANS:
                         outputColumnNames: _col0, _col2
                         input vertices:
                           1 Map 2
-                        Statistics: Num rows: 6758 Data size: 1190783 Basic stats: COMPLETE Column stats: NONE
+                        Statistics: Num rows: 37748736 Data size: 13339877376 Basic stats: COMPLETE Column stats: NONE
                         Select Operator
                           expressions: 6981 (type: int), 6981 (type: int), _col0 (type: decimal(20,10)), _col2 (type: decimal(23,14))
                           outputColumnNames: _col0, _col1, _col2, _col3
-                          Statistics: Num rows: 6758 Data size: 1190783 Basic stats: COMPLETE Column stats: NONE
+                          Statistics: Num rows: 37748736 Data size: 13339877376 Basic stats: COMPLETE Column stats: NONE
                           File Output Operator
                             compressed: false
-                            Statistics: Num rows: 6758 Data size: 1190783 Basic stats: COMPLETE Column stats: NONE
+                            Statistics: Num rows: 37748736 Data size: 13339877376 Basic stats: COMPLETE Column stats: NONE
                             table:
                                 input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                                 output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -1381,7 +1380,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Map Join MAPJOIN[14][bigTable=?] in task 'Map 1' is a cross product
+Warning: Map Join MAPJOIN[13][bigTable=?] in task 'Map 1' is a cross product
 PREHOOK: query: SELECT l.cint, r.cint, l.cdecimal1, r.cdecimal2
   FROM decimal_mapjoin l
   JOIN decimal_mapjoin r ON l.cint = r.cint
@@ -1496,7 +1495,7 @@ POSTHOOK: Input: default@decimal_mapjoin
 6981	6981	-515.6210729730	NULL
 6981	6981	-515.6210729730	NULL
 6981	6981	-515.6210729730	NULL
-Warning: Map Join MAPJOIN[14][bigTable=?] in task 'Map 1' is a cross product
+Warning: Map Join MAPJOIN[13][bigTable=?] in task 'Map 1' is a cross product
 PREHOOK: query: EXPLAIN SELECT l.cint, r.cint, l.cdecimal1, r.cdecimal2
   FROM decimal_mapjoin l
   JOIN decimal_mapjoin r ON l.cint = r.cint
@@ -1540,14 +1539,14 @@ STAGE PLANS:
                         outputColumnNames: _col0, _col2
                         input vertices:
                           1 Map 2
-                        Statistics: Num rows: 6758 Data size: 1190783 Basic stats: COMPLETE Column stats: NONE
+                        Statistics: Num rows: 37748736 Data size: 13339877376 Basic stats: COMPLETE Column stats: NONE
                         Select Operator
                           expressions: 6981 (type: int), 6981 (type: int), _col0 (type: decimal(20,10)), _col2 (type: decimal(23,14))
                           outputColumnNames: _col0, _col1, _col2, _col3
-                          Statistics: Num rows: 6758 Data size: 1190783 Basic stats: COMPLETE Column stats: NONE
+                          Statistics: Num rows: 37748736 Data size: 13339877376 Basic stats: COMPLETE Column stats: NONE
                           File Output Operator
                             compressed: false
-                            Statistics: Num rows: 6758 Data size: 1190783 Basic stats: COMPLETE Column stats: NONE
+                            Statistics: Num rows: 37748736 Data size: 13339877376 Basic stats: COMPLETE Column stats: NONE
                             table:
                                 input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                                 output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -1579,7 +1578,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-Warning: Map Join MAPJOIN[14][bigTable=?] in task 'Map 1' is a cross product
+Warning: Map Join MAPJOIN[13][bigTable=?] in task 'Map 1' is a cross product
 PREHOOK: query: SELECT l.cint, r.cint, l.cdecimal1, r.cdecimal2
   FROM decimal_mapjoin l
   JOIN decimal_mapjoin r ON l.cint = r.cint

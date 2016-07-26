@@ -336,6 +336,54 @@ module ThriftHiveMetastore
       return
     end
 
+    def drop_constraint(req)
+      send_drop_constraint(req)
+      recv_drop_constraint()
+    end
+
+    def send_drop_constraint(req)
+      send_message('drop_constraint', Drop_constraint_args, :req => req)
+    end
+
+    def recv_drop_constraint()
+      result = receive_message(Drop_constraint_result)
+      raise result.o1 unless result.o1.nil?
+      raise result.o3 unless result.o3.nil?
+      return
+    end
+
+    def add_primary_key(req)
+      send_add_primary_key(req)
+      recv_add_primary_key()
+    end
+
+    def send_add_primary_key(req)
+      send_message('add_primary_key', Add_primary_key_args, :req => req)
+    end
+
+    def recv_add_primary_key()
+      result = receive_message(Add_primary_key_result)
+      raise result.o1 unless result.o1.nil?
+      raise result.o2 unless result.o2.nil?
+      return
+    end
+
+    def add_foreign_key(req)
+      send_add_foreign_key(req)
+      recv_add_foreign_key()
+    end
+
+    def send_add_foreign_key(req)
+      send_message('add_foreign_key', Add_foreign_key_args, :req => req)
+    end
+
+    def recv_add_foreign_key()
+      result = receive_message(Add_foreign_key_result)
+      raise result.o1 unless result.o1.nil?
+      raise result.o2 unless result.o2.nil?
+      return
+    end
+
     def drop_table(dbname, name, deleteData)
       send_drop_table(dbname, name, deleteData)
       recv_drop_table()
@@ -2128,6 +2176,21 @@ module ThriftHiveMetastore
       return
     end
 
+    def abort_txns(rqst)
+      send_abort_txns(rqst)
+      recv_abort_txns()
+    end
+
+    def send_abort_txns(rqst)
+      send_message('abort_txns', Abort_txns_args, :rqst => rqst)
+    end
+
+    def recv_abort_txns()
+      result = receive_message(Abort_txns_result)
+      raise result.o1 unless result.o1.nil?
+      return
+    end
+
     def commit_txn(rqst)
       send_commit_txn(rqst)
       recv_commit_txn()
@@ -2421,21 +2484,6 @@ module ThriftHiveMetastore
       raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'cache_file_metadata failed: unknown result')
     end
 
-    def get_change_version(req)
-      send_get_change_version(req)
-      return recv_get_change_version()
-    end
-
-    def send_get_change_version(req)
-      send_message('get_change_version', Get_change_version_args, :req => req)
-    end
-
-    def recv_get_change_version()
-      result = receive_message(Get_change_version_result)
-      return result.success unless result.success.nil?
-      raise ::Thrift::ApplicationException.new(::Thrift::ApplicationException::MISSING_RESULT, 'get_change_version failed: unknown result')
-    end
-
   end
 
   class Processor < ::FacebookService::Processor 
@@ -2702,6 +2750,45 @@ module ThriftHiveMetastore
         result.o4 = o4
       end
       write_result(result, oprot, 'create_table_with_constraints', seqid)
+    end
+
+    def process_drop_constraint(seqid, iprot, oprot)
+      args = read_args(iprot, Drop_constraint_args)
+      result = Drop_constraint_result.new()
+      begin
+        @handler.drop_constraint(args.req)
+      rescue ::NoSuchObjectException => o1
+        result.o1 = o1
+      rescue ::MetaException => o3
+        result.o3 = o3
+      end
+      write_result(result, oprot, 'drop_constraint', seqid)
+    end
+
+    def process_add_primary_key(seqid, iprot, oprot)
+      args = read_args(iprot, Add_primary_key_args)
+      result = Add_primary_key_result.new()
+      begin
+        @handler.add_primary_key(args.req)
+      rescue ::NoSuchObjectException => o1
+        result.o1 = o1
+      rescue ::MetaException => o2
+        result.o2 = o2
+      end
+      write_result(result, oprot, 'add_primary_key', seqid)
+    end
+
+    def process_add_foreign_key(seqid, iprot, oprot)
+      args = read_args(iprot, Add_foreign_key_args)
+      result = Add_foreign_key_result.new()
+      begin
+        @handler.add_foreign_key(args.req)
+      rescue ::NoSuchObjectException => o1
+        result.o1 = o1
+      rescue ::MetaException => o2
+        result.o2 = o2
+      end
+      write_result(result, oprot, 'add_foreign_key', seqid)
     end
 
     def process_drop_table(seqid, iprot, oprot)
@@ -4059,6 +4146,17 @@ module ThriftHiveMetastore
       write_result(result, oprot, 'abort_txn', seqid)
     end
 
+    def process_abort_txns(seqid, iprot, oprot)
+      args = read_args(iprot, Abort_txns_args)
+      result = Abort_txns_result.new()
+      begin
+        @handler.abort_txns(args.rqst)
+      rescue ::NoSuchTxnException => o1
+        result.o1 = o1
+      end
+      write_result(result, oprot, 'abort_txns', seqid)
+    end
+
     def process_commit_txn(seqid, iprot, oprot)
       args = read_args(iprot, Commit_txn_args)
       result = Commit_txn_result.new()
@@ -4230,13 +4328,6 @@ module ThriftHiveMetastore
       result = Cache_file_metadata_result.new()
       result.success = @handler.cache_file_metadata(args.req)
       write_result(result, oprot, 'cache_file_metadata', seqid)
-    end
-
-    def process_get_change_version(seqid, iprot, oprot)
-      args = read_args(iprot, Get_change_version_args)
-      result = Get_change_version_result.new()
-      result.success = @handler.get_change_version(args.req)
-      write_result(result, oprot, 'get_change_version', seqid)
     end
 
   end
@@ -4944,6 +5035,108 @@ module ThriftHiveMetastore
       O2 => {:type => ::Thrift::Types::STRUCT, :name => 'o2', :class => ::InvalidObjectException},
       O3 => {:type => ::Thrift::Types::STRUCT, :name => 'o3', :class => ::MetaException},
       O4 => {:type => ::Thrift::Types::STRUCT, :name => 'o4', :class => ::NoSuchObjectException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Drop_constraint_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQ = 1
+
+    FIELDS = {
+      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::DropConstraintRequest}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Drop_constraint_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    O1 = 1
+    O3 = 2
+
+    FIELDS = {
+      O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::NoSuchObjectException},
+      O3 => {:type => ::Thrift::Types::STRUCT, :name => 'o3', :class => ::MetaException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Add_primary_key_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQ = 1
+
+    FIELDS = {
+      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::AddPrimaryKeyRequest}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Add_primary_key_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    O1 = 1
+    O2 = 2
+
+    FIELDS = {
+      O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::NoSuchObjectException},
+      O2 => {:type => ::Thrift::Types::STRUCT, :name => 'o2', :class => ::MetaException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Add_foreign_key_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    REQ = 1
+
+    FIELDS = {
+      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::AddForeignKeyRequest}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Add_foreign_key_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    O1 = 1
+    O2 = 2
+
+    FIELDS = {
+      O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::NoSuchObjectException},
+      O2 => {:type => ::Thrift::Types::STRUCT, :name => 'o2', :class => ::MetaException}
     }
 
     def struct_fields; FIELDS; end
@@ -9081,6 +9274,38 @@ module ThriftHiveMetastore
     ::Thrift::Struct.generate_accessors self
   end
 
+  class Abort_txns_args
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    RQST = 1
+
+    FIELDS = {
+      RQST => {:type => ::Thrift::Types::STRUCT, :name => 'rqst', :class => ::AbortTxnsRequest}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
+  class Abort_txns_result
+    include ::Thrift::Struct, ::Thrift::Struct_Union
+    O1 = 1
+
+    FIELDS = {
+      O1 => {:type => ::Thrift::Types::STRUCT, :name => 'o1', :class => ::NoSuchTxnException}
+    }
+
+    def struct_fields; FIELDS; end
+
+    def validate
+    end
+
+    ::Thrift::Struct.generate_accessors self
+  end
+
   class Commit_txn_args
     include ::Thrift::Struct, ::Thrift::Struct_Union
     RQST = 1
@@ -9695,38 +9920,6 @@ module ThriftHiveMetastore
 
     FIELDS = {
       SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::CacheFileMetadataResult}
-    }
-
-    def struct_fields; FIELDS; end
-
-    def validate
-    end
-
-    ::Thrift::Struct.generate_accessors self
-  end
-
-  class Get_change_version_args
-    include ::Thrift::Struct, ::Thrift::Struct_Union
-    REQ = 1
-
-    FIELDS = {
-      REQ => {:type => ::Thrift::Types::STRUCT, :name => 'req', :class => ::GetChangeVersionRequest}
-    }
-
-    def struct_fields; FIELDS; end
-
-    def validate
-    end
-
-    ::Thrift::Struct.generate_accessors self
-  end
-
-  class Get_change_version_result
-    include ::Thrift::Struct, ::Thrift::Struct_Union
-    SUCCESS = 0
-
-    FIELDS = {
-      SUCCESS => {:type => ::Thrift::Types::STRUCT, :name => 'success', :class => ::GetChangeVersionResult}
     }
 
     def struct_fields; FIELDS; end

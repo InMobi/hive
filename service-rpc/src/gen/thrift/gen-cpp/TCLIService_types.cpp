@@ -21,7 +21,8 @@ int _kTProtocolVersionValues[] = {
   TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V5,
   TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V6,
   TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V7,
-  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V8
+  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V8,
+  TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V9
 };
 const char* _kTProtocolVersionNames[] = {
   "HIVE_CLI_SERVICE_PROTOCOL_V1",
@@ -31,9 +32,10 @@ const char* _kTProtocolVersionNames[] = {
   "HIVE_CLI_SERVICE_PROTOCOL_V5",
   "HIVE_CLI_SERVICE_PROTOCOL_V6",
   "HIVE_CLI_SERVICE_PROTOCOL_V7",
-  "HIVE_CLI_SERVICE_PROTOCOL_V8"
+  "HIVE_CLI_SERVICE_PROTOCOL_V8",
+  "HIVE_CLI_SERVICE_PROTOCOL_V9"
 };
-const std::map<int, const char*> _TProtocolVersion_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(8, _kTProtocolVersionValues, _kTProtocolVersionNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
+const std::map<int, const char*> _TProtocolVersion_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(9, _kTProtocolVersionValues, _kTProtocolVersionNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
 int _kTTypeIdValues[] = {
   TTypeId::BOOLEAN_TYPE,
@@ -109,7 +111,8 @@ int _kTOperationStateValues[] = {
   TOperationState::CLOSED_STATE,
   TOperationState::ERROR_STATE,
   TOperationState::UKNOWN_STATE,
-  TOperationState::PENDING_STATE
+  TOperationState::PENDING_STATE,
+  TOperationState::TIMEDOUT_STATE
 };
 const char* _kTOperationStateNames[] = {
   "INITIALIZED_STATE",
@@ -119,9 +122,10 @@ const char* _kTOperationStateNames[] = {
   "CLOSED_STATE",
   "ERROR_STATE",
   "UKNOWN_STATE",
-  "PENDING_STATE"
+  "PENDING_STATE",
+  "TIMEDOUT_STATE"
 };
-const std::map<int, const char*> _TOperationState_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(8, _kTOperationStateValues, _kTOperationStateNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
+const std::map<int, const char*> _TOperationState_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(9, _kTOperationStateValues, _kTOperationStateNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
 int _kTOperationTypeValues[] = {
   TOperationType::EXECUTE_STATEMENT,
@@ -5575,6 +5579,11 @@ void TExecuteStatementReq::__set_runAsync(const bool val) {
 __isset.runAsync = true;
 }
 
+void TExecuteStatementReq::__set_queryTimeout(const int64_t val) {
+  this->queryTimeout = val;
+__isset.queryTimeout = true;
+}
+
 uint32_t TExecuteStatementReq::read(::apache::thrift::protocol::TProtocol* iprot) {
 
   apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
@@ -5645,6 +5654,14 @@ uint32_t TExecuteStatementReq::read(::apache::thrift::protocol::TProtocol* iprot
           xfer += iprot->skip(ftype);
         }
         break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->queryTimeout);
+          this->__isset.queryTimeout = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -5693,6 +5710,11 @@ uint32_t TExecuteStatementReq::write(::apache::thrift::protocol::TProtocol* opro
     xfer += oprot->writeBool(this->runAsync);
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.queryTimeout) {
+    xfer += oprot->writeFieldBegin("queryTimeout", ::apache::thrift::protocol::T_I64, 5);
+    xfer += oprot->writeI64(this->queryTimeout);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -5704,6 +5726,7 @@ void swap(TExecuteStatementReq &a, TExecuteStatementReq &b) {
   swap(a.statement, b.statement);
   swap(a.confOverlay, b.confOverlay);
   swap(a.runAsync, b.runAsync);
+  swap(a.queryTimeout, b.queryTimeout);
   swap(a.__isset, b.__isset);
 }
 
@@ -5712,6 +5735,7 @@ TExecuteStatementReq::TExecuteStatementReq(const TExecuteStatementReq& other222)
   statement = other222.statement;
   confOverlay = other222.confOverlay;
   runAsync = other222.runAsync;
+  queryTimeout = other222.queryTimeout;
   __isset = other222.__isset;
 }
 TExecuteStatementReq& TExecuteStatementReq::operator=(const TExecuteStatementReq& other223) {
@@ -5719,6 +5743,7 @@ TExecuteStatementReq& TExecuteStatementReq::operator=(const TExecuteStatementReq
   statement = other223.statement;
   confOverlay = other223.confOverlay;
   runAsync = other223.runAsync;
+  queryTimeout = other223.queryTimeout;
   __isset = other223.__isset;
   return *this;
 }
@@ -5729,6 +5754,7 @@ void TExecuteStatementReq::printTo(std::ostream& out) const {
   out << ", " << "statement=" << to_string(statement);
   out << ", " << "confOverlay="; (__isset.confOverlay ? (out << to_string(confOverlay)) : (out << "<null>"));
   out << ", " << "runAsync="; (__isset.runAsync ? (out << to_string(runAsync)) : (out << "<null>"));
+  out << ", " << "queryTimeout="; (__isset.queryTimeout ? (out << to_string(queryTimeout)) : (out << "<null>"));
   out << ")";
 }
 

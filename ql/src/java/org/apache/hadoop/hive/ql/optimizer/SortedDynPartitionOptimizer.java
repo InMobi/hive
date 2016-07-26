@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.ql.optimizer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,7 @@ import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDescUtils;
 import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.ListBucketingCtx;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -191,8 +192,16 @@ public class SortedDynPartitionOptimizer extends Transform {
         sortPositions = Arrays.asList(0);
         sortOrder = Arrays.asList(1); // 1 means asc, could really use enum here in the thrift if
       } else {
-        sortPositions = getSortPositions(destTable.getSortCols(), destTable.getCols());
-        sortOrder = getSortOrders(destTable.getSortCols(), destTable.getCols());
+        if (!destTable.getSortCols().isEmpty()) {
+          // Sort columns specified by table
+          sortPositions = getSortPositions(destTable.getSortCols(), destTable.getCols());
+          sortOrder = getSortOrders(destTable.getSortCols(), destTable.getCols());
+        } else {
+          // Infer sort columns from operator tree
+          sortPositions = Lists.newArrayList();
+          sortOrder = Lists.newArrayList();
+          inferSortPositions(fsParent, sortPositions, sortOrder);
+        }
       }
       List<Integer> sortNullOrder = new ArrayList<Integer>();
       for (int order : sortOrder) {
@@ -245,7 +254,6 @@ public class SortedDynPartitionOptimizer extends Transform {
       // Create SelectDesc
       SelectDesc selConf = new SelectDesc(descs, colNames);
 
-
       // Create Select Operator
       SelectOperator selOp = (SelectOperator) OperatorFactory.getAndMakeChild(
               selConf, selRS, rsOp);
@@ -287,7 +295,7 @@ public class SortedDynPartitionOptimizer extends Transform {
       }
       if (op.getColumnExprMap() != null) {
         for(String dpCol : dpCols) {
-          ExprNodeDesc end = findConstantExprOrigin(dpCol, op);
+          ExprNodeDesc end = ExprNodeDescUtils.findConstantExprOrigin(dpCol, op);
           if (!(end instanceof ExprNodeConstantDesc)) {
             return false;
           }
@@ -296,37 +304,6 @@ public class SortedDynPartitionOptimizer extends Transform {
         return false;
       }
       return true;
-    }
-
-    // Find the constant origin of a certain column if it is originated from a constant
-    // Otherwise, it returns the expression that originated the column
-    private ExprNodeDesc findConstantExprOrigin(String dpCol, Operator<? extends OperatorDesc> op) {
-      ExprNodeDesc expr = op.getColumnExprMap().get(dpCol);
-      ExprNodeDesc foldedExpr;
-      // If it is a function, we try to fold it
-      if (expr instanceof ExprNodeGenericFuncDesc) {
-        foldedExpr = ConstantPropagateProcFactory.foldExpr((ExprNodeGenericFuncDesc)expr);
-        if (foldedExpr == null) {
-          foldedExpr = expr;
-        }
-      } else {
-        foldedExpr = expr;
-      }
-      // If it is a column reference, we will try to resolve it
-      if (foldedExpr instanceof ExprNodeColumnDesc) {
-        Operator<? extends OperatorDesc> originOp = null;
-        for(Operator<? extends OperatorDesc> parentOp : op.getParentOperators()) {
-          if (parentOp.getColumnExprMap() != null) {
-            originOp = parentOp;
-            break;
-          }
-        }
-        if (originOp != null) {
-          return findConstantExprOrigin(((ExprNodeColumnDesc)foldedExpr).getColumn(), originOp);
-        }
-      }
-      // Otherwise, we return the expression
-      return foldedExpr;
     }
 
     // Remove RS and SEL introduced by enforce bucketing/sorting config
@@ -410,16 +387,50 @@ public class SortedDynPartitionOptimizer extends Transform {
       return posns;
     }
 
+    // Try to infer possible sort columns in the query
+    // i.e. the sequence must be pRS-SEL*-fsParent
+    // Returns true if columns could be inferred, false otherwise
+    private void inferSortPositions(Operator<? extends OperatorDesc> fsParent,
+            List<Integer> sortPositions, List<Integer> sortOrder) throws SemanticException {
+      // If it is not a SEL operator, we bail out
+      if (!(fsParent instanceof SelectOperator)) {
+        return;
+      }
+      SelectOperator pSel = (SelectOperator) fsParent;
+      Operator<? extends OperatorDesc> parent = pSel;
+      while (!(parent instanceof ReduceSinkOperator)) {
+        if (parent.getNumParent() != 1 ||
+                !(parent instanceof SelectOperator)) {
+          return;
+        }
+        parent = parent.getParentOperators().get(0);
+      }
+      // Backtrack SEL columns to pRS
+      List<ExprNodeDesc> selColsInPRS =
+              ExprNodeDescUtils.backtrack(pSel.getConf().getColList(), pSel, parent);
+      ReduceSinkOperator pRS = (ReduceSinkOperator) parent;
+      for (int i = 0; i < pRS.getConf().getKeyCols().size(); i++) {
+        ExprNodeDesc col = pRS.getConf().getKeyCols().get(i);
+        int pos = selColsInPRS.indexOf(col);
+        if (pos == -1) {
+          sortPositions.clear();
+          sortOrder.clear();
+          return;
+        }
+        sortPositions.add(pos);
+        sortOrder.add(pRS.getConf().getOrder().charAt(i) == '+' ? 1 : 0); // 1 asc, 0 desc
+      }
+    }
+
     public ReduceSinkOperator getReduceSinkOp(List<Integer> partitionPositions,
         List<Integer> sortPositions, List<Integer> sortOrder, List<Integer> sortNullOrder,
         ArrayList<ExprNodeDesc> allCols, ArrayList<ExprNodeDesc> bucketColumns, int numBuckets,
-        Operator<? extends OperatorDesc> parent, AcidUtils.Operation writeType) {
+        Operator<? extends OperatorDesc> parent, AcidUtils.Operation writeType) throws SemanticException {
 
       // Order of KEY columns
       // 1) Partition columns
       // 2) Bucket number column
       // 3) Sort columns
-      // 4) Null sort columns
       Set<Integer> keyColsPosInVal = Sets.newLinkedHashSet();
       ArrayList<ExprNodeDesc> keyCols = Lists.newArrayList();
       List<Integer> newSortOrder = Lists.newArrayList();
@@ -518,17 +529,21 @@ public class SortedDynPartitionOptimizer extends Transform {
         }
       }
 
+      // map _col0 to KEY._col0, etc
+      Map<String, String> nameMapping = new HashMap<>();
       ArrayList<String> keyColNames = Lists.newArrayList();
       for (ExprNodeDesc keyCol : keyCols) {
         String keyColName = keyCol.getExprString();
         keyColNames.add(keyColName);
         colExprMap.put(Utilities.ReduceField.KEY + "." +keyColName, keyCol);
+        nameMapping.put(keyColName, Utilities.ReduceField.KEY + "." + keyColName);
       }
       ArrayList<String> valColNames = Lists.newArrayList();
       for (ExprNodeDesc valCol : valCols) {
-        String colName =valCol.getExprString();
+        String colName = valCol.getExprString();
         valColNames.add(colName);
-        colExprMap.put(Utilities.ReduceField.VALUE + "." +colName, valCol);
+        colExprMap.put(Utilities.ReduceField.VALUE + "." + colName, valCol);
+        nameMapping.put(colName, Utilities.ReduceField.VALUE + "." + colName);
       }
 
       // Create Key/Value TableDesc. When the operator plan is split into MR tasks,
@@ -548,8 +563,15 @@ public class SortedDynPartitionOptimizer extends Transform {
           valueTable, writeType);
       rsConf.setBucketCols(bucketColumns);
       rsConf.setNumBuckets(numBuckets);
+
+      ArrayList<ColumnInfo> signature = new ArrayList<>();
+      for (int index = 0; index < parent.getSchema().getSignature().size(); index++) {
+        ColumnInfo colInfo = new ColumnInfo(parent.getSchema().getSignature().get(index));
+        colInfo.setInternalName(nameMapping.get(colInfo.getInternalName()));
+        signature.add(colInfo);
+      }
       ReduceSinkOperator op = (ReduceSinkOperator) OperatorFactory.getAndMakeChild(
-          rsConf, new RowSchema(parent.getSchema()), parent);
+          rsConf, new RowSchema(signature), parent);
       op.setColumnExprMap(colExprMap);
       return op;
     }

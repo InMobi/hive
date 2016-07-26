@@ -33,8 +33,8 @@ import org.apache.hadoop.hive.llap.daemon.FragmentCompletionHandler;
 import org.apache.hadoop.hive.llap.daemon.HistoryLogger;
 import org.apache.hadoop.hive.llap.daemon.KilledTaskHandler;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.FragmentRuntimeInfo;
-import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.FragmentSpecProto;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.IOSpecProto;
+import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.SignableVertexSpec;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.SubmitWorkRequestProto;
 import org.apache.hadoop.hive.llap.metrics.LlapDaemonExecutorMetrics;
 import org.apache.hadoop.hive.llap.protocol.LlapTaskUmbilicalProtocol;
@@ -113,6 +113,7 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
   private final AtomicBoolean isCompleted = new AtomicBoolean(false);
   private final AtomicBoolean killInvoked = new AtomicBoolean(false);
+  private final SignableVertexSpec vertex;
 
   @VisibleForTesting
   public TaskRunnerCallable(SubmitWorkRequestProto request, QueryFragmentInfo fragmentInfo,
@@ -123,7 +124,8 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
                      ConfParams confParams, LlapDaemonExecutorMetrics metrics,
                      KilledTaskHandler killedTaskHandler,
                      FragmentCompletionHandler fragmentCompleteHandler,
-                     HadoopShim tezHadoopShim) {
+                     HadoopShim tezHadoopShim, TezTaskAttemptID attemptId,
+                     SignableVertexSpec vertex) {
     this.request = request;
     this.fragmentInfo = fragmentInfo;
     this.conf = conf;
@@ -134,17 +136,19 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
     this.memoryAvailable = memoryAvailable;
     this.confParams = confParams;
     this.jobToken = TokenCache.getSessionToken(credentials);
-    this.taskSpec = Converters.getTaskSpecfromProto(request.getFragmentSpec());
+    this.vertex = vertex;
+    this.taskSpec = Converters.getTaskSpecfromProto(
+        vertex, request.getFragmentNumber(), request.getAttemptNumber(), attemptId);
     this.amReporter = amReporter;
     // Register with the AMReporter when the callable is setup. Unregister once it starts running.
-    if (jobToken != null) {
-    this.amReporter.registerTask(request.getAmHost(), request.getAmPort(),
-        request.getUser(), jobToken, fragmentInfo.getQueryInfo().getQueryIdentifier());
+    if (amReporter != null && jobToken != null) {
+      this.amReporter.registerTask(request.getAmHost(), request.getAmPort(),
+          vertex.getUser(), jobToken, fragmentInfo.getQueryInfo().getQueryIdentifier());
     }
     this.metrics = metrics;
-    this.requestId = request.getFragmentSpec().getFragmentIdentifierString();
+    this.requestId = taskSpec.getTaskAttemptID().toString();
     // TODO Change this to the queryId/Name when that's available.
-    this.queryId = request.getFragmentSpec().getDagName();
+    this.queryId = vertex.getDagName();
     this.killedTaskHandler = killedTaskHandler;
     this.fragmentCompletionHanler = fragmentCompleteHandler;
     this.tezHadoopShim = tezHadoopShim;
@@ -184,16 +188,16 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
 
     // TODO Consolidate this code with TezChild.
     runtimeWatch.start();
-    UserGroupInformation taskUgi = UserGroupInformation.createRemoteUser(request.getUser());
+    UserGroupInformation taskUgi = UserGroupInformation.createRemoteUser(vertex.getUser());
     taskUgi.addCredentials(credentials);
 
     Map<String, ByteBuffer> serviceConsumerMetadata = new HashMap<>();
     serviceConsumerMetadata.put(TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID,
         TezCommonUtils.convertJobTokenToBytes(jobToken));
-    Multimap<String, String> startedInputsMap = createStartedInputMap(request.getFragmentSpec());
+    Multimap<String, String> startedInputsMap = createStartedInputMap(vertex);
 
     UserGroupInformation taskOwner =
-        UserGroupInformation.createRemoteUser(request.getTokenIdentifier());
+        UserGroupInformation.createRemoteUser(vertex.getTokenIdentifier());
     final InetSocketAddress address =
         NetUtils.createSocketAddrForHost(request.getAmHost(), request.getAmPort());
     SecurityUtil.setTokenService(jobToken, address);
@@ -228,7 +232,7 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
         if (shouldRunTask) {
           taskRunner = new TezTaskRunner2(conf, taskUgi, fragmentInfo.getLocalDirs(),
               taskSpec,
-              request.getAppAttemptNumber(),
+              vertex.getVertexIdentifier().getAppAttemptNumber(),
               serviceConsumerMetadata, envMap, startedInputsMap, taskReporter, executor,
               objectRegistry,
               pid,
@@ -313,7 +317,7 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
    */
   public void reportTaskKilled() {
     killedTaskHandler
-        .taskKilled(request.getAmHost(), request.getAmPort(), request.getUser(), jobToken,
+        .taskKilled(request.getAmHost(), request.getAmPort(), vertex.getUser(), jobToken,
             fragmentInfo.getQueryInfo().getQueryIdentifier(), taskSpec.getTaskAttemptID());
   }
 
@@ -321,15 +325,15 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
     return fragmentInfo.canFinish();
   }
 
-  private Multimap<String, String> createStartedInputMap(FragmentSpecProto fragmentSpec) {
+  private static Multimap<String, String> createStartedInputMap(SignableVertexSpec vertex) {
     Multimap<String, String> startedInputMap = HashMultimap.create();
     // Let the Processor control start for Broadcast inputs.
 
     // TODO For now, this affects non broadcast unsorted cases as well. Make use of the edge
     // property when it's available.
-    for (IOSpecProto inputSpec : fragmentSpec.getInputSpecsList()) {
+    for (IOSpecProto inputSpec : vertex.getInputSpecsList()) {
       if (inputSpec.getIoDescriptor().getClassName().equals(UnorderedKVInput.class.getName())) {
-        startedInputMap.put(fragmentSpec.getVertexName(), inputSpec.getConnectedVertexName());
+        startedInputMap.put(vertex.getVertexName(), inputSpec.getConnectedVertexName());
       }
     }
     return startedInputMap;
@@ -350,7 +354,7 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
   @Override
   public String toString() {
     return requestId + " {canFinish: " + canFinish() +
-        ", vertexParallelism: " + request.getFragmentSpec().getVertexParallelism() +
+        ", vertexParallelism: " + vertex.getVertexParallelism() +
         ", selfAndUpstreamParallelism: " + request.getFragmentRuntimeInfo().getNumSelfAndUpstreamTasks() +
         ", selfAndUpstreamComplete: " + request.getFragmentRuntimeInfo().getNumSelfAndUpstreamCompletedTasks() +
         ", firstAttemptStartTime: " + getFragmentRuntimeInfo().getFirstAttemptStartTime() +
@@ -385,7 +389,7 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
   }
 
   public TaskRunnerCallback getCallback() {
-    return new TaskRunnerCallback(request, this);
+    return new TaskRunnerCallback(request, vertex, this);
   }
 
   public SubmitWorkRequestProto getRequest() {
@@ -395,11 +399,13 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
   final class TaskRunnerCallback implements FutureCallback<TaskRunner2Result> {
 
     private final SubmitWorkRequestProto request;
+    private final SignableVertexSpec vertex;
     private final TaskRunnerCallable taskRunnerCallable;
 
-    TaskRunnerCallback(SubmitWorkRequestProto request,
+    TaskRunnerCallback(SubmitWorkRequestProto request, SignableVertexSpec vertex,
         TaskRunnerCallable taskRunnerCallable) {
       this.request = request;
+      this.vertex = vertex;
       this.taskRunnerCallable = taskRunnerCallable;
     }
 
@@ -413,10 +419,15 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
         // Only the KILLED case requires a message to be sent out to the AM.
         case SUCCESS:
           LOG.debug("Successfully finished {}", requestId);
-          metrics.incrExecutorTotalSuccess();
+          if (metrics != null) {
+            metrics.incrExecutorTotalSuccess();
+          }
           break;
         case CONTAINER_STOP_REQUESTED:
           LOG.info("Received container stop request (AM preemption) for {}", requestId);
+          if (metrics != null) {
+            metrics.incrExecutorTotalKilled();
+          }
           break;
         case KILL_REQUESTED:
           LOG.info("Killed task {}", requestId);
@@ -424,51 +435,51 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
             killtimerWatch.stop();
             long elapsed = killtimerWatch.elapsedMillis();
             LOG.info("Time to die for task {}", elapsed);
+            if (metrics != null) {
+              metrics.addMetricsPreemptionTimeToKill(elapsed);
+            }
           }
-          metrics.incrPreemptionTimeLost(runtimeWatch.elapsedMillis());
-          metrics.incrExecutorTotalKilled();
+          if (metrics != null) {
+            metrics.addMetricsPreemptionTimeLost(runtimeWatch.elapsedMillis());
+            metrics.incrExecutorTotalKilled();
+          }
           break;
         case COMMUNICATION_FAILURE:
           LOG.info("Failed to run {} due to communication failure", requestId);
-          metrics.incrExecutorTotalExecutionFailed();
+          if (metrics != null) {
+            metrics.incrExecutorTotalExecutionFailed();
+          }
           break;
         case TASK_ERROR:
           LOG.info("Failed to run {} due to task error", requestId);
-          metrics.incrExecutorTotalExecutionFailed();
+          if (metrics != null) {
+            metrics.incrExecutorTotalExecutionFailed();
+          }
           break;
       }
       fragmentCompletionHanler.fragmentComplete(fragmentInfo);
 
       taskRunnerCallable.shutdown();
-      HistoryLogger
-          .logFragmentEnd(request.getApplicationIdString(), request.getContainerIdString(),
-              executionContext.getHostName(), request.getFragmentSpec().getDagName(),
-              fragmentInfo.getQueryInfo().getDagIdentifier(),
-              request.getFragmentSpec().getVertexName(),
-              request.getFragmentSpec().getFragmentNumber(),
-              request.getFragmentSpec().getAttemptNumber(), taskRunnerCallable.threadName,
-              taskRunnerCallable.startTime, true);
-      metrics.decrExecutorNumQueuedRequests();
+      logFragmentEnd(true);
     }
 
     @Override
     public void onFailure(Throwable t) {
-      LOG.error("TezTaskRunner execution failed for : " + getTaskIdentifierString(request), t);
+      LOG.error("TezTaskRunner execution failed for : "
+          + getTaskIdentifierString(request, vertex), t);
       isCompleted.set(true);
       fragmentCompletionHanler.fragmentComplete(fragmentInfo);
       // TODO HIVE-10236 Report a fatal error over the umbilical
       taskRunnerCallable.shutdown();
-      HistoryLogger
-          .logFragmentEnd(request.getApplicationIdString(), request.getContainerIdString(),
-              executionContext.getHostName(), request.getFragmentSpec().getDagName(),
-              fragmentInfo.getQueryInfo().getDagIdentifier(),
-              request.getFragmentSpec().getVertexName(),
-              request.getFragmentSpec().getFragmentNumber(),
-              request.getFragmentSpec().getAttemptNumber(), taskRunnerCallable.threadName,
-              taskRunnerCallable.startTime, false);
-      if (metrics != null) {
-        metrics.decrExecutorNumQueuedRequests();
-      }
+      logFragmentEnd(false);
+    }
+
+    protected void logFragmentEnd(boolean success) {
+      HistoryLogger.logFragmentEnd(vertex.getVertexIdentifier().getApplicationIdString(),
+          request.getContainerIdString(), executionContext.getHostName(), vertex.getDagName(),
+          fragmentInfo.getQueryInfo().getDagIdentifier(), vertex.getVertexName(),
+          request.getFragmentNumber(), request.getAttemptNumber(), taskRunnerCallable.threadName,
+          taskRunnerCallable.startTime, success);
     }
   }
 
@@ -486,14 +497,14 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
   }
 
   public static String getTaskIdentifierString(
-      SubmitWorkRequestProto request) {
+      SubmitWorkRequestProto request, SignableVertexSpec vertex) {
     StringBuilder sb = new StringBuilder();
-    sb.append("AppId=").append(request.getApplicationIdString())
+    sb.append("AppId=").append(vertex.getVertexIdentifier().getApplicationIdString())
         .append(", containerId=").append(request.getContainerIdString())
-        .append(", Dag=").append(request.getFragmentSpec().getDagName())
-        .append(", Vertex=").append(request.getFragmentSpec().getVertexName())
-        .append(", FragmentNum=").append(request.getFragmentSpec().getFragmentNumber())
-        .append(", Attempt=").append(request.getFragmentSpec().getAttemptNumber());
+        .append(", Dag=").append(vertex.getDagName())
+        .append(", Vertex=").append(vertex.getVertexName())
+        .append(", FragmentNum=").append(request.getFragmentNumber())
+        .append(", Attempt=").append(request.getAttemptNumber());
     return sb.toString();
   }
 
@@ -501,7 +512,8 @@ public class TaskRunnerCallable extends CallableWithNdc<TaskRunner2Result> {
     return request.getFragmentRuntimeInfo();
   }
 
-  public FragmentSpecProto getFragmentSpec() {
-    return request.getFragmentSpec();
+  public SignableVertexSpec getVertexSpec() {
+    // TODO: support for binary spec? presumably we'd parse it somewhere earlier
+    return vertex;
   }
 }

@@ -179,6 +179,8 @@ TOK_ALTERTABLE_SKEWED_LOCATION;
 TOK_ALTERTABLE_BUCKETS;
 TOK_ALTERTABLE_CLUSTER_SORT;
 TOK_ALTERTABLE_COMPACT;
+TOK_ALTERTABLE_DROPCONSTRAINT;
+TOK_ALTERTABLE_ADDCONSTRAINT;
 TOK_ALTERINDEX_REBUILD;
 TOK_ALTERINDEX_PROPERTIES;
 TOK_MSCK;
@@ -374,6 +376,7 @@ TOK_COMMIT;
 TOK_ROLLBACK;
 TOK_SET_AUTOCOMMIT;
 TOK_CACHE_METADATA;
+TOK_ABORT_TRANSACTIONS;
 }
 
 
@@ -532,6 +535,8 @@ import org.apache.hadoop.hive.conf.HiveConf;
     xlateMap.put("KW_NOVALIDATE", "NOVALIDATE");
     xlateMap.put("KW_RELY", "RELY");
     xlateMap.put("KW_NORELY", "NORELY");
+    xlateMap.put("KW_ABORT", "ABORT");
+    xlateMap.put("KW_TRANSACTIONS", "TRANSACTIONS");
 
     // Operators
     xlateMap.put("DOT", ".");
@@ -803,6 +808,7 @@ ddlStatement
     | revokeRole
     | setRole
     | showCurrentRole
+    | abortTransactionStatement
     ;
 
 ifExists
@@ -1040,6 +1046,8 @@ alterTableStatementSuffix
     | alterStatementSuffixSkewedby
     | alterStatementSuffixExchangePartition
     | alterStatementPartitionKeyType
+    | alterStatementSuffixDropConstraint
+    | alterStatementSuffixAddConstraint
     | partitionSpec? alterTblPartitionStatementSuffix -> alterTblPartitionStatementSuffix partitionSpec?
     ;
 
@@ -1128,6 +1136,21 @@ alterStatementSuffixAddCol
     -> {$add != null}? ^(TOK_ALTERTABLE_ADDCOLS columnNameTypeList restrictOrCascade?)
     ->                 ^(TOK_ALTERTABLE_REPLACECOLS columnNameTypeList restrictOrCascade?)
     ;
+
+alterStatementSuffixAddConstraint
+@init { pushMsg("add constraint statement", state); }
+@after { popMsg(state); }
+   :  KW_ADD (fk=foreignKeyWithName | primaryKeyWithName)
+   -> {fk != null}? ^(TOK_ALTERTABLE_ADDCONSTRAINT foreignKeyWithName)
+   ->               ^(TOK_ALTERTABLE_ADDCONSTRAINT primaryKeyWithName)
+   ;
+
+alterStatementSuffixDropConstraint
+@init { pushMsg("drop constraint statement", state); }
+@after { popMsg(state); }
+   : KW_DROP KW_CONSTRAINT cName=identifier
+   ->^(TOK_ALTERTABLE_DROPCONSTRAINT $cName)
+   ;
 
 alterStatementSuffixRenameCol
 @init { pushMsg("rename column name", state); }
@@ -1340,8 +1363,8 @@ alterStatementSuffixBucketNum
 alterStatementSuffixCompact
 @init { msgs.push("compaction request"); }
 @after { msgs.pop(); }
-    : KW_COMPACT compactType=StringLiteral
-    -> ^(TOK_ALTERTABLE_COMPACT $compactType)
+    : KW_COMPACT compactType=StringLiteral (KW_WITH KW_OVERWRITE KW_TBLPROPERTIES tableProperties)?
+    -> ^(TOK_ALTERTABLE_COMPACT $compactType tableProperties?)
     ;
 
 
@@ -2592,3 +2615,10 @@ setAutoCommitStatement
 /*
 END user defined transaction boundaries
 */
+
+abortTransactionStatement
+@init { pushMsg("abort transactions statement", state); }
+@after { popMsg(state); }
+  :
+  KW_ABORT KW_TRANSACTIONS ( Number )+ -> ^(TOK_ABORT_TRANSACTIONS ( Number )+)
+  ;

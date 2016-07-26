@@ -37,7 +37,7 @@ POSTHOOK: Lineage: small_alltypesorc2a.cboolean1 SIMPLE [(alltypesorc)alltypesor
 POSTHOOK: Lineage: small_alltypesorc2a.cboolean2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cboolean2, type:boolean, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc2a.cdouble SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc2a.cfloat SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cfloat, type:float, comment:null), ]
-POSTHOOK: Lineage: small_alltypesorc2a.cint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cint, type:int, comment:null), ]
+POSTHOOK: Lineage: small_alltypesorc2a.cint SIMPLE []
 POSTHOOK: Lineage: small_alltypesorc2a.csmallint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:csmallint, type:smallint, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc2a.cstring1 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cstring1, type:string, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc2a.cstring2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cstring2, type:string, comment:null), ]
@@ -61,7 +61,7 @@ POSTHOOK: Lineage: small_alltypesorc3a.cdouble SIMPLE [(alltypesorc)alltypesorc.
 POSTHOOK: Lineage: small_alltypesorc3a.cfloat SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cfloat, type:float, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc3a.cint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cint, type:int, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc3a.csmallint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:csmallint, type:smallint, comment:null), ]
-POSTHOOK: Lineage: small_alltypesorc3a.cstring1 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cstring1, type:string, comment:null), ]
+POSTHOOK: Lineage: small_alltypesorc3a.cstring1 SIMPLE []
 POSTHOOK: Lineage: small_alltypesorc3a.cstring2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cstring2, type:string, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc3a.ctimestamp1 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:ctimestamp1, type:timestamp, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc3a.ctimestamp2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:ctimestamp2, type:timestamp, comment:null), ]
@@ -81,9 +81,9 @@ POSTHOOK: Lineage: small_alltypesorc4a.cboolean1 SIMPLE [(alltypesorc)alltypesor
 POSTHOOK: Lineage: small_alltypesorc4a.cboolean2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cboolean2, type:boolean, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc4a.cdouble SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc4a.cfloat SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cfloat, type:float, comment:null), ]
-POSTHOOK: Lineage: small_alltypesorc4a.cint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cint, type:int, comment:null), ]
+POSTHOOK: Lineage: small_alltypesorc4a.cint SIMPLE []
 POSTHOOK: Lineage: small_alltypesorc4a.csmallint SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:csmallint, type:smallint, comment:null), ]
-POSTHOOK: Lineage: small_alltypesorc4a.cstring1 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cstring1, type:string, comment:null), ]
+POSTHOOK: Lineage: small_alltypesorc4a.cstring1 SIMPLE []
 POSTHOOK: Lineage: small_alltypesorc4a.cstring2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cstring2, type:string, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc4a.ctimestamp1 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:ctimestamp1, type:timestamp, comment:null), ]
 POSTHOOK: Lineage: small_alltypesorc4a.ctimestamp2 SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:ctimestamp2, type:timestamp, comment:null), ]
@@ -573,8 +573,8 @@ STAGE PLANS:
                     Statistics: Num rows: 20 Data size: 5221 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       keys:
-                        0 _col3 (type: string), _col1 (type: bigint)
-                        1 _col1 (type: string), _col0 (type: bigint)
+                        0 _col1 (type: bigint), _col3 (type: string)
+                        1 _col0 (type: bigint), _col1 (type: string)
             Execution mode: vectorized
             Local Work:
               Map Reduce Local Work
@@ -589,8 +589,8 @@ STAGE PLANS:
                     Statistics: Num rows: 20 Data size: 5221 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       keys:
-                        0 _col2 (type: string), _col0 (type: int)
-                        1 _col1 (type: string), _col0 (type: int)
+                        0 _col0 (type: int), _col2 (type: string)
+                        1 _col0 (type: int), _col1 (type: string)
             Execution mode: vectorized
             Local Work:
               Map Reduce Local Work
@@ -614,8 +614,8 @@ STAGE PLANS:
                       condition map:
                            Left Outer Join0 to 1
                       keys:
-                        0 _col3 (type: string), _col1 (type: bigint)
-                        1 _col1 (type: string), _col0 (type: bigint)
+                        0 _col1 (type: bigint), _col3 (type: string)
+                        1 _col0 (type: bigint), _col1 (type: string)
                       outputColumnNames: _col0, _col2
                       input vertices:
                         1 Map 3
@@ -624,8 +624,8 @@ STAGE PLANS:
                         condition map:
                              Left Outer Join0 to 1
                         keys:
-                          0 _col2 (type: string), _col0 (type: int)
-                          1 _col1 (type: string), _col0 (type: int)
+                          0 _col0 (type: int), _col2 (type: string)
+                          1 _col0 (type: int), _col1 (type: string)
                         input vertices:
                           1 Map 4
                         Statistics: Num rows: 24 Data size: 6317 Basic stats: COMPLETE Column stats: NONE

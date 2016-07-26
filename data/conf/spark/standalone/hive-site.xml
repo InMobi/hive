@@ -50,6 +50,11 @@
 </property>
 
 <property>
+  <name>hive.metastore.schema.verification</name>
+  <value>false</value>
+</property>
+
+<property>
   <name>javax.jdo.option.ConnectionURL</name>
   <value>jdbc:derby:;databaseName=${test.tmp.dir}/junit_metastore_db;create=true</value>
 </property>
@@ -216,7 +221,7 @@
 
 <property>
   <name>spark.driver.extraClassPath</name>
-  <value>${maven.local.repository}/org/apache/hive/hive-it-util/${hive.version}/hive-it-util-${hive.version}.jar:${maven.local.repository}/org/apache/hive/hive-exec/${hive.version}/hive-exec-${hive.version}.jar</value>
+  <value>${maven.local.repository}/org/apache/hive/hive-it-util/${hive.version}/hive-it-util-${hive.version}.jar:${maven.local.repository}/org/apache/hive/hive-exec/${hive.version}/hive-exec-${hive.version}.jar:${maven.local.repository}/org/antlr/antlr-runtime/${antlr.version}/antlr-runtime-${antlr.version}.jar</value>
 </property>
 
 <property>

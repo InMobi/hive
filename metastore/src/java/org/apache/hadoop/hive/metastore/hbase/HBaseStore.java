@@ -30,7 +30,6 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.FileMetadataHandler;
 import org.apache.hadoop.hive.metastore.HiveMetaStore;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.PartFilterExprUtil;
 import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.RawStore;
@@ -704,38 +703,128 @@ public class HBaseStore implements RawStore {
 
   @Override
   public boolean addIndex(Index index) throws InvalidObjectException, MetaException {
-    throw new UnsupportedOperationException();
+    boolean commit = false;
+    openTransaction();
+    try {
+      index.setDbName(HiveStringUtils.normalizeIdentifier(index.getDbName()));
+      index.setOrigTableName(HiveStringUtils.normalizeIdentifier(index.getOrigTableName()));
+      index.setIndexName(HiveStringUtils.normalizeIdentifier(index.getIndexName()));
+      index.setIndexTableName(HiveStringUtils.normalizeIdentifier(index.getIndexTableName()));
+      getHBase().putIndex(index);
+      commit = true;
+    } catch (IOException e) {
+      LOG.error("Unable to create index ", e);
+      throw new MetaException("Unable to read from or write to hbase " + e.getMessage());
+    } finally {
+      commitOrRoleBack(commit);
+    }
+    return commit;
   }
 
   @Override
   public Index getIndex(String dbName, String origTableName, String indexName) throws
       MetaException {
-    throw new UnsupportedOperationException();
+    boolean commit = false;
+    openTransaction();
+    try {
+      Index index = getHBase().getIndex(HiveStringUtils.normalizeIdentifier(dbName),
+          HiveStringUtils.normalizeIdentifier(origTableName),
+          HiveStringUtils.normalizeIdentifier(indexName));
+      if (index == null) {
+        LOG.debug("Unable to find index " + indexNameForErrorMsg(dbName, origTableName, indexName));
+      }
+      commit = true;
+      return index;
+    } catch (IOException e) {
+      LOG.error("Unable to get index", e);
+      throw new MetaException("Error reading index " + e.getMessage());
+    } finally {
+      commitOrRoleBack(commit);
+    }
   }
 
   @Override
   public boolean dropIndex(String dbName, String origTableName, String indexName) throws
       MetaException {
-    throw new UnsupportedOperationException();
+    boolean commit = false;
+    openTransaction();
+    try {
+      getHBase().deleteIndex(HiveStringUtils.normalizeIdentifier(dbName),
+          HiveStringUtils.normalizeIdentifier(origTableName),
+          HiveStringUtils.normalizeIdentifier(indexName));
+      commit = true;
+      return true;
+    } catch (IOException e) {
+      LOG.error("Unable to delete index" + e);
+      throw new MetaException("Unable to drop index "
+          + indexNameForErrorMsg(dbName, origTableName, indexName));
+    } finally {
+      commitOrRoleBack(commit);
+    }
   }
 
   @Override
   public List<Index> getIndexes(String dbName, String origTableName, int max) throws MetaException {
-    // TODO - Index not currently supported.  But I need to return an empty list or else drop
-    // table cores.
-    return new ArrayList<Index>();
+    boolean commit = false;
+    openTransaction();
+    try {
+      List<Index> indexes = getHBase().scanIndexes(HiveStringUtils.normalizeIdentifier(dbName),
+          HiveStringUtils.normalizeIdentifier(origTableName), max);
+      commit = true;
+      return indexes;
+    } catch (IOException e) {
+      LOG.error("Unable to get indexes", e);
+      throw new MetaException("Error scanning indexxes");
+    } finally {
+      commitOrRoleBack(commit);
+    }
   }
 
   @Override
   public List<String> listIndexNames(String dbName, String origTableName, short max) throws
       MetaException {
-    throw new UnsupportedOperationException();
+    boolean commit = false;
+    openTransaction();
+    try {
+      List<Index> indexes = getHBase().scanIndexes(HiveStringUtils.normalizeIdentifier(dbName),
+          HiveStringUtils.normalizeIdentifier(origTableName), max);
+      if (indexes == null) return null;
+      List<String> names = new ArrayList<String>(indexes.size());
+      for (Index index : indexes) {
+        names.add(index.getIndexName());
+      }
+      commit = true;
+      return names;
+    } catch (IOException e) {
+      LOG.error("Unable to get indexes", e);
+      throw new MetaException("Error scanning indexes");
+    } finally {
+      commitOrRoleBack(commit);
+    }
   }
 
   @Override
   public void alterIndex(String dbname, String baseTblName, String name, Index newIndex) throws
       InvalidObjectException, MetaException {
-    throw new UnsupportedOperationException();
+    boolean commit = false;
+    openTransaction();
+    try {
+      Index newIndexCopy = newIndex.deepCopy();
+      newIndexCopy.setDbName(HiveStringUtils.normalizeIdentifier(newIndexCopy.getDbName()));
+      newIndexCopy.setOrigTableName(
+          HiveStringUtils.normalizeIdentifier(newIndexCopy.getOrigTableName()));
+      newIndexCopy.setIndexName(HiveStringUtils.normalizeIdentifier(newIndexCopy.getIndexName()));
+      getHBase().replaceIndex(getHBase().getIndex(HiveStringUtils.normalizeIdentifier(dbname),
+          HiveStringUtils.normalizeIdentifier(baseTblName),
+          HiveStringUtils.normalizeIdentifier(name)), newIndexCopy);
+      commit = true;
+    } catch (IOException e) {
+      LOG.error("Unable to alter index " + indexNameForErrorMsg(dbname, baseTblName, name), e);
+      throw new MetaException("Unable to alter index "
+          + indexNameForErrorMsg(dbname, baseTblName, name));
+    } finally {
+      commitOrRoleBack(commit);
+    }
   }
 
   @Override
@@ -2252,9 +2341,7 @@ public class HBaseStore implements RawStore {
     boolean commit = false;
     openTransaction();
     try {
-      HBaseReadWrite hbase = getHBase();
-      hbase.putFunction(func);
-      hbase.incrementChangeVersion(IMetaStoreClient.PERMANENT_FUNCTION_CV);
+      getHBase().putFunction(func);
       commit = true;
     } catch (IOException e) {
       LOG.error("Unable to create function", e);
@@ -2270,9 +2357,7 @@ public class HBaseStore implements RawStore {
     boolean commit = false;
     openTransaction();
     try {
-      HBaseReadWrite hbase = getHBase();
-      hbase.putFunction(newFunction);
-      hbase.incrementChangeVersion(IMetaStoreClient.PERMANENT_FUNCTION_CV);
+      getHBase().putFunction(newFunction);
       commit = true;
     } catch (IOException e) {
       LOG.error("Unable to alter function ", e);
@@ -2288,9 +2373,7 @@ public class HBaseStore implements RawStore {
     boolean commit = false;
     openTransaction();
     try {
-      HBaseReadWrite hbase = getHBase();
-      hbase.deleteFunction(dbName, funcName);
-      hbase.incrementChangeVersion(IMetaStoreClient.PERMANENT_FUNCTION_CV);
+      getHBase().deleteFunction(dbName, funcName);
       commit = true;
     } catch (IOException e) {
       LOG.error("Unable to delete function" + e);
@@ -2429,6 +2512,12 @@ public class HBaseStore implements RawStore {
   // they may just throw another error.
   private String partNameForErrorMsg(String dbName, String tableName, List<String> partVals) {
     return tableNameForErrorMsg(dbName, tableName) + "." + StringUtils.join(partVals, ':');
+  }
+
+  // This is for building error messages only.  It does not look up anything in the metastore as
+  // they may just throw another error.
+  private String indexNameForErrorMsg(String dbName, String origTableName, String indexName) {
+    return tableNameForErrorMsg(dbName, origTableName) + "." + indexName;
   }
 
   private String buildExternalPartName(Table table, Partition part) {
@@ -2580,24 +2669,9 @@ public class HBaseStore implements RawStore {
   }
 
   @Override
-  public long getChangeVersion(String topic) throws MetaException {
-    openTransaction();
-    boolean commit = true;
-    try {
-      return getHBase().getChangeVersion(topic);
-    } catch (IOException e) {
-      commit = false;
-      LOG.error("Unable to get change version", e);
-      throw new MetaException("Unable to get change version " + e.getMessage());
-    } finally {
-      commitOrRoleBack(commit);
-    }
-  }
-
-  @Override
   public List<SQLPrimaryKey> getPrimaryKeys(String db_name, String tbl_name)
     throws MetaException {
-    // TODO Auto-generated method stub
+    // TODO: WTF?
     return null;
   }
 
@@ -2605,7 +2679,7 @@ public class HBaseStore implements RawStore {
   public List<SQLForeignKey> getForeignKeys(String parent_db_name,
     String parent_tbl_name, String foreign_db_name, String foreign_tbl_name)
     throws MetaException {
-    // TODO Auto-generated method stub
+    // TODO: WTF?
     return null;
   }
 
@@ -2613,6 +2687,24 @@ public class HBaseStore implements RawStore {
   public void createTableWithConstraints(Table tbl,
     List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
     throws InvalidObjectException, MetaException {
-    // TODO Auto-generated method stub
+    // TODO: WTF?
+  }
+
+  @Override
+  public void dropConstraint(String dbName, String tableName,
+    String constraintName) throws NoSuchObjectException {
+    // TODO: WTF?
+  }
+
+  @Override
+  public void addPrimaryKeys(List<SQLPrimaryKey> pks)
+    throws InvalidObjectException, MetaException {
+    // TODO: WTF?
+  }
+
+  @Override
+  public void addForeignKeys(List<SQLForeignKey> fks)
+    throws InvalidObjectException, MetaException {
+    // TODO: WTF?
   }
 }

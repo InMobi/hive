@@ -760,17 +760,6 @@ CREATE TABLE IF NOT EXISTS `VERSION` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
--- Table structure for CHANGE_VERSION
---
-CREATE TABLE IF NOT EXISTS `CHANGE_VERSION` (
-  `CHANGE_VERSION_ID` BIGINT NOT NULL,
-  `VERSION` BIGINT NOT NULL,
-  `TOPIC` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`CHANGE_VERSION_ID`),
-  UNIQUE KEY `UNIQUECHANGEVERSION` (`TOPIC`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
---
 -- Table structure for table FUNCS
 --
 CREATE TABLE IF NOT EXISTS `FUNCS` (
@@ -822,8 +811,10 @@ CREATE TABLE IF NOT EXISTS `NOTIFICATION_SEQUENCE`
 CREATE TABLE IF NOT EXISTS `KEY_CONSTRAINTS`
 (
   `CHILD_CD_ID` BIGINT,
+  `CHILD_INTEGER_IDX` INT(11),
   `CHILD_TBL_ID` BIGINT,
   `PARENT_CD_ID` BIGINT NOT NULL,
+  `PARENT_INTEGER_IDX` INT(11) NOT NULL,
   `PARENT_TBL_ID` BIGINT NOT NULL,
   `POSITION` BIGINT NOT NULL,
   `CONSTRAINT_NAME` VARCHAR(400) NOT NULL,
@@ -839,7 +830,7 @@ CREATE INDEX `CONSTRAINTS_PARENT_TABLE_ID_INDEX` ON KEY_CONSTRAINTS (`PARENT_TBL
 -- ----------------------------
 -- Transaction and Lock Tables
 -- ----------------------------
-SOURCE hive-txn-schema-2.0.0.mysql.sql;
+SOURCE hive-txn-schema-2.1.0.mysql.sql;
 
 -- -----------------------------------------------------------------
 -- Record schema version. Should be the last step in the init script

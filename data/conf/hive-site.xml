@@ -64,6 +64,11 @@
 </property>
 
 <property>
+  <name>hive.metastore.schema.verification</name>
+  <value>false</value>
+</property>
+
+<property>
   <name>javax.jdo.option.ConnectionURL</name>
   <value>jdbc:derby:;databaseName=${test.tmp.dir}/junit_metastore_db;create=true</value>
 </property>
@@ -261,6 +266,12 @@
 </property>
 
 <property>
+  <name>hive.security.authorization.manager</name>
+  <value>org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactoryForTest</value>
+  <description>The Hive client authorization manager class name.</description>
+</property>
+
+<property>
   <name>hive.llap.io.cache.orc.size</name>
   <value>8388608</value>
 </property>
@@ -288,7 +299,7 @@
 
 <property>
   <name>hive.llap.io.use.lrfu</name>
-  <value>false</value>
+  <value>true</value>
 </property>
 
 

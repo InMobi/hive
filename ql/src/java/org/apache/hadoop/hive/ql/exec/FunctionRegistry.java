@@ -105,6 +105,7 @@ import org.apache.hadoop.hive.ql.udf.UDFToString;
 import org.apache.hadoop.hive.ql.udf.UDFType;
 import org.apache.hadoop.hive.ql.udf.UDFUnbase64;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
+import org.apache.hadoop.hive.ql.udf.UDFVersion;
 import org.apache.hadoop.hive.ql.udf.UDFWeekOfYear;
 import org.apache.hadoop.hive.ql.udf.UDFYear;
 import org.apache.hadoop.hive.ql.udf.generic.*;
@@ -348,6 +349,9 @@ public final class FunctionRegistry {
     system.registerGenericUDF("ewah_bitmap_or", GenericUDFEWAHBitmapOr.class);
     system.registerGenericUDF("ewah_bitmap_empty", GenericUDFEWAHBitmapEmpty.class);
 
+    // Utility UDFs
+    system.registerUDF("version", UDFVersion.class, false);
+
     // Aliases for Java Class Names
     // These are used in getImplicitConvertUDFMethod
     system.registerUDF(serdeConstants.BOOLEAN_TYPE_NAME, UDFToBoolean.class, false, UDFToBoolean.class.getSimpleName());
@@ -446,6 +450,7 @@ public final class FunctionRegistry {
     system.registerGenericUDTF("parse_url_tuple", GenericUDTFParseUrlTuple.class);
     system.registerGenericUDTF("posexplode", GenericUDTFPosExplode.class);
     system.registerGenericUDTF("stack", GenericUDTFStack.class);
+    system.registerGenericUDTF("get_splits", GenericUDTFGetSplits.class);
 
     //PTF declarations
     system.registerGenericUDF(LEAD_FUNC_NAME, GenericUDFLead.class);
@@ -474,6 +479,14 @@ public final class FunctionRegistry {
     system.registerHiddenBuiltIn(GenericUDFOPDTIPlus.class);
     system.registerHiddenBuiltIn(GenericUDFOPNumericMinus.class);
     system.registerHiddenBuiltIn(GenericUDFOPNumericPlus.class);
+
+    // mask UDFs
+    system.registerGenericUDF(GenericUDFMask.UDF_NAME, GenericUDFMask.class);
+    system.registerGenericUDF(GenericUDFMaskFirstN.UDF_NAME, GenericUDFMaskFirstN.class);
+    system.registerGenericUDF(GenericUDFMaskLastN.UDF_NAME, GenericUDFMaskLastN.class);
+    system.registerGenericUDF(GenericUDFMaskShowFirstN.UDF_NAME, GenericUDFMaskShowFirstN.class);
+    system.registerGenericUDF(GenericUDFMaskShowLastN.UDF_NAME, GenericUDFMaskShowLastN.class);
+    system.registerGenericUDF(GenericUDFMaskHash.UDF_NAME, GenericUDFMaskHash.class);
   }
 
   public static String getNormalizedFunctionName(String fn) throws SemanticException {

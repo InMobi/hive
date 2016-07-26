@@ -25,6 +25,9 @@ import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.orc.impl.AcidStats;
+import org.apache.orc.impl.OrcAcidUtils;
+import org.apache.orc.OrcConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -55,7 +58,6 @@ public class OrcRecordUpdater implements RecordUpdater {
 
   public static final String ACID_KEY_INDEX_NAME = "hive.acid.key.index";
   public static final String ACID_FORMAT = "_orc_acid_version";
-  public static final String ACID_STATS = "hive.acid.stats";
   public static final int ORC_ACID_VERSION = 0;
 
 
@@ -101,46 +103,6 @@ public class OrcRecordUpdater implements RecordUpdater {
   private LongObjectInspector rowIdInspector; // OI for the long row id inside the recordIdentifier
   private LongObjectInspector origTxnInspector; // OI for the original txn inside the record
   // identifer
-
-  static class AcidStats {
-    long inserts;
-    long updates;
-    long deletes;
-
-    AcidStats() {
-      // nothing
-    }
-
-    AcidStats(String serialized) {
-      String[] parts = serialized.split(",");
-      inserts = Long.parseLong(parts[0]);
-      updates = Long.parseLong(parts[1]);
-      deletes = Long.parseLong(parts[2]);
-    }
-
-    String serialize() {
-      StringBuilder builder = new StringBuilder();
-      builder.append(inserts);
-      builder.append(",");
-      builder.append(updates);
-      builder.append(",");
-      builder.append(deletes);
-      return builder.toString();
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder builder = new StringBuilder();
-      builder.append(" inserts: ").append(inserts);
-      builder.append(" updates: ").append(updates);
-      builder.append(" deletes: ").append(deletes);
-      return builder.toString();
-    }
-  }
-
-  public static Path getSideFile(Path main) {
-    return new Path(main + AcidUtils.DELTA_SIDE_FILE_SUFFIX);
-  }
 
   static int getOperation(OrcStruct struct) {
     return ((IntWritable) struct.getFieldValue(OPERATION)).get();
@@ -225,37 +187,57 @@ public class OrcRecordUpdater implements RecordUpdater {
       fs = path.getFileSystem(options.getConfiguration());
     }
     this.fs = fs;
-    try {
-      FSDataOutputStream strm = fs.create(new Path(path, ACID_FORMAT), false);
-      strm.writeInt(ORC_ACID_VERSION);
-      strm.close();
-    } catch (IOException ioe) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Failed to create " + path + "/" + ACID_FORMAT + " with " +
+    Path formatFile = new Path(path, ACID_FORMAT);
+    if(!fs.exists(formatFile)) {
+      try (FSDataOutputStream strm = fs.create(formatFile, false)) {
+        strm.writeInt(ORC_ACID_VERSION);
+      } catch (IOException ioe) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed to create " + path + "/" + ACID_FORMAT + " with " +
             ioe);
+        }
       }
     }
     if (options.getMinimumTransactionId() != options.getMaximumTransactionId()
         && !options.isWritingBase()){
-      flushLengths = fs.create(getSideFile(this.path), true, 8,
+      flushLengths = fs.create(OrcAcidUtils.getSideFile(this.path), true, 8,
           options.getReporter());
     } else {
       flushLengths = null;
     }
     OrcFile.WriterOptions writerOptions = null;
-    if (options instanceof OrcOptions) {
-      writerOptions = ((OrcOptions) options).getOrcOptions();
-    }
-    if (writerOptions == null) {
-      writerOptions = OrcFile.writerOptions(options.getTableProperties(),
-          options.getConfiguration());
+    // If writing delta dirs, we need to make a clone of original options, to avoid polluting it for
+    // the base writer
+    if (options.isWritingBase()) {
+      if (options instanceof OrcOptions) {
+        writerOptions = ((OrcOptions) options).getOrcOptions();
+      }
+      if (writerOptions == null) {
+        writerOptions = OrcFile.writerOptions(options.getTableProperties(),
+            options.getConfiguration());
+      }
+    } else {  // delta writer
+      AcidOutputFormat.Options optionsCloneForDelta = options.clone();
+
+      if (optionsCloneForDelta instanceof OrcOptions) {
+        writerOptions = ((OrcOptions) optionsCloneForDelta).getOrcOptions();
+      }
+      if (writerOptions == null) {
+        writerOptions = OrcFile.writerOptions(optionsCloneForDelta.getTableProperties(),
+            optionsCloneForDelta.getConfiguration());
+      }
+
+      // get buffer size and stripe size for base writer
+      int baseBufferSizeValue = writerOptions.getBufferSize();
+      long baseStripeSizeValue = writerOptions.getStripeSize();
+
+      // overwrite buffer size and stripe size for delta writer, based on BASE_DELTA_RATIO
+      int ratio = (int) OrcConf.BASE_DELTA_RATIO.getLong(options.getConfiguration());
+      writerOptions.bufferSize(baseBufferSizeValue / ratio);
+      writerOptions.stripeSize(baseStripeSizeValue / ratio);
+      writerOptions.blockPadding(false);
     }
     writerOptions.fileSystem(fs).callback(indexBuilder);
-    if (!options.isWritingBase()) {
-      writerOptions.blockPadding(false);
-      writerOptions.bufferSize(DELTA_BUFFER_SIZE);
-      writerOptions.stripeSize(DELTA_STRIPE_SIZE);
-    }
     rowInspector = (StructObjectInspector)options.getInspector();
     writerOptions.inspector(createEventSchema(findRecId(options.getInspector(),
         options.getRecordIdColumn())));
@@ -297,7 +279,7 @@ public class OrcRecordUpdater implements RecordUpdater {
       }
       Reader reader = OrcFile.createReader(matchingBucket, OrcFile.readerOptions(options.getConfiguration()));
       //no close() on Reader?!
-      AcidStats acidStats = parseAcidStats(reader);
+      AcidStats acidStats = OrcAcidUtils.parseAcidStats(reader);
       if(acidStats.inserts > 0) {
         return acidStats.inserts;
       }
@@ -412,7 +394,7 @@ public class OrcRecordUpdater implements RecordUpdater {
     }
     if (flushLengths != null) {
       flushLengths.close();
-      fs.delete(getSideFile(path), false);
+      fs.delete(OrcAcidUtils.getSideFile(path), false);
     }
     writer = null;
   }
@@ -456,26 +438,6 @@ public class OrcRecordUpdater implements RecordUpdater {
     }
     return result;
   }
-  /**
-   * {@link KeyIndexBuilder} creates these
-   */
-  static AcidStats parseAcidStats(Reader reader) {
-    if (reader.hasMetadataValue(OrcRecordUpdater.ACID_STATS)) {
-      String statsSerialized;
-      try {
-        ByteBuffer val =
-            reader.getMetadataValue(OrcRecordUpdater.ACID_STATS)
-                .duplicate();
-        statsSerialized = utf8Decoder.decode(val).toString();
-      } catch (CharacterCodingException e) {
-        throw new IllegalArgumentException("Bad string encoding for " +
-            OrcRecordUpdater.ACID_STATS, e);
-      }
-      return new AcidStats(statsSerialized);
-    } else {
-      return null;
-    }
-  }
 
   static class KeyIndexBuilder implements OrcFile.WriterCallback {
     StringBuilder lastKey = new StringBuilder();
@@ -500,7 +462,7 @@ public class OrcRecordUpdater implements RecordUpdater {
                                ) throws IOException {
       context.getWriter().addUserMetadata(ACID_KEY_INDEX_NAME,
           UTF8.encode(lastKey.toString()));
-      context.getWriter().addUserMetadata(ACID_STATS,
+      context.getWriter().addUserMetadata(OrcAcidUtils.ACID_STATS,
           UTF8.encode(acidStats.serialize()));
     }
 

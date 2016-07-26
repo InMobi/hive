@@ -21,9 +21,18 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
+import org.apache.hadoop.hive.metastore.api.LockState;
+import org.apache.hadoop.hive.metastore.api.LockType;
+import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
+import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
+import org.apache.hadoop.hive.metastore.api.TxnInfo;
+import org.apache.hadoop.hive.metastore.api.TxnState;
 import org.apache.hadoop.hive.metastore.txn.TxnDbUtil;
+import org.apache.hadoop.hive.metastore.txn.TxnStore;
+import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
-import org.apache.hadoop.hive.ql.io.orc.FileDump;
+import org.apache.hadoop.hive.ql.lockmgr.TestDbTxnManager2;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.txn.AcidHouseKeeperService;
@@ -36,7 +45,6 @@ import org.junit.Test;
 import org.junit.rules.TestName;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -87,6 +95,9 @@ public class TestTxnCommands {
     hiveConf.set(HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY.varname, "false");
     hiveConf.set(HiveConf.ConfVars.METASTOREWAREHOUSE.varname, TEST_WAREHOUSE_DIR);
     hiveConf.setVar(HiveConf.ConfVars.HIVEMAPREDMODE, "nonstrict");
+    hiveConf
+    .setVar(HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER,
+        "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory");
     TxnDbUtil.setConfValues(hiveConf);
     TxnDbUtil.prepDb();
     File f = new File(TEST_WAREHOUSE_DIR);
@@ -417,14 +428,74 @@ public class TestTxnCommands {
     hiveConf.setTimeVar(HiveConf.ConfVars.HIVE_TXN_TIMEOUT, 2, TimeUnit.MILLISECONDS);
     AcidHouseKeeperService houseKeeperService = new AcidHouseKeeperService();
     //this will abort the txn
-    houseKeeperService.start(hiveConf);
-    while(houseKeeperService.getIsAliveCounter() <= Integer.MIN_VALUE) {
-      Thread.sleep(100);//make sure it has run at least once
-    }
-    houseKeeperService.stop();
+    TestTxnCommands2.runHouseKeeperService(houseKeeperService, hiveConf);
     //this should fail because txn aborted due to timeout
     CommandProcessorResponse cpr = runStatementOnDriverNegative("delete from " + Table.ACIDTBL + " where a = 5");
     Assert.assertTrue("Actual: " + cpr.getErrorMessage(), cpr.getErrorMessage().contains("Transaction manager has aborted the transaction txnid:1"));
+    
+    //now test that we don't timeout locks we should not
+    //heartbeater should be running in the background every 1/2 second
+    hiveConf.setTimeVar(HiveConf.ConfVars.HIVE_TXN_TIMEOUT, 1, TimeUnit.SECONDS);
+    //hiveConf.setBoolVar(HiveConf.ConfVars.HIVETESTMODEFAILHEARTBEATER, true);
+    runStatementOnDriver("start transaction");
+    runStatementOnDriver("select count(*) from " + Table.ACIDTBL + " where a = 17");
+    pause(750);
+    
+    TxnStore txnHandler = TxnUtils.getTxnStore(hiveConf);
+    
+    //since there is txn open, we are heartbeating the txn not individual locks
+    GetOpenTxnsInfoResponse txnsInfoResponse = txnHandler.getOpenTxnsInfo();
+    Assert.assertEquals(2, txnsInfoResponse.getOpen_txns().size());
+    TxnInfo txnInfo = null;
+    for(TxnInfo ti : txnsInfoResponse.getOpen_txns()) {
+      if(ti.getState() == TxnState.OPEN) {
+        txnInfo = ti;
+        break;
+      }
+    }
+    Assert.assertNotNull(txnInfo);
+    Assert.assertEquals(2, txnInfo.getId());
+    Assert.assertEquals(TxnState.OPEN, txnInfo.getState());
+    String s =TxnDbUtil.queryToString("select TXN_STARTED, TXN_LAST_HEARTBEAT from TXNS where TXN_ID = " + txnInfo.getId(), false);
+    String[] vals = s.split("\\s+");
+    Assert.assertEquals("Didn't get expected timestamps", 2, vals.length);
+    long lastHeartbeat = Long.parseLong(vals[1]);
+    //these 2 values are equal when TXN entry is made.  Should never be equal after 1st heartbeat, which we
+    //expect to have happened by now since HIVE_TXN_TIMEOUT=1sec
+    Assert.assertNotEquals("Didn't see heartbeat happen", Long.parseLong(vals[0]), lastHeartbeat);
+    
+    ShowLocksResponse slr = txnHandler.showLocks(new ShowLocksRequest());
+    TestDbTxnManager2.checkLock(LockType.SHARED_READ, LockState.ACQUIRED, "default", Table.ACIDTBL.name, null, slr.getLocks().get(0));
+    pause(750);
+    TestTxnCommands2.runHouseKeeperService(houseKeeperService, hiveConf);
+    pause(750);
+    slr = txnHandler.showLocks(new ShowLocksRequest());
+    Assert.assertEquals("Unexpected lock count: " + slr, 1, slr.getLocks().size());
+    TestDbTxnManager2.checkLock(LockType.SHARED_READ, LockState.ACQUIRED, "default", Table.ACIDTBL.name, null, slr.getLocks().get(0));
+
+    pause(750);
+    TestTxnCommands2.runHouseKeeperService(houseKeeperService, hiveConf);
+    slr = txnHandler.showLocks(new ShowLocksRequest());
+    Assert.assertEquals("Unexpected lock count: " + slr, 1, slr.getLocks().size());
+    TestDbTxnManager2.checkLock(LockType.SHARED_READ, LockState.ACQUIRED, "default", Table.ACIDTBL.name, null, slr.getLocks().get(0));
+
+    //should've done several heartbeats
+    s =TxnDbUtil.queryToString("select TXN_STARTED, TXN_LAST_HEARTBEAT from TXNS where TXN_ID = " + txnInfo.getId(), false);
+    vals = s.split("\\s+");
+    Assert.assertEquals("Didn't get expected timestamps", 2, vals.length);
+    Assert.assertTrue("Heartbeat didn't progress: (old,new) (" + lastHeartbeat + "," + vals[1]+ ")",
+       lastHeartbeat < Long.parseLong(vals[1]));
+
+    runStatementOnDriver("rollback");
+    slr = txnHandler.showLocks(new ShowLocksRequest());
+    Assert.assertEquals("Unexpected lock count", 0, slr.getLocks().size());
+  }
+  private static void pause(int timeMillis) {
+    try {
+      Thread.sleep(timeMillis);
+    }
+    catch (InterruptedException e) {
+    }
   }
 
   /**

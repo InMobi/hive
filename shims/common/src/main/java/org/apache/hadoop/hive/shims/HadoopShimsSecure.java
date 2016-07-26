@@ -373,20 +373,10 @@ public abstract class HadoopShimsSecure implements HadoopShims {
   abstract public long getDefaultBlockSize(FileSystem fs, Path path);
 
   @Override
-  abstract public boolean moveToAppropriateTrash(FileSystem fs, Path path, Configuration conf)
-      throws IOException;
-
-  @Override
   abstract public FileSystem createProxyFileSystem(FileSystem fs, URI uri);
 
   @Override
   abstract public FileSystem getNonCachedFileSystem(URI uri, Configuration conf) throws IOException;
-
-  protected void run(FsShell shell, String[] command) throws Exception {
-    LOG.debug(ArrayUtils.toString(command));
-    int retval = shell.run(command);
-    LOG.debug("Return value is :" + retval);
-  }
 
   private static String[] dedup(String[] locations) throws IOException {
     Set<String> dedup = new HashSet<String>();
@@ -402,33 +392,4 @@ public abstract class HadoopShimsSecure implements HadoopShims {
 
   @Override
   abstract public void addDelegationTokens(FileSystem fs, Credentials cred, String uname) throws IOException;
-
-  private final class BasicTextReaderShim implements TextReaderShim {
-    private final InputStream in;
-
-    public BasicTextReaderShim(InputStream in) {
-      this.in = in;
-    }
-
-    @Override
-    public void read(Text txt, int len) throws IOException {
-      int offset = 0;
-      byte[] bytes = new byte[len];
-      while (len > 0) {
-        int written = in.read(bytes, offset, len);
-        if (written < 0) {
-          throw new EOFException("Can't finish read from " + in + " read "
-              + (offset) + " bytes out of " + bytes.length);
-        }
-        len -= written;
-        offset += written;
-      }
-      txt.set(bytes);
-    }
-  }
-
-  @Override
-  public TextReaderShim getTextReaderShim(InputStream in) throws IOException {
-    return new BasicTextReaderShim(in);
-  }
 }

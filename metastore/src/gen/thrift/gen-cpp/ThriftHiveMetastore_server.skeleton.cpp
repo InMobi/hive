@@ -117,6 +117,21 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("create_table_with_constraints\n");
   }
 
+  void drop_constraint(const DropConstraintRequest& req) {
+    // Your implementation goes here
+    printf("drop_constraint\n");
+  }
+
+  void add_primary_key(const AddPrimaryKeyRequest& req) {
+    // Your implementation goes here
+    printf("add_primary_key\n");
+  }
+
+  void add_foreign_key(const AddForeignKeyRequest& req) {
+    // Your implementation goes here
+    printf("add_foreign_key\n");
+  }
+
   void drop_table(const std::string& dbname, const std::string& name, const bool deleteData) {
     // Your implementation goes here
     printf("drop_table\n");
@@ -652,6 +667,11 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("abort_txn\n");
   }
 
+  void abort_txns(const AbortTxnsRequest& rqst) {
+    // Your implementation goes here
+    printf("abort_txns\n");
+  }
+
   void commit_txn(const CommitTxnRequest& rqst) {
     // Your implementation goes here
     printf("commit_txn\n");
@@ -745,11 +765,6 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   void cache_file_metadata(CacheFileMetadataResult& _return, const CacheFileMetadataRequest& req) {
     // Your implementation goes here
     printf("cache_file_metadata\n");
-  }
-
-  void get_change_version(GetChangeVersionResult& _return, const GetChangeVersionRequest& req) {
-    // Your implementation goes here
-    printf("get_change_version\n");
   }
 
 };

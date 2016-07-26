@@ -169,7 +169,7 @@
 
     <fileSet>
       <fileMode>666</fileMode>
-      <directory>${project.parent.basedir}/llap-server/sql</directory>
+      <directory>${project.parent.basedir}/llap-server/scripts</directory>
       <includes>
         <include>**/*</include>
       </includes>
@@ -391,6 +391,16 @@
       <source>${project.parent.basedir}/llap-server/src/main/resources/llap-daemon-log4j2.properties</source>
       <outputDirectory>conf</outputDirectory>
       <destName>llap-daemon-log4j2.properties.template</destName>
+    </file>
+    <file>
+      <source>${project.parent.basedir}/llap-server/src/main/resources/llap-cli-log4j2.properties</source>
+      <outputDirectory>conf</outputDirectory>
+      <destName>llap-cli-log4j2.properties.template</destName>
+    </file>
+    <file>
+      <source>${project.parent.basedir}/common/src/main/resources/parquet-logging.properties</source>
+      <outputDirectory>conf</outputDirectory>
+      <destName>parquet-logging.properties</destName>
     </file>
     <file>
       <source>${project.parent.basedir}/hcatalog/README.txt</source>

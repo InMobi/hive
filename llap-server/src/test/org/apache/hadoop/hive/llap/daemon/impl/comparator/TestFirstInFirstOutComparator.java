@@ -31,8 +31,11 @@ import org.apache.hadoop.hive.llap.daemon.impl.TaskExecutorService.TaskWrapper;
 import org.apache.hadoop.hive.llap.daemon.impl.TaskRunnerCallable;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.EntityDescriptorProto;
-import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.FragmentSpecProto;
+import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.SignableVertexSpec;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.SubmitWorkRequestProto;
+import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.VertexIdentifier;
+import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.VertexOrBinary;
+import org.apache.hadoop.hive.llap.tez.Converters;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.dag.records.TezDAGID;
@@ -49,37 +52,6 @@ import org.junit.Test;
 public class TestFirstInFirstOutComparator {
   private static Configuration conf;
   private static Credentials cred = new Credentials();
-
-  private static class MockRequest extends TaskRunnerCallable {
-    private int workTime;
-    private boolean canFinish;
-
-    public MockRequest(SubmitWorkRequestProto requestProto,
-        boolean canFinish, int workTime) {
-      super(requestProto, mock(QueryFragmentInfo.class), conf,
-          new ExecutionContextImpl("localhost"), null, cred, 0, null, null, null,
-          mock(KilledTaskHandler.class), mock(
-          FragmentCompletionHandler.class), new DefaultHadoopShim());
-      this.workTime = workTime;
-      this.canFinish = canFinish;
-    }
-
-    @Override
-    protected TaskRunner2Result callInternal() {
-      System.out.println(super.getRequestId() + " is executing..");
-      try {
-        Thread.sleep(workTime);
-      } catch (InterruptedException e) {
-        return new TaskRunner2Result(EndReason.KILL_REQUESTED, null, null, false);
-      }
-      return new TaskRunner2Result(EndReason.SUCCESS, null, null, false);
-    }
-
-    @Override
-    public boolean canFinish() {
-      return canFinish;
-    }
-  }
 
   @Before
   public void setup() {
@@ -102,19 +74,23 @@ public class TestFirstInFirstOutComparator {
     TezTaskAttemptID taId = TezTaskAttemptID.getInstance(tId, fragmentNumber);
     return SubmitWorkRequestProto
         .newBuilder()
-        .setFragmentSpec(
-            FragmentSpecProto
+        .setAttemptNumber(0)
+        .setFragmentNumber(fragmentNumber)
+        .setWorkSpec(
+            VertexOrBinary.newBuilder().setVertex(
+            SignableVertexSpec
                 .newBuilder()
-                .setAttemptNumber(0)
+                .setVertexIdentifier(Converters.createVertexIdentifier(taId, 0))
                 .setDagName("MockDag")
-                .setFragmentNumber(fragmentNumber)
                 .setVertexName("MockVertex")
+                .setUser("MockUser")
+                .setTokenIdentifier("MockToken_1")
                 .setProcessorDescriptor(
                     EntityDescriptorProto.newBuilder().setClassName("MockProcessor").build())
-                .setFragmentIdentifierString(taId.toString()).build()).setAmHost("localhost")
-        .setAmPort(12345).setAppAttemptNumber(0).setApplicationIdString("MockApp_1")
-        .setContainerIdString("MockContainer_1").setUser("MockUser")
-        .setTokenIdentifier("MockToken_1")
+                .build()).build())
+        .setAmHost("localhost")
+        .setAmPort(12345)
+        .setContainerIdString("MockContainer_1")
         .setFragmentRuntimeInfo(LlapDaemonProtocolProtos
             .FragmentRuntimeInfo
             .newBuilder()

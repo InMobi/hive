@@ -129,13 +129,11 @@ public class Optimizer {
         /* Add list bucketing pruner. */
         transformations.add(new ListBucketingPruner());
       }
-    }
-    if ((HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTPPD)
-            && HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTCONSTANTPROPAGATION)) ||
-            (HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTCONSTANTPROPAGATION)
-                    && pctx.getContext().isCboSucceeded())) {
-      // PartitionPruner may create more folding opportunities, run ConstantPropagate again.
-      transformations.add(new ConstantPropagate());
+      if (HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTCONSTANTPROPAGATION) &&
+              !pctx.getContext().isCboSucceeded()) {
+        // PartitionPruner may create more folding opportunities, run ConstantPropagate again.
+        transformations.add(new ConstantPropagate());
+      }
     }
 
     if (HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTGROUPBY) ||
@@ -195,7 +193,7 @@ public class Optimizer {
       transformations.add(new FixedBucketPruningOptimizer(compatMode));
     }
 
-    if(HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTREDUCEDEDUPLICATION)) {
+    if(HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTREDUCEDEDUPLICATION) || pctx.hasAcidWrite()) {
       transformations.add(new ReduceSinkDeDuplication());
     }
     transformations.add(new NonBlockingOpDeDupProc());

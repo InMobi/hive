@@ -24,6 +24,7 @@ final class TProtocolVersion {
   const HIVE_CLI_SERVICE_PROTOCOL_V6 = 5;
   const HIVE_CLI_SERVICE_PROTOCOL_V7 = 6;
   const HIVE_CLI_SERVICE_PROTOCOL_V8 = 7;
+  const HIVE_CLI_SERVICE_PROTOCOL_V9 = 8;
   static public $__names = array(
     0 => 'HIVE_CLI_SERVICE_PROTOCOL_V1',
     1 => 'HIVE_CLI_SERVICE_PROTOCOL_V2',
@@ -33,6 +34,7 @@ final class TProtocolVersion {
     5 => 'HIVE_CLI_SERVICE_PROTOCOL_V6',
     6 => 'HIVE_CLI_SERVICE_PROTOCOL_V7',
     7 => 'HIVE_CLI_SERVICE_PROTOCOL_V8',
+    8 => 'HIVE_CLI_SERVICE_PROTOCOL_V9',
   );
 }
 
@@ -109,6 +111,7 @@ final class TOperationState {
   const ERROR_STATE = 5;
   const UKNOWN_STATE = 6;
   const PENDING_STATE = 7;
+  const TIMEDOUT_STATE = 8;
   static public $__names = array(
     0 => 'INITIALIZED_STATE',
     1 => 'RUNNING_STATE',
@@ -118,6 +121,7 @@ final class TOperationState {
     5 => 'ERROR_STATE',
     6 => 'UKNOWN_STATE',
     7 => 'PENDING_STATE',
+    8 => 'TIMEDOUT_STATE',
   );
 }
 
@@ -5446,6 +5450,10 @@ class TExecuteStatementReq {
    * @var bool
    */
   public $runAsync = false;
+  /**
+   * @var int
+   */
+  public $queryTimeout = 0;
 
   public function __construct($vals=null) {
     if (!isset(self::$_TSPEC)) {
@@ -5475,6 +5483,10 @@ class TExecuteStatementReq {
           'var' => 'runAsync',
           'type' => TType::BOOL,
           ),
+        5 => array(
+          'var' => 'queryTimeout',
+          'type' => TType::I64,
+          ),
         );
     }
     if (is_array($vals)) {
@@ -5489,6 +5501,9 @@ class TExecuteStatementReq {
       }
       if (isset($vals['runAsync'])) {
         $this->runAsync = $vals['runAsync'];
+      }
+      if (isset($vals['queryTimeout'])) {
+        $this->queryTimeout = $vals['queryTimeout'];
       }
     }
   }
@@ -5554,6 +5569,13 @@ class TExecuteStatementReq {
             $xfer += $input->skip($ftype);
           }
           break;
+        case 5:
+          if ($ftype == TType::I64) {
+            $xfer += $input->readI64($this->queryTimeout);
+          } else {
+            $xfer += $input->skip($ftype);
+          }
+          break;
         default:
           $xfer += $input->skip($ftype);
           break;
@@ -5601,6 +5623,11 @@ class TExecuteStatementReq {
     if ($this->runAsync !== null) {
       $xfer += $output->writeFieldBegin('runAsync', TType::BOOL, 4);
       $xfer += $output->writeBool($this->runAsync);
+      $xfer += $output->writeFieldEnd();
+    }
+    if ($this->queryTimeout !== null) {
+      $xfer += $output->writeFieldBegin('queryTimeout', TType::I64, 5);
+      $xfer += $output->writeI64($this->queryTimeout);
       $xfer += $output->writeFieldEnd();
     }
     $xfer += $output->writeFieldStop();

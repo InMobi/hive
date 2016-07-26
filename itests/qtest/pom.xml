@@ -410,6 +410,21 @@
                 <qtestgen hiveRootDirectory="${basedir}/${hive.path.to.root}/" outputDirectory="${project.build.directory}/generated-test-sources/java/org/apache/hadoop/hive/ql/parse/" templatePath="${basedir}/${hive.path.to.root}/ql/src/test/templates/" template="TestParseNegative.vm" queryDirectory="${basedir}/${hive.path.to.root}/ql/src/test/queries/negative/" queryFile="${qfile}" queryFileRegex="${qfile_regex}" runDisabled="${run_disabled}" resultsDirectory="${basedir}/${hive.path.to.root}/ql/src/test/results/compiler/errors/" className="TestParseNegative" logFile="${project.build.directory}/testparseneggen.log" hadoopVersion="${hadoop.version}" logDirectory="${project.build.directory}/qfile-results/negative/" initScript="${initScript}" cleanupScript="q_test_cleanup.sql" />
 
                 <!-- Cli -->
+                <qtestgen hiveRootDirectory="${basedir}/${hive.path.to.root}/"
+                  outputDirectory="${project.build.directory}/generated-test-sources/java/org/apache/hadoop/hive/cli/"
+                  templatePath="${basedir}/${hive.path.to.root}/ql/src/test/templates/" template="TestCliDriver.vm"
+                  queryDirectory="${basedir}/${hive.path.to.root}/ql/src/test/queries/clientpositive/"
+                  queryFile="${qfile}"
+                  excludeQueryFile="${minillap.query.files},${minimr.query.files},${minitez.query.files},${encrypted.query.files},${spark.only.query.files},${disabled.query.files}"
+                  queryFileRegex="${qfile_regex}"
+                  clusterMode="${clustermode}"
+                  runDisabled="${run_disabled}"
+                  resultsDirectory="${basedir}/${hive.path.to.root}/ql/src/test/results/clientpositive/" className="TestCliDriver"
+                  logFile="${project.build.directory}/testclidrivergen.log"
+                  logDirectory="${project.build.directory}/qfile-results/clientpositive/"
+                  hadoopVersion="${hadoop.version}"
+                  initScript="${initScript}"
+                  cleanupScript="q_test_cleanup.sql"/>
 
                 <qtestgen hiveRootDirectory="${basedir}/${hive.path.to.root}/" outputDirectory="${project.build.directory}/generated-test-sources/java/org/apache/hadoop/hive/cli/" templatePath="${basedir}/${hive.path.to.root}/ql/src/test/templates/" template="TestCliDriver.vm" queryDirectory="${basedir}/${hive.path.to.root}/ql/src/test/queries/clientpositive/" queryFile="${qfile}" excludeQueryFile="${minillap.query.files},${minimr.query.files},${minitez.query.files},${encrypted.query.files},${spark.only.query.files},${disabled.query.files},regexp_extract.q" queryFileRegex="${qfile_regex}" clusterMode="${clustermode}" runDisabled="${run_disabled}" resultsDirectory="${basedir}/${hive.path.to.root}/ql/src/test/results/clientpositive/" className="TestCliDriver" logFile="${project.build.directory}/testclidrivergen.log" logDirectory="${project.build.directory}/qfile-results/clientpositive/" hadoopVersion="${hadoop.version}" initScript="${initScript}" cleanupScript="q_test_cleanup.sql" />
 

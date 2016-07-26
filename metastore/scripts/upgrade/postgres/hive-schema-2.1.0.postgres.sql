@@ -514,15 +514,6 @@ CREATE TABLE "VERSION" (
 );
 
 --
--- Table structure for CHANGE_VERSION
---
-CREATE TABLE "CHANGE_VERSION" (
-  "CHANGE_VERSION_ID" bigint,
-  "VERSION" bigint NOT NULL,
-  "TOPIC" character varying(255) NOT NULL
-);
-
---
 -- Name: PART_COL_STATS Type: TABLE; Schema: public; Owner: hiveuser; Tablespace:
 --
 
@@ -597,8 +588,10 @@ CREATE TABLE "NOTIFICATION_SEQUENCE"
 CREATE TABLE "KEY_CONSTRAINTS"
 (
   "CHILD_CD_ID" BIGINT,
+  "CHILD_INTEGER_IDX" BIGINT,
   "CHILD_TBL_ID" BIGINT,
   "PARENT_CD_ID" BIGINT NOT NULL,
+  "PARENT_INTEGER_IDX" BIGINT NOT NULL,
   "PARENT_TBL_ID" BIGINT NOT NULL,
   "POSITION" BIGINT NOT NULL,
   "CONSTRAINT_NAME" VARCHAR(400) NOT NULL,
@@ -1453,11 +1446,6 @@ ALTER TABLE ONLY "PART_COL_STATS" ADD CONSTRAINT "PART_COL_STATS_fkey" FOREIGN K
 
 ALTER TABLE ONLY "VERSION" ADD CONSTRAINT "VERSION_pkey" PRIMARY KEY ("VER_ID");
 
-ALTER TABLE ONLY "CHANGE_VERSION" ADD CONSTRAINT "CHANGE_VERSION_pkey" PRIMARY KEY ("CHANGE_VERSION_ID");
-
-ALTER TABLE ONLY "CHANGE_VERSION" ADD CONSTRAINT "CHANGE_VERSION_UNIQUE" UNIQUE ("TOPIC");
-
-
 -- Name: FUNCS_FK1; Type: FK CONSTRAINT; Schema: public; Owner: hiveuser
 ALTER TABLE ONLY "FUNCS"
     ADD CONSTRAINT "FUNCS_FK1" FOREIGN KEY ("DB_ID") REFERENCES "DBS" ("DB_ID") DEFERRABLE;
@@ -1480,7 +1468,7 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 ------------------------------
 -- Transaction and lock tables
 ------------------------------
-\i hive-txn-schema-2.0.0.postgres.sql;
+\i hive-txn-schema-2.1.0.postgres.sql;
 
 -- -----------------------------------------------------------------
 -- Record schema version. Should be the last step in the init script

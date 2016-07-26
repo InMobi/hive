@@ -19,8 +19,10 @@
 package org.apache.hadoop.hive.ql.optimizer.stats.annotation;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,6 +31,7 @@ import java.util.Stack;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.exec.AbstractMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
 import org.apache.hadoop.hive.ql.exec.FilterOperator;
@@ -60,7 +63,9 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeDynamicListDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.GroupByDesc;
+import org.apache.hadoop.hive.ql.plan.JoinCondDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
+import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.Statistics;
 import org.apache.hadoop.hive.ql.stats.StatsUtils;
@@ -471,7 +476,8 @@ public class StatsRulesProcFactory {
         float columnFactor = dvs == 0 ? 0.5f : ((float)dvs / numRows) * values.get(i).size();
         factor *= columnFactor;
       }
-      return Math.round( (double)numRows * factor);
+      float inFactor = HiveConf.getFloatVar(aspCtx.getConf(), HiveConf.ConfVars.HIVE_STATS_IN_CLAUSE_FACTOR);
+      return Math.round( (double)numRows * factor * inFactor);
     }
 
     private long evaluateNotExpr(Statistics stats, ExprNodeDesc pred,
@@ -1403,6 +1409,14 @@ public class StatsRulesProcFactory {
           stats.updateColumnStatsState(parentStats.getColumnStatsState());
         }
 
+        if (numAttr == 0) {
+          // It is a cartesian product, row count is easy to infer
+          inferredRowCount = 1;
+          for (int pos = 0; pos < parents.size(); pos++) {
+            inferredRowCount = StatsUtils.safeMult(joinStats.get(pos).getNumRows(), inferredRowCount);
+          }
+        }
+
         List<Long> distinctVals = Lists.newArrayList();
         long denom = 1;
         if (inferredRowCount == -1) {
@@ -1458,8 +1472,8 @@ public class StatsRulesProcFactory {
 
         // update join statistics
         stats.setColumnStats(outColStats);
-        long newRowCount = inferredRowCount !=-1 ? inferredRowCount : computeNewRowCount(rowCounts, denom);
-        updateStatsForJoinType(stats, newRowCount, jop, rowCountParents);
+        long newRowCount = inferredRowCount !=-1 ? inferredRowCount : computeNewRowCount(rowCounts, denom, jop);
+        updateColStats(conf, stats, newRowCount, jop, rowCountParents);
         jop.setStatistics(stats);
 
         if (isDebugEnabled) {
@@ -1470,27 +1484,51 @@ public class StatsRulesProcFactory {
         // worst case when there are no column statistics
         float joinFactor = HiveConf.getFloatVar(conf, HiveConf.ConfVars.HIVE_STATS_JOIN_FACTOR);
         int numParents = parents.size();
-        List<Long> parentRows = Lists.newArrayList();
-        List<Long> parentSizes = Lists.newArrayList();
-        int maxRowIdx = 0;
+        long crossRowCount = 1;
+        long crossDataSize = 1;
         long maxRowCount = 0;
-        int idx = 0;
+        long maxDataSize = 0;
 
         for (Operator<? extends OperatorDesc> op : parents) {
           Statistics ps = op.getStatistics();
           long rowCount = ps.getNumRows();
+          long dataSize = ps.getDataSize();
+          // Update cross size
+          long newCrossRowCount = StatsUtils.safeMult(crossRowCount, rowCount);
+          long newCrossDataSize = StatsUtils.safeAdd(
+                  StatsUtils.safeMult(crossDataSize, rowCount),
+                  StatsUtils.safeMult(dataSize, crossRowCount));
+          crossRowCount = newCrossRowCount;
+          crossDataSize = newCrossDataSize;
+          // Update largest relation
           if (rowCount > maxRowCount) {
             maxRowCount = rowCount;
-            maxRowIdx = idx;
+            maxDataSize = dataSize;
           }
-          parentRows.add(rowCount);
-          parentSizes.add(ps.getDataSize());
-          idx++;
         }
 
-        long maxDataSize = parentSizes.get(maxRowIdx);
-        newNumRows = StatsUtils.safeMult(StatsUtils.safeMult(maxRowCount, (numParents - 1)), joinFactor);
-        long newDataSize = StatsUtils.safeMult(StatsUtils.safeMult(maxDataSize, (numParents - 1)), joinFactor);
+        long newDataSize;
+        // detect if there are attributes in join key
+        boolean cartesianProduct = false;
+        if (jop.getParentOperators().get(0) instanceof ReduceSinkOperator) {
+          ReduceSinkOperator rsOp = (ReduceSinkOperator) jop.getParentOperators().get(0);
+          List<String> keyExprs = StatsUtils.getQualifedReducerKeyNames(rsOp.getConf()
+              .getOutputKeyColumnNames());
+          cartesianProduct = keyExprs.size() == 0;
+        } else if (jop instanceof AbstractMapJoinOperator) {
+          AbstractMapJoinOperator<? extends MapJoinDesc> mjop =
+                  (AbstractMapJoinOperator<? extends MapJoinDesc>) jop;
+          List<ExprNodeDesc> keyExprs = mjop.getConf().getKeys().values().iterator().next();
+          cartesianProduct = keyExprs.size() == 0;
+        }
+        if (cartesianProduct) {
+          // Cartesian product
+          newNumRows = crossRowCount;
+          newDataSize = crossDataSize;
+        } else {
+          newNumRows = StatsUtils.safeMult(StatsUtils.safeMult(maxRowCount, (numParents - 1)), joinFactor);
+          newDataSize = StatsUtils.safeMult(StatsUtils.safeMult(maxDataSize, (numParents - 1)), joinFactor);
+        }
         Statistics wcStats = new Statistics();
         wcStats.setNumRows(newNumRows);
         wcStats.setDataSize(newDataSize);
@@ -1609,7 +1647,7 @@ public class StatsRulesProcFactory {
         newNumRows = newrows;
       } else {
         // there is more than one FK
-        newNumRows = this.computeNewRowCount(rowCounts, getDenominator(distinctVals));
+        newNumRows = this.computeNewRowCount(rowCounts, getDenominator(distinctVals), jop);
       }
       return newNumRows;
     }
@@ -1729,7 +1767,7 @@ public class StatsRulesProcFactory {
       return result;
     }
 
-    private void updateStatsForJoinType(Statistics stats, long newNumRows,
+    private void updateColStats(HiveConf conf, Statistics stats, long newNumRows,
         CommonJoinOperator<? extends JoinDesc> jop,
         Map<Integer, Long> rowCountParents) {
 
@@ -1752,7 +1790,9 @@ public class StatsRulesProcFactory {
       // stats for columns from 1st parent should be scaled down by 200/10 = 20x
       // and stats for columns from 2nd parent should be scaled down by 200x
       List<ColStatistics> colStats = stats.getColumnStats();
+      Set<String> colNameStatsAvailable = new HashSet<>();
       for (ColStatistics cs : colStats) {
+        colNameStatsAvailable.add(cs.getColumnName());
         int pos = jop.getConf().getReversedExprs().get(cs.getColumnName());
         long oldRowCount = rowCountParents.get(pos);
         double ratio = (double) newNumRows / (double) oldRowCount;
@@ -1774,10 +1814,21 @@ public class StatsRulesProcFactory {
       stats.setColumnStats(colStats);
       long newDataSize = StatsUtils
           .getDataSizeFromColumnStats(newNumRows, colStats);
+      // Add default size for columns for which stats were not available
+      List<String> neededColumns = new ArrayList<>();
+      for (String colName : jop.getSchema().getColumnNames()) {
+        if (!colNameStatsAvailable.contains(colName)) {
+          neededColumns.add(colName);
+        }
+      }
+      if (neededColumns.size() != 0) {
+        int restColumnsDefaultSize = StatsUtils.estimateRowSizeFromSchema(conf, jop.getSchema().getSignature(), neededColumns);
+        newDataSize = StatsUtils.safeAdd(newDataSize, StatsUtils.safeMult(restColumnsDefaultSize, newNumRows));
+      }
       stats.setDataSize(StatsUtils.getMaxIfOverflow(newDataSize));
     }
 
-    private long computeNewRowCount(List<Long> rowCountParents, long denom) {
+    private long computeNewRowCount(List<Long> rowCountParents, long denom, CommonJoinOperator<? extends JoinDesc> join) {
       double factor = 0.0d;
       long result = 1;
       long max = rowCountParents.get(0);
@@ -1792,6 +1843,7 @@ public class StatsRulesProcFactory {
         }
       }
 
+      denom = denom == 0 ? 1 : denom;
       factor = (double) max / (double) denom;
 
       for (int i = 0; i < rowCountParents.size(); i++) {
@@ -1802,6 +1854,33 @@ public class StatsRulesProcFactory {
 
       result = (long) (result * factor);
 
+      if (join.getConf().getConds().length == 1) {
+        JoinCondDesc joinCond = join.getConf().getConds()[0];
+        switch (joinCond.getType()) {
+          case JoinDesc.INNER_JOIN:
+            // only dealing with special join types here.
+            break;
+          case JoinDesc.LEFT_OUTER_JOIN :
+            // all rows from left side will be present in resultset
+            result = Math.max(rowCountParents.get(joinCond.getLeft()),result);
+            break;
+          case JoinDesc.RIGHT_OUTER_JOIN :
+            // all rows from right side will be present in resultset
+            result = Math.max(rowCountParents.get(joinCond.getRight()),result);
+            break;
+          case JoinDesc.FULL_OUTER_JOIN :
+            // all rows from both side will be present in resultset
+            result = Math.max(StatsUtils.safeAdd(rowCountParents.get(joinCond.getRight()), rowCountParents.get(joinCond.getLeft())),result);
+            break;
+          case JoinDesc.LEFT_SEMI_JOIN :
+            // max # of rows = rows from left side
+            result = Math.min(rowCountParents.get(joinCond.getLeft()),result);
+            break;
+          default:
+            LOG.debug("Unhandled join type in stats estimation: " + joinCond.getType());
+            break;
+        }
+      }
       return result;
     }
 

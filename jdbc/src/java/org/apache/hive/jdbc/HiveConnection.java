@@ -44,13 +44,15 @@ import org.apache.http.client.ServiceUnavailableRetryStrategy;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.DefaultHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.apache.http.protocol.HttpContext;
+import org.apache.http.ssl.SSLContexts;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.THttpClient;
@@ -146,16 +148,6 @@ public class HiveConnection implements java.sql.Connection {
       fetchSize = Integer.parseInt(sessConfMap.get(JdbcConnectionParams.FETCH_SIZE));
     }
 
-    if (isEmbeddedMode) {
-      EmbeddedThriftBinaryCLIService embeddedClient = new EmbeddedThriftBinaryCLIService();
-      embeddedClient.init(null);
-      client = embeddedClient;
-    } else {
-      // open the client transport
-      openTransport();
-      // set up the client
-      client = new TCLIService.Client(new TBinaryProtocol(transport));
-    }
     // add supported protocols
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1);
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V2);
@@ -165,36 +157,36 @@ public class HiveConnection implements java.sql.Connection {
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6);
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V7);
     supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V8);
+    supportedProtocols.add(TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V9);
 
-    // open client session
-    openSession();
+    if (isEmbeddedMode) {
+      EmbeddedThriftBinaryCLIService embeddedClient = new EmbeddedThriftBinaryCLIService();
+      embeddedClient.init(null);
+      client = embeddedClient;
 
-    // Wrap the client with a thread-safe proxy to serialize the RPC calls
-    client = newSynchronizedClient(client);
-  }
-
-  private void openTransport() throws SQLException {
-    int maxRetries = 1;
-    try {
-      String strRetries = sessConfMap.get(JdbcConnectionParams.RETRIES);
-      if (StringUtils.isNotBlank(strRetries)) {
-        maxRetries = Integer.parseInt(strRetries);
+      // open client session
+      openSession();
+    } else {
+      int maxRetries = 1;
+      try {
+        String strRetries = sessConfMap.get(JdbcConnectionParams.RETRIES);
+        if (StringUtils.isNotBlank(strRetries)) {
+          maxRetries = Integer.parseInt(strRetries);
+        }
+      } catch(NumberFormatException e) { // Ignore the exception
       }
-    } catch(NumberFormatException e) { // Ignore the exception
-    }
 
-    for (int numRetries = 0;;) {
+      for (int numRetries = 0;;) {
         try {
-          assumeSubject =
-              JdbcConnectionParams.AUTH_KERBEROS_AUTH_TYPE_FROM_SUBJECT.equals(sessConfMap
-                  .get(JdbcConnectionParams.AUTH_KERBEROS_AUTH_TYPE));
-          transport = isHttpTransportMode() ? createHttpTransport() : createBinaryTransport();
-          if (!transport.isOpen()) {
-            transport.open();
-            logZkDiscoveryMessage("Connected to " + connParams.getHost() + ":" + connParams.getPort());
-          }
+          // open the client transport
+          openTransport();
+          // set up the client
+          client = new TCLIService.Client(new TBinaryProtocol(transport));
+          // open client session
+          openSession();
+
           break;
-        } catch (TTransportException e) {
+        } catch (Exception e) {
           LOG.warn("Failed to connect to " + connParams.getHost() + ":" + connParams.getPort());
           String errMsg = null;
           String warnMsg = "Could not open client transport with JDBC Uri: " + jdbcUriString + ": ";
@@ -219,7 +211,22 @@ public class HiveConnection implements java.sql.Connection {
             LOG.warn(warnMsg + e.getMessage() + " Retrying " + numRetries + " of " + maxRetries);
           }
         }
+      }
     }
+
+    // Wrap the client with a thread-safe proxy to serialize the RPC calls
+    client = newSynchronizedClient(client);
+  }
+
+  private void openTransport() throws Exception {
+      assumeSubject =
+          JdbcConnectionParams.AUTH_KERBEROS_AUTH_TYPE_FROM_SUBJECT.equals(sessConfMap
+              .get(JdbcConnectionParams.AUTH_KERBEROS_AUTH_TYPE));
+      transport = isHttpTransportMode() ? createHttpTransport() : createBinaryTransport();
+      if (!transport.isOpen()) {
+        transport.open();
+        logZkDiscoveryMessage("Connected to " + connParams.getHost() + ":" + connParams.getPort());
+      }
   }
 
   public String getConnectedUrl() {
@@ -246,26 +253,7 @@ public class HiveConnection implements java.sql.Connection {
     boolean useSsl = isSslConnection();
     // Create an http client from the configs
     httpClient = getHttpClient(useSsl);
-    try {
-      transport = new THttpClient(getServerHttpUrl(useSsl), httpClient);
-      // We'll call an open/close here to send a test HTTP message to the server. Any
-      // TTransportException caused by trying to connect to a non-available peer are thrown here.
-      // Bubbling them up the call hierarchy so that a retry can happen in openTransport,
-      // if dynamic service discovery is configured.
-      TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
-      TOpenSessionResp openResp = client.OpenSession(new TOpenSessionReq());
-      if (openResp != null) {
-        client.CloseSession(new TCloseSessionReq(openResp.getSessionHandle()));
-      }
-    }
-    catch (TException e) {
-      LOG.info("JDBC Connection Parameters used : useSSL = " + useSsl + " , httpPath  = " +
-        sessConfMap.get(JdbcConnectionParams.HTTP_PATH) + " Authentication type = " +
-        sessConfMap.get(JdbcConnectionParams.AUTH_TYPE));
-      String msg =  "Could not create http connection to " +
-          jdbcUriString + ". " + e.getMessage();
-      throw new TTransportException(msg, e);
-    }
+    transport = new THttpClient(getServerHttpUrl(useSsl), httpClient);
     return transport;
   }
 
@@ -324,35 +312,38 @@ public class HiveConnection implements java.sql.Connection {
     if (isCookieEnabled) {
       // Create a http client with a retry mechanism when the server returns a status code of 401.
       httpClientBuilder =
-      HttpClients.custom().setServiceUnavailableRetryStrategy(
-        new  ServiceUnavailableRetryStrategy() {
+          HttpClients.custom().setServiceUnavailableRetryStrategy(
+              new ServiceUnavailableRetryStrategy() {
+                @Override
+                public boolean retryRequest(final HttpResponse response, final int executionCount,
+                    final HttpContext context) {
+                  int statusCode = response.getStatusLine().getStatusCode();
+                  boolean ret = statusCode == 401 && executionCount <= 1;
 
-      @Override
-      public boolean retryRequest(
-        final HttpResponse response,
-        final int executionCount,
-        final HttpContext context) {
-        int statusCode = response.getStatusLine().getStatusCode();
-        boolean ret = statusCode == 401 && executionCount <= 1;
+                  // Set the context attribute to true which will be interpreted by the request
+                  // interceptor
+                  if (ret) {
+                    context.setAttribute(Utils.HIVE_SERVER2_RETRY_KEY,
+                        Utils.HIVE_SERVER2_RETRY_TRUE);
+                  }
+                  return ret;
+                }
 
-        // Set the context attribute to true which will be interpreted by the request interceptor
-        if (ret) {
-          context.setAttribute(Utils.HIVE_SERVER2_RETRY_KEY, Utils.HIVE_SERVER2_RETRY_TRUE);
-        }
-        return ret;
-      }
-
-      @Override
-      public long getRetryInterval() {
-        // Immediate retry
-        return 0;
-      }
-    });
+                @Override
+                public long getRetryInterval() {
+                  // Immediate retry
+                  return 0;
+                }
+              });
     } else {
       httpClientBuilder = HttpClientBuilder.create();
     }
     // Add the request interceptor to the client builder
     httpClientBuilder.addInterceptorFirst(requestInterceptor);
+
+    // Add an interceptor to add in an XSRF header
+    httpClientBuilder.addInterceptorLast(new XsrfHttpRequestInterceptor());
+
     // Configure http client for SSL
     if (useSsl) {
       String useTwoWaySSL = sessConfMap.get(JdbcConnectionParams.USE_TWO_WAY_SSL);
@@ -360,47 +351,37 @@ public class HiveConnection implements java.sql.Connection {
       String sslTrustStorePassword = sessConfMap.get(
         JdbcConnectionParams.SSL_TRUST_STORE_PASSWORD);
       KeyStore sslTrustStore;
-      SSLSocketFactory socketFactory;
-
+      SSLConnectionSocketFactory socketFactory;
+      SSLContext sslContext;
       /**
-       * The code within the try block throws:
-       * 1. SSLInitializationException
-       * 2. KeyStoreException
-       * 3. IOException
-       * 4. NoSuchAlgorithmException
-       * 5. CertificateException
-       * 6. KeyManagementException
-       * 7. UnrecoverableKeyException
-       * We don't want the client to retry on any of these, hence we catch all
-       * and throw a SQLException.
+       * The code within the try block throws: SSLInitializationException, KeyStoreException,
+       * IOException, NoSuchAlgorithmException, CertificateException, KeyManagementException &
+       * UnrecoverableKeyException. We don't want the client to retry on any of these,
+       * hence we catch all and throw a SQLException.
        */
       try {
-        if (useTwoWaySSL != null &&
-            useTwoWaySSL.equalsIgnoreCase(JdbcConnectionParams.TRUE)) {
+        if (useTwoWaySSL != null && useTwoWaySSL.equalsIgnoreCase(JdbcConnectionParams.TRUE)) {
           socketFactory = getTwoWaySSLSocketFactory();
         } else if (sslTrustStorePath == null || sslTrustStorePath.isEmpty()) {
           // Create a default socket factory based on standard JSSE trust material
-          socketFactory = SSLSocketFactory.getSocketFactory();
+          socketFactory = SSLConnectionSocketFactory.getSocketFactory();
         } else {
           // Pick trust store config from the given path
           sslTrustStore = KeyStore.getInstance(JdbcConnectionParams.SSL_TRUST_STORE_TYPE);
           try (FileInputStream fis = new FileInputStream(sslTrustStorePath)) {
             sslTrustStore.load(fis, sslTrustStorePassword.toCharArray());
           }
-          socketFactory = new SSLSocketFactory(sslTrustStore);
+          sslContext = SSLContexts.custom().loadTrustMaterial(sslTrustStore, null).build();
+          socketFactory =
+              new SSLConnectionSocketFactory(sslContext, new DefaultHostnameVerifier(null));
         }
-        socketFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-
         final Registry<ConnectionSocketFactory> registry =
-          RegistryBuilder.<ConnectionSocketFactory>create()
-          .register("https", socketFactory)
-          .build();
-
+            RegistryBuilder.<ConnectionSocketFactory> create().register("https", socketFactory)
+                .build();
         httpClientBuilder.setConnectionManager(new BasicHttpClientConnectionManager(registry));
-      }
-      catch (Exception e) {
-        String msg =  "Could not create an https connection to " +
-          jdbcUriString + ". " + e.getMessage();
+      } catch (Exception e) {
+        String msg =
+            "Could not create an https connection to " + jdbcUriString + ". " + e.getMessage();
         throw new SQLException(msg, " 08S01", e);
       }
     }
@@ -502,8 +483,8 @@ public class HiveConnection implements java.sql.Connection {
     return transport;
   }
 
-  SSLSocketFactory getTwoWaySSLSocketFactory() throws SQLException {
-    SSLSocketFactory socketFactory = null;
+  SSLConnectionSocketFactory getTwoWaySSLSocketFactory() throws SQLException {
+    SSLConnectionSocketFactory socketFactory = null;
 
     try {
       KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(
@@ -540,7 +521,7 @@ public class HiveConnection implements java.sql.Connection {
       SSLContext context = SSLContext.getInstance("TLS");
       context.init(keyManagerFactory.getKeyManagers(),
         trustManagerFactory.getTrustManagers(), new SecureRandom());
-      socketFactory = new SSLSocketFactory(context);
+      socketFactory = new SSLConnectionSocketFactory(context);
     } catch (Exception e) {
       throw new SQLException("Error while initializing 2 way ssl socket factory ", e);
     }

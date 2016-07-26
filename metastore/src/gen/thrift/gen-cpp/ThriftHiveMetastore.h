@@ -41,6 +41,9 @@ class ThriftHiveMetastoreIf : virtual public  ::facebook::fb303::FacebookService
   virtual void create_table(const Table& tbl) = 0;
   virtual void create_table_with_environment_context(const Table& tbl, const EnvironmentContext& environment_context) = 0;
   virtual void create_table_with_constraints(const Table& tbl, const std::vector<SQLPrimaryKey> & primaryKeys, const std::vector<SQLForeignKey> & foreignKeys) = 0;
+  virtual void drop_constraint(const DropConstraintRequest& req) = 0;
+  virtual void add_primary_key(const AddPrimaryKeyRequest& req) = 0;
+  virtual void add_foreign_key(const AddForeignKeyRequest& req) = 0;
   virtual void drop_table(const std::string& dbname, const std::string& name, const bool deleteData) = 0;
   virtual void drop_table_with_environment_context(const std::string& dbname, const std::string& name, const bool deleteData, const EnvironmentContext& environment_context) = 0;
   virtual void get_tables(std::vector<std::string> & _return, const std::string& db_name, const std::string& pattern) = 0;
@@ -148,6 +151,7 @@ class ThriftHiveMetastoreIf : virtual public  ::facebook::fb303::FacebookService
   virtual void get_open_txns_info(GetOpenTxnsInfoResponse& _return) = 0;
   virtual void open_txns(OpenTxnsResponse& _return, const OpenTxnRequest& rqst) = 0;
   virtual void abort_txn(const AbortTxnRequest& rqst) = 0;
+  virtual void abort_txns(const AbortTxnsRequest& rqst) = 0;
   virtual void commit_txn(const CommitTxnRequest& rqst) = 0;
   virtual void lock(LockResponse& _return, const LockRequest& rqst) = 0;
   virtual void check_lock(LockResponse& _return, const CheckLockRequest& rqst) = 0;
@@ -167,7 +171,6 @@ class ThriftHiveMetastoreIf : virtual public  ::facebook::fb303::FacebookService
   virtual void put_file_metadata(PutFileMetadataResult& _return, const PutFileMetadataRequest& req) = 0;
   virtual void clear_file_metadata(ClearFileMetadataResult& _return, const ClearFileMetadataRequest& req) = 0;
   virtual void cache_file_metadata(CacheFileMetadataResult& _return, const CacheFileMetadataRequest& req) = 0;
-  virtual void get_change_version(GetChangeVersionResult& _return, const GetChangeVersionRequest& req) = 0;
 };
 
 class ThriftHiveMetastoreIfFactory : virtual public  ::facebook::fb303::FacebookServiceIfFactory {
@@ -254,6 +257,15 @@ class ThriftHiveMetastoreNull : virtual public ThriftHiveMetastoreIf , virtual p
     return;
   }
   void create_table_with_constraints(const Table& /* tbl */, const std::vector<SQLPrimaryKey> & /* primaryKeys */, const std::vector<SQLForeignKey> & /* foreignKeys */) {
+    return;
+  }
+  void drop_constraint(const DropConstraintRequest& /* req */) {
+    return;
+  }
+  void add_primary_key(const AddPrimaryKeyRequest& /* req */) {
+    return;
+  }
+  void add_foreign_key(const AddForeignKeyRequest& /* req */) {
     return;
   }
   void drop_table(const std::string& /* dbname */, const std::string& /* name */, const bool /* deleteData */) {
@@ -603,6 +615,9 @@ class ThriftHiveMetastoreNull : virtual public ThriftHiveMetastoreIf , virtual p
   void abort_txn(const AbortTxnRequest& /* rqst */) {
     return;
   }
+  void abort_txns(const AbortTxnsRequest& /* rqst */) {
+    return;
+  }
   void commit_txn(const CommitTxnRequest& /* rqst */) {
     return;
   }
@@ -658,9 +673,6 @@ class ThriftHiveMetastoreNull : virtual public ThriftHiveMetastoreIf , virtual p
     return;
   }
   void cache_file_metadata(CacheFileMetadataResult& /* _return */, const CacheFileMetadataRequest& /* req */) {
-    return;
-  }
-  void get_change_version(GetChangeVersionResult& /* _return */, const GetChangeVersionRequest& /* req */) {
     return;
   }
 };
@@ -3027,6 +3039,342 @@ class ThriftHiveMetastore_create_table_with_constraints_presult {
   NoSuchObjectException o4;
 
   _ThriftHiveMetastore_create_table_with_constraints_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _ThriftHiveMetastore_drop_constraint_args__isset {
+  _ThriftHiveMetastore_drop_constraint_args__isset() : req(false) {}
+  bool req :1;
+} _ThriftHiveMetastore_drop_constraint_args__isset;
+
+class ThriftHiveMetastore_drop_constraint_args {
+ public:
+
+  ThriftHiveMetastore_drop_constraint_args(const ThriftHiveMetastore_drop_constraint_args&);
+  ThriftHiveMetastore_drop_constraint_args& operator=(const ThriftHiveMetastore_drop_constraint_args&);
+  ThriftHiveMetastore_drop_constraint_args() {
+  }
+
+  virtual ~ThriftHiveMetastore_drop_constraint_args() throw();
+  DropConstraintRequest req;
+
+  _ThriftHiveMetastore_drop_constraint_args__isset __isset;
+
+  void __set_req(const DropConstraintRequest& val);
+
+  bool operator == (const ThriftHiveMetastore_drop_constraint_args & rhs) const
+  {
+    if (!(req == rhs.req))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_drop_constraint_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_drop_constraint_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class ThriftHiveMetastore_drop_constraint_pargs {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_drop_constraint_pargs() throw();
+  const DropConstraintRequest* req;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_drop_constraint_result__isset {
+  _ThriftHiveMetastore_drop_constraint_result__isset() : o1(false), o3(false) {}
+  bool o1 :1;
+  bool o3 :1;
+} _ThriftHiveMetastore_drop_constraint_result__isset;
+
+class ThriftHiveMetastore_drop_constraint_result {
+ public:
+
+  ThriftHiveMetastore_drop_constraint_result(const ThriftHiveMetastore_drop_constraint_result&);
+  ThriftHiveMetastore_drop_constraint_result& operator=(const ThriftHiveMetastore_drop_constraint_result&);
+  ThriftHiveMetastore_drop_constraint_result() {
+  }
+
+  virtual ~ThriftHiveMetastore_drop_constraint_result() throw();
+  NoSuchObjectException o1;
+  MetaException o3;
+
+  _ThriftHiveMetastore_drop_constraint_result__isset __isset;
+
+  void __set_o1(const NoSuchObjectException& val);
+
+  void __set_o3(const MetaException& val);
+
+  bool operator == (const ThriftHiveMetastore_drop_constraint_result & rhs) const
+  {
+    if (!(o1 == rhs.o1))
+      return false;
+    if (!(o3 == rhs.o3))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_drop_constraint_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_drop_constraint_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_drop_constraint_presult__isset {
+  _ThriftHiveMetastore_drop_constraint_presult__isset() : o1(false), o3(false) {}
+  bool o1 :1;
+  bool o3 :1;
+} _ThriftHiveMetastore_drop_constraint_presult__isset;
+
+class ThriftHiveMetastore_drop_constraint_presult {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_drop_constraint_presult() throw();
+  NoSuchObjectException o1;
+  MetaException o3;
+
+  _ThriftHiveMetastore_drop_constraint_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _ThriftHiveMetastore_add_primary_key_args__isset {
+  _ThriftHiveMetastore_add_primary_key_args__isset() : req(false) {}
+  bool req :1;
+} _ThriftHiveMetastore_add_primary_key_args__isset;
+
+class ThriftHiveMetastore_add_primary_key_args {
+ public:
+
+  ThriftHiveMetastore_add_primary_key_args(const ThriftHiveMetastore_add_primary_key_args&);
+  ThriftHiveMetastore_add_primary_key_args& operator=(const ThriftHiveMetastore_add_primary_key_args&);
+  ThriftHiveMetastore_add_primary_key_args() {
+  }
+
+  virtual ~ThriftHiveMetastore_add_primary_key_args() throw();
+  AddPrimaryKeyRequest req;
+
+  _ThriftHiveMetastore_add_primary_key_args__isset __isset;
+
+  void __set_req(const AddPrimaryKeyRequest& val);
+
+  bool operator == (const ThriftHiveMetastore_add_primary_key_args & rhs) const
+  {
+    if (!(req == rhs.req))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_add_primary_key_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_add_primary_key_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class ThriftHiveMetastore_add_primary_key_pargs {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_add_primary_key_pargs() throw();
+  const AddPrimaryKeyRequest* req;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_add_primary_key_result__isset {
+  _ThriftHiveMetastore_add_primary_key_result__isset() : o1(false), o2(false) {}
+  bool o1 :1;
+  bool o2 :1;
+} _ThriftHiveMetastore_add_primary_key_result__isset;
+
+class ThriftHiveMetastore_add_primary_key_result {
+ public:
+
+  ThriftHiveMetastore_add_primary_key_result(const ThriftHiveMetastore_add_primary_key_result&);
+  ThriftHiveMetastore_add_primary_key_result& operator=(const ThriftHiveMetastore_add_primary_key_result&);
+  ThriftHiveMetastore_add_primary_key_result() {
+  }
+
+  virtual ~ThriftHiveMetastore_add_primary_key_result() throw();
+  NoSuchObjectException o1;
+  MetaException o2;
+
+  _ThriftHiveMetastore_add_primary_key_result__isset __isset;
+
+  void __set_o1(const NoSuchObjectException& val);
+
+  void __set_o2(const MetaException& val);
+
+  bool operator == (const ThriftHiveMetastore_add_primary_key_result & rhs) const
+  {
+    if (!(o1 == rhs.o1))
+      return false;
+    if (!(o2 == rhs.o2))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_add_primary_key_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_add_primary_key_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_add_primary_key_presult__isset {
+  _ThriftHiveMetastore_add_primary_key_presult__isset() : o1(false), o2(false) {}
+  bool o1 :1;
+  bool o2 :1;
+} _ThriftHiveMetastore_add_primary_key_presult__isset;
+
+class ThriftHiveMetastore_add_primary_key_presult {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_add_primary_key_presult() throw();
+  NoSuchObjectException o1;
+  MetaException o2;
+
+  _ThriftHiveMetastore_add_primary_key_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _ThriftHiveMetastore_add_foreign_key_args__isset {
+  _ThriftHiveMetastore_add_foreign_key_args__isset() : req(false) {}
+  bool req :1;
+} _ThriftHiveMetastore_add_foreign_key_args__isset;
+
+class ThriftHiveMetastore_add_foreign_key_args {
+ public:
+
+  ThriftHiveMetastore_add_foreign_key_args(const ThriftHiveMetastore_add_foreign_key_args&);
+  ThriftHiveMetastore_add_foreign_key_args& operator=(const ThriftHiveMetastore_add_foreign_key_args&);
+  ThriftHiveMetastore_add_foreign_key_args() {
+  }
+
+  virtual ~ThriftHiveMetastore_add_foreign_key_args() throw();
+  AddForeignKeyRequest req;
+
+  _ThriftHiveMetastore_add_foreign_key_args__isset __isset;
+
+  void __set_req(const AddForeignKeyRequest& val);
+
+  bool operator == (const ThriftHiveMetastore_add_foreign_key_args & rhs) const
+  {
+    if (!(req == rhs.req))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_add_foreign_key_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_add_foreign_key_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class ThriftHiveMetastore_add_foreign_key_pargs {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_add_foreign_key_pargs() throw();
+  const AddForeignKeyRequest* req;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_add_foreign_key_result__isset {
+  _ThriftHiveMetastore_add_foreign_key_result__isset() : o1(false), o2(false) {}
+  bool o1 :1;
+  bool o2 :1;
+} _ThriftHiveMetastore_add_foreign_key_result__isset;
+
+class ThriftHiveMetastore_add_foreign_key_result {
+ public:
+
+  ThriftHiveMetastore_add_foreign_key_result(const ThriftHiveMetastore_add_foreign_key_result&);
+  ThriftHiveMetastore_add_foreign_key_result& operator=(const ThriftHiveMetastore_add_foreign_key_result&);
+  ThriftHiveMetastore_add_foreign_key_result() {
+  }
+
+  virtual ~ThriftHiveMetastore_add_foreign_key_result() throw();
+  NoSuchObjectException o1;
+  MetaException o2;
+
+  _ThriftHiveMetastore_add_foreign_key_result__isset __isset;
+
+  void __set_o1(const NoSuchObjectException& val);
+
+  void __set_o2(const MetaException& val);
+
+  bool operator == (const ThriftHiveMetastore_add_foreign_key_result & rhs) const
+  {
+    if (!(o1 == rhs.o1))
+      return false;
+    if (!(o2 == rhs.o2))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_add_foreign_key_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_add_foreign_key_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_add_foreign_key_presult__isset {
+  _ThriftHiveMetastore_add_foreign_key_presult__isset() : o1(false), o2(false) {}
+  bool o1 :1;
+  bool o2 :1;
+} _ThriftHiveMetastore_add_foreign_key_presult__isset;
+
+class ThriftHiveMetastore_add_foreign_key_presult {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_add_foreign_key_presult() throw();
+  NoSuchObjectException o1;
+  MetaException o2;
+
+  _ThriftHiveMetastore_add_foreign_key_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -16683,6 +17031,110 @@ class ThriftHiveMetastore_abort_txn_presult {
 
 };
 
+typedef struct _ThriftHiveMetastore_abort_txns_args__isset {
+  _ThriftHiveMetastore_abort_txns_args__isset() : rqst(false) {}
+  bool rqst :1;
+} _ThriftHiveMetastore_abort_txns_args__isset;
+
+class ThriftHiveMetastore_abort_txns_args {
+ public:
+
+  ThriftHiveMetastore_abort_txns_args(const ThriftHiveMetastore_abort_txns_args&);
+  ThriftHiveMetastore_abort_txns_args& operator=(const ThriftHiveMetastore_abort_txns_args&);
+  ThriftHiveMetastore_abort_txns_args() {
+  }
+
+  virtual ~ThriftHiveMetastore_abort_txns_args() throw();
+  AbortTxnsRequest rqst;
+
+  _ThriftHiveMetastore_abort_txns_args__isset __isset;
+
+  void __set_rqst(const AbortTxnsRequest& val);
+
+  bool operator == (const ThriftHiveMetastore_abort_txns_args & rhs) const
+  {
+    if (!(rqst == rhs.rqst))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_abort_txns_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_abort_txns_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class ThriftHiveMetastore_abort_txns_pargs {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_abort_txns_pargs() throw();
+  const AbortTxnsRequest* rqst;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_abort_txns_result__isset {
+  _ThriftHiveMetastore_abort_txns_result__isset() : o1(false) {}
+  bool o1 :1;
+} _ThriftHiveMetastore_abort_txns_result__isset;
+
+class ThriftHiveMetastore_abort_txns_result {
+ public:
+
+  ThriftHiveMetastore_abort_txns_result(const ThriftHiveMetastore_abort_txns_result&);
+  ThriftHiveMetastore_abort_txns_result& operator=(const ThriftHiveMetastore_abort_txns_result&);
+  ThriftHiveMetastore_abort_txns_result() {
+  }
+
+  virtual ~ThriftHiveMetastore_abort_txns_result() throw();
+  NoSuchTxnException o1;
+
+  _ThriftHiveMetastore_abort_txns_result__isset __isset;
+
+  void __set_o1(const NoSuchTxnException& val);
+
+  bool operator == (const ThriftHiveMetastore_abort_txns_result & rhs) const
+  {
+    if (!(o1 == rhs.o1))
+      return false;
+    return true;
+  }
+  bool operator != (const ThriftHiveMetastore_abort_txns_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ThriftHiveMetastore_abort_txns_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _ThriftHiveMetastore_abort_txns_presult__isset {
+  _ThriftHiveMetastore_abort_txns_presult__isset() : o1(false) {}
+  bool o1 :1;
+} _ThriftHiveMetastore_abort_txns_presult__isset;
+
+class ThriftHiveMetastore_abort_txns_presult {
+ public:
+
+
+  virtual ~ThriftHiveMetastore_abort_txns_presult() throw();
+  NoSuchTxnException o1;
+
+  _ThriftHiveMetastore_abort_txns_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _ThriftHiveMetastore_commit_txn_args__isset {
   _ThriftHiveMetastore_commit_txn_args__isset() : rqst(false) {}
   bool rqst :1;
@@ -18679,110 +19131,6 @@ class ThriftHiveMetastore_cache_file_metadata_presult {
 
 };
 
-typedef struct _ThriftHiveMetastore_get_change_version_args__isset {
-  _ThriftHiveMetastore_get_change_version_args__isset() : req(false) {}
-  bool req :1;
-} _ThriftHiveMetastore_get_change_version_args__isset;
-
-class ThriftHiveMetastore_get_change_version_args {
- public:
-
-  ThriftHiveMetastore_get_change_version_args(const ThriftHiveMetastore_get_change_version_args&);
-  ThriftHiveMetastore_get_change_version_args& operator=(const ThriftHiveMetastore_get_change_version_args&);
-  ThriftHiveMetastore_get_change_version_args() {
-  }
-
-  virtual ~ThriftHiveMetastore_get_change_version_args() throw();
-  GetChangeVersionRequest req;
-
-  _ThriftHiveMetastore_get_change_version_args__isset __isset;
-
-  void __set_req(const GetChangeVersionRequest& val);
-
-  bool operator == (const ThriftHiveMetastore_get_change_version_args & rhs) const
-  {
-    if (!(req == rhs.req))
-      return false;
-    return true;
-  }
-  bool operator != (const ThriftHiveMetastore_get_change_version_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const ThriftHiveMetastore_get_change_version_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class ThriftHiveMetastore_get_change_version_pargs {
- public:
-
-
-  virtual ~ThriftHiveMetastore_get_change_version_pargs() throw();
-  const GetChangeVersionRequest* req;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _ThriftHiveMetastore_get_change_version_result__isset {
-  _ThriftHiveMetastore_get_change_version_result__isset() : success(false) {}
-  bool success :1;
-} _ThriftHiveMetastore_get_change_version_result__isset;
-
-class ThriftHiveMetastore_get_change_version_result {
- public:
-
-  ThriftHiveMetastore_get_change_version_result(const ThriftHiveMetastore_get_change_version_result&);
-  ThriftHiveMetastore_get_change_version_result& operator=(const ThriftHiveMetastore_get_change_version_result&);
-  ThriftHiveMetastore_get_change_version_result() {
-  }
-
-  virtual ~ThriftHiveMetastore_get_change_version_result() throw();
-  GetChangeVersionResult success;
-
-  _ThriftHiveMetastore_get_change_version_result__isset __isset;
-
-  void __set_success(const GetChangeVersionResult& val);
-
-  bool operator == (const ThriftHiveMetastore_get_change_version_result & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    return true;
-  }
-  bool operator != (const ThriftHiveMetastore_get_change_version_result &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const ThriftHiveMetastore_get_change_version_result & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _ThriftHiveMetastore_get_change_version_presult__isset {
-  _ThriftHiveMetastore_get_change_version_presult__isset() : success(false) {}
-  bool success :1;
-} _ThriftHiveMetastore_get_change_version_presult__isset;
-
-class ThriftHiveMetastore_get_change_version_presult {
- public:
-
-
-  virtual ~ThriftHiveMetastore_get_change_version_presult() throw();
-  GetChangeVersionResult* success;
-
-  _ThriftHiveMetastore_get_change_version_presult__isset __isset;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-
-};
-
 class ThriftHiveMetastoreClient : virtual public ThriftHiveMetastoreIf, public  ::facebook::fb303::FacebookServiceClient {
  public:
   ThriftHiveMetastoreClient(boost::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) :
@@ -18851,6 +19199,15 @@ class ThriftHiveMetastoreClient : virtual public ThriftHiveMetastoreIf, public  
   void create_table_with_constraints(const Table& tbl, const std::vector<SQLPrimaryKey> & primaryKeys, const std::vector<SQLForeignKey> & foreignKeys);
   void send_create_table_with_constraints(const Table& tbl, const std::vector<SQLPrimaryKey> & primaryKeys, const std::vector<SQLForeignKey> & foreignKeys);
   void recv_create_table_with_constraints();
+  void drop_constraint(const DropConstraintRequest& req);
+  void send_drop_constraint(const DropConstraintRequest& req);
+  void recv_drop_constraint();
+  void add_primary_key(const AddPrimaryKeyRequest& req);
+  void send_add_primary_key(const AddPrimaryKeyRequest& req);
+  void recv_add_primary_key();
+  void add_foreign_key(const AddForeignKeyRequest& req);
+  void send_add_foreign_key(const AddForeignKeyRequest& req);
+  void recv_add_foreign_key();
   void drop_table(const std::string& dbname, const std::string& name, const bool deleteData);
   void send_drop_table(const std::string& dbname, const std::string& name, const bool deleteData);
   void recv_drop_table();
@@ -19172,6 +19529,9 @@ class ThriftHiveMetastoreClient : virtual public ThriftHiveMetastoreIf, public  
   void abort_txn(const AbortTxnRequest& rqst);
   void send_abort_txn(const AbortTxnRequest& rqst);
   void recv_abort_txn();
+  void abort_txns(const AbortTxnsRequest& rqst);
+  void send_abort_txns(const AbortTxnsRequest& rqst);
+  void recv_abort_txns();
   void commit_txn(const CommitTxnRequest& rqst);
   void send_commit_txn(const CommitTxnRequest& rqst);
   void recv_commit_txn();
@@ -19229,9 +19589,6 @@ class ThriftHiveMetastoreClient : virtual public ThriftHiveMetastoreIf, public  
   void cache_file_metadata(CacheFileMetadataResult& _return, const CacheFileMetadataRequest& req);
   void send_cache_file_metadata(const CacheFileMetadataRequest& req);
   void recv_cache_file_metadata(CacheFileMetadataResult& _return);
-  void get_change_version(GetChangeVersionResult& _return, const GetChangeVersionRequest& req);
-  void send_get_change_version(const GetChangeVersionRequest& req);
-  void recv_get_change_version(GetChangeVersionResult& _return);
 };
 
 class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceProcessor {
@@ -19261,6 +19618,9 @@ class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceP
   void process_create_table(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_create_table_with_environment_context(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_create_table_with_constraints(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_drop_constraint(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_add_primary_key(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_add_foreign_key(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_drop_table(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_drop_table_with_environment_context(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_get_tables(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -19368,6 +19728,7 @@ class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceP
   void process_get_open_txns_info(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_open_txns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_abort_txn(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_abort_txns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_commit_txn(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_lock(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_check_lock(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -19387,7 +19748,6 @@ class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceP
   void process_put_file_metadata(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_clear_file_metadata(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_cache_file_metadata(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_get_change_version(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   ThriftHiveMetastoreProcessor(boost::shared_ptr<ThriftHiveMetastoreIf> iface) :
      ::facebook::fb303::FacebookServiceProcessor(iface),
@@ -19411,6 +19771,9 @@ class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceP
     processMap_["create_table"] = &ThriftHiveMetastoreProcessor::process_create_table;
     processMap_["create_table_with_environment_context"] = &ThriftHiveMetastoreProcessor::process_create_table_with_environment_context;
     processMap_["create_table_with_constraints"] = &ThriftHiveMetastoreProcessor::process_create_table_with_constraints;
+    processMap_["drop_constraint"] = &ThriftHiveMetastoreProcessor::process_drop_constraint;
+    processMap_["add_primary_key"] = &ThriftHiveMetastoreProcessor::process_add_primary_key;
+    processMap_["add_foreign_key"] = &ThriftHiveMetastoreProcessor::process_add_foreign_key;
     processMap_["drop_table"] = &ThriftHiveMetastoreProcessor::process_drop_table;
     processMap_["drop_table_with_environment_context"] = &ThriftHiveMetastoreProcessor::process_drop_table_with_environment_context;
     processMap_["get_tables"] = &ThriftHiveMetastoreProcessor::process_get_tables;
@@ -19518,6 +19881,7 @@ class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceP
     processMap_["get_open_txns_info"] = &ThriftHiveMetastoreProcessor::process_get_open_txns_info;
     processMap_["open_txns"] = &ThriftHiveMetastoreProcessor::process_open_txns;
     processMap_["abort_txn"] = &ThriftHiveMetastoreProcessor::process_abort_txn;
+    processMap_["abort_txns"] = &ThriftHiveMetastoreProcessor::process_abort_txns;
     processMap_["commit_txn"] = &ThriftHiveMetastoreProcessor::process_commit_txn;
     processMap_["lock"] = &ThriftHiveMetastoreProcessor::process_lock;
     processMap_["check_lock"] = &ThriftHiveMetastoreProcessor::process_check_lock;
@@ -19537,7 +19901,6 @@ class ThriftHiveMetastoreProcessor : public  ::facebook::fb303::FacebookServiceP
     processMap_["put_file_metadata"] = &ThriftHiveMetastoreProcessor::process_put_file_metadata;
     processMap_["clear_file_metadata"] = &ThriftHiveMetastoreProcessor::process_clear_file_metadata;
     processMap_["cache_file_metadata"] = &ThriftHiveMetastoreProcessor::process_cache_file_metadata;
-    processMap_["get_change_version"] = &ThriftHiveMetastoreProcessor::process_get_change_version;
   }
 
   virtual ~ThriftHiveMetastoreProcessor() {}
@@ -19750,6 +20113,33 @@ class ThriftHiveMetastoreMultiface : virtual public ThriftHiveMetastoreIf, publi
       ifaces_[i]->create_table_with_constraints(tbl, primaryKeys, foreignKeys);
     }
     ifaces_[i]->create_table_with_constraints(tbl, primaryKeys, foreignKeys);
+  }
+
+  void drop_constraint(const DropConstraintRequest& req) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->drop_constraint(req);
+    }
+    ifaces_[i]->drop_constraint(req);
+  }
+
+  void add_primary_key(const AddPrimaryKeyRequest& req) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->add_primary_key(req);
+    }
+    ifaces_[i]->add_primary_key(req);
+  }
+
+  void add_foreign_key(const AddForeignKeyRequest& req) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->add_foreign_key(req);
+    }
+    ifaces_[i]->add_foreign_key(req);
   }
 
   void drop_table(const std::string& dbname, const std::string& name, const bool deleteData) {
@@ -20778,6 +21168,15 @@ class ThriftHiveMetastoreMultiface : virtual public ThriftHiveMetastoreIf, publi
     ifaces_[i]->abort_txn(rqst);
   }
 
+  void abort_txns(const AbortTxnsRequest& rqst) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->abort_txns(rqst);
+    }
+    ifaces_[i]->abort_txns(rqst);
+  }
+
   void commit_txn(const CommitTxnRequest& rqst) {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -20962,16 +21361,6 @@ class ThriftHiveMetastoreMultiface : virtual public ThriftHiveMetastoreIf, publi
     return;
   }
 
-  void get_change_version(GetChangeVersionResult& _return, const GetChangeVersionRequest& req) {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->get_change_version(_return, req);
-    }
-    ifaces_[i]->get_change_version(_return, req);
-    return;
-  }
-
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -21045,6 +21434,15 @@ class ThriftHiveMetastoreConcurrentClient : virtual public ThriftHiveMetastoreIf
   void create_table_with_constraints(const Table& tbl, const std::vector<SQLPrimaryKey> & primaryKeys, const std::vector<SQLForeignKey> & foreignKeys);
   int32_t send_create_table_with_constraints(const Table& tbl, const std::vector<SQLPrimaryKey> & primaryKeys, const std::vector<SQLForeignKey> & foreignKeys);
   void recv_create_table_with_constraints(const int32_t seqid);
+  void drop_constraint(const DropConstraintRequest& req);
+  int32_t send_drop_constraint(const DropConstraintRequest& req);
+  void recv_drop_constraint(const int32_t seqid);
+  void add_primary_key(const AddPrimaryKeyRequest& req);
+  int32_t send_add_primary_key(const AddPrimaryKeyRequest& req);
+  void recv_add_primary_key(const int32_t seqid);
+  void add_foreign_key(const AddForeignKeyRequest& req);
+  int32_t send_add_foreign_key(const AddForeignKeyRequest& req);
+  void recv_add_foreign_key(const int32_t seqid);
   void drop_table(const std::string& dbname, const std::string& name, const bool deleteData);
   int32_t send_drop_table(const std::string& dbname, const std::string& name, const bool deleteData);
   void recv_drop_table(const int32_t seqid);
@@ -21366,6 +21764,9 @@ class ThriftHiveMetastoreConcurrentClient : virtual public ThriftHiveMetastoreIf
   void abort_txn(const AbortTxnRequest& rqst);
   int32_t send_abort_txn(const AbortTxnRequest& rqst);
   void recv_abort_txn(const int32_t seqid);
+  void abort_txns(const AbortTxnsRequest& rqst);
+  int32_t send_abort_txns(const AbortTxnsRequest& rqst);
+  void recv_abort_txns(const int32_t seqid);
   void commit_txn(const CommitTxnRequest& rqst);
   int32_t send_commit_txn(const CommitTxnRequest& rqst);
   void recv_commit_txn(const int32_t seqid);
@@ -21423,9 +21824,6 @@ class ThriftHiveMetastoreConcurrentClient : virtual public ThriftHiveMetastoreIf
   void cache_file_metadata(CacheFileMetadataResult& _return, const CacheFileMetadataRequest& req);
   int32_t send_cache_file_metadata(const CacheFileMetadataRequest& req);
   void recv_cache_file_metadata(CacheFileMetadataResult& _return, const int32_t seqid);
-  void get_change_version(GetChangeVersionResult& _return, const GetChangeVersionRequest& req);
-  int32_t send_get_change_version(const GetChangeVersionRequest& req);
-  void recv_get_change_version(GetChangeVersionResult& _return, const int32_t seqid);
 };
 
 #ifdef _WIN32

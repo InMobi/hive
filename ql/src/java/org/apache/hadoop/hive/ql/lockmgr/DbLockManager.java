@@ -54,11 +54,11 @@ public class DbLockManager implements HiveLockManager{
   private long MAX_SLEEP;
   //longer term we should always have a txn id and then we won't need to track locks here at all
   private Set<DbHiveLock> locks;
-  private IMetaStoreClient client;
+  private DbTxnManager.SynchronizedMetaStoreClient client;
   private long nextSleep = 50;
   private final HiveConf conf;
 
-  DbLockManager(IMetaStoreClient client, HiveConf conf) {
+  DbLockManager(DbTxnManager.SynchronizedMetaStoreClient client, HiveConf conf) {
     locks = new HashSet<>();
     this.client = client;
     this.conf = conf;
@@ -172,8 +172,9 @@ public class DbLockManager implements HiveLockManager{
       LOG.error("Metastore could not find " + JavaUtils.txnIdToString(lock.getTxnid()));
       throw new LockException(e, ErrorMsg.TXN_NO_SUCH_TRANSACTION, JavaUtils.txnIdToString(lock.getTxnid()));
     } catch (TxnAbortedException e) {
-      LOG.error("Transaction " + JavaUtils.txnIdToString(lock.getTxnid()) + " already aborted.");
-      throw new LockException(e, ErrorMsg.TXN_ABORTED, JavaUtils.txnIdToString(lock.getTxnid()));
+      LockException le = new LockException(e, ErrorMsg.TXN_ABORTED, JavaUtils.txnIdToString(lock.getTxnid()), e.getMessage());
+      LOG.error(le.getMessage());
+      throw le;
     } catch (TException e) {
       throw new LockException(ErrorMsg.METASTORE_COMMUNICATION_FAILED.getMsg(),
           e);
@@ -277,8 +278,12 @@ public class DbLockManager implements HiveLockManager{
   }
 
   public ShowLocksResponse getLocks() throws LockException {
+    return getLocks(new ShowLocksRequest());
+  }
+
+  public ShowLocksResponse getLocks(ShowLocksRequest showLocksRequest) throws LockException {
     try {
-      return client.showLocks();
+      return client.showLocks(showLocksRequest);
     } catch (TException e) {
       throw new LockException(ErrorMsg.METASTORE_COMMUNICATION_FAILED.getMsg(), e);
     }

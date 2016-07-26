@@ -88,6 +88,8 @@ public class TestExecDriver extends TestCase {
       conf = queryState.getConf();
       conf.setBoolVar(HiveConf.ConfVars.SUBMITVIACHILD, true);
       conf.setBoolVar(HiveConf.ConfVars.SUBMITLOCALTASKVIACHILD, true);
+      conf.setVar(HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER,
+          "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory");
 
       SessionState.start(conf);
 
@@ -144,7 +146,7 @@ public class TestExecDriver extends TestCase {
         db.dropTable(MetaStoreUtils.DEFAULT_DATABASE_NAME, src, true, true);
         db.createTable(src, cols, null, TextInputFormat.class,
             HiveIgnoreKeyTextOutputFormat.class);
-        db.loadTable(hadoopDataFile[i], src, false, true, false, false);
+        db.loadTable(hadoopDataFile[i], src, false, true, false, false, false);
         i++;
       }
 

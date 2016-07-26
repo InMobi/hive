@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
-import com.esotericsoftware.kryo.KryoException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -63,11 +62,15 @@ import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters.Converter;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hive.common.util.ReflectionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.esotericsoftware.kryo.KryoException;
 
 /**
  * Map side Join operator implementation.
@@ -83,7 +86,6 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
   private transient ObjectCache cache;
 
   protected HashTableLoader loader;
-  private boolean loadCalled;
 
   protected transient MapJoinTableContainer[] mapJoinTables;
   private transient MapJoinTableContainerSerDe[] mapJoinTableSerdes;
@@ -206,7 +208,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
         }
       }
 
-      if (!loadCalled && spilled) {
+      if (spilled) {
         // we can't use the cached table because it has spilled.
 
         loadHashTable(getExecContext(), MapredContext.get());
@@ -240,19 +242,30 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
     if (valueIndex == null) {
       return super.getValueObjectInspectors(alias, aliasToObjectInspectors);
     }
-    unwrapContainer[alias] = new UnwrapRowContainer(alias, valueIndex, hasFilter(alias));
 
     List<ObjectInspector> inspectors = aliasToObjectInspectors[alias];
-
     int bigPos = conf.getPosBigTable();
+    Converter[] converters = new Converter[valueIndex.length];
     List<ObjectInspector> valueOI = new ArrayList<ObjectInspector>();
     for (int i = 0; i < valueIndex.length; i++) {
       if (valueIndex[i] >= 0 && !joinKeysObjectInspectors[bigPos].isEmpty()) {
-        valueOI.add(joinKeysObjectInspectors[bigPos].get(valueIndex[i]));
+        if (conf.getNoOuterJoin()) {
+          valueOI.add(joinKeysObjectInspectors[bigPos].get(valueIndex[i]));
+        } else {
+          // It is an outer join. We are going to add the inspector from the
+          // inner side, but the key value will come from the outer side, so
+          // we need to create a converter from inputOI to outputOI.
+          valueOI.add(inspectors.get(i));
+          converters[i] = ObjectInspectorConverters.getConverter(
+                  joinKeysObjectInspectors[bigPos].get(valueIndex[i]), inspectors.get(i));
+        }
       } else {
         valueOI.add(inspectors.get(i));
       }
     }
+
+    unwrapContainer[alias] = new UnwrapRowContainer(alias, valueIndex, converters, hasFilter(alias));
+
     return valueOI;
   }
 
@@ -290,8 +303,6 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
 
   protected Pair<MapJoinTableContainer[], MapJoinTableContainerSerDe[]> loadHashTable(
       ExecMapperContext mapContext, MapredContext mrContext) throws HiveException {
-    loadCalled = true;
-
     if (canSkipReload(mapContext)) {
       // no need to reload
       return new ImmutablePair<MapJoinTableContainer[], MapJoinTableContainerSerDe[]>(
@@ -588,6 +599,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
       throws HiveException, IOException, SerDeException, ClassNotFoundException {
     for (byte pos = 0; pos < mapJoinTables.length; pos++) {
       if (pos != conf.getPosBigTable()) {
+        LOG.info("Going to reload hash partition " + partitionId);
         reloadHashTable(pos, partitionId);
       }
     }
@@ -612,6 +624,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
 
     // Merge the sidefile into the newly created hash table
     // This is where the spilling may happen again
+    LOG.info("Going to restore sidefile...");
     KeyValueContainer kvContainer = partition.getSidefileKVContainer();
     int rowCount = kvContainer.size();
     LOG.info("Hybrid Grace Hash Join: Number of rows restored from KeyValueContainer: " +
@@ -624,6 +637,7 @@ public class MapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc> implem
                               // as the initialCapacity which cannot be 0, we provide a reasonable
                               // positive number here
     }
+    LOG.info("Going to restore hashmap...");
     BytesBytesMultiHashMap restoredHashMap = partition.getHashMapFromDisk(rowCount);
     rowCount += restoredHashMap.getNumValues();
     LOG.info("Hybrid Grace Hash Join: Deserializing spilled hash partition...");

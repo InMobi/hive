@@ -29,7 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLSocket;
 import javax.security.auth.login.LoginException;
 import javax.security.sasl.AuthenticationException;
 import javax.security.sasl.Sasl;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hive.thrift.DBTokenStore;
 import org.apache.hadoop.hive.thrift.HiveDelegationTokenManager;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge.Server.ServerMode;
+import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.ProxyUsers;
@@ -224,9 +227,18 @@ public class HiveAuthFactory {
     }
   }
 
+  public String getUserAuthMechanism() {
+    return saslServer == null ? null : saslServer.getUserAuthMechanism();
+  }
+
   public boolean isSASLWithKerberizedHadoop() {
     return "kerberos".equalsIgnoreCase(hadoopAuth)
         && !authTypeStr.equalsIgnoreCase(AuthTypes.NOSASL.getAuthName());
+  }
+
+  public boolean isSASLKerberosUser() {
+    return AuthMethod.KERBEROS.getMechanismName().equals(getUserAuthMechanism())
+            || AuthMethod.TOKEN.getMechanismName().equals(getUserAuthMechanism());
   }
 
   // Perform kerberos login using the hadoop shim API if the configuration is available
@@ -258,7 +270,9 @@ public class HiveAuthFactory {
 
   public static TTransport getSSLSocket(String host, int port, int loginTimeout)
     throws TTransportException {
-    return TSSLTransportFactory.getClientSocket(host, port, loginTimeout);
+    // The underlying SSLSocket object is bound to host:port with the given SO_TIMEOUT
+    TSocket tSSLSocket = TSSLTransportFactory.getClientSocket(host, port, loginTimeout);
+    return getSSLSocketWithHttps(tSSLSocket);
   }
 
   public static TTransport getSSLSocket(String host, int port, int loginTimeout,
@@ -267,7 +281,20 @@ public class HiveAuthFactory {
       new TSSLTransportFactory.TSSLTransportParameters();
     params.setTrustStore(trustStorePath, trustStorePassWord);
     params.requireClientAuth(true);
-    return TSSLTransportFactory.getClientSocket(host, port, loginTimeout, params);
+    // The underlying SSLSocket object is bound to host:port with the given SO_TIMEOUT and
+    // SSLContext created with the given params
+    TSocket tSSLSocket = TSSLTransportFactory.getClientSocket(host, port, loginTimeout, params);
+    return getSSLSocketWithHttps(tSSLSocket);
+  }
+
+  // Using endpoint identification algorithm as HTTPS enables us to do
+  // CNAMEs/subjectAltName verification
+  private static TSocket getSSLSocketWithHttps(TSocket tSSLSocket) throws TTransportException {
+    SSLSocket sslSocket = (SSLSocket) tSSLSocket.getSocket();
+    SSLParameters sslParams = sslSocket.getSSLParameters();
+    sslParams.setEndpointIdentificationAlgorithm("HTTPS");
+    sslSocket.setSSLParameters(sslParams);
+    return new TSocket(sslSocket);
   }
 
   public static TServerSocket getServerSocket(String hiveHost, int portNum)

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Stack;
 
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.PTFOperator;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
@@ -50,11 +52,12 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDescUtils;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
-
-import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * If two reducer sink operators share the same partition/sort columns and order,
@@ -64,6 +67,8 @@ import com.google.common.collect.Lists;
  * This optimizer removes/replaces child-RS (not parent) which is safer way for DefaultGraphWalker.
  */
 public class ReduceSinkDeDuplication extends Transform {
+
+  protected static final Logger LOG = LoggerFactory.getLogger(ReduceSinkDeDuplication.class);
 
   private static final String RS = ReduceSinkOperator.getOperatorName();
   private static final String GBY = GroupByOperator.getOperatorName();
@@ -201,7 +206,7 @@ public class ReduceSinkDeDuplication extends Transform {
           return false;
         }
 
-        Integer moveRSOrderTo = checkOrder(cRSc.getOrder(), pRSNc.getOrder(),
+        Integer moveRSOrderTo = checkOrder(true, cRSc.getOrder(), pRSNc.getOrder(),
                 cRSc.getNullOrder(), pRSNc.getNullOrder());
         if (moveRSOrderTo == null) {
           return false;
@@ -253,7 +258,7 @@ public class ReduceSinkDeDuplication extends Transform {
      */
     protected boolean merge(ReduceSinkOperator cRS, ReduceSinkOperator pRS, int minReducer)
         throws SemanticException {
-      int[] result = checkStatus(cRS, pRS, minReducer);
+      int[] result = extractMergeDirections(cRS, pRS, minReducer);
       if (result == null) {
         return false;
       }
@@ -300,6 +305,16 @@ public class ReduceSinkDeDuplication extends Transform {
         }
         pRS.getConf().setOrder(cRS.getConf().getOrder());
         pRS.getConf().setNullOrder(cRS.getConf().getNullOrder());
+      } else {
+        // The sorting order of the parent RS is more specific or they are equal.
+        // We will copy the order from the child RS, and then fill in the order
+        // of the rest of columns with the one taken from parent RS.
+        StringBuilder order = new StringBuilder(cRS.getConf().getOrder());
+        StringBuilder orderNull = new StringBuilder(cRS.getConf().getNullOrder());
+        order.append(pRS.getConf().getOrder().substring(order.length()));
+        orderNull.append(pRS.getConf().getNullOrder().substring(orderNull.length()));
+        pRS.getConf().setOrder(order.toString());
+        pRS.getConf().setNullOrder(orderNull.toString());
       }
 
       if (result[3] > 0) {
@@ -334,11 +349,13 @@ public class ReduceSinkDeDuplication extends Transform {
      * 2. for -1, configuration of parent RS is more specific than child RS
      * 3. for 1, configuration of child RS is more specific than parent RS
      */
-    private int[] checkStatus(ReduceSinkOperator cRS, ReduceSinkOperator pRS, int minReducer)
+    private int[] extractMergeDirections(ReduceSinkOperator cRS, ReduceSinkOperator pRS, int minReducer)
         throws SemanticException {
       ReduceSinkDesc cConf = cRS.getConf();
       ReduceSinkDesc pConf = pRS.getConf();
-      Integer moveRSOrderTo = checkOrder(cConf.getOrder(), pConf.getOrder(),
+      // If there is a PTF between cRS and pRS we cannot ignore the order direction
+      final boolean checkStrictEquality = isStrictEqualityNeeded(cRS, pRS);
+      Integer moveRSOrderTo = checkOrder(checkStrictEquality, cConf.getOrder(), pConf.getOrder(),
               cConf.getNullOrder(), pConf.getNullOrder());
       if (moveRSOrderTo == null) {
         return null;
@@ -364,6 +381,18 @@ public class ReduceSinkDeDuplication extends Transform {
           pConf.getNumDistributionKeys());
       return new int[] {moveKeyColTo, movePartitionColTo, moveRSOrderTo,
           moveReducerNumTo, moveNumDistKeyTo};
+    }
+
+    private boolean isStrictEqualityNeeded(ReduceSinkOperator cRS, ReduceSinkOperator pRS) {
+      Operator<? extends OperatorDesc> parent = cRS.getParentOperators().get(0);
+      while (parent != pRS) {
+        assert parent.getNumParent() == 1;
+        if (parent instanceof PTFOperator) {
+          return true;
+        }
+        parent = parent.getParentOperators().get(0);
+      }
+      return false;
     }
 
     private Integer checkNumDistributionKey(int cnd, int pnd) {
@@ -448,8 +477,7 @@ public class ReduceSinkDeDuplication extends Transform {
       return Integer.valueOf(cexprs.size()).compareTo(pexprs.size());
     }
 
-    // order of overlapping keys should be exactly the same
-    protected Integer checkOrder(String corder, String porder,
+    protected Integer checkOrder(boolean checkStrictEquality, String corder, String porder,
             String cNullOrder, String pNullOrder) {
       assert corder.length() == cNullOrder.length();
       assert porder.length() == pNullOrder.length();
@@ -464,12 +492,15 @@ public class ReduceSinkDeDuplication extends Transform {
       }
       corder = corder.trim();
       porder = porder.trim();
-      cNullOrder = cNullOrder.trim();
-      pNullOrder = pNullOrder.trim();
-      int target = Math.min(corder.length(), porder.length());
-      if (!corder.substring(0, target).equals(porder.substring(0, target)) ||
-              !cNullOrder.substring(0, target).equals(pNullOrder.substring(0, target))) {
-        return null;
+      if (checkStrictEquality) {
+        // order of overlapping keys should be exactly the same
+        cNullOrder = cNullOrder.trim();
+        pNullOrder = pNullOrder.trim();
+        int target = Math.min(corder.length(), porder.length());
+        if (!corder.substring(0, target).equals(porder.substring(0, target)) ||
+                !cNullOrder.substring(0, target).equals(pNullOrder.substring(0, target))) {
+          return null;
+        }
       }
       return Integer.valueOf(corder.length()).compareTo(porder.length());
     }
@@ -493,6 +524,112 @@ public class ReduceSinkDeDuplication extends Transform {
         return null;
       }
       return 0;
+    }
+
+    protected boolean aggressiveDedup(ReduceSinkOperator cRS, ReduceSinkOperator pRS,
+            ReduceSinkDeduplicateProcCtx dedupCtx) throws SemanticException {
+      assert cRS.getNumParent() == 1;
+
+      ReduceSinkDesc cConf = cRS.getConf();
+      ReduceSinkDesc pConf = pRS.getConf();
+      List<ExprNodeDesc> cKeys = cConf.getKeyCols();
+      List<ExprNodeDesc> pKeys = pConf.getKeyCols();
+
+      // Check that in the path between cRS and pRS, there are only Select operators
+      // i.e. the sequence must be pRS-SEL*-cRS
+      Operator<? extends OperatorDesc> parent = cRS.getParentOperators().get(0);
+      while (parent != pRS) {
+        assert parent.getNumParent() == 1;
+        if (!(parent instanceof SelectOperator)) {
+          return false;
+        }
+        parent = parent.getParentOperators().get(0);
+      }
+
+      // If child keys are null or empty, we bail out
+      if (cKeys == null || cKeys.isEmpty()) {
+        return false;
+      }
+      // If parent keys are null or empty, we bail out
+      if (pKeys == null || pKeys.isEmpty()) {
+        return false;
+      }
+
+      // Backtrack key columns of cRS to pRS
+      // If we cannot backtrack any of the columns, bail out
+      List<ExprNodeDesc> cKeysInParentRS = ExprNodeDescUtils.backtrack(cKeys, cRS, pRS);
+      for (int i = 0; i < cKeysInParentRS.size(); i++) {
+        ExprNodeDesc pexpr = cKeysInParentRS.get(i);
+        if (pexpr == null) {
+          // We cannot backtrack the expression, we bail out
+          return false;
+        }
+      }
+      cRS.getConf().setKeyCols(ExprNodeDescUtils.backtrack(cKeysInParentRS, cRS, pRS));
+
+      // Backtrack partition columns of cRS to pRS
+      // If we cannot backtrack any of the columns, bail out
+      List<ExprNodeDesc> cPartitionInParentRS = ExprNodeDescUtils.backtrack(
+              cConf.getPartitionCols(), cRS, pRS);
+      for (int i = 0; i < cPartitionInParentRS.size(); i++) {
+        ExprNodeDesc pexpr = cPartitionInParentRS.get(i);
+        if (pexpr == null) {
+          // We cannot backtrack the expression, we bail out
+          return false;
+        }
+      }
+      cRS.getConf().setPartitionCols(ExprNodeDescUtils.backtrack(cPartitionInParentRS, cRS, pRS));
+
+      // Backtrack value columns of cRS to pRS
+      // If we cannot backtrack any of the columns, bail out
+      List<ExprNodeDesc> cValueInParentRS = ExprNodeDescUtils.backtrack(
+              cConf.getValueCols(), cRS, pRS);
+      for (int i = 0; i < cValueInParentRS.size(); i++) {
+        ExprNodeDesc pexpr = cValueInParentRS.get(i);
+        if (pexpr == null) {
+          // We cannot backtrack the expression, we bail out
+          return false;
+        }
+      }
+      cRS.getConf().setValueCols(ExprNodeDescUtils.backtrack(cValueInParentRS, cRS, pRS));
+
+      // Backtrack bucket columns of cRS to pRS (if any)
+      // If we cannot backtrack any of the columns, bail out
+      if (cConf.getBucketCols() != null) {
+        List<ExprNodeDesc> cBucketInParentRS = ExprNodeDescUtils.backtrack(
+                cConf.getBucketCols(), cRS, pRS);
+        for (int i = 0; i < cBucketInParentRS.size(); i++) {
+          ExprNodeDesc pexpr = cBucketInParentRS.get(i);
+          if (pexpr == null) {
+            // We cannot backtrack the expression, we bail out
+            return false;
+          }
+        }
+        cRS.getConf().setBucketCols(ExprNodeDescUtils.backtrack(cBucketInParentRS, cRS, pRS));
+      }
+
+      // Update column expression map
+      for (Entry<String, ExprNodeDesc> e : cRS.getColumnExprMap().entrySet()) {
+        e.setValue(ExprNodeDescUtils.backtrack(e.getValue(), cRS, pRS));
+      }
+
+      // Replace pRS with cRS and remove operator sequence from pRS to cRS
+      // Recall that the sequence must be pRS-SEL*-cRS
+      parent = cRS.getParentOperators().get(0);
+      while (parent != pRS) {
+        dedupCtx.addRemovedOperator(parent);
+        parent = parent.getParentOperators().get(0);
+      }
+      dedupCtx.addRemovedOperator(pRS);
+      cRS.getParentOperators().clear();
+      for (Operator<? extends OperatorDesc> op : pRS.getParentOperators()) {
+        op.replaceChild(pRS, cRS);
+        cRS.getParentOperators().add(op);
+      }
+      pRS.getParentOperators().clear();
+      pRS.getChildOperators().clear();
+
+      return true;
     }
   }
 
@@ -601,11 +738,18 @@ public class ReduceSinkDeDuplication extends Transform {
       ReduceSinkOperator pRS =
           CorrelationUtilities.findPossibleParent(
               cRS, ReduceSinkOperator.class, dedupCtx.trustScript());
-      if (pRS != null && merge(cRS, pRS, dedupCtx.minReducer())) {
-        CorrelationUtilities.replaceReduceSinkWithSelectOperator(
-            cRS, dedupCtx.getPctx(), dedupCtx);
-        pRS.getConf().setDeduplicated(true);
-        return true;
+      if (pRS != null) {
+        // Try extended deduplication
+        if (aggressiveDedup(cRS, pRS, dedupCtx)) {
+          return true;
+        }
+        // Normal deduplication
+        if (merge(cRS, pRS, dedupCtx.minReducer())) {
+          CorrelationUtilities.replaceReduceSinkWithSelectOperator(
+              cRS, dedupCtx.getPctx(), dedupCtx);
+          pRS.getConf().setDeduplicated(true);
+          return true;
+        }
       }
       return false;
     }

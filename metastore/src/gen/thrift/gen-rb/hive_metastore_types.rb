@@ -79,6 +79,17 @@ module GrantRevokeType
   VALID_VALUES = Set.new([GRANT, REVOKE]).freeze
 end
 
+module DataOperationType
+  SELECT = 1
+  INSERT = 2
+  UPDATE = 3
+  DELETE = 4
+  UNSET = 5
+  NO_TXN = 6
+  VALUE_MAP = {1 => "SELECT", 2 => "INSERT", 3 => "UPDATE", 4 => "DELETE", 5 => "UNSET", 6 => "NO_TXN"}
+  VALID_VALUES = Set.new([SELECT, INSERT, UPDATE, DELETE, UNSET, NO_TXN]).freeze
+end
+
 module EventRequestType
   INSERT = 1
   UPDATE = 2
@@ -1262,9 +1273,11 @@ end
 class SetPartitionsStatsRequest
   include ::Thrift::Struct, ::Thrift::Struct_Union
   COLSTATS = 1
+  NEEDMERGE = 2
 
   FIELDS = {
-    COLSTATS => {:type => ::Thrift::Types::LIST, :name => 'colStats', :element => {:type => ::Thrift::Types::STRUCT, :class => ::ColumnStatistics}}
+    COLSTATS => {:type => ::Thrift::Types::LIST, :name => 'colStats', :element => {:type => ::Thrift::Types::STRUCT, :class => ::ColumnStatistics}},
+    NEEDMERGE => {:type => ::Thrift::Types::BOOL, :name => 'needMerge', :optional => true}
   }
 
   def struct_fields; FIELDS; end
@@ -1364,10 +1377,6 @@ class ForeignKeysRequest
   def struct_fields; FIELDS; end
 
   def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field parent_db_name is unset!') unless @parent_db_name
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field parent_tbl_name is unset!') unless @parent_tbl_name
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field foreign_db_name is unset!') unless @foreign_db_name
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field foreign_tbl_name is unset!') unless @foreign_tbl_name
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -1385,6 +1394,63 @@ class ForeignKeysResponse
 
   def validate
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field foreignKeys is unset!') unless @foreignKeys
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class DropConstraintRequest
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  DBNAME = 1
+  TABLENAME = 2
+  CONSTRAINTNAME = 3
+
+  FIELDS = {
+    DBNAME => {:type => ::Thrift::Types::STRING, :name => 'dbname'},
+    TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tablename'},
+    CONSTRAINTNAME => {:type => ::Thrift::Types::STRING, :name => 'constraintname'}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field dbname is unset!') unless @dbname
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field tablename is unset!') unless @tablename
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field constraintname is unset!') unless @constraintname
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class AddPrimaryKeyRequest
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  PRIMARYKEYCOLS = 1
+
+  FIELDS = {
+    PRIMARYKEYCOLS => {:type => ::Thrift::Types::LIST, :name => 'primaryKeyCols', :element => {:type => ::Thrift::Types::STRUCT, :class => ::SQLPrimaryKey}}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field primaryKeyCols is unset!') unless @primaryKeyCols
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
+class AddForeignKeyRequest
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  FOREIGNKEYCOLS = 1
+
+  FIELDS = {
+    FOREIGNKEYCOLS => {:type => ::Thrift::Types::LIST, :name => 'foreignKeyCols', :element => {:type => ::Thrift::Types::STRUCT, :class => ::SQLForeignKey}}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field foreignKeyCols is unset!') unless @foreignKeyCols
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -1852,6 +1918,23 @@ class AbortTxnRequest
   ::Thrift::Struct.generate_accessors self
 end
 
+class AbortTxnsRequest
+  include ::Thrift::Struct, ::Thrift::Struct_Union
+  TXN_IDS = 1
+
+  FIELDS = {
+    TXN_IDS => {:type => ::Thrift::Types::LIST, :name => 'txn_ids', :element => {:type => ::Thrift::Types::I64}}
+  }
+
+  def struct_fields; FIELDS; end
+
+  def validate
+    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field txn_ids is unset!') unless @txn_ids
+  end
+
+  ::Thrift::Struct.generate_accessors self
+end
+
 class CommitTxnRequest
   include ::Thrift::Struct, ::Thrift::Struct_Union
   TXNID = 1
@@ -1876,13 +1959,17 @@ class LockComponent
   DBNAME = 3
   TABLENAME = 4
   PARTITIONNAME = 5
+  OPERATIONTYPE = 6
+  ISACID = 7
 
   FIELDS = {
     TYPE => {:type => ::Thrift::Types::I32, :name => 'type', :enum_class => ::LockType},
     LEVEL => {:type => ::Thrift::Types::I32, :name => 'level', :enum_class => ::LockLevel},
     DBNAME => {:type => ::Thrift::Types::STRING, :name => 'dbname'},
     TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tablename', :optional => true},
-    PARTITIONNAME => {:type => ::Thrift::Types::STRING, :name => 'partitionname', :optional => true}
+    PARTITIONNAME => {:type => ::Thrift::Types::STRING, :name => 'partitionname', :optional => true},
+    OPERATIONTYPE => {:type => ::Thrift::Types::I32, :name => 'operationType', :default =>     5, :optional => true, :enum_class => ::DataOperationType},
+    ISACID => {:type => ::Thrift::Types::BOOL, :name => 'isAcid', :default => false, :optional => true}
   }
 
   def struct_fields; FIELDS; end
@@ -1896,6 +1983,9 @@ class LockComponent
     end
     unless @level.nil? || ::LockLevel::VALID_VALUES.include?(@level)
       raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field level!')
+    end
+    unless @operationType.nil? || ::DataOperationType::VALID_VALUES.include?(@operationType)
+      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field operationType!')
     end
   end
 
@@ -2152,13 +2242,15 @@ class CompactionRequest
   PARTITIONNAME = 3
   TYPE = 4
   RUNAS = 5
+  PROPERTIES = 6
 
   FIELDS = {
     DBNAME => {:type => ::Thrift::Types::STRING, :name => 'dbname'},
     TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tablename'},
     PARTITIONNAME => {:type => ::Thrift::Types::STRING, :name => 'partitionname', :optional => true},
     TYPE => {:type => ::Thrift::Types::I32, :name => 'type', :enum_class => ::CompactionType},
-    RUNAS => {:type => ::Thrift::Types::STRING, :name => 'runas', :optional => true}
+    RUNAS => {:type => ::Thrift::Types::STRING, :name => 'runas', :optional => true},
+    PROPERTIES => {:type => ::Thrift::Types::MAP, :name => 'properties', :key => {:type => ::Thrift::Types::STRING}, :value => {:type => ::Thrift::Types::STRING}, :optional => true}
   }
 
   def struct_fields; FIELDS; end
@@ -2258,12 +2350,14 @@ class AddDynamicPartitions
   DBNAME = 2
   TABLENAME = 3
   PARTITIONNAMES = 4
+  OPERATIONTYPE = 5
 
   FIELDS = {
     TXNID => {:type => ::Thrift::Types::I64, :name => 'txnid'},
     DBNAME => {:type => ::Thrift::Types::STRING, :name => 'dbname'},
     TABLENAME => {:type => ::Thrift::Types::STRING, :name => 'tablename'},
-    PARTITIONNAMES => {:type => ::Thrift::Types::LIST, :name => 'partitionnames', :element => {:type => ::Thrift::Types::STRING}}
+    PARTITIONNAMES => {:type => ::Thrift::Types::LIST, :name => 'partitionnames', :element => {:type => ::Thrift::Types::STRING}},
+    OPERATIONTYPE => {:type => ::Thrift::Types::I32, :name => 'operationType', :default =>     5, :optional => true, :enum_class => ::DataOperationType}
   }
 
   def struct_fields; FIELDS; end
@@ -2273,6 +2367,9 @@ class AddDynamicPartitions
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field dbname is unset!') unless @dbname
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field tablename is unset!') unless @tablename
     raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field partitionnames is unset!') unless @partitionnames
+    unless @operationType.nil? || ::DataOperationType::VALID_VALUES.include?(@operationType)
+      raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Invalid value of field operationType!')
+    end
   end
 
   ::Thrift::Struct.generate_accessors self
@@ -2437,40 +2534,6 @@ class FireEventResponse
   def struct_fields; FIELDS; end
 
   def validate
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class GetChangeVersionRequest
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  TOPIC = 1
-
-  FIELDS = {
-    TOPIC => {:type => ::Thrift::Types::STRING, :name => 'topic'}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field topic is unset!') unless @topic
-  end
-
-  ::Thrift::Struct.generate_accessors self
-end
-
-class GetChangeVersionResult
-  include ::Thrift::Struct, ::Thrift::Struct_Union
-  VERSION = 1
-
-  FIELDS = {
-    VERSION => {:type => ::Thrift::Types::I64, :name => 'version'}
-  }
-
-  def struct_fields; FIELDS; end
-
-  def validate
-    raise ::Thrift::ProtocolException.new(::Thrift::ProtocolException::UNKNOWN, 'Required field version is unset!') unless @version
   end
 
   ::Thrift::Struct.generate_accessors self

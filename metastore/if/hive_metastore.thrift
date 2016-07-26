@@ -134,6 +134,15 @@ enum GrantRevokeType {
     REVOKE = 2,
 }
 
+enum DataOperationType {
+    SELECT = 1,
+    INSERT = 2
+    UPDATE = 3,
+    DELETE = 4,
+    UNSET = 5,//this is the default to distinguish from NULL from old clients
+    NO_TXN = 6,//drop table, insert overwrite, etc - something non-transactional
+}
+
 // Types of events the client can request that the metastore fire.  For now just support DML operations, as the metastore knows
 // about DDL operations and there's no reason for the client to request such an event.
 enum EventRequestType {
@@ -449,7 +458,8 @@ struct AggrStats {
 }
 
 struct SetPartitionsStatsRequest {
-1: required list<ColumnStatistics> colStats
+1: required list<ColumnStatistics> colStats,
+2: optional bool needMerge //stats need to be merged with the existing stats
 }
 
 // schema of the table/query results etc.
@@ -477,16 +487,29 @@ struct PrimaryKeysResponse {
 }
 
 struct ForeignKeysRequest {
-  1: required string parent_db_name,
-  2: required string parent_tbl_name,
-  3: required string foreign_db_name,
-  4: required string foreign_tbl_name
+  1: string parent_db_name,
+  2: string parent_tbl_name,
+  3: string foreign_db_name,
+  4: string foreign_tbl_name
 }
 
 struct ForeignKeysResponse {
   1: required list<SQLForeignKey> foreignKeys
 }
 
+struct DropConstraintRequest {
+  1: required string dbname, 
+  2: required string tablename,
+  3: required string constraintname
+}
+
+struct AddPrimaryKeyRequest {
+  1: required list<SQLPrimaryKey> primaryKeyCols
+}
+
+struct AddForeignKeyRequest {
+  1: required list<SQLForeignKey> foreignKeyCols
+}
 
 // Return type for get_partitions_by_expr
 struct PartitionsByExprResult {
@@ -629,6 +652,10 @@ struct AbortTxnRequest {
     1: required i64 txnid,
 }
 
+struct AbortTxnsRequest {
+    1: required list<i64> txn_ids,
+}
+
 struct CommitTxnRequest {
     1: required i64 txnid,
 }
@@ -639,6 +666,8 @@ struct LockComponent {
     3: required string dbname,
     4: optional string tablename,
     5: optional string partitionname,
+    6: optional DataOperationType operationType = DataOperationType.UNSET,
+    7: optional bool isAcid = false
 }
 
 struct LockRequest {
@@ -715,6 +744,7 @@ struct CompactionRequest {
     3: optional string partitionname,
     4: required CompactionType type,
     5: optional string runas,
+    6: optional map<string, string> properties
 }
 
 struct ShowCompactRequest {
@@ -744,6 +774,7 @@ struct AddDynamicPartitions {
     2: required string dbname,
     3: required string tablename,
     4: required list<string> partitionnames,
+    5: optional DataOperationType operationType = DataOperationType.UNSET
 }
 
 struct NotificationEventRequest {
@@ -789,17 +820,7 @@ struct FireEventRequest {
 struct FireEventResponse {
     // NOP for now, this is just a place holder for future responses
 }
-
-
-struct GetChangeVersionRequest {
-  1: required string topic
-}
-
-struct GetChangeVersionResult {
-  1: required i64 version
-}
-
-
+    
 struct MetadataPpdResult {
   1: optional binary metadata,
   2: optional binary includeBitset
@@ -993,6 +1014,13 @@ service ThriftHiveMetastore extends fb303.FacebookService
       throws (1:AlreadyExistsException o1,
               2:InvalidObjectException o2, 3:MetaException o3,
               4:NoSuchObjectException o4)
+  void drop_constraint(1:DropConstraintRequest req)
+      throws(1:NoSuchObjectException o1, 2:MetaException o3)
+  void add_primary_key(1:AddPrimaryKeyRequest req)
+      throws(1:NoSuchObjectException o1, 2:MetaException o2)
+  void add_foreign_key(1:AddForeignKeyRequest req)
+      throws(1:NoSuchObjectException o1, 2:MetaException o2)  
+
   // drops the table and all the partitions associated with it if the table has partitions
   // delete data (including partitions) if deleteData is set to true
   void drop_table(1:string dbname, 2:string name, 3:bool deleteData)
@@ -1384,6 +1412,7 @@ service ThriftHiveMetastore extends fb303.FacebookService
   GetOpenTxnsInfoResponse get_open_txns_info()
   OpenTxnsResponse open_txns(1:OpenTxnRequest rqst)
   void abort_txn(1:AbortTxnRequest rqst) throws (1:NoSuchTxnException o1)
+  void abort_txns(1:AbortTxnsRequest rqst) throws (1:NoSuchTxnException o1)
   void commit_txn(1:CommitTxnRequest rqst) throws (1:NoSuchTxnException o1, 2:TxnAbortedException o2)
   LockResponse lock(1:LockRequest rqst) throws (1:NoSuchTxnException o1, 2:TxnAbortedException o2)
   LockResponse check_lock(1:CheckLockRequest rqst)
@@ -1408,7 +1437,6 @@ service ThriftHiveMetastore extends fb303.FacebookService
   ClearFileMetadataResult clear_file_metadata(1:ClearFileMetadataRequest req)
   CacheFileMetadataResult cache_file_metadata(1:CacheFileMetadataRequest req)
 
-  GetChangeVersionResult get_change_version(1:GetChangeVersionRequest req)
 }
 
 // * Note about the DDL_TIME: When creating or altering a table or a partition,

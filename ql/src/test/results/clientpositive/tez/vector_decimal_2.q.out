@@ -1050,8 +1050,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 3.14 (type: decimal(3,2))
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1110,8 +1109,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 3.14 (type: decimal(3,2))
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1170,8 +1168,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 1355944339.1234567 (type: decimal(17,7))
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1230,8 +1227,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 1 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1281,8 +1277,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 1 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1341,8 +1336,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 3 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1401,8 +1395,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 3 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1461,8 +1454,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 3 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1521,8 +1513,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 3 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1581,8 +1572,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 1 (type: int)
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 
@@ -1641,8 +1631,7 @@ STAGE PLANS:
                   Select Operator
                     Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
-                      key expressions: 0.99999999999999999999 (type: decimal(20,20))
-                      sort order: +
+                      sort order: 
                       Statistics: Num rows: 1 Data size: 112 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized
         Reducer 2 

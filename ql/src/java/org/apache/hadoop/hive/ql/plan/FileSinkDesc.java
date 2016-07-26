@@ -61,6 +61,7 @@ public class FileSinkDesc extends AbstractOperatorDesc {
   private DynamicPartitionCtx dpCtx;
   private String staticSpec; // static partition spec ends with a '/'
   private boolean gatherStats;
+  private int indexInTezUnion = -1;
 
   // Consider a query like:
   // insert overwrite table T3 select ... from T1 join T2 on T1.key = T2.key;
@@ -87,8 +88,6 @@ public class FileSinkDesc extends AbstractOperatorDesc {
   private boolean statsReliable;
   private ListBucketingCtx lbCtx;
   private String statsTmpDir;
-
-  private boolean statsCollectRawDataSize;
 
   // Record what type of write this is.  Default is non-ACID (ie old style).
   private AcidUtils.Operation writeType = AcidUtils.Operation.NOT_ACID;
@@ -153,7 +152,6 @@ public class FileSinkDesc extends AbstractOperatorDesc {
     ret.setParentDir(parentDir);
     ret.setLinkedFileSinkDesc(linkedFileSinkDesc);
     ret.setStatsReliable(statsReliable);
-    ret.setStatsCollectRawDataSize(statsCollectRawDataSize);
     ret.setDpSortState(dpSortState);
     ret.setWriteType(writeType);
     ret.setTransactionId(txnId);
@@ -416,14 +414,6 @@ public class FileSinkDesc extends AbstractOperatorDesc {
     this.linkedFileSinkDesc = linkedFileSinkDesc;
   }
 
-  public boolean isStatsCollectRawDataSize() {
-    return statsCollectRawDataSize;
-  }
-
-  public void setStatsCollectRawDataSize(boolean statsCollectRawDataSize) {
-    this.statsCollectRawDataSize = statsCollectRawDataSize;
-  }
-
   public boolean isRemovedReduceSinkBucketSort() {
     return removedReduceSinkBucketSort;
   }
@@ -483,6 +473,14 @@ public class FileSinkDesc extends AbstractOperatorDesc {
 
   public void setStatsTmpDir(String statsCollectionTempDir) {
     this.statsTmpDir = statsCollectionTempDir;
+  }
+
+  public int getIndexInTezUnion() {
+    return indexInTezUnion;
+  }
+
+  public void setIndexInTezUnion(int indexInTezUnion) {
+    this.indexInTezUnion = indexInTezUnion;
   }
 
 }

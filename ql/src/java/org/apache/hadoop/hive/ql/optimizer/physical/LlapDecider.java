@@ -41,6 +41,7 @@ import org.apache.hadoop.hive.ql.exec.FilterOperator;
 import org.apache.hadoop.hive.ql.exec.FunctionInfo;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
+import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.ScriptOperator;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
@@ -105,6 +106,7 @@ public class LlapDecider implements PhysicalPlanResolver {
     private final boolean doSkipUdfCheck;
     private final boolean arePermanentFnsAllowed;
     private final boolean shouldUber;
+    private List<MapJoinOperator> mapJoinOpList;
 
     public LlapDecisionDispatcher(PhysicalContext pctx, LlapMode mode) {
       conf = pctx.getConf();
@@ -112,6 +114,7 @@ public class LlapDecider implements PhysicalPlanResolver {
       arePermanentFnsAllowed = HiveConf.getBoolVar(conf, ConfVars.LLAP_ALLOW_PERMANENT_FNS);
       // Don't user uber in "all" mode - everything can go into LLAP, which is better than uber.
       shouldUber = HiveConf.getBoolVar(conf, ConfVars.LLAP_AUTO_ALLOW_UBER) && (mode != all);
+      mapJoinOpList = new ArrayList<MapJoinOperator>();
     }
 
     @Override
@@ -130,10 +133,20 @@ public class LlapDecider implements PhysicalPlanResolver {
 
     private void handleWork(TezWork tezWork, BaseWork work)
       throws SemanticException {
-      if (evaluateWork(tezWork, work)) {
+      boolean workCanBeDoneInLlap = evaluateWork(tezWork, work);
+      LOG.debug(
+          "Work " + work + " " + (workCanBeDoneInLlap ? "can" : "cannot") + " be done in LLAP");
+      if (workCanBeDoneInLlap) {
+        for (MapJoinOperator graceMapJoinOp : mapJoinOpList) {
+          LOG.debug(
+              "Disabling hybrid grace hash join in case of LLAP and non-dynamic partition hash join.");
+          graceMapJoinOp.getConf().setHybridHashJoin(false);
+        }
         convertWork(tezWork, work);
       }
+      mapJoinOpList.clear();
     }
+
 
     private void convertWork(TezWork tezWork, BaseWork work)
       throws SemanticException {
@@ -177,12 +190,13 @@ public class LlapDecider implements PhysicalPlanResolver {
 
       // if mode is all just run it
       if (mode == all) {
+        LOG.info("LLAP mode set to 'all' so can convert any work.");
         return true;
       }
 
       // if map mode run iff work is map work
       if (mode == map) {
-        return work instanceof MapWork;
+        return (work instanceof MapWork);
       }
 
       // --- From here we evaluate the auto mode
@@ -228,6 +242,7 @@ public class LlapDecider implements PhysicalPlanResolver {
       }
 
       // couldn't convince you otherwise? well then let's llap.
+      LOG.info("Can run work " + work.getName() + " in llap mode.");
       return true;
     }
 
@@ -304,6 +319,7 @@ public class LlapDecider implements PhysicalPlanResolver {
           @Override
           public Object process(Node n, Stack<Node> s, NodeProcessorCtx c,
               Object... os) {
+            LOG.debug("Cannot run operator [" + n + "] in llap mode.");
             return new Boolean(false);
           }
         });
@@ -313,7 +329,11 @@ public class LlapDecider implements PhysicalPlanResolver {
           public Object process(Node n, Stack<Node> s, NodeProcessorCtx c,
               Object... os) {
             ExprNodeDesc expr = ((FilterOperator)n).getConf().getPredicate();
-            return new Boolean(checkExpression(expr));
+            Boolean retval = new Boolean(checkExpression(expr));
+            if (!retval) {
+              LOG.info("Cannot run filter operator [" + n + "] in llap mode");
+            }
+            return new Boolean(retval);
           }
         });
       opRules.put(new RuleRegExp("No user code in gby", GroupByOperator.getOperatorName() + "%"),
@@ -321,9 +341,13 @@ public class LlapDecider implements PhysicalPlanResolver {
           @Override
           public Object process(Node n, Stack<Node> s, NodeProcessorCtx c,
               Object... os) {
-              @SuppressWarnings("unchecked")
-              List<AggregationDesc> aggs = ((Operator<GroupByDesc>) n).getConf().getAggregators();
-            return new Boolean(checkAggregators(aggs));
+            @SuppressWarnings("unchecked")
+            List<AggregationDesc> aggs = ((Operator<GroupByDesc>) n).getConf().getAggregators();
+            Boolean retval = new Boolean(checkAggregators(aggs));
+            if (!retval) {
+              LOG.info("Cannot run group by operator [" + n + "] in llap mode");
+            }
+            return new Boolean(retval);
           }
         });
       opRules.put(new RuleRegExp("No user code in select", SelectOperator.getOperatorName() + "%"),
@@ -331,11 +355,31 @@ public class LlapDecider implements PhysicalPlanResolver {
           @Override
           public Object process(Node n, Stack<Node> s, NodeProcessorCtx c,
               Object... os) {
-              @SuppressWarnings({ "unchecked" })
-              List<ExprNodeDesc> exprs = ((Operator<SelectDesc>) n).getConf().getColList();
-            return new Boolean(checkExpressions(exprs));
+            @SuppressWarnings({ "unchecked" })
+            List<ExprNodeDesc> exprs = ((Operator<SelectDesc>) n).getConf().getColList();
+            Boolean retval = new Boolean(checkExpressions(exprs));
+            if (!retval) {
+              LOG.info("Cannot run select operator [" + n + "] in llap mode");
+            }
+            return new Boolean(retval);
           }
         });
+
+      if (!conf.getBoolVar(HiveConf.ConfVars.LLAP_ENABLE_GRACE_JOIN_IN_LLAP)) {
+        opRules.put(
+            new RuleRegExp("Disable grace hash join if LLAP mode and not dynamic partition hash join",
+                MapJoinOperator.getOperatorName() + "%"), new NodeProcessor() {
+              @Override
+              public Object process(Node n, Stack<Node> s, NodeProcessorCtx c, Object... os) {
+                MapJoinOperator mapJoinOp = (MapJoinOperator) n;
+                if (mapJoinOp.getConf().isHybridHashJoin()
+                    && !(mapJoinOp.getConf().isDynamicPartitionHashJoin())) {
+                  mapJoinOpList.add((MapJoinOperator) n);
+                }
+                return new Boolean(true);
+              }
+            });
+      }
 
       return opRules;
     }
@@ -355,6 +399,7 @@ public class LlapDecider implements PhysicalPlanResolver {
       for (Node n : nodeOutput.keySet()) {
         if (nodeOutput.get(n) != null) {
           if (!((Boolean)nodeOutput.get(n))) {
+            LOG.info("Cannot run in LLAP mode.");
             return false;
           }
         }
@@ -379,7 +424,7 @@ public class LlapDecider implements PhysicalPlanResolver {
           Arrays.asList(pd.getInputFileFormatClass().getInterfaces());
         if (!interfaceList.contains(VectorizedInputFormatInterface.class)) {
           LOG.info("Input format: " + pd.getInputFileFormatClassName()
-              + ", doesn't provide vectorized input");
+            + ", doesn't provide vectorized input");
           return false;
         }
       }

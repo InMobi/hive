@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +29,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
@@ -48,6 +45,7 @@ import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
@@ -67,6 +65,7 @@ import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDescUtils;
 import org.apache.hadoop.hive.ql.plan.FetchWork;
 import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFCount;
@@ -81,6 +80,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.Pr
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
@@ -213,13 +214,17 @@ public class StatsOptimizer extends Transform {
 
     private boolean hasNullOrConstantGbyKey(GroupByOperator gbyOp) {
       GroupByDesc gbyDesc = gbyOp.getConf();
+      int numCols = gbyDesc.getOutputColumnNames().size();
+      int aggCols = gbyDesc.getAggregators().size();
       // If the Group by operator has null key
-      if (gbyDesc.getOutputColumnNames().size() ==
-        gbyDesc.getAggregators().size()) {
+      if (numCols == aggCols) {
         return true;
       }
-      for (ExprNodeDesc en :gbyDesc.getKeys()) {
-        if (!(en instanceof ExprNodeConstantDesc)) {
+      // If the Gby key is a constant
+      List<String> dpCols = gbyOp.getSchema().getColumnNames().subList(0, numCols - aggCols);
+      for(String dpCol : dpCols) {
+        ExprNodeDesc end = ExprNodeDescUtils.findConstantExprOrigin(dpCol, gbyOp);
+        if (!(end instanceof ExprNodeConstantDesc)) {
           return false;
         }
       }
@@ -314,6 +319,10 @@ public class StatsOptimizer extends Transform {
         }
 
         Table tbl = tsOp.getConf().getTableMetadata();
+        if (AcidUtils.isAcidTable(tbl)) {
+          Logger.info("Table " + tbl.getTableName() + " is ACID table. Skip StatsOptimizer.");
+          return null;
+        }
         List<Object> oneRow = new ArrayList<Object>();
 
         Hive hive = Hive.get(pctx.getConf());

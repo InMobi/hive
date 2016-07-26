@@ -66,6 +66,7 @@ import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
 import org.apache.pig.impl.logicalLayer.schema.Schema.FieldSchema;
+import org.apache.pig.impl.util.PropertiesUtil;
 import org.joda.time.DateTime;
 import org.junit.After;
 import org.junit.Before;
@@ -86,11 +87,13 @@ public class TestHCatLoader {
   private static final String TEST_WAREHOUSE_DIR = TEST_DATA_DIR + "/warehouse";
   private static final String BASIC_FILE_NAME = TEST_DATA_DIR + "/basic.input.data";
   private static final String COMPLEX_FILE_NAME = TEST_DATA_DIR + "/complex.input.data";
+  private static final String DATE_FILE_NAME = TEST_DATA_DIR + "/datetimestamp.input.data";
 
   private static final String BASIC_TABLE = "junit_unparted_basic";
   private static final String COMPLEX_TABLE = "junit_unparted_complex";
   private static final String PARTITIONED_TABLE = "junit_parted_basic";
   private static final String SPECIFIC_SIZE_TABLE = "junit_specific_size";
+  private static final String PARTITIONED_DATE_TABLE = "junit_parted_date";
 
   private Driver driver;
   private Map<Integer, Pair<Integer, String>> basicInputData;
@@ -102,6 +105,9 @@ public class TestHCatLoader {
           add("testReadPartitionedBasic");
           add("testProjectionsBasic");
           add("testColumnarStorePushdown2");
+          add("testReadMissingPartitionBasicNeg");
+          add("testDatePartitionPushUp");
+          add("testTimestampPartitionPushUp");
         }});
       }};
 
@@ -177,6 +183,9 @@ public class TestHCatLoader {
     hiveConf.set(HiveConf.ConfVars.HIVE_SUPPORT_CONCURRENCY.varname, "false");
     hiveConf.set(HiveConf.ConfVars.METASTOREWAREHOUSE.varname, TEST_WAREHOUSE_DIR);
     hiveConf.setVar(HiveConf.ConfVars.HIVEMAPREDMODE, "nonstrict");
+    hiveConf
+    .setVar(HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER,
+        "org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory");
 
     if (Shell.WINDOWS) {
       WindowsPathUtil.convertPathsFromWindowsToHdfs(hiveConf);
@@ -195,6 +204,7 @@ public class TestHCatLoader {
 
     createTable(PARTITIONED_TABLE, "a int, b string", "bkt string");
     createTable(SPECIFIC_SIZE_TABLE, "a int, b string");
+    createTable(PARTITIONED_DATE_TABLE, "b string", "dt date");
     AllTypesTable.setupAllTypesTable(driver);
 
     int LOOP_SIZE = 3;
@@ -217,6 +227,12 @@ public class TestHCatLoader {
         "Edward Hyde\t1337\t(415-253-6367,anonymous@b44chan.org)\t{(CREATIVE_WRITING),(COPYRIGHT_LAW)}\t[CREATIVE_WRITING#A+,COPYRIGHT_LAW#D]\t{(415-253-6367,cell),(408-253-6367,landline)}",
       }
     );
+    HcatTestUtils.createTestDataFile(DATE_FILE_NAME,
+      new String[]{
+        "2016-07-14 08:10:15\tHenry Jekyll",
+        "2016-07-15 11:54:55\tEdward Hyde",
+      }
+    );
     PigServer server = new PigServer(ExecType.LOCAL);
     server.setBatchOn();
     int i = 0;
@@ -234,6 +250,11 @@ public class TestHCatLoader {
 
     server.registerQuery("D = load '" + COMPLEX_FILE_NAME + "' as (name:chararray, studentid:int, contact:tuple(phno:chararray,email:chararray), currently_registered_courses:bag{innertup:tuple(course:chararray)}, current_grades:map[ ] , phnos :bag{innertup:tuple(phno:chararray,type:chararray)});", ++i);
     server.registerQuery("store D into '" + COMPLEX_TABLE + "' using org.apache.hive.hcatalog.pig.HCatStorer();", ++i);
+
+    server.registerQuery("E = load '" + DATE_FILE_NAME + "' as (dt:chararray, b:chararray);", ++i);
+    server.registerQuery("F = foreach E generate ToDate(dt, 'yyyy-MM-dd HH:mm:ss') as dt, b;", ++i);
+    server.registerQuery("store F into '" + PARTITIONED_DATE_TABLE + "' using org.apache.hive.hcatalog.pig.HCatStorer();", ++i);
+
     server.executeBatch();
   }
 
@@ -245,6 +266,7 @@ public class TestHCatLoader {
         dropTable(COMPLEX_TABLE);
         dropTable(PARTITIONED_TABLE);
         dropTable(SPECIFIC_SIZE_TABLE);
+        dropTable(PARTITIONED_DATE_TABLE);
         dropTable(AllTypesTable.ALL_PRIMITIVE_TYPES_TABLE);
       }
     } finally {
@@ -438,6 +460,59 @@ public class TestHCatLoader {
   }
 
   @Test
+  public void testReadMissingPartitionBasicNeg() throws IOException, CommandNeedRetryException {
+    assumeTrue(!TestUtil.shouldSkip(storageFormat, DISABLED_STORAGE_FORMATS));
+    PigServer server = new PigServer(ExecType.LOCAL);
+
+    File removedPartitionDir = new File(TEST_WAREHOUSE_DIR + "/" + PARTITIONED_TABLE + "/bkt=0");
+    if (!removeDirectory(removedPartitionDir)) {
+      System.out.println("Test did not run because its environment could not be set.");
+      return;
+    }
+    driver.run("select * from " + PARTITIONED_TABLE);
+    ArrayList<String> valuesReadFromHiveDriver = new ArrayList<String>();
+    driver.getResults(valuesReadFromHiveDriver);
+    assertTrue(valuesReadFromHiveDriver.size() == 6);
+
+    server.registerQuery("W = load '" + PARTITIONED_TABLE + "' using org.apache.hive.hcatalog.pig.HCatLoader();");
+    Schema dumpedWSchema = server.dumpSchema("W");
+    List<FieldSchema> Wfields = dumpedWSchema.getFields();
+    assertEquals(3, Wfields.size());
+    assertTrue(Wfields.get(0).alias.equalsIgnoreCase("a"));
+    assertTrue(Wfields.get(0).type == DataType.INTEGER);
+    assertTrue(Wfields.get(1).alias.equalsIgnoreCase("b"));
+    assertTrue(Wfields.get(1).type == DataType.CHARARRAY);
+    assertTrue(Wfields.get(2).alias.equalsIgnoreCase("bkt"));
+    assertTrue(Wfields.get(2).type == DataType.CHARARRAY);
+
+    try {
+      Iterator<Tuple> WIter = server.openIterator("W");
+      fail("Should failed in retriving an invalid partition");
+    } catch (IOException ioe) {
+      // expected
+    }
+  }
+
+  private static boolean removeDirectory(File dir) {
+    boolean success = false;
+    if (dir.isDirectory()) {
+      File[] files = dir.listFiles();
+      if (files != null && files.length > 0) {
+        for (File file : files) {
+          success = removeDirectory(file);
+          if (!success) {
+            return false;
+          }
+        }
+      }
+      success = dir.delete();
+    } else {
+        success = dir.delete();
+    }
+    return success;
+  }
+
+  @Test
   public void testProjectionsBasic() throws IOException {
     assumeTrue(!TestUtil.shouldSkip(storageFormat, DISABLED_STORAGE_FORMATS));
 
@@ -600,6 +675,25 @@ public class TestHCatLoader {
     assertEquals("alpaca", t.get(0));
     assertEquals(0, t.get(1));
     assertFalse(iterator.hasNext());
+  }
+
+  /**
+   * Test if we can read a date partitioned table
+   */
+  @Test
+  public void testDatePartitionPushUp() throws Exception {
+    assumeTrue(!TestUtil.shouldSkip(storageFormat, DISABLED_STORAGE_FORMATS));
+    PigServer server = new PigServer(ExecType.LOCAL);
+    server.registerQuery("X = load '" + PARTITIONED_DATE_TABLE + "' using " + HCatLoader.class.getName() + "();");
+    server.registerQuery("Y = filter X by dt == ToDate('2016-07-14','yyyy-MM-dd');");
+    Iterator<Tuple> YIter = server.openIterator("Y");
+    int numTuplesRead = 0;
+    while (YIter.hasNext()) {
+      Tuple t = YIter.next();
+      assertEquals(t.size(), 2);
+      numTuplesRead++;
+    }
+    assertTrue("Expected " + 1 + "; found " + numTuplesRead, numTuplesRead == 1);
   }
 
   /**
