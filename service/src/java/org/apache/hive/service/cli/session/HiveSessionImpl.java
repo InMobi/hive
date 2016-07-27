@@ -24,13 +24,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.Semaphore;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
@@ -40,6 +38,8 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.ql.QueryPlan;
+import org.apache.hadoop.hive.ql.exec.ListSinkOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.history.HiveHistory;
 import org.apache.hadoop.hive.ql.metadata.Hive;
@@ -113,18 +113,16 @@ public class HiveSessionImpl implements HiveSession {
 
   private volatile long lastAccessTime;
   private volatile long lastIdleTime;
-  private final Semaphore operationLock;
 
-  public HiveSessionImpl(SessionHandle sessionHandle, TProtocolVersion protocol,
-      String username, String password, HiveConf serverConf, String ipAddress) {
+
+  public HiveSessionImpl(SessionHandle sessionHandle, TProtocolVersion protocol, String username, String password,
+    HiveConf serverhiveConf, String ipAddress) {
     this.username = username;
     this.password = password;
     creationTime = System.currentTimeMillis();
     this.sessionHandle = sessionHandle != null ? sessionHandle : new SessionHandle(protocol);
-    this.sessionConf = new HiveConf(serverConf);
+    this.sessionConf = new HiveConf(serverhiveConf);
     this.ipAddress = ipAddress;
-    this.operationLock = serverConf.getBoolVar(
-        ConfVars.HIVE_SERVER2_PARALLEL_OPS_IN_SESSION) ? null : new Semaphore(1);
     try {
       // In non-impersonation mode, map scheduler queue to current user
       // if fair scheduler is configured.
@@ -327,27 +325,7 @@ public class HiveSessionImpl implements HiveSession {
     this.operationManager = operationManager;
   }
 
-  protected void acquire(boolean userAccess, boolean isOperation) {
-    if (isOperation && operationLock != null) {
-      try {
-        operationLock.acquire();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException(e);
-      }
-    }
-    boolean success = false;
-    try {
-      acquireAfterOpLock(userAccess);
-      success = true;
-    } finally {
-      if (!success && isOperation && operationLock != null) {
-        operationLock.release();
-      }
-    }
-  }
-
-  private synchronized void acquireAfterOpLock(boolean userAccess) {
+  protected synchronized void acquire(boolean userAccess) {
     // Need to make sure that the this HiveServer2's session's SessionState is
     // stored in the thread local for the handler thread.
     SessionState.setCurrentSessionState(sessionState);
@@ -367,17 +345,7 @@ public class HiveSessionImpl implements HiveSession {
    * when this thread is garbage collected later.
    * @see org.apache.hive.service.server.ThreadWithGarbageCleanup#finalize()
    */
-  protected void release(boolean userAccess, boolean isOperation) {
-    try {
-      releaseBeforeOpLock(userAccess);
-    } finally {
-      if (isOperation && operationLock != null) {
-        operationLock.release();
-      }
-    }
-  }
-
-  private synchronized void releaseBeforeOpLock(boolean userAccess) {
+  protected synchronized void release(boolean userAccess) {
     if (sessionState != null) {
       // can be null in-case of junit tests. skip reset.
       // reset thread name at release time.
@@ -433,7 +401,7 @@ public class HiveSessionImpl implements HiveSession {
   @Override
   public GetInfoValue getInfo(GetInfoType getInfoType)
       throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
     try {
       switch (getInfoType) {
       case CLI_SERVER_NAME:
@@ -453,7 +421,7 @@ public class HiveSessionImpl implements HiveSession {
         throw new HiveSQLException("Unrecognized GetInfoType value: " + getInfoType.toString());
       }
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
@@ -481,11 +449,12 @@ public class HiveSessionImpl implements HiveSession {
 
   private OperationHandle executeStatementInternal(String statement,
       Map<String, String> confOverlay, boolean runAsync, long queryTimeout) throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
-    ExecuteStatementOperation operation = operationManager.newExecuteStatementOperation(
-        getSession(), statement, confOverlay, runAsync, queryTimeout);
+    ExecuteStatementOperation operation =
+        operationManager.newExecuteStatementOperation(getSession(), statement, confOverlay,
+            runAsync, queryTimeout);
     OperationHandle opHandle = operation.getHandle();
     try {
       operation.run();
@@ -498,29 +467,14 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      if (operation.getBackgroundHandle() == null) {
-        release(true, true); // Not async, or wasn't submitted for some reason (failure, etc.)
-      } else {
-        releaseBeforeOpLock(true); // Release, but keep the lock (if present).
-      }
+      release(true);
     }
-  }
-
-  @Override
-  public Future<?> submitBackgroundOperation(Runnable work) {
-    return getSessionManager().submitBackgroundOperation(
-        operationLock == null ? work : new FutureTask<Void>(work, null) {
-      protected void done() {
-        // We assume this always comes from a user operation that took the lock.
-        operationLock.release();
-      };
-    });
   }
 
   @Override
   public OperationHandle getTypeInfo()
       throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetTypeInfoOperation operation = operationManager.newGetTypeInfoOperation(getSession());
@@ -533,14 +487,14 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
   @Override
   public OperationHandle getCatalogs()
       throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetCatalogsOperation operation = operationManager.newGetCatalogsOperation(getSession());
@@ -553,14 +507,14 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
   @Override
   public OperationHandle getSchemas(String catalogName, String schemaName)
       throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetSchemasOperation operation =
@@ -574,7 +528,7 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
@@ -582,7 +536,7 @@ public class HiveSessionImpl implements HiveSession {
   public OperationHandle getTables(String catalogName, String schemaName, String tableName,
       List<String> tableTypes)
           throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     MetadataOperation operation =
@@ -596,14 +550,14 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
   @Override
   public OperationHandle getTableTypes()
       throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetTableTypesOperation operation = operationManager.newGetTableTypesOperation(getSession());
@@ -616,14 +570,14 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
   @Override
   public OperationHandle getColumns(String catalogName, String schemaName,
       String tableName, String columnName)  throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
     String addedJars = Utilities.getResourceFiles(sessionConf, SessionState.ResourceType.JAR);
     if (StringUtils.isNotBlank(addedJars)) {
        IMetaStoreClient metastoreClient = getSession().getMetaStoreClient();
@@ -641,7 +595,7 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
@@ -654,7 +608,7 @@ public class HiveSessionImpl implements HiveSession {
   @Override
   public OperationHandle getFunctions(String catalogName, String schemaName, String functionName)
       throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetFunctionsOperation operation = operationManager
@@ -668,14 +622,14 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
   @Override
   public void close() throws HiveSQLException {
     try {
-      acquire(true, false);
+      acquire(true);
       // Iterate through the opHandles and close their operations
       List<OperationHandle> ops = null;
       synchronized (opHandleSet) {
@@ -717,7 +671,7 @@ public class HiveSessionImpl implements HiveSession {
         }
         sessionHive = null;
       }
-      release(true, false);
+      release(true);
     }
   }
 
@@ -778,7 +732,7 @@ public class HiveSessionImpl implements HiveSession {
   }
 
   private void closeTimedOutOperations(List<Operation> operations) {
-    acquire(false, false);
+    acquire(false);
     try {
       for (Operation operation : operations) {
         synchronized (opHandleSet) {
@@ -791,54 +745,54 @@ public class HiveSessionImpl implements HiveSession {
         }
       }
     } finally {
-      release(false, false);
+      release(false);
     }
   }
 
   @Override
   public void cancelOperation(OperationHandle opHandle) throws HiveSQLException {
-    acquire(true, false);
+    acquire(true);
     try {
       sessionManager.getOperationManager().cancelOperation(opHandle);
     } finally {
-      release(true, false);
+      release(true);
     }
   }
 
   @Override
   public void closeOperation(OperationHandle opHandle) throws HiveSQLException {
-    acquire(true, false);
+    acquire(true);
     try {
       operationManager.closeOperation(opHandle);
       synchronized (opHandleSet) {
         opHandleSet.remove(opHandle);
       }
     } finally {
-      release(true, false);
+      release(true);
     }
   }
 
   @Override
   public TableSchema getResultSetMetadata(OperationHandle opHandle) throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
     try {
       return sessionManager.getOperationManager().getOperationResultSetSchema(opHandle);
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
   @Override
   public RowSet fetchResults(OperationHandle opHandle, FetchOrientation orientation,
       long maxRows, FetchType fetchType) throws HiveSQLException {
-    acquire(true, false);
+    acquire(true);
     try {
       if (fetchType == FetchType.QUERY_OUTPUT) {
         return operationManager.getOperationNextRowSet(opHandle, orientation, maxRows);
       }
       return operationManager.getOperationLogRowSet(opHandle, orientation, maxRows, sessionConf);
     } finally {
-      release(true, false);
+      release(true);
     }
   }
 
@@ -892,7 +846,7 @@ public class HiveSessionImpl implements HiveSession {
   @Override
   public OperationHandle getPrimaryKeys(String catalog, String schema,
     String table) throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetPrimaryKeysOperation operation = operationManager
@@ -906,7 +860,7 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 
@@ -914,7 +868,7 @@ public class HiveSessionImpl implements HiveSession {
   public OperationHandle getCrossReference(String primaryCatalog,
     String primarySchema, String primaryTable, String foreignCatalog,
     String foreignSchema, String foreignTable) throws HiveSQLException {
-    acquire(true, true);
+    acquire(true);
 
     OperationManager operationManager = getOperationManager();
     GetCrossReferenceOperation operation = operationManager
@@ -930,7 +884,7 @@ public class HiveSessionImpl implements HiveSession {
       operationManager.closeOperation(opHandle);
       throw e;
     } finally {
-      release(true, true);
+      release(true);
     }
   }
 }
