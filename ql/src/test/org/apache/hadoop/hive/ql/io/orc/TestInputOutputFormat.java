@@ -768,7 +768,7 @@ public class TestInputOutputFormat {
       MockFileSystem fs, String path, OrcInputFormat.CombinedCtx combineCtx) throws IOException {
     OrcInputFormat.AcidDirInfo adi = createAdi(context, fs, path);
     return OrcInputFormat.determineSplitStrategy(combineCtx, context,
-        adi.fs, adi.splitPath, adi.acidInfo, adi.baseOrOriginalFiles, null, true);
+        adi.fs, adi.splitPath, adi.acidInfo, adi.baseOrOriginalFiles, null, null, true);
   }
 
   public OrcInputFormat.AcidDirInfo createAdi(
@@ -781,7 +781,7 @@ public class TestInputOutputFormat {
       OrcInputFormat.Context context, OrcInputFormat.FileGenerator gen) throws IOException {
     OrcInputFormat.AcidDirInfo adi = gen.call();
     return OrcInputFormat.determineSplitStrategy(
-        null, context, adi.fs, adi.splitPath, adi.acidInfo, adi.baseOrOriginalFiles, null, true);
+        null, context, adi.fs, adi.splitPath, adi.acidInfo, adi.baseOrOriginalFiles, null, null, true);
   }
 
   public static class MockBlock {
@@ -1389,7 +1389,7 @@ public class TestInputOutputFormat {
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
     OrcInputFormat.SplitGenerator splitter =
         new OrcInputFormat.SplitGenerator(new OrcInputFormat.SplitInfo(context, fs,
-            fs.getFileStatus(new Path("/a/file")), null, true,
+            fs.getFileStatus(new Path("/a/file")), null, null, true,
             new ArrayList<AcidInputFormat.DeltaMetaData>(), true, null, null), null, true);
     OrcSplit result = splitter.createSplit(0, 200, null);
     assertEquals(0, result.getStart());
@@ -1430,7 +1430,7 @@ public class TestInputOutputFormat {
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
     OrcInputFormat.SplitGenerator splitter =
         new OrcInputFormat.SplitGenerator(new OrcInputFormat.SplitInfo(context, fs,
-            fs.getFileStatus(new Path("/a/file")), null, true,
+            fs.getFileStatus(new Path("/a/file")), null, null, true,
             new ArrayList<AcidInputFormat.DeltaMetaData>(), true, null, null), null, true);
     List<OrcSplit> results = splitter.call();
     OrcSplit result = results.get(0);
@@ -1453,7 +1453,7 @@ public class TestInputOutputFormat {
     HiveConf.setLongVar(conf, HiveConf.ConfVars.MAPREDMINSPLITSIZE, 0);
     context = new OrcInputFormat.Context(conf);
     splitter = new OrcInputFormat.SplitGenerator(new OrcInputFormat.SplitInfo(context, fs,
-      fs.getFileStatus(new Path("/a/file")), null, true,
+      fs.getFileStatus(new Path("/a/file")), null, null, true,
         new ArrayList<AcidInputFormat.DeltaMetaData>(), true, null, null), null, true);
     results = splitter.call();
     for(int i=0; i < stripeSizes.length; ++i) {
@@ -1481,7 +1481,7 @@ public class TestInputOutputFormat {
     OrcInputFormat.Context context = new OrcInputFormat.Context(conf);
     OrcInputFormat.SplitGenerator splitter =
         new OrcInputFormat.SplitGenerator(new OrcInputFormat.SplitInfo(context, fs,
-            fs.getFileStatus(new Path("/a/file")), null, true,
+            fs.getFileStatus(new Path("/a/file")), null, null, true,
             new ArrayList<AcidInputFormat.DeltaMetaData>(), true, null, null), null, true);
     List<OrcSplit> results = splitter.call();
     OrcSplit result = results.get(0);
@@ -1503,7 +1503,7 @@ public class TestInputOutputFormat {
     HiveConf.setLongVar(conf, HiveConf.ConfVars.MAPREDMINSPLITSIZE, 0);
     context = new OrcInputFormat.Context(conf);
     splitter = new OrcInputFormat.SplitGenerator(new OrcInputFormat.SplitInfo(context, fs,
-        fs.getFileStatus(new Path("/a/file")), null, true,
+        fs.getFileStatus(new Path("/a/file")), null, null, true,
         new ArrayList<AcidInputFormat.DeltaMetaData>(),
         true, null, null), null, true);
     results = splitter.call();
@@ -1523,7 +1523,7 @@ public class TestInputOutputFormat {
     HiveConf.setLongVar(conf, HiveConf.ConfVars.MAPREDMINSPLITSIZE, 100000);
     context = new OrcInputFormat.Context(conf);
     splitter = new OrcInputFormat.SplitGenerator(new OrcInputFormat.SplitInfo(context, fs,
-        fs.getFileStatus(new Path("/a/file")), null, true,
+        fs.getFileStatus(new Path("/a/file")), null, null, true,
         new ArrayList<AcidInputFormat.DeltaMetaData>(),
         true, null, null), null, true);
     results = splitter.call();
@@ -3466,5 +3466,84 @@ public class TestInputOutputFormat {
 
     // revert back to local fs
     conf.set("fs.defaultFS", "file:///");
+  }
+
+  /**
+   * also see {@link TestOrcFile#testPredicatePushdown()}
+   * This tests that {@link RecordReader#getRowNumber()} works with multiple splits
+   * @throws Exception
+   */
+  @Test
+  public void testRowNumberUniquenessInDifferentSplits() throws Exception {
+    Properties properties = new Properties();
+    properties.setProperty("columns", "x,y");
+    properties.setProperty("columns.types", "int:int");
+    StructObjectInspector inspector;
+    synchronized (TestOrcFile.class) {
+      inspector = (StructObjectInspector)
+        ObjectInspectorFactory.getReflectionObjectInspector(MyRow.class,
+          ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
+    }
+
+    // Save the conf variable values so that they can be restored later.
+    long oldDefaultStripeSize = conf.getLong(HiveConf.ConfVars.HIVE_ORC_DEFAULT_STRIPE_SIZE.varname, -1L);
+    long oldMaxSplitSize = conf.getLong(HiveConf.ConfVars.MAPREDMAXSPLITSIZE.varname, -1L);
+
+    // Set the conf variable values for this test.
+    long newStripeSize = 10000L; // 10000 bytes per stripe
+    long newMaxSplitSize = 100L; // 1024 bytes per split
+    conf.setLong(HiveConf.ConfVars.HIVE_ORC_DEFAULT_STRIPE_SIZE.varname, newStripeSize);
+    conf.setLong(HiveConf.ConfVars.MAPREDMAXSPLITSIZE.varname, newMaxSplitSize);
+
+    SerDe serde = new OrcSerde();
+    HiveOutputFormat<?, ?> outFormat = new OrcOutputFormat();
+    org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter writer =
+      outFormat.getHiveRecordWriter(conf, testFilePath, MyRow.class, true,
+        properties, Reporter.NULL);
+    // The following loop should create 20 stripes in the orc file.
+    for (int i = 0; i < newStripeSize * 10; ++i) {
+      writer.write(serde.serialize(new MyRow(i,i+1), inspector));
+    }
+    writer.close(true);
+    serde = new OrcSerde();
+    SerDeUtils.initializeSerDe(serde, conf, properties, null);
+    assertEquals(OrcSerde.OrcSerdeRow.class, serde.getSerializedClass());
+    inspector = (StructObjectInspector) serde.getObjectInspector();
+    assertEquals("struct<x:int,y:int>", inspector.getTypeName());
+    InputFormat<?,?> in = new OrcInputFormat();
+    FileInputFormat.setInputPaths(conf, testFilePath.toString());
+    int numExpectedSplits = 20;
+    InputSplit[] splits = in.getSplits(conf, numExpectedSplits);
+    assertEquals(numExpectedSplits, splits.length);
+
+    for (int i = 0; i < numExpectedSplits; ++i) {
+      OrcSplit split = (OrcSplit) splits[i];
+      Reader.Options orcReaderOptions = new Reader.Options();
+      orcReaderOptions.range(split.getStart(), split.getLength());
+      OrcFile.ReaderOptions qlReaderOptions = OrcFile.readerOptions(conf).maxLength(split.getFileLength());
+      Reader reader = OrcFile.createReader(split.getPath(), qlReaderOptions);
+      RecordReader recordReader = reader.rowsOptions(orcReaderOptions);
+      for(int j = 0; recordReader.hasNext(); j++) {
+        long rowNum = (i * 5000) + j;
+        long rowNumActual = recordReader.getRowNumber();
+        assertEquals("rowNum=" + rowNum, rowNum, rowNumActual);
+        Object row = recordReader.next(null);
+      }
+      recordReader.close();
+    }
+
+    // Reset the conf variable values that we changed for this test.
+    if (oldDefaultStripeSize != -1L) {
+      conf.setLong(HiveConf.ConfVars.HIVE_ORC_DEFAULT_STRIPE_SIZE.varname, oldDefaultStripeSize);
+    } else {
+      // this means that nothing was set for default stripe size previously, so we should unset it.
+      conf.unset(HiveConf.ConfVars.HIVE_ORC_DEFAULT_STRIPE_SIZE.varname);
+    }
+    if (oldMaxSplitSize != -1L) {
+      conf.setLong(HiveConf.ConfVars.MAPREDMAXSPLITSIZE.varname, oldMaxSplitSize);
+    } else {
+      // this means that nothing was set for default stripe size previously, so we should unset it.
+      conf.unset(HiveConf.ConfVars.MAPREDMAXSPLITSIZE.varname);
+    }
   }
 }

@@ -18,14 +18,10 @@
 
 package org.apache.orc.impl;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.orc.TypeDescription;
 
 /**
@@ -33,50 +29,168 @@ import org.apache.orc.TypeDescription;
  * has been schema evolution.
  */
 public class SchemaEvolution {
-  private final Map<TypeDescription, TypeDescription> readerToFile;
+  // indexed by reader column id
+  private final TypeDescription[] readerFileTypes;
+  // indexed by reader column id
   private final boolean[] included;
+  private final TypeDescription fileSchema;
   private final TypeDescription readerSchema;
-  private static final Log LOG = LogFactory.getLog(SchemaEvolution.class);
+  private boolean hasConversion;
+  // indexed by reader column id
+  private final boolean[] ppdSafeConversion;
 
-  public SchemaEvolution(TypeDescription readerSchema, boolean[] included) {
-    this.included = included;
-    readerToFile = null;
-    this.readerSchema = readerSchema;
+  public SchemaEvolution(TypeDescription fileSchema, boolean[] includedCols) {
+    this(fileSchema, null, includedCols);
   }
 
   public SchemaEvolution(TypeDescription fileSchema,
                          TypeDescription readerSchema,
-                         boolean[] included) throws IOException {
-    readerToFile = new HashMap<>(readerSchema.getMaximumId() + 1);
-    this.included = included;
-    if (checkAcidSchema(fileSchema)) {
-      this.readerSchema = createEventSchema(readerSchema);
+                         boolean[] includeCols) {
+    this.included = includeCols == null ? null : Arrays.copyOf(includeCols, includeCols.length);
+    this.hasConversion = false;
+    this.fileSchema = fileSchema;
+    if (readerSchema != null) {
+      if (checkAcidSchema(fileSchema)) {
+        this.readerSchema = createEventSchema(readerSchema);
+      } else {
+        this.readerSchema = readerSchema;
+      }
+      this.readerFileTypes = new TypeDescription[this.readerSchema.getMaximumId() + 1];
+      buildConversionFileTypesArray(fileSchema, this.readerSchema);
     } else {
-      this.readerSchema = readerSchema;
+      this.readerSchema = fileSchema;
+      this.readerFileTypes = new TypeDescription[this.readerSchema.getMaximumId() + 1];
+      buildSameSchemaFileTypesArray();
     }
-    buildMapping(fileSchema, this.readerSchema);
+    this.ppdSafeConversion = populatePpdSafeConversion();
   }
 
   public TypeDescription getReaderSchema() {
     return readerSchema;
   }
 
+  /**
+   * Is there Schema Evolution data type conversion?
+   * @return
+   */
+  public boolean hasConversion() {
+    return hasConversion;
+  }
+
   public TypeDescription getFileType(TypeDescription readerType) {
-    TypeDescription result;
-    if (readerToFile == null) {
-      if (included == null || included[readerType.getId()]) {
-        result = readerType;
-      } else {
-        result = null;
+    return getFileType(readerType.getId());
+  }
+
+  /**
+   * Get the file type by reader type id.
+   * @param id reader column id
+   * @return
+   */
+  public TypeDescription getFileType(int id) {
+    return readerFileTypes[id];
+  }
+
+  /**
+   * Check if column is safe for ppd evaluation
+   * @param colId reader column id
+   * @return true if the specified column is safe for ppd evaluation else false
+   */
+  public boolean isPPDSafeConversion(final int colId) {
+    if (hasConversion()) {
+      if (colId < 0 || colId >= ppdSafeConversion.length) {
+        return false;
       }
-    } else {
-      result = readerToFile.get(readerType);
+      return ppdSafeConversion[colId];
+    }
+
+    // when there is no schema evolution PPD is safe
+    return true;
+  }
+
+  private boolean[] populatePpdSafeConversion() {
+    if (fileSchema == null || readerSchema == null || readerFileTypes == null) {
+      return null;
+    }
+
+    boolean[] result = new boolean[readerSchema.getMaximumId() + 1];
+    boolean safePpd = validatePPDConversion(fileSchema, readerSchema);
+    result[readerSchema.getId()] = safePpd;
+    List<TypeDescription> children = readerSchema.getChildren();
+    if (children != null) {
+      for (TypeDescription child : children) {
+        TypeDescription fileType = getFileType(child.getId());
+        safePpd = validatePPDConversion(fileType, child);
+        result[child.getId()] = safePpd;
+      }
     }
     return result;
   }
 
-  void buildMapping(TypeDescription fileType,
-                    TypeDescription readerType) throws IOException {
+  private boolean validatePPDConversion(final TypeDescription fileType,
+      final TypeDescription readerType) {
+    if (fileType == null) {
+      return false;
+    }
+    if (fileType.getCategory().isPrimitive()) {
+      if (fileType.getCategory().equals(readerType.getCategory())) {
+        // for decimals alone do equality check to not mess up with precision change
+        if (fileType.getCategory().equals(TypeDescription.Category.DECIMAL) &&
+            !fileType.equals(readerType)) {
+          return false;
+        }
+        return true;
+      }
+
+      // only integer and string evolutions are safe
+      // byte -> short -> int -> long
+      // string <-> char <-> varchar
+      // NOTE: Float to double evolution is not safe as floats are stored as doubles in ORC's
+      // internal index, but when doing predicate evaluation for queries like "select * from
+      // orc_float where f = 74.72" the constant on the filter is converted from string -> double
+      // so the precisions will be different and the comparison will fail.
+      // Soon, we should convert all sargs that compare equality between floats or
+      // doubles to range predicates.
+
+      // Similarly string -> char and varchar -> char and vice versa is not possible, as ORC stores
+      // char with padded spaces in its internal index.
+      switch (fileType.getCategory()) {
+        case BYTE:
+          if (readerType.getCategory().equals(TypeDescription.Category.SHORT) ||
+              readerType.getCategory().equals(TypeDescription.Category.INT) ||
+              readerType.getCategory().equals(TypeDescription.Category.LONG)) {
+            return true;
+          }
+          break;
+        case SHORT:
+          if (readerType.getCategory().equals(TypeDescription.Category.INT) ||
+              readerType.getCategory().equals(TypeDescription.Category.LONG)) {
+            return true;
+          }
+          break;
+        case INT:
+          if (readerType.getCategory().equals(TypeDescription.Category.LONG)) {
+            return true;
+          }
+          break;
+        case STRING:
+          if (readerType.getCategory().equals(TypeDescription.Category.VARCHAR)) {
+            return true;
+          }
+          break;
+        case VARCHAR:
+          if (readerType.getCategory().equals(TypeDescription.Category.STRING)) {
+            return true;
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    return false;
+  }
+
+  void buildConversionFileTypesArray(TypeDescription fileType,
+                                     TypeDescription readerType) {
     // if the column isn't included, don't map it
     if (included != null && !included[readerType.getId()]) {
       return;
@@ -100,12 +214,17 @@ public class SchemaEvolution {
           break;
         case CHAR:
         case VARCHAR:
-          // HIVE-13648: Look at ORC data type conversion edge cases (CHAR, VARCHAR, DECIMAL)
-          isOk = fileType.getMaxLength() == readerType.getMaxLength();
+          // We do conversion when same CHAR/VARCHAR type but different maxLength.
+          if (fileType.getMaxLength() != readerType.getMaxLength()) {
+            hasConversion = true;
+          }
           break;
         case DECIMAL:
-          // HIVE-13648: Look at ORC data type conversion edge cases (CHAR, VARCHAR, DECIMAL)
-          // TODO we don't enforce scale and precision checks, but probably should
+          // We do conversion when same DECIMAL type but different precision/scale.
+          if (fileType.getPrecision() != readerType.getPrecision() ||
+              fileType.getScale() != readerType.getScale()) {
+            hasConversion = true;
+          }
           break;
         case UNION:
         case MAP:
@@ -115,7 +234,7 @@ public class SchemaEvolution {
           List<TypeDescription> readerChildren = readerType.getChildren();
           if (fileChildren.size() == readerChildren.size()) {
             for(int i=0; i < fileChildren.size(); ++i) {
-              buildMapping(fileChildren.get(i), readerChildren.get(i));
+              buildConversionFileTypesArray(fileChildren.get(i), readerChildren.get(i));
             }
           } else {
             isOk = false;
@@ -126,9 +245,12 @@ public class SchemaEvolution {
           // allow either side to have fewer fields than the other
           List<TypeDescription> fileChildren = fileType.getChildren();
           List<TypeDescription> readerChildren = readerType.getChildren();
+          if (fileChildren.size() != readerChildren.size()) {
+            hasConversion = true;
+          }
           int jointSize = Math.min(fileChildren.size(), readerChildren.size());
           for(int i=0; i < jointSize; ++i) {
-            buildMapping(fileChildren.get(i), readerChildren.get(i));
+            buildConversionFileTypesArray(fileChildren.get(i), readerChildren.get(i));
           }
           break;
         }
@@ -141,15 +263,45 @@ public class SchemaEvolution {
        */
 
       isOk = ConvertTreeReaderFactory.canConvert(fileType, readerType);
+      hasConversion = true;
     }
     if (isOk) {
-      readerToFile.put(readerType, fileType);
+      int id = readerType.getId();
+      if (readerFileTypes[id] != null) {
+        throw new RuntimeException("reader to file type entry already assigned");
+      }
+      readerFileTypes[id] = fileType;
     } else {
-      throw new IOException(
+      throw new IllegalArgumentException(
           String.format(
               "ORC does not support type conversion from file type %s (%d) to reader type %s (%d)",
               fileType.toString(), fileType.getId(),
               readerType.toString(), readerType.getId()));
+    }
+  }
+
+  /**
+   * Use to make a reader to file type array when the schema is the same.
+   * @return
+   */
+  private void buildSameSchemaFileTypesArray() {
+    buildSameSchemaFileTypesArrayRecurse(readerSchema);
+  }
+
+  void buildSameSchemaFileTypesArrayRecurse(TypeDescription readerType) {
+    if (included != null && !included[readerType.getId()]) {
+      return;
+    }
+    int id = readerType.getId();
+    if (readerFileTypes[id] != null) {
+      throw new RuntimeException("reader to file type entry already assigned");
+    }
+    readerFileTypes[id] = readerType;
+    List<TypeDescription> children = readerType.getChildren();
+    if (children != null) {
+      for (TypeDescription child : children) {
+        buildSameSchemaFileTypesArrayRecurse(child);
+      }
     }
   }
 
