@@ -292,7 +292,7 @@ public abstract class VectorMapJoinGenerateResultOperator extends VectorMapJoinC
     }
 
     ByteSegmentRef byteSegmentRef = hashMapResult.first();
-    while (true) {
+    while (byteSegmentRef != null) {
 
       // Fill up as much of the overflow batch as possible with small table values.
       while (byteSegmentRef != null) {
@@ -304,7 +304,7 @@ public abstract class VectorMapJoinGenerateResultOperator extends VectorMapJoinC
           int length = byteSegmentRef.getLength();
           smallTableVectorDeserializeRow.setBytes(bytes, offset, length);
 
-          smallTableVectorDeserializeRow.deserialize(overflowBatch, overflowBatch.DEFAULT_SIZE);
+          smallTableVectorDeserializeRow.deserialize(overflowBatch, overflowBatch.size);
         }
 
         overflowBatch.size++;
@@ -507,6 +507,7 @@ public abstract class VectorMapJoinGenerateResultOperator extends VectorMapJoinC
     vectorMapJoinHashTable = VectorMapJoinOptimizedCreateHashTable.createHashTable(conf,
         smallTable);
     needHashTableSetup = true;
+    LOG.info("Created " + vectorMapJoinHashTable.getClass().getSimpleName() + " from " + this.getClass().getSimpleName());
 
     if (isLogDebugEnabled) {
       LOG.debug(CLASS_NAME + " reloadHashTable!");

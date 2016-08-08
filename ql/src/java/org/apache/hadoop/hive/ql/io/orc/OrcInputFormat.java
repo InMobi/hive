@@ -600,9 +600,8 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
           footerCache = useExternalCache ? metaCache : localCache;
         }
       }
-      String value = conf.get(ValidTxnList.VALID_TXNS_KEY,
-                              Long.MAX_VALUE + ":");
-      transactionList = new ValidReadTxnList(value);
+      String value = conf.get(ValidTxnList.VALID_TXNS_KEY);
+      transactionList = value == null ? new ValidReadTxnList() : new ValidReadTxnList(value);
     }
 
     @VisibleForTesting
@@ -1802,9 +1801,9 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       bucket = (int) split.getStart();
       reader = null;
     }
-    String txnString = conf.get(ValidTxnList.VALID_TXNS_KEY,
-                                Long.MAX_VALUE + ":");
-    ValidTxnList validTxnList = new ValidReadTxnList(txnString);
+    String txnString = conf.get(ValidTxnList.VALID_TXNS_KEY);
+    ValidTxnList validTxnList = txnString == null ? new ValidReadTxnList() :
+      new ValidReadTxnList(txnString);
     final OrcRawRecordMerger records =
         new OrcRawRecordMerger(conf, true, reader, split.isOriginal(), bucket,
             validTxnList, readOptions, deltas);
@@ -2165,12 +2164,11 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
    * @param isAcidRead is this an acid format?
    * @param dataColumns the desired number of data columns for vectorized read
    * @return the desired schema or null if schema evolution isn't enabled
-   * @throws IOException
+   * @throws IllegalArgumentException
    */
   public static TypeDescription getDesiredRowTypeDescr(Configuration conf,
                                                        boolean isAcidRead,
-                                                       int dataColumns
-                                                       ) throws IOException {
+                                                       int dataColumns) {
 
     String columnNameProperty = null;
     String columnTypeProperty = null;
@@ -2201,7 +2199,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
           }
         }
       } else if (isAcidRead) {
-        throw new IOException(ErrorMsg.SCHEMA_REQUIRED_TO_READ_ACID_TABLES.getErrorCodedMsg());
+        throw new IllegalArgumentException(ErrorMsg.SCHEMA_REQUIRED_TO_READ_ACID_TABLES.getErrorCodedMsg());
       }
     }
 
