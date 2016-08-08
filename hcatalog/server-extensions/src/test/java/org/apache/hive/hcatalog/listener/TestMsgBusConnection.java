@@ -43,6 +43,7 @@ import org.apache.hive.hcatalog.common.HCatConstants;
 import org.apache.hive.hcatalog.messaging.HCatEventMessage;
 import org.apache.hive.hcatalog.messaging.jms.MessagingUtils;
 
+@org.junit.Ignore
 public class TestMsgBusConnection extends TestCase {
 
   private Driver driver;
@@ -83,7 +84,6 @@ public class TestMsgBusConnection extends TestCase {
     Destination hcatTopic = session.createTopic("planetlab.hcat");
     consumer = session.createConsumer(hcatTopic);
   }
-
   public void testConnection() throws Exception {
 
     try {
