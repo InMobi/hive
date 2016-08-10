@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.QueryPlan;
@@ -270,10 +271,22 @@ public class TestUpdateDeleteSemanticAnalyzer {
     // connection, which is conveniently created by the semantic analyzer.
     Map<String, String> params = new HashMap<String, String>(1);
     params.put(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, "true");
-    db.createTable("T", Arrays.asList("a", "b"), null, OrcInputFormat.class,
+    try {
+      db.createTable("T", Arrays.asList("a", "b"), null, OrcInputFormat.class,
         OrcOutputFormat.class, 2, Arrays.asList("a"), params);
+    } catch (HiveException e) {
+      if (!(e.getCause() instanceof AlreadyExistsException)) {
+        throw e;
+      }
+    }
+    try {
     db.createTable("U", Arrays.asList("a", "b"), Arrays.asList("ds"), OrcInputFormat.class,
         OrcOutputFormat.class, 2, Arrays.asList("a"), params);
+    } catch (HiveException e) {
+      if (!(e.getCause() instanceof AlreadyExistsException)) {
+        throw e;
+      }
+    }
     Table u = db.getTable("U");
     Map<String, String> partVals = new HashMap<String, String>(2);
     partVals.put("ds", "yesterday");
