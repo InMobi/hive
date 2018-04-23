@@ -46,7 +46,8 @@ import org.apache.thrift.transport.TTransportException;
    @Override
    public void open() throws TTransportException {
      try {
-       ugi.doAs(new PrivilegedExceptionAction<Void>() {
+
+       UserGroupInformation.getLoginUser().doAs(new PrivilegedExceptionAction<Void>() {
          public Void run() {
            try {
              wrapped.open();
