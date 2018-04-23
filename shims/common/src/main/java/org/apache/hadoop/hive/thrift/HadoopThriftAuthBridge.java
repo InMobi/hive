@@ -640,12 +640,18 @@ public abstract class HadoopThriftAuthBridge {
 
       @Override
       public TTransport getTransport(final TTransport trans) {
-        return ugi.doAs(new PrivilegedAction<TTransport>() {
-          @Override
-          public TTransport run() {
-            return wrapped.getTransport(trans);
-          }
-        });
+        TTransport transport = null;
+        try {
+          transport = UserGroupInformation.getLoginUser().doAs(new PrivilegedAction<TTransport>() {
+            @Override
+            public TTransport run() {
+              return wrapped.getTransport(trans);
+            }
+          });
+        } catch (IOException ex) {
+          throw new RuntimeException(ex);
+        }
+        return transport;
       }
     }
   }
